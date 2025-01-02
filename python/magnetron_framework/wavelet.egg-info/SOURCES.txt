@@ -1,0 +1,12 @@
+setup.py
+magnetron/__init__.py
+magnetron/_ffi_cdecl_generated.py
+magnetron/_lib_loader.py
+magnetron/core.py
+magnetron/models.py
+magnetron.egg-info/PKG-INFO
+magnetron.egg-info/SOURCES.txt
+magnetron.egg-info/dependency_links.txt
+magnetron.egg-info/not-zip-safe
+magnetron.egg-info/requires.txt
+magnetron.egg-info/top_level.txt

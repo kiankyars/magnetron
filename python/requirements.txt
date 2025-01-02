@@ -1,0 +1,7 @@
+cffi
+pycparser
+setuptools
+pytest
+pyqt5
+numpy
+matplotlib

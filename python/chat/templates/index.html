@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat with magnetron</title>
+    <!-- Link to external CSS file -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="main-container">
+        <!-- Logo Image -->
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='images/magnetron-logo.png') }}" alt="magnetron Logo">
+        </div>
+
+        <!-- Chat Interface -->
+        <div class="chat-container">
+            <h1>Chat with magnetron</h1>
+            <div class="chatbox" id="chatbox"></div>
+            <div class="input-container">
+                <input type="text" id="message" placeholder="Type your message here...">
+                <button id="send">Send</button>
+            </div>
+        </div>
+
+        <!-- Footer Information -->
+        <footer>
+            <p class="copyright"> AI Powered by <a href="https://github.com/MarioSieg/magnetron">magnetron</a> &copy; Mario Sieg 2024</p>
+            <p class="info-text" id="info-text"></p>
+        </footer>
+    </div>
+    <!-- Link to external JavaScript file -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
