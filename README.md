@@ -2,7 +2,8 @@
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
-[![Apache 2 License][license-shield]][license-url]
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/MarioSieg/magnetron/cmake-multi-platform.yml?style=for-the-badge)
+
 
 <br />
 <div align="center">
@@ -125,5 +126,3 @@ Distributed under the Apache 2 License. See `LICENSE.txt` for more information.
 [issues-url]: https://github.com/MarioSieg/magnetron/issues
 [license-shield]: https://img.shields.io/github/license/MarioSieg/magnetron.svg?style=for-the-badge
 [license-url]: https://github.com/MarioSieg/magnetron/blob/master/LICENSE.txt
-[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/mario-sieg
