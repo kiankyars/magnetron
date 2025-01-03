@@ -83,15 +83,15 @@ static void* mag_os_alloc_stub(void* blk, size_t size) {
     if (!size) {
         free(blk);
         return NULL;
-    } else if(!blk) {
+    }
+    if(!blk) {
         blk = malloc(size);
         mag_assert(blk, "Failed to allocate %.03fKiB memory", (double)size/(double)(1<<10));
         return blk;
-    } else {
-        void* block = realloc(blk, size);
-        mag_assert(blk, "Failed to reallocate %.03fKiB memory", (double)size/(double)(1<<10));
-        return block;
     }
+    void* block = realloc(blk, size);
+    mag_assert(blk, "Failed to reallocate %.03fKiB memory", (double)size/(double)(1<<10));
+    return block;
 }
 
 void* (*mag_alloc)(void* blk, size_t size) = &mag_os_alloc_stub;
@@ -911,7 +911,8 @@ static mag_intrusive_chunk* mag_fixed_pool_chunk_new(size_t block_size, size_t b
 }
 
 void mag_fixed_intrusive_pool_init(mag_fixed_intrusive_pool* pool, size_t block_size, size_t block_align, size_t blocks_per_chunk) {
-    mag_assert2(block_size && blocks_per_chunk);
+    mag_assert2(blocks_per_chunk);
+    block_size = mag_xmax(sizeof(void*), block_size); /* Ensure block size is at least sizeof(void*) to store intrusive free list. */
     mag_intrusive_chunk* chunk = mag_fixed_pool_chunk_new(block_size, block_align, blocks_per_chunk);
     *pool = (mag_fixed_intrusive_pool) {
         .block_size = block_size,
