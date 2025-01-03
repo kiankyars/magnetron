@@ -179,11 +179,15 @@ static MAG_AINLINE mag_atomic_t mag_atomic_exchange(volatile mag_atomic_t* o, ma
 }
 static MAG_AINLINE bool mag_atomic_compare_exchange_weak(volatile mag_atomic_t* o, mag_atomic_t *exp, mag_atomic_t *des, mag_mo_t order_succ, mag_mo_t order_fail) {
     (void)order_succ; (void)order_fail;
-    return _InterlockedCompareExchange(o, *des, *exp) == *exp;
+    mag_atomic_t old = _InterlockedCompareExchange(o, *des, *exp);
+    if (old == *exp) return true;
+    else { *exp = old; return false; }
 }
 static MAG_AINLINE bool mag_atomic_compare_exchange_strong(volatile mag_atomic_t* o, mag_atomic_t *exp, mag_atomic_t *des, mag_mo_t order_succ, mag_mo_t order_fail) {
     (void)order_succ; (void)order_fail;
-    return _InterlockedCompareExchange(o, *des, *exp) == *exp;
+    mag_atomic_t old = _InterlockedCompareExchange(o, *des, *exp);
+    if (old == *exp) return true;
+    else { *exp = old; return false; }
 }
 
 #endif
