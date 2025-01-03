@@ -69,6 +69,7 @@ jobs:
         run: ctest --build-config ${{ matrix.build_type }} --verbose
 
       - name: Setup Python Virtual Environment
+        if: runner.os != 'windows'
         shell: bash
         run: |
           python3 -m venv .venv
@@ -76,6 +77,7 @@ jobs:
           pip install --upgrade pip
 
       - name: Build Python wheel
+        if: runner.os != 'windows'
         shell: bash
         run: |
           . .venv/bin/activate
@@ -83,18 +85,21 @@ jobs:
           pip wheel --verbose -w dist .
 
       - name: Install Python wheel
+        if: runner.os != 'windows'
         shell: bash
         run: |
           . .venv/bin/activate
           pip install ${{ github.workspace }}/python/magnetron_framework/dist/*.whl
 
       - name: Install Pytest
+        if: runner.os != 'windows'
         shell: bash
         run: |
           . .venv/bin/activate
           pip install pytest
 
       - name: Run Python Tests
+        if: runner.os != 'windows'
         shell: bash
         run: |
           . .venv/bin/activate
