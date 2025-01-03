@@ -1,9 +1,0 @@
-Metadata-Version: 2.1
-Name: magnetron
-Version: 0.1.0
-Summary: A lightweight machine learning library with GPU support.
-Author: Mario Sieg
-Author-email: mario.sieg.64@gmail.com
-Requires-Dist: cffi
-
-A lightweight machine learning library with GPU support.
