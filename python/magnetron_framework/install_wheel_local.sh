@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
 
-bash ./build_wheel.sh
+rm -rf ./build
+rm -rf ./dist
+rm -rf ./magnetron.egg-info
+pip3 wheel --verbose -w dist .
 pip3 install ./dist/*.whl --force-reinstall

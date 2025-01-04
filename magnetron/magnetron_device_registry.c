@@ -6,8 +6,8 @@ extern mag_compute_device_t* mag_init_device_cpu(mag_ctx_t* ctx);   /* Initializ
 extern void mag_destroy_device_cpu(mag_compute_device_t* dvc);      /* Destroy CPU compute device. Implemented in magnetron_cpu.c */
 
 #ifdef MAG_ENABLE_CUDA
-extern mag_compute_device_t* mag_init_device_cuda(mag_ctx_t* ctx);  /* Initialize GPU compute device. Implemented in magnetron_cpu.c */
-extern void mag_destroy_device_cuda(mag_compute_device_t* dvc);     /* Destroy GPU compute device. Implemented in magnetron_cpu.c */
+extern mag_compute_device_t* mag_init_device_cuda(mag_ctx_t* ctx);  /* Initialize GPU compute device. Implemented in magnetron_cuda.cu */
+extern void mag_destroy_device_cuda(mag_compute_device_t* dvc);     /* Destroy GPU compute device. Implemented in magnetron_cuda.cu */
 #endif
 
 #define MAG_DEVICE_FALLBACK MAG_COMPUTE_DEVICE_TYPE_CPU

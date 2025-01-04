@@ -46,12 +46,12 @@
   </ol>
 </details>
 
-## About The Project
+## About
 
 ![ScreenShot](media/xor.png)
 This project started as a learning experience and a way to understand the inner workings of PyTorch and other deep learning frameworks.<br>
 The goal is to create a minimalistic but still powerful deep learning framework that can be used for research and production.<br>
-The project is still in its early stages and many features are missing, but the core functionality is already implemented.<br>
+The framework is written in C99 and Python and is designed to be easy to understand and modify.<br>
 
 ### Work in Progress
 * The project is still in its early stages and many features are missing.
@@ -60,7 +60,9 @@ The project is still in its early stages and many features are missing, but the 
 
 ## Getting Started
 
-To get a local copy up and running follow these simple steps.
+To get a local copy up and running follow these simple steps.<br>
+Magnetron itself has **no** Python dependencies except for CFFI to call the C library from Python.<br>
+Some examples use matplotlib and numpy for plotting and data generation, but these are not required to use the framework.
 
 ### Prerequisites
 * Linux, MacOS or Windows
@@ -70,9 +72,10 @@ To get a local copy up and running follow these simple steps.
 ### Installation
 *A pip installable package will be provided, as soon as all core features are implemented.*
 1. Clone the repo
-2. If you want to use the C library, use CMake to build the library and link it to your project.
-3. If you want to use the Python API, enter the `python/magnetron_framework` directory within a VENV and run `install_wheel_local.sh` to build the wheel and install it locally.
-4. Run the XOR example in the `python/examples/simple/xor.py` directory to test the installation.
+2. `cd magnetron/python` (VENV recommended).
+3. `pip install -r requirements.txt` Install dependencies for examples.
+4. `cd magnetron_framework && bash install_wheel_local.sh && cd ../` Install the Magnetron wheel locally, a pip installable package will be provided in the future.
+5. `python examples/simple/xor.py` Run the XOR example.
 
 ## Usage
 See the [Examples](python/examples) directory for examples on how to use the framework.

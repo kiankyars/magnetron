@@ -1,7 +1,6 @@
 cffi
-pycparser
+wheel
 setuptools
 pytest
-pyqt5
 numpy
 matplotlib
