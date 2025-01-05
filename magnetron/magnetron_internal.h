@@ -306,7 +306,7 @@ extern MAG_EXPORT void mag_humanize_memory_size(size_t n, double* out, const cha
     }
 #define mag_assert2(expr) mag_assert(expr, "")
 
-#if MAG_BOUNDS_CHECK
+#ifdef MAG_DEBUG
 #define mag_bnd_chk(ptr, base, n) \
     mag_assert((uintptr_t)(ptr) >= (uintptr_t)(base) && (uintptr_t)(ptr) < (uintptr_t)(base) + (n), \
         "\nBound check failed: %p not in [%p, %p), base+%zu, end+%zu", \
@@ -404,7 +404,7 @@ typedef struct mag_op_perf_info_t {
     uint64_t n_execs;
 } mag_op_perf_info_t;
 
-#if MAG_SANITIZE_RC
+#ifdef MAG_DEBUG
 typedef struct mag_tensor_node_t mag_tensor_node_t;
 struct mag_tensor_node_t {
     mag_tensor_t* tensor;
@@ -430,7 +430,7 @@ struct mag_ctx_t {
         uint32_t x86_64_cpu_features[8][4];         /* x86-64 CPU features. */
 #endif
     } sys;
-#if MAG_SANITIZE_RC
+#ifdef MAG_DEBUG
     mag_tensor_node_t* rc_tracked;                  /* Linked list of RC tensors for sanitize. */
 #endif
     mag_fixed_intrusive_pool tensor_pool;           /* Fixed-size memory pool for tensors. */
@@ -478,7 +478,7 @@ struct mag_tensor_t {
     struct {
         uint32_t rc_strong;                         /* Strong reference count. */
         uint32_t rc_weak;                           /* Weak reference count. */
-#if MAG_SANITIZE_RC
+#ifdef MAG_DEBUG
         void (*dtor)(mag_tensor_t*);                 /* Debug destructor. */
 #endif
     } rcb;                                          /* Reference count control block. */

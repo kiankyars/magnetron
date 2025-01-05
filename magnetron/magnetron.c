@@ -55,10 +55,10 @@
 #include <unistd.h>
 #endif
 
-#ifdef NDEBUG
-#define MAG_LOG_DEFAULT_ENABLE 0
-#else
+#ifdef MAG_DEBUG
 #define MAG_LOG_DEFAULT_ENABLE 1
+#else
+#define MAG_LOG_DEFAULT_ENABLE 0
 #endif
 bool mag_log_enabled = MAG_LOG_DEFAULT_ENABLE; /* Read from multiple threads, allowed to be written from main thread once at start. */
 #undef MAG_LOG_DEFAULT_ENABLE
@@ -838,7 +838,7 @@ mag_ctx_t* mag_ctx_create(mag_compute_device_type_t device) {
 static void mag_tensor_destroy(mag_tensor_t* t);
 
 void mag_ctx_destroy(mag_ctx_t* ctx) {
-#if MAG_SANITIZE_RC /* Check for leaked tensors in RC tracking list and print them */
+#ifdef MAG_DEBUG /* Check for leaked tensors in RC tracking list and print them */
     mag_tensor_node_t** head = &ctx->rc_tracked;
     mag_tensor_node_t* curr = *head;
     uint32_t nleaked = 0;
@@ -1724,7 +1724,7 @@ int64_t mag_tensor_num_rows(const mag_tensor_t* t) {
 }
 int64_t mag_tensor_num_cols(const mag_tensor_t* t) { return *t->shape; }
 
-#if MAG_SANITIZE_RC
+#ifdef MAG_DEBUG
     static void mag_tensor_sanitize_dtor(mag_tensor_t* t) {
         (void)t;
     }
@@ -1754,7 +1754,7 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
         .rcb = {
             .rc_strong = 0,
             .rc_weak = 0,
-            #if MAG_SANITIZE_RC
+            #ifdef MAG_DEBUG
                 .dtor = &mag_tensor_sanitize_dtor
             #endif
         },
@@ -1789,7 +1789,7 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
     #pragma GCC unroll 5
     for (uint32_t i=1; i < MAG_MAX_DIMS; ++i)    /* Calculate strides and check for overflow. */
         mag_assert2(!mag_imull64_ov(t->strides[i-1], t->shape[i-1], t->strides+i));
-#if MAG_SANITIZE_RC /* If tensor RC sanitize is enabled, insert into tracking list */
+#ifdef MAG_DEBUG /* If tensor RC sanitize is enabled, insert into tracking list */
     mag_tensor_node_t** head = &ctx->rc_tracked;
     mag_tensor_node_t* node = (*mag_alloc)(NULL, sizeof(*node));
     *node = (mag_tensor_node_t) {
@@ -1803,7 +1803,7 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
 
 static void mag_tensor_destroy(mag_tensor_t* t) {
     mag_ctx_t* ctx = t->ctx;
-#if MAG_SANITIZE_RC  /* If tensor RC sanitize is enabled, invoke destructor and erase from tracking list */
+#ifdef MAG_DEBUG  /* If tensor RC sanitize is enabled, invoke destructor and erase from tracking list */
     void (*dtor)(mag_tensor_t*) = t->rcb.dtor;  /* Invoke Debug destructor. */
     if (dtor) (*dtor)(t);
     mag_tensor_node_t** head = &ctx->rc_tracked;

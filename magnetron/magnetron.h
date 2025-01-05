@@ -3,18 +3,6 @@
 #ifndef MAGNETRON_H
 #define MAGNETRON_H
 
-/* Compile time config macros */
-#define MAG_CFG_X86_64_FAST_MATH 1 /* Use fast math for x86_64 by setting mxcsr control register. */
-#define MAG_INTRIN 1 /* Use platform and compiler specific intrinsics for performance. */
-#define MAG_BOUNDS_CHECK 0 /* Enable bounds checking for BLAS routines. */
-#define MAG_SANITIZE_RC 0 /* Enable runtime checks for debugging of reference counted tensors. */
-#define MAG_EXPORT_DLL
-
-#if !defined(NDEBUG) && !MAG_BOUNDS_CHECK
-#undef MAG_BOUNDS_CHECK
-#define MAG_BOUNDS_CHECK 1
-#endif
-
 #include <string.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -32,21 +20,21 @@ extern "C" {
 #define MAG_MAX_OP_PARAMS 6                /* Maximum number of parameters for an operation */
 
 #ifndef MAG_EXPORT
-#   ifdef MAG_EXPORT_DLL
-#       ifdef _MSC_VER
-#           define MAG_EXPORT __declspec(dllexport)
-#       else
-#           define MAG_EXPORT __attribute__((visibility("default")))
-#       endif
-#   else
-#       define MAG_EXPORT
-#   endif
+#ifdef MAG_SHARED
+#ifdef _MSC_VER
+#define MAG_EXPORT __declspec(dllexport)
+#else
+#define MAG_EXPORT __attribute__((visibility("default")))
+#endif
+#else
+#define MAG_EXPORT
+#endif
 #endif
 
 #define mag_version_pack(major, minor) ((uint32_t)((((major)&0xff)<<8)+((minor)&0xff)))
 #define mag_version_major(version) (((version)>>8)&0xff)
 #define mag_version_minor(version) ((version)&0xff)
-#define MAG_VERSION mag_version_pack(0, 1) /* magnetron library version. */
+#define MAG_VERSION mag_version_pack(0, 2) /* magnetron library version. */
 #define MAG_STORAGE_VERSION 1 /* magnetron storage format version. */
 
 #define mag_assert_name2(name, line) name ## line
