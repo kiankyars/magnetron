@@ -9,6 +9,7 @@ message("Configuring magnetron project for ${CMAKE_SYSTEM_PROCESSOR}...")
 set(CMAKE_C_STANDARD 99) # Use C99 standard
 set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}")
 set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}")
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 option(MAGNETRON_BUILD_SHARED "Build shared library" ON)                    # Build shared library
 option(MAGNETRON_BUILD_TESTS "Build tests" ON)                              # Build tests
