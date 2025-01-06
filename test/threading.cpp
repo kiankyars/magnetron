@@ -1,6 +1,64 @@
 // (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
+#include <thread>
+#include <atomic>
+#include <chrono>
+
 #include "prelude.hpp"
+
+using namespace std::chrono_literals;
+
+TEST(threading, create_thread) {
+    std::atomic<bool> executed = false;
+    static volatile std::atomic_uintptr_t main_tid {mag_thread_id()};
+    static volatile std::atomic_uintptr_t second_tid {};
+
+    std::cout << "Main thread ID: " << std::hex << main_tid.load(std::memory_order_seq_cst) << std::endl;
+
+    auto thread_func = [](void* arg) -> mag_thread_ret_t {
+        mag_thread_sched_set_prio(MAG_THREAD_SCHED_PRIO_MEDIUM);
+        std::this_thread::sleep_for(1s); // Simulate some work
+        second_tid.store(mag_thread_id(), std::memory_order_seq_cst);
+        static_cast<std::atomic<bool>*>(arg)->store(true, std::memory_order_seq_cst);
+        std::cout << "Second thread ID: " << std::hex << second_tid.load(std::memory_order_seq_cst) << std::endl;
+        return NULL;
+    };
+
+    mag_thread_t* thread = mag_thread_create(thread_func, &executed);
+    ASSERT_NE(thread, nullptr);
+    mag_thread_join(thread);
+    EXPECT_EQ(true, executed.load(std::memory_order_seq_cst));
+    ASSERT_NE(main_tid.load(std::memory_order_seq_cst), second_tid.load(std::memory_order_seq_cst));
+}
+
+TEST(threading, scheduler_yield) {
+    std::atomic<bool> thread_started = false;
+    std::atomic<bool> thread_done = false;
+
+    auto thread_func = [](void* arg) -> mag_thread_ret_t {
+        auto* state = static_cast<std::pair<std::atomic<bool>*, std::atomic<bool>*>*>(arg);
+        std::atomic<bool>& started = *state->first;
+        std::atomic<bool>& done = *state->second;
+        started.store(true, std::memory_order_seq_cst);
+        for (int i = 0; i < 10; ++i) {
+            mag_thread_sched_yield();
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        done.store(true, std::memory_order_seq_cst);
+        return nullptr;
+    };
+
+    std::pair<std::atomic<bool>*, std::atomic<bool>*> thread_state {&thread_started, &thread_done};
+    mag_thread_t* thread = mag_thread_create(thread_func, &thread_state);
+    ASSERT_NE(thread, nullptr);
+
+    while (!thread_started) {
+        mag_thread_sched_yield();
+    }
+    EXPECT_FALSE(thread_done.load(std::memory_order_seq_cst));
+    mag_thread_join(thread);
+    EXPECT_TRUE(thread_done.load(std::memory_order_seq_cst));
+}
 
 TEST(threading, StoreLoadTest) {
     mag_atomic_t val = 0;

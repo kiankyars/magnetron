@@ -50,25 +50,32 @@ typedef enum mag_compute_device_type_t {
 extern MAG_EXPORT const char* mag_device_type_get_name(mag_compute_device_type_t op);
 
 typedef enum mag_exec_mode_t {
-    MAG_EXEC_MODE_EAGER = 0, /* Execute operations immediately. (Dynamic computation graph, like PyTorch). */
-    MAG_EXEC_MODE_DEFERRED = 1, /* Build computation graph and execute later. (Static computation graph, like TensorFlow 1.0). */
+    MAG_EXEC_MODE_EAGER = 0,        /* Execute operations immediately. (Dynamic computation graph, like PyTorch). */
+    MAG_EXEC_MODE_DEFERRED = 1,     /* Build computation graph and execute later. (Static computation graph, like TensorFlow 1.0). */
 
     MAG_EXEC_MODE__NUM
 } mag_exec_mode_t;
 
 typedef enum mag_prng_algorithm_t {
-    MAG_PRNG_MERSENNE_TWISTER = 0, /* Mersenne Twister PRNG */
-    MAG_PRNG_PCG = 1, /* Permuted Congruential Generator PRNG */
+    MAG_PRNG_MERSENNE_TWISTER = 0,  /* Mersenne Twister PRNG */
+    MAG_PRNG_PCG = 1,               /* Permuted Congruential Generator PRNG */
 
     MAG_PRNG__NUM
 } mag_prng_algorithm_t;
 
+typedef enum mag_thread_sched_prio_t {  /* Thread scheduling priority for CPU compute */
+    MAG_THREAD_SCHED_PRIO_NORMAL = 0,   /* Normal thread priority */
+    MAG_THREAD_SCHED_PRIO_MEDIUM = 1,   /* Medium thread priority */
+    MAG_THREAD_SCHED_PRIO_HIGH = 2,     /* High thread priority */
+    MAG_THREAD_SCHED_PRIO_REALTIME = 3, /* Real-time thread priority */
+} mag_thread_sched_prio_t;
+
 typedef enum mag_color_channels_t {
-    MAG_COLOR_CHANNELS_AUTO,  /* Automatically detect number of color channels */
-    MAG_COLOR_CHANNELS_GRAY,  /* Grayscale F32 */
-    MAG_COLOR_CHANNELS_GRAY_A,/* Grayscale F32 + Alpha F32 */
-    MAG_COLOR_CHANNELS_RGB,   /* R32G32B32 */
-    MAG_COLOR_CHANNELS_RGBA,   /* R32G32B32A32 */
+    MAG_COLOR_CHANNELS_AUTO,    /* Automatically detect number of color channels */
+    MAG_COLOR_CHANNELS_GRAY,    /* Grayscale F32 */
+    MAG_COLOR_CHANNELS_GRAY_A,  /* Grayscale F32 + Alpha F32 */
+    MAG_COLOR_CHANNELS_RGB,     /* R32G32B32 */
+    MAG_COLOR_CHANNELS_RGBA,    /* R32G32B32A32 */
 
     MAG_COLOR_CHANNELS__NUM
 } mag_color_channels_t;

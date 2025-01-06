@@ -10,9 +10,9 @@
 #endif
 
 typedef struct mag_cpu_thread_local_ctx_t {
-    mag_ctx_t* ctx;
     int64_t thread_num;
     int64_t thread_idx;
+    mag_thread_t* thread;
 } mag_cpu_thread_local_ctx_t;
 
 #define mag_f32p(t) ((const float*)(t)->storage.base)
@@ -2313,11 +2313,64 @@ static void mag_cpu_free_storage(mag_compute_device_t* dvc, mag_storage_buffer_t
     memset(buf, 0, sizeof(*buf)); /* Set to zero. */
 }
 
+static mag_thread_ret_t mag_thread_fn(void* arg) {
+    mag_cpu_thread_local_ctx_t* tr_local = (mag_cpu_thread_local_ctx_t*)arg;
+    (void)tr_local;
+    return NULL;
+}
+
+#define MAG_CPU_STOP_FLAG (1<<0)
+#define MAG_CPU_PAUSE_FLAG (1<<1)
+
+typedef struct mag_cpu_ctx_t {
+    mag_ctx_t* ctx;
+    mag_cpu_thread_local_ctx_t* local_ctxs;
+    uint32_t num_threads;
+    volatile mag_atomic_t flags;
+    mag_thread_sched_prio_t sched_prio;
+} mag_cpu_ctx_t;
+
 static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx) {
-    mag_compute_device_t* dvc = (*mag_alloc)(NULL, sizeof(*dvc));
-    *dvc = (mag_compute_device_t){
+    mag_thread_sched_prio_t prio = MAG_THREAD_SCHED_PRIO_NORMAL;
+    uint32_t num_threads = 32;
+
+    uintptr_t mem_req = 0; /* Calculate memory requirements */
+    mag_pincr((void**)&mem_req, sizeof(mag_compute_device_t), __alignof(mag_compute_device_t));
+    mag_pincr((void**)&mem_req, sizeof(mag_cpu_ctx_t), __alignof(mag_cpu_ctx_t));
+    mag_pincr((void**)&mem_req, sizeof(mag_cpu_thread_local_ctx_t)*num_threads, __alignof(mag_cpu_thread_local_ctx_t));
+
+    void* base = (*mag_alloc)(NULL, mem_req); /* Allocate one memory chunk for splitted data */
+    memset(base, 0, mem_req);
+    mag_compute_device_t* dvc = mag_pincr(&base, sizeof(mag_compute_device_t), __alignof(mag_compute_device_t));
+    mag_cpu_ctx_t* cpu_ctx = mag_pincr(&base, sizeof(mag_cpu_ctx_t), __alignof(mag_cpu_ctx_t));
+    mag_cpu_thread_local_ctx_t* tr_locals = mag_pincr(&base, sizeof(mag_cpu_thread_local_ctx_t)*num_threads, __alignof(mag_cpu_thread_local_ctx_t));
+
+    for (uint32_t i=0; i < num_threads; ++i) { /* Initialize thread local contexts */
+        tr_locals[i] = (mag_cpu_thread_local_ctx_t){
+            .thread_idx = (int64_t)i,
+            .thread_num = (int64_t)num_threads
+        };
+    }
+
+    for (uint32_t i=1; i < num_threads; ++i) { /* Start threads, -1 for current thread */
+        pthread_t* thread = mag_thread_create(&mag_thread_fn, tr_locals+i);
+        tr_locals[i] = (mag_cpu_thread_local_ctx_t){
+            .thread_idx = (int64_t)i,
+            .thread_num = (int64_t)num_threads,
+            .thread = thread
+        };
+    }
+
+    *cpu_ctx = (mag_cpu_ctx_t){ /* Initialize CPU context */
+        .ctx = ctx,
+        .local_ctxs = tr_locals,
+        .num_threads = num_threads,
+        .flags = 0,
+        .sched_prio = prio
+    };
+    *dvc = (mag_compute_device_t){ /* Initialize device interface */
         .name = "CPU",
-        .impl = NULL,
+        .impl = cpu_ctx,
         .is_async = false,
         .type = MAG_COMPUTE_DEVICE_TYPE_CPU,
         .eager_exec_fwd = &mag_cpu_exec_fwd,
@@ -2325,12 +2378,17 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx) {
         .alloc_storage = &mag_cpu_alloc_storage,
         .free_storage = &mag_cpu_free_storage
     };
-    snprintf(dvc->name, sizeof(dvc->name), "%s - %s", mag_device_type_get_name(dvc->type), ctx->sys.cpu_name);
+    snprintf(dvc->name, sizeof(dvc->name), "%s - %s - %u Compute Threads", mag_device_type_get_name(dvc->type), ctx->sys.cpu_name, num_threads);
     return dvc;
 }
 
 static void mag_cpu_release_interface(mag_compute_device_t* ctx) {
-    (*mag_alloc)(ctx, 0);
+    mag_cpu_ctx_t* cpu_ctx = ctx->impl;
+    mag_cpu_thread_local_ctx_t* tr_locals = cpu_ctx->local_ctxs;
+    for (uint32_t i=1; i < cpu_ctx->num_threads; ++i) { /* Stop threads, -1 for current thread */
+        mag_thread_join(tr_locals[i].thread);
+    }
+    (*mag_alloc)(ctx, 0); /* Free all memory */
 }
 
 mag_compute_device_t* mag_init_device_cpu(mag_ctx_t* ctx, uint32_t num_threads) {

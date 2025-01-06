@@ -275,8 +275,8 @@ extern MAG_EXPORT bool mag_log_enabled;
 extern MAG_EXPORT void* (*mag_alloc)(void* blk, size_t size);
 extern MAG_EXPORT void* mag_alloc_aligned(size_t size, size_t align);
 extern MAG_EXPORT void mag_free_aligned(void* blk);
-
 extern MAG_EXPORT void mag_humanize_memory_size(size_t n, double* out, const char** unit);
+extern MAG_EXPORT uintptr_t mag_thread_id(void);
 
 #define mag_swap(T, a, b) do { T tmp = (a); (a) = (b); (b) = tmp; } while (0)
 #define mag_xmax(x, y) (((x) > (y)) ? (x) : (y))
@@ -326,6 +326,18 @@ static MAG_AINLINE void* mag_pincr(void** p, size_t sz, size_t align) {
     *p = (void*)((uint8_t*)pp+sz);
     return pp;
 }
+
+typedef void mag_thread_t;
+#ifdef _WIN32
+typedef int32_t mag_thread_ret_t; /* DWORD */
+#else
+typedef void* mag_thread_ret_t;
+#endif
+
+extern MAG_EXPORT mag_thread_t* mag_thread_create(mag_thread_ret_t (*f)(void*), void* arg); /* Create thread. */
+extern MAG_EXPORT bool mag_thread_join(mag_thread_t* t); /* Join thread. */
+extern MAG_EXPORT void mag_thread_sched_yield(void); /* Yield thread to another thread. */
+extern MAG_EXPORT void mag_thread_sched_set_prio(mag_thread_sched_prio_t prio); /* Set thread scheduling priority of current thread. */
 
 typedef struct mag_intrusive_chunk mag_intrusive_chunk;
 struct mag_intrusive_chunk {
