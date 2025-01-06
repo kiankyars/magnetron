@@ -534,3 +534,25 @@ TEST(compute_cpu, heavy_compute_single_op_scalar) {
     mag_tensor_decref(R);
     mag_ctx_destroy(ctx);
 }
+
+TEST(compute_cpu, threaded_add) {
+    mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
+    mag_tensor_t* A = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 8192, 8192, 1);
+    mag_tensor_fill(A, 5.0);
+
+    mag_tensor_t* B = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 8192, 8192, 1);
+    mag_tensor_fill(B, 5.0);
+
+    mag_tensor_t* R = mag_add(A, B);
+    ASSERT_NE(R, nullptr);
+
+    const auto* r = static_cast<const float*>(mag_tensor_data_ptr(R));
+    for (std::int64_t i=0; i < mag_tensor_numel(R); ++i) {
+        ASSERT_FLOAT_EQ(r[i], 10.0f);
+    }
+
+    mag_tensor_decref(A);
+    mag_tensor_decref(B);
+    mag_tensor_decref(R);
+    mag_ctx_destroy(ctx);
+}

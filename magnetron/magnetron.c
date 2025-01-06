@@ -90,11 +90,21 @@ static void* mag_os_alloc_stub(void* blk, size_t size) {
     }
     if(!blk) {
         blk = malloc(size);
-        mag_assert(blk, "Failed to allocate %.03fKiB memory", (double)size/(double)(1<<10));
+        if (mag_unlikely(!blk)) {
+            double mem = 0.0;
+            const char* unit = "";
+            mag_humanize_memory_size(size, &mem, &unit);
+            mag_panic("Failed to allocate %.01f %s memory", mem, unit);
+        }
         return blk;
     }
     void* block = realloc(blk, size);
-    mag_assert(blk, "Failed to reallocate %.03fKiB memory", (double)size/(double)(1<<10));
+    if (mag_unlikely(!blk)) {
+        double mem = 0.0;
+        const char* unit = "";
+        mag_humanize_memory_size(size, &mem, &unit);
+        mag_panic("Failed to reallocate %.01f %s memory", mem, unit);
+    }
     return block;
 }
 

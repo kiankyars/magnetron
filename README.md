@@ -99,7 +99,7 @@ The goal is to implement training and inference for LLMs and other state of the 
 - [X] Automatic differentiation
 - [ ] Compute on GPU (Cuda)
 - [ ] Other Datatypes (f16, bf16, int8)
-- [ ] Multithreaded CPU Compute
+- [ ] Multithreaded CPU Compute with intra-op parallelism
 - [ ] Distributed Training and Inference
 - [ ] CPU and GPU kernel JIT compilation
 - [ ] Better examples with real world models (LLMs and state of the art models)
