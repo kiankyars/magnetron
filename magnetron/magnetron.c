@@ -53,6 +53,10 @@
 #include <unistd.h>
 #else
 #include <unistd.h>
+#ifdef __linux__
+#include <linux/prctl.h>
+#include <sys/prctl.h>
+#endif
 #endif
 
 #ifdef MAG_DEBUG

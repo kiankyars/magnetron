@@ -25,8 +25,7 @@ TEST(threading, create_thread) {
     };
 
     mag_thread_t thread;
-    mag_thread_create(&thread, nullptr, thread_func, &executed);
-    ASSERT_NE(thread, nullptr);
+    ASSERT_EQ(mag_thread_create(&thread, nullptr, thread_func, &executed), 0);
     mag_thread_join(thread, nullptr);
     EXPECT_EQ(true, executed.load(std::memory_order_seq_cst));
     ASSERT_NE(main_tid.load(std::memory_order_seq_cst), second_tid.load(std::memory_order_seq_cst));

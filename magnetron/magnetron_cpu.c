@@ -2440,9 +2440,9 @@ static mag_threadpool_t* mag_threadpool_create(uint32_t num_threads, mag_thread_
 static void mag_threadpool_enqueue_task(mag_threadpool_t* pool, void* (*f)(void*), void* arg) {
     mag_compute_task_t* task = (mag_compute_task_t*)(*mag_alloc)(NULL, sizeof(*task));
     *task = (mag_compute_task_t){
+        .prev = NULL,
         .f = f,
         .arg = arg,
-        .prev = NULL
     };
     mag_task_queue_push(&pool->task_queue, task);
 }
@@ -2471,16 +2471,16 @@ static void mag_threadpool_destroy(mag_threadpool_t* pool) {
 
 static MAG_HOTPROC void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t* root) {
     mag_cpu_thread_local_ctx_t tlc = (mag_cpu_thread_local_ctx_t){
+        .thread_num = 1,
         .thread_idx = 0,
-        .thread_num = 1
     };
     mag_blas_dispatch_table_forward[root->op](&tlc, root, (const mag_tensor_t**)root->op_inputs);
 }
 
 static MAG_HOTPROC void mag_cpu_exec_bwd(mag_compute_device_t* dvc, mag_tensor_t* root) {
     mag_cpu_thread_local_ctx_t tlc = (mag_cpu_thread_local_ctx_t){
+        .thread_num = 1,
         .thread_idx = 0,
-        .thread_num = 1
     };
     mag_blas_dispatch_table_backward[root->op](&tlc, root, (const mag_tensor_t**)root->op_inputs);
 }
@@ -2521,15 +2521,12 @@ static void mag_cpu_free_storage(mag_compute_device_t* dvc, mag_storage_buffer_t
 }
 
 static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx) {
-    mag_thread_sched_prio_t prio = MAG_THREAD_SCHED_PRIO_NORMAL;
     uint32_t num_threads = 4;
-
-    mag_threadpool_t* pool = mag_threadpool_create(num_threads, prio);
 
     mag_compute_device_t* dvc = (mag_compute_device_t*)(*mag_alloc)(ctx, sizeof(mag_compute_device_t));
     *dvc = (mag_compute_device_t){ /* Initialize device interface */
         .name = "CPU",
-        .impl = pool,
+        .impl = NULL,
         .is_async = false,
         .type = MAG_COMPUTE_DEVICE_TYPE_CPU,
         .eager_exec_fwd = &mag_cpu_exec_fwd,
@@ -2542,8 +2539,6 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx) {
 }
 
 static void mag_cpu_release_interface(mag_compute_device_t* ctx) {
-    mag_threadpool_t* pool = (mag_threadpool_t*)ctx->impl;
-    mag_threadpool_destroy(pool);
     (*mag_alloc)(ctx, 0); /* Free all memory */
 }
 
