@@ -13,10 +13,11 @@
 
 typedef struct mag_threadpool_t mag_threadpool_t;
 
-typedef struct mag_cpu_thread_local_ctx_t {
+typedef struct mag_compute_payload_t {
     int64_t thread_num;
     int64_t thread_idx;
-} mag_cpu_thread_local_ctx_t;
+    mag_tensor_t* node;
+} mag_compute_payload_t;
 
 #define mag_f32p(t) ((const float*)(t)->storage.base)
 #define mag_f32p_mut(t) ((float*)(t)->storage.base)
@@ -1012,37 +1013,22 @@ static void MAG_HOTPROC mag_vgelu_dv_f32( /* gelu' : ℝ -> ℝ, x |-> TODO */
     }
 }
 
-static void mag_blas_nop(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs
-) {
-    (void)bci;
-    (void)r;
-    (void)inputs;
-}
+static void mag_blas_nop(const mag_compute_payload_t* payload) { (void)payload; }
 
-static void mag_blas_clone(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs
-) {
-    const mag_tensor_t* const x = inputs[0];
+static void mag_blas_clone(const mag_compute_payload_t* payload) {
+    mag_tensor_t* r = payload->node;
+    const mag_tensor_t* x = r->op_inputs[0];
     mag_assert2(mag_tensor_is_shape_eq(x, r));
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
+    float* b_r = mag_f32p_mut(r);
+    const float* b_x = mag_f32p(x);
     memcpy(b_r, b_x, mag_tensor_data_size(r));
 }
 
-static void MAG_HOTPROC mag_blas_mean_f32( /* Σx/n Arithmetic mean */
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
+static void MAG_HOTPROC mag_blas_mean_f32(const mag_compute_payload_t* payload) {
+    mag_tensor_t* r = payload->node;
+    const mag_tensor_t* x = r->op_inputs[0];
+    float* b_r = mag_f32p_mut(r);
+    const float* b_x = mag_f32p(x);
     mag_load_local_storage_group(r, r_s, strides);
     mag_load_local_storage_group(x, x_d, shape);
     mag_load_local_storage_group(x, x_s, strides);
@@ -1052,11 +1038,11 @@ static void MAG_HOTPROC mag_blas_mean_f32( /* Σx/n Arithmetic mean */
             for (int64_t i3=0; i3 < x_d3; ++i3) {
                 for (int64_t i2=0; i2 < x_d2; ++i2) {
                     for (int64_t i1=0; i1 < x_d1; ++i1) {
-                        const float* const p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
+                        const float* p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
                         mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
                         sum += mag_vsum_f64_f32(
-                                x_d0,
-                                p_x
+                            x_d0,
+                            p_x
                         );
                     }
                 }
@@ -1067,15 +1053,11 @@ static void MAG_HOTPROC mag_blas_mean_f32( /* Σx/n Arithmetic mean */
     *b_r = (float)sum;
 }
 
-static void MAG_HOTPROC mag_blas_min_f32( /* min x */
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
+static void MAG_HOTPROC mag_blas_min_f32(const mag_compute_payload_t* payload) {
+    mag_tensor_t* r = payload->node;
+    const mag_tensor_t* const x = r->op_inputs[0];
+    float* b_r = mag_f32p_mut(r);
+    const float* b_x = mag_f32p(x);
     mag_load_local_storage_group(r, r_s, strides);
     mag_load_local_storage_group(x, x_d, shape);
     mag_load_local_storage_group(x, x_s, strides);
@@ -1085,7 +1067,7 @@ static void MAG_HOTPROC mag_blas_min_f32( /* min x */
             for (int64_t i3=0; i3 < x_d3; ++i3) {
                 for (int64_t i2=0; i2 < x_d2; ++i2) {
                     for (int64_t i1=0; i1 < x_d1; ++i1) {
-                        const float* const p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
+                        const float* p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
                         mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
                         min = fminf(mag_vmin_f32(x_d0, p_x), min);
                     }
@@ -1096,13 +1078,9 @@ static void MAG_HOTPROC mag_blas_min_f32( /* min x */
     *b_r = min;
 }
 
-static void MAG_HOTPROC mag_blas_max_f32( /* max x */
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
+static void MAG_HOTPROC mag_blas_max_f32(const mag_compute_payload_t* payload) {
+    mag_tensor_t* r = payload->node;
+    const mag_tensor_t* const x = r->op_inputs[0];
     float* const b_r = mag_f32p_mut(r);
     const float* const b_x = mag_f32p(x);
     mag_load_local_storage_group(r, r_s, strides);
@@ -1114,7 +1092,7 @@ static void MAG_HOTPROC mag_blas_max_f32( /* max x */
             for (int64_t i3=0; i3 < x_d3; ++i3) {
                 for (int64_t i2=0; i2 < x_d2; ++i2) {
                     for (int64_t i1=0; i1 < x_d1; ++i1) {
-                        const float* const p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
+                        const float* p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
                         mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
                         max = fmaxf(mag_vmax_f32(x_d0, p_x), max);
                     }
@@ -1125,13 +1103,9 @@ static void MAG_HOTPROC mag_blas_max_f32( /* max x */
     *b_r = max;
 }
 
-static void MAG_HOTPROC mag_blas_sum_f32( /* Σx/n Arithmetic mean */
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
+static void MAG_HOTPROC mag_blas_sum_f32(const mag_compute_payload_t* payload) {
+    mag_tensor_t* r = payload->node;
+    const mag_tensor_t* const x = r->op_inputs[0];
     float* const b_r = mag_f32p_mut(r);
     const float* const b_x = mag_f32p(x);
     mag_load_local_storage_group(r, r_s, strides);
@@ -1143,7 +1117,7 @@ static void MAG_HOTPROC mag_blas_sum_f32( /* Σx/n Arithmetic mean */
             for (int64_t i3=0; i3 < x_d3; ++i3) {
                 for (int64_t i2=0; i2 < x_d2; ++i2) {
                     for (int64_t i1=0; i1 < x_d1; ++i1) {
-                        const float* const p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
+                        const float* p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
                         mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
                         sum += mag_vsum_f64_f32(x_d0, p_x);
                     }
@@ -1154,475 +1128,80 @@ static void MAG_HOTPROC mag_blas_sum_f32( /* Σx/n Arithmetic mean */
     *b_r = (float)sum;
 }
 
-static void MAG_HOTPROC mag_blas_abs_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vabs_f32(cc, p_r, p_x);
+#define mag_cpu_blas_impl_unary(name) \
+    static void MAG_HOTPROC mag_blas_##name##_f32(const mag_compute_payload_t* payload) { \
+        mag_tensor_t* r = payload->node; \
+        const mag_tensor_t* x = r->op_inputs[0]; \
+        float* b_r = mag_f32p_mut(r); \
+        const float* b_x = mag_f32p(x); \
+        mag_load_local_storage_group(r, r_s, strides); \
+        mag_load_local_storage_group(x, x_s, strides); \
+        int64_t rc = mag_tensor_num_rows(x); \
+        int64_t cc = mag_tensor_num_cols(x); \
+        for (int64_t ri=0; ri < rc; ++ri) { \
+            float* p_r = b_r + ri*r_s1; \
+            const float* p_x = b_x + ri*x_s1; \
+            mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r)); \
+            mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x)); \
+            mag_v##name##_f32(cc, p_r, p_x); \
+        } \
     }
-}
 
-static void MAG_HOTPROC mag_blas_neg_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vneg_f32(cc, p_r, p_x);
+mag_cpu_blas_impl_unary(abs)
+mag_cpu_blas_impl_unary(neg)
+mag_cpu_blas_impl_unary(log)
+mag_cpu_blas_impl_unary(sqr)
+mag_cpu_blas_impl_unary(sqrt)
+mag_cpu_blas_impl_unary(sin)
+mag_cpu_blas_impl_unary(cos)
+mag_cpu_blas_impl_unary(step)
+mag_cpu_blas_impl_unary(softmax)
+mag_cpu_blas_impl_unary(softmax_dv)
+mag_cpu_blas_impl_unary(sigmoid)
+mag_cpu_blas_impl_unary(sigmoid_dv)
+mag_cpu_blas_impl_unary(hard_sigmoid)
+mag_cpu_blas_impl_unary(silu)
+mag_cpu_blas_impl_unary(silu_dv)
+mag_cpu_blas_impl_unary(tanh)
+mag_cpu_blas_impl_unary(tanh_dv)
+mag_cpu_blas_impl_unary(relu)
+mag_cpu_blas_impl_unary(relu_dv)
+mag_cpu_blas_impl_unary(gelu)
+mag_cpu_blas_impl_unary(gelu_dv)
+
+#undef mag_cpu_blas_impl_unary
+
+#define mag_cpu_blas_impl_unary_scalar(name) \
+    static void MAG_HOTPROC mag_blas_##name##s_f32(const mag_compute_payload_t* payload) { \
+        mag_tensor_t* r = payload->node; \
+        const mag_tensor_t* x = r->op_inputs[0]; \
+        float xi = r->op_params->x.f32; \
+        float* b_r = mag_f32p_mut(r); \
+        const float* b_x = mag_f32p(x); \
+        mag_load_local_storage_group(r, r_s, strides); \
+        mag_load_local_storage_group(x, x_s, strides); \
+        int64_t rc = mag_tensor_num_rows(x); \
+        int64_t cc = mag_tensor_num_cols(x); \
+        for (int64_t ri=0; ri < rc; ++ri) { \
+            float* p_r = b_r + ri*r_s1; \
+            const float* p_x = b_x + ri*x_s1; \
+            mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r)); \
+            mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x)); \
+            mag_v##name##s_f32(cc, p_r, p_x, xi); \
+        } \
     }
-}
 
-static void MAG_HOTPROC mag_blas_log_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vlog_f32(cc, p_r, p_x);
-    }
-}
+mag_cpu_blas_impl_unary_scalar(add)
+mag_cpu_blas_impl_unary_scalar(sub)
+mag_cpu_blas_impl_unary_scalar(mul)
+mag_cpu_blas_impl_unary_scalar(div)
 
-static void MAG_HOTPROC mag_blas_sqr_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vsqr_f32(cc, p_r, p_x);
-    }
-}
+#undef mag_cpu_blas_impl_unary_scalar
 
-static void MAG_HOTPROC mag_blas_sqrt_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vsqrt_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_sin_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vsin_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_cos_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vcos_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_step_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vstep_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_softmax_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vsoftmax_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_softmax_dv_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vsoftmax_dv_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_sigmoid_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vsigmoid_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_sigmoid_dv_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vsigmoid_dv_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_hard_sigmoid_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vhard_sigmoid_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_silu_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vsilu_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_silu_dv_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vsilu_dv_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_tanh_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vtanh_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_tanh_dv_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vtanh_dv_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_relu_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vrelu_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_relu_dv_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vrelu_dv_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_gelu_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vgelu_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_gelu_dv_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vgelu_dv_f32(cc, p_r, p_x);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_add_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    const mag_tensor_t* const x = inputs[0];
-    const mag_tensor_t* const y = inputs[1];
+static void MAG_HOTPROC mag_blas_add_f32(const mag_compute_payload_t* payload) {
+    mag_tensor_t* r = payload->node;
+    const mag_tensor_t* const x = r->op_inputs[0];
+    const mag_tensor_t* const y = r->op_inputs[1];
     float* const b_r = mag_f32p_mut(r);
     const float* const b_x = mag_f32p(x);
     const float* const b_y = mag_f32p(y);
@@ -1632,13 +1211,12 @@ static void MAG_HOTPROC mag_blas_add_f32(
     mag_load_local_storage_group(x, x_s, strides);
     mag_load_local_storage_group(y, y_d, shape);
     mag_load_local_storage_group(y, y_s, strides);
-    const int64_t tc = bci->thread_num;         /* Thread count */
-    const int64_t ti = bci->thread_idx;         /* Thread idx ∈ {1, 2, ..., tc-1} */
+    const int64_t tc = payload->thread_num;         /* Thread count */
+    const int64_t ti = payload->thread_idx;         /* Thread idx ∈ {1, 2, ..., tc-1} */
     const int64_t nr = mag_tensor_num_rows(x);  /* Number of rows */
     const int64_t rpt = (nr + tc - 1)/tc;       /* Row partition size. */
     const int64_t ra = rpt*ti;                  /* Row partition start */
     const int64_t rb = mag_xmin(ra+rpt, nr);    /* Row partition end */
-    //printf("# %zu/%zu processes [%zu, %zu), rpt: %zu, total: %zu\n", (size_t)ti, (size_t)tc, (size_t)ra, (size_t)rb, (size_t)rpt, (size_t)r->numel);
     if (y_s0 == 1) { /* Fast path for contiguous input tensors. */
         for (int64_t ri=ra; ri < rb; ++ri) { /* Iterate row partition: P := {ra, ..., rb-1} with |P| = rpt. */
             int64_t ro = ri;
@@ -1710,13 +1288,10 @@ static void MAG_HOTPROC mag_blas_add_f32(
     }
 }
 
-static void MAG_HOTPROC mag_blas_sub_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    const mag_tensor_t* const x = inputs[0];
-    const mag_tensor_t* const y = inputs[1];
+static void MAG_HOTPROC mag_blas_sub_f32(const mag_compute_payload_t* payload) {
+    mag_tensor_t* r = payload->node;
+    const mag_tensor_t* const x = r->op_inputs[0];
+    const mag_tensor_t* const y = r->op_inputs[1];
     float* const b_r = mag_f32p_mut(r);
     const float* const b_x = mag_f32p(x);
     const float* const b_y = mag_f32p(y);
@@ -1810,13 +1385,10 @@ static void MAG_HOTPROC mag_blas_sub_f32(
     }
 }
 
-static void MAG_HOTPROC mag_blas_mul_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    const mag_tensor_t* const x = inputs[0];
-    const mag_tensor_t* const y = inputs[1];
+static void MAG_HOTPROC mag_blas_mul_f32(const mag_compute_payload_t* payload) {
+    mag_tensor_t* r = payload->node;
+    const mag_tensor_t* const x = r->op_inputs[0];
+    const mag_tensor_t* const y = r->op_inputs[1];
     float* const b_r = mag_f32p_mut(r);
     const float* const b_x = mag_f32p(x);
     const float* const b_y = mag_f32p(y);
@@ -1910,13 +1482,10 @@ static void MAG_HOTPROC mag_blas_mul_f32(
     }
 }
 
-static void MAG_HOTPROC mag_blas_div_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    const mag_tensor_t* const x = inputs[0];
-    const mag_tensor_t* const y = inputs[1];
+static void MAG_HOTPROC mag_blas_div_f32(const mag_compute_payload_t* payload) {
+    mag_tensor_t* r = payload->node;
+    const mag_tensor_t* const x = r->op_inputs[0];
+    const mag_tensor_t* const y = r->op_inputs[1];
     float* const b_r = mag_f32p_mut(r);
     const float* const b_x = mag_f32p(x);
     const float* const b_y = mag_f32p(y);
@@ -2010,151 +1579,17 @@ static void MAG_HOTPROC mag_blas_div_f32(
     }
 }
 
-static void MAG_HOTPROC mag_blas_adds_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    const float xi = r->op_params->x.f32;
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vadds_f32(cc, p_r, p_x, xi);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_subs_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    const float xi = r->op_params->x.f32;
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vsubs_f32(cc, p_r, p_x, xi);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_muls_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    const float xi = r->op_params->x.f32;
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vmuls_f32(cc, p_r, p_x, xi);
-    }
-}
-
-static void MAG_HOTPROC mag_blas_divs_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    (void)bci;
-    const mag_tensor_t* const x = inputs[0];
-    const float xi = r->op_params->x.f32;
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    const int64_t cc = mag_tensor_num_cols(x);
-    for (int64_t ri=0; ri < rc; ++ri) {
-        float* const p_r = b_r + ri*r_s1;
-        const float* const p_x = b_x + ri*x_s1;
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-        mag_vdivs_f32(cc, p_r, p_x, xi);
-    }
-}
-
-#if 0 /* Naive matrix multiplication, but no broadcasting support. */
-static void MAG_HOTPROC mag_blas_matmul_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    const mag_tensor_t* const x = inputs[0];
-    const mag_tensor_t* const y = inputs[1];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    const uint8_t* const b_y = (const uint8_t*)y->buf;
-    mag_load_local_storage_group(r, r_d, shape);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_d, shape);
-    mag_load_local_storage_group(x, x_s, strides);
-    mag_load_local_storage_group(y, y_d, shape);
-    mag_load_local_storage_group(y, y_s, strides);
-    for (int64_t i3=0; i3 < r_d3; ++i3) {
-        for (int64_t i2=0; i2 < r_d2; ++i2) {
-            for (int64_t i1=0; i1 < r_d1; ++i1) {
-                for (int64_t i0=0; i0 < r_d1; ++i0) {
-                    double sum = 0.0;
-                    for (int64_t k=0; k < x_d0; ++k) {
-                        const float* const p_x = (const float*)(b_x + k*x_s0 + i0*x_s1 + i2*x_s2 + i3*x_s3);
-                        const float* const p_y = (const float*)(b_y + i1*y_s0 + k*y_s1 + i2*y_s2 + i3*y_s3);
-                        mag_bnd_chk(p_x, b_x, x->buf_size);
-                        mag_bnd_chk(p_y, b_y, y->buf_size);
-                        sum += (double)(*p_x**p_y);
-                    }
-                    float* const p_r = (float*)(b_r + i1*r_s0 + i0*r_s1 + i2*r_s2 + i3*r_s3);
-                    mag_bnd_chk(p_r, b_r, r->buf_size);
-                    *p_r = (float)sum;
-                }
-            }
-        }
-    }
-}
-#endif
-
 /*
 ** Matrix multiplication.
 ** R = A x B
 */
-static void MAG_HOTPROC mag_blas_matmul_f32(
-    const mag_cpu_thread_local_ctx_t* const bci,
-    mag_tensor_t* const r,
-    const mag_tensor_t** const inputs /* Assumes correct inputs for op, all != NULL! */
-) {
-    const mag_tensor_t* const x = inputs[0];
-    const mag_tensor_t* const y = inputs[1];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    const float* const b_y = mag_f32p(y);
+static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload) {
+    mag_tensor_t* r = payload->node;
+    const mag_tensor_t* x = r->op_inputs[0];
+    const mag_tensor_t* y = r->op_inputs[1];
+    float* b_r = mag_f32p_mut(r);
+    const float* b_x = mag_f32p(x);
+    const float* b_y = mag_f32p(y);
     mag_load_local_storage_group(r, r_d, shape);
     mag_load_local_storage_group(r, r_s, strides);
     mag_load_local_storage_group(x, x_d, shape);
@@ -2163,20 +1598,17 @@ static void MAG_HOTPROC mag_blas_matmul_f32(
     mag_load_local_storage_group(y, y_s, strides);
     mag_assert2(x_d2 == 1 && x_d3 == 1);
     mag_assert2(y_d2 == 1 && y_d3 == 1);
-    const int64_t rows = x_d0;
-    const int64_t cols = x_d1;
-    const int64_t inners = y_d1;
+    int64_t rows = x_d0;
+    int64_t cols = x_d1;
+    int64_t inners = y_d1;
     for (int64_t i=0; i < rows; ++i) {
         for (int64_t k=0; k < cols; ++k) {
-            const float* const p_x = b_x + x_d1*i + k;
+            const float* p_x = b_x + x_d1*i + k;
             mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
+            for (int64_t j = 0; j < inners; ++j) b_r[r_d1*i + j] = 0.0f; /* Zero out result */
             for (int64_t j = 0; j < inners; ++j) {
-                float* const p_r = b_r + r_d1*i + j;
-                *p_r = 0.0f;
-            }
-            for (int64_t j = 0; j < inners; ++j) {
-                float* const p_r = b_r + r_d1*i + j;
-                const float* const p_y = b_y + y_d1*k + j;
+                float* p_r = b_r + r_d1*i + j;
+                const float* p_y = b_y + y_d1*k + j;
                 mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
                 mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y));
                 *p_r += *p_x * *p_y;
@@ -2185,7 +1617,7 @@ static void MAG_HOTPROC mag_blas_matmul_f32(
     }
 }
 
-static void (*mag_blas_dispatch_table_forward[MAG_OP__NUM])(const mag_cpu_thread_local_ctx_t*, mag_tensor_t*, const mag_tensor_t**) = {
+static void (*mag_blas_dispatch_table_forward[MAG_OP__NUM])(const mag_compute_payload_t*) = {
     [MAG_OP_NOP] = &mag_blas_nop, /* No operation */
     [MAG_OP_CLONE] = &mag_blas_clone,
     [MAG_OP_VIEW] = &mag_blas_nop, /* View is a no-op */
@@ -2227,7 +1659,7 @@ static void (*mag_blas_dispatch_table_forward[MAG_OP__NUM])(const mag_cpu_thread
     [MAG_OP_MATMUL] = &mag_blas_matmul_f32
 };
 
-static void (*mag_blas_dispatch_table_backward[MAG_OP__NUM])(const mag_cpu_thread_local_ctx_t*, mag_tensor_t*, const mag_tensor_t**) = {
+static void (*mag_blas_dispatch_table_backward[MAG_OP__NUM])(const mag_compute_payload_t*) = {
     [MAG_OP_NOP] = &mag_blas_nop, /* No operation */
     [MAG_OP_CLONE] = &mag_blas_clone,
     [MAG_OP_VIEW] = &mag_blas_nop, /* View is a no-op */
@@ -2335,18 +1767,18 @@ static void mag_task_queue_destroy(mag_task_queue_t* queue) {
 }
 
 typedef struct mag_worker_t {
-    uint32_t id;
     mag_threadpool_t* pool;
     mag_thread_t thread;
+    mag_compute_payload_t payload;
 } mag_worker_t;
 
 static void* mag_worker_entry_fn(void* arg);
 
-static void mag_worker_init(mag_worker_t* worker, mag_threadpool_t* pool, uint32_t id) {
+static void mag_worker_init(mag_worker_t* worker, mag_threadpool_t* pool, const mag_compute_payload_t* payload) {
     memset(worker, 0, sizeof(*worker));
-    worker->id = id;
     worker->pool = pool;
     mag_assert2(mag_thread_create(&worker->thread, NULL, &mag_worker_entry_fn, worker) == 0);
+    worker->payload = *payload;
 }
 
 static void mag_worker_destroy(mag_worker_t* worker) {
@@ -2370,7 +1802,7 @@ static void* mag_worker_entry_fn(void* arg) {
     mag_worker_t* worker = (mag_worker_t*)arg;
     mag_threadpool_t* pool = worker->pool;
     char name[32];
-    snprintf(name, sizeof(name), "Magnetron Worker %u", worker->id);
+    snprintf(name, sizeof(name), "Magnetron Worker #%" PRIi64, worker->payload.thread_idx);
     mag_thread_set_name(name);
 
     mag_mtx_lock(&pool->count_mtx);
@@ -2425,7 +1857,12 @@ static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers, mag_thread_
     mag_cv_init(&pool->all_idle);
     mag_task_queue_init(&pool->task_queue);
     for (uint32_t i=0; i < num_workers; ++i) {
-        mag_worker_init(pool->workers+i, pool, i);
+        const mag_compute_payload_t payload = (mag_compute_payload_t){
+            .thread_num = (int64_t)num_workers,
+            .thread_idx = (int64_t)i,
+            .node = NULL // Will be set in OP
+        };
+        mag_worker_init(pool->workers+i, pool, &payload);
     }
     while (pool->workers_alive != num_workers) {
         mag_thread_yield();
@@ -2464,46 +1901,26 @@ static void mag_threadpool_destroy(mag_threadpool_t* pool) {
     (*mag_alloc)(pool, 0);
 }
 
-typedef struct mag_compute_payload_t {
-    mag_cpu_thread_local_ctx_t tlc;
-    mag_op_t op;
-    mag_tensor_t* root;
-    const mag_tensor_t** inputs;
-} mag_compute_payload_t;
-
 static void* mag_cpu_thread_exec(void* arg) {
     mag_compute_payload_t* payload = (mag_compute_payload_t*)arg;
-    mag_blas_dispatch_table_forward[payload->op](&payload->tlc, payload->root, payload->inputs);
+    (*mag_blas_dispatch_table_forward[payload->node->op])(payload);
     return NULL;
 }
 
-static MAG_HOTPROC void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t* root) {
+static MAG_HOTPROC void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t* node) {
     mag_threadpool_t* pool = (mag_threadpool_t*)dvc->impl;
+    mag_worker_t* worker = pool->workers;
     uint32_t num_workers = pool->num_workers;
-    mag_compute_payload_t* payloads = (mag_compute_payload_t*)alloca(sizeof(*payloads)*num_workers);
     for (uint32_t i=0; i < num_workers; ++i) {
-        payloads[i] = (mag_compute_payload_t){
-            .tlc = (mag_cpu_thread_local_ctx_t){
-                .thread_num = num_workers,
-                .thread_idx = i,
-            },
-            .op = root->op,
-            .root = root,
-            .inputs = (const mag_tensor_t**)root->op_inputs
-        };
-    }
-    for (uint32_t i=0; i < num_workers; ++i) {
-        mag_threadpool_enqueue_task(pool, &mag_cpu_thread_exec, payloads+i);
+        worker[i].payload.node = node;
+        mag_threadpool_enqueue_task(pool, &mag_cpu_thread_exec, &worker[i].payload);
     }
     mag_threadpool_barrier(pool);
 }
 
 static MAG_HOTPROC void mag_cpu_exec_bwd(mag_compute_device_t* dvc, mag_tensor_t* root) {
-    mag_cpu_thread_local_ctx_t tlc = (mag_cpu_thread_local_ctx_t){
-        .thread_num = 1,
-        .thread_idx = 0,
-    };
-    mag_blas_dispatch_table_backward[root->op](&tlc, root, (const mag_tensor_t**)root->op_inputs);
+    (void)dvc, (void)root, (void)mag_blas_dispatch_table_backward;
+    mag_panic("NYI");
 }
 
 static void mag_cpu_buf_set(mag_storage_buffer_t* sto, size_t offs, uint8_t x) {
