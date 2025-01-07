@@ -2342,33 +2342,23 @@ typedef struct mag_worker_t {
 
 static void* mag_worker_entry_fn(void* arg);
 
-static mag_worker_t* mag_worker_init(mag_threadpool_t* pool, uint32_t id) {
-    mag_worker_t* worker = (mag_worker_t*)(*mag_alloc)(NULL, sizeof(*worker));
+static void mag_worker_init(mag_worker_t* worker, mag_threadpool_t* pool, uint32_t id) {
+    memset(worker, 0, sizeof(*worker));
     worker->id = id;
     worker->pool = pool;
-    mag_thread_create(&worker->thread, NULL, &mag_worker_entry_fn, worker);
-    pthread_detach(worker->thread);
-    return worker;
-}
-
-static volatile bool mag_workers_alive;
-static volatile bool mag_workers_on_hold;
-
-static void mag_worker_hold(int sig) {
-    mag_workers_on_hold = true;
-    while (mag_workers_on_hold) {
-        sleep(1);
-    }
+    mag_assert2(mag_thread_create(&worker->thread, NULL, &mag_worker_entry_fn, worker) == 0);
 }
 
 static void mag_worker_destroy(mag_worker_t* worker) {
-
+    mag_assert2(mag_thread_join(worker->thread, NULL) == 0);
+    memset(worker, 0, sizeof(*worker));
 }
 
 struct mag_threadpool_t {
     uint32_t num_workers;
-    mag_worker_t** workers;
+    mag_worker_t* workers;
     mag_thread_sched_prio_t prio;
+    volatile mag_atomic_t is_running;
     volatile mag_atomic_t workers_alive;
     volatile mag_atomic_t workers_working;
     mag_mutex_t count_mtx;
@@ -2382,21 +2372,14 @@ static void* mag_worker_entry_fn(void* arg) {
     char name[32];
     snprintf(name, sizeof(name), "Magnetron Worker %u", worker->id);
     mag_thread_set_name(name);
-    mag_thread_sched_set_prio(pool->prio);
-
-    struct sigaction act;
-    sigemptyset(&act.sa_mask);
-    act.sa_flags = SA_ONSTACK;
-    act.sa_handler = &mag_worker_hold;
-    mag_assert2(sigaction(SIGUSR1, &act, NULL) != -1);
 
     mag_mtx_lock(&pool->count_mtx);
     pool->workers_alive++;
     mag_mtx_unlock(&pool->count_mtx);
 
-    while (mag_workers_alive) {
+    for (;;) {
         mag_binary_semaphore_await(&pool->task_queue.has_task);
-        if (!mag_workers_alive) continue;
+        if (mag_atomic_load(&pool->is_running, MAG_MO_RELAXED) == 0) break;
         mag_mtx_lock(&pool->count_mtx);
         pool->workers_working++;
         mag_mtx_unlock(&pool->count_mtx);
@@ -2421,15 +2404,20 @@ static void* mag_worker_entry_fn(void* arg) {
 }
 
 static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers, mag_thread_sched_prio_t prio) {
-    mag_workers_on_hold = false;
-    mag_workers_alive = true;
     num_workers = mag_xmax(1, num_workers);
-    mag_threadpool_t* pool = (mag_threadpool_t*)(*mag_alloc)(NULL, sizeof(*pool));
-    memset(pool, 0, sizeof(*pool));
+    uintptr_t mem = 0;
+    mag_pincr((void**)&mem, sizeof(mag_threadpool_t), __alignof(mag_threadpool_t));
+    mag_pincr((void**)&mem, sizeof(mag_worker_t)*num_workers, __alignof(mag_worker_t));
+    void* base = (*mag_alloc)(NULL, mem);
+    void* needle = base;
+    memset(base, 0, mem);
+    mag_threadpool_t* pool = (mag_threadpool_t*)mag_pincr(&needle, sizeof(mag_threadpool_t), __alignof(mag_threadpool_t));
+    mag_worker_t* workers = (mag_worker_t*)mag_pincr(&needle, sizeof(mag_worker_t)*num_workers, __alignof(mag_worker_t));
     *pool = (mag_threadpool_t){
         .num_workers = num_workers,
-        .workers = (mag_worker_t**)(*mag_alloc)(NULL, num_workers*sizeof(mag_worker_t*)),
+        .workers = workers,
         .prio = prio,
+        .is_running = 1,
         .workers_alive = 0,
         .workers_working = 0
     };
@@ -2437,9 +2425,11 @@ static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers, mag_thread_
     mag_cv_init(&pool->all_idle);
     mag_task_queue_init(&pool->task_queue);
     for (uint32_t i=0; i < num_workers; ++i) {
-        pool->workers[i] = mag_worker_init(pool, i);
+        mag_worker_init(pool->workers+i, pool, i);
     }
-    while (pool->workers_alive != num_workers); /* Wait for all workers to start. */
+    while (pool->workers_alive != num_workers) {
+        mag_thread_yield();
+    }
     return pool;
 }
 
@@ -2461,18 +2451,17 @@ static void mag_threadpool_barrier(mag_threadpool_t* pool) { /* Wait for all wor
     mag_mtx_unlock(&pool->count_mtx);
 }
 
-static void mag_threadpool_pause(mag_threadpool_t* pool) {
-    for (uint32_t i=0; i < pool->workers_alive; ++i) {
-        pthread_kill(pool->workers[i]->thread, SIGUSR1);
-    }
-}
-
-static void mag_threadpool_resume(mag_threadpool_t* pool) {
-    mag_workers_on_hold = false;
-}
-
 static void mag_threadpool_destroy(mag_threadpool_t* pool) {
-
+    mag_threadpool_barrier(pool);
+    mag_atomic_store(&pool->is_running, 0, MAG_MO_RELAXED);
+    while (pool->workers_alive != 0)
+        mag_binary_semaphore_broadcast(&pool->task_queue.has_task);
+    for (uint32_t i=0; i < pool->num_workers; ++i)
+        mag_worker_destroy(pool->workers+i);
+    mag_task_queue_destroy(&pool->task_queue);
+    mag_cv_destroy(&pool->all_idle);
+    mag_mtx_destroy(&pool->count_mtx);
+    (*mag_alloc)(pool, 0);
 }
 
 typedef struct mag_compute_payload_t {
@@ -2551,8 +2540,7 @@ static void mag_cpu_free_storage(mag_compute_device_t* dvc, mag_storage_buffer_t
     memset(buf, 0, sizeof(*buf)); /* Set to zero. */
 }
 
-static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx) {
-    uint32_t num_threads = 4;
+static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num_threads) {
     mag_threadpool_t* pool = mag_threadpool_create(num_threads, MAG_THREAD_SCHED_PRIO_NORMAL);
     mag_compute_device_t* dvc = (mag_compute_device_t*)(*mag_alloc)(NULL, sizeof(*dvc));
     *dvc = (mag_compute_device_t){ /* Initialize device interface */
@@ -2575,9 +2563,9 @@ static void mag_cpu_release_interface(mag_compute_device_t* ctx) {
     (*mag_alloc)(ctx, 0); /* Free all memory */
 }
 
-mag_compute_device_t* mag_init_device_cpu(mag_ctx_t* ctx, uint32_t num_threads) {
-    num_threads = num_threads ? num_threads : mag_xmax(1, ctx->sys.cpu_virtual_cores);
-    mag_compute_device_t* dvc = mag_cpu_init_interface(ctx);
+mag_compute_device_t* mag_init_device_cpu(mag_ctx_t* ctx, const mag_device_descriptor_t* desc) {
+    uint32_t num_threads = desc->thread_count ? desc->thread_count : mag_xmax(1, ctx->sys.cpu_virtual_cores);
+    mag_compute_device_t* dvc = mag_cpu_init_interface(ctx, num_threads);
     return dvc;
 }
 

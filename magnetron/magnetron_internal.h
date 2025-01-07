@@ -143,7 +143,6 @@ static MAG_AINLINE uint32_t mag_ffs64(const uint64_t x) {
 static MAG_AINLINE uint32_t mag_fls64(const uint64_t x) {
   unsigned long r; _BitScanReverse64(&r, x); return (uint32_t)r;
 }
-#define __alignof__ __alignof
 
 typedef long mag_atomic_t;       /* Atomic integer type */
 typedef enum mag_mo_t {             /* Atomic memory order */
@@ -371,12 +370,13 @@ typedef struct mag_binary_semaphore_t {
 extern MAG_EXPORT void mag_binary_semaphore_init(mag_binary_semaphore_t* sem, bool v);
 extern MAG_EXPORT void mag_binary_semaphore_reset(mag_binary_semaphore_t* sem);
 extern MAG_EXPORT void mag_binary_semaphore_post(mag_binary_semaphore_t* sem);
-extern MAG_EXPORT void mag_binary_semaphore_post_all(mag_binary_semaphore_t* sem);
+extern MAG_EXPORT void mag_binary_semaphore_broadcast(mag_binary_semaphore_t* sem);
 extern MAG_EXPORT void mag_binary_semaphore_await(mag_binary_semaphore_t* sem);
 extern MAG_EXPORT void mag_binary_semaphore_destroy(mag_binary_semaphore_t* sem);
 
-extern MAG_EXPORT void mag_thread_sched_set_prio(mag_thread_sched_prio_t prio); /* Set thread scheduling priority of current thread. */
+extern MAG_EXPORT void mag_thread_set_prio(mag_thread_sched_prio_t prio); /* Set thread scheduling priority of current thread. */
 extern MAG_EXPORT void mag_thread_set_name(const char* name); /* Set thread name. */
+extern MAG_EXPORT void mag_thread_yield(void); /* Yield current thread. */
 
 typedef struct mag_intrusive_chunk mag_intrusive_chunk;
 struct mag_intrusive_chunk {
@@ -434,12 +434,12 @@ struct mag_compute_device_t {
 
 /* Device creation and destruction. */
 typedef struct mag_device_factory_t {
-    mag_compute_device_t* (*init)(mag_ctx_t* ctx);      /* Initialize device. */
+    mag_compute_device_t* (*init)(mag_ctx_t* ctx, const mag_device_descriptor_t* desc);      /* Initialize device. */
     void (*destroy)(mag_compute_device_t* dvc);         /* Destroy device. */
 } mag_device_factory_t;
 
 /* Global device factories. Implemented in magnetron_device_registry.c */
-extern mag_compute_device_t* mag_init_dynamic_device(mag_ctx_t* ctx, mag_compute_device_type_t* type);
+extern mag_compute_device_t* mag_init_dynamic_device(mag_ctx_t* ctx, const mag_device_descriptor_t* desc);
 extern void mag_destroy_dynamic_device(mag_compute_device_t* dvc);
 
 /* Profiling performance monitor per op. */

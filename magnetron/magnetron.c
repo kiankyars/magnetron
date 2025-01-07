@@ -797,6 +797,11 @@ static MAG_COLDPROC void mag_ctx_dump_compiler_info(void) {
 }
 
 mag_ctx_t* mag_ctx_create(mag_compute_device_type_t device) {
+    const mag_device_descriptor_t info = {device};
+    return mag_ctx_create2(&info);
+}
+
+mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
     mag_log_info("Creating magnetron context...");
 
     uint64_t time_stamp_start = mag_hpc_clock_ns();
@@ -826,8 +831,8 @@ mag_ctx_t* mag_ctx_create(mag_compute_device_type_t device) {
 
     /* Create selected compute device. */
     ctx->exec_mode = MAG_EXEC_MODE_EAGER;
-    ctx->device_type = device;
-    ctx->device = mag_init_dynamic_device(ctx, &ctx->device_type);
+    ctx->device_type = device_info->type;
+    ctx->device = mag_init_dynamic_device(ctx, device_info);
     mag_log_info("Compute device: %s", ctx->device->name);
 
 
@@ -912,7 +917,7 @@ void mag_binary_semaphore_post(mag_binary_semaphore_t* sem) {
     mag_mtx_unlock(&sem->mtx);
 }
 
-void mag_binary_semaphore_post_all(mag_binary_semaphore_t* sem) {
+void mag_binary_semaphore_broadcast(mag_binary_semaphore_t* sem) {
     mag_mtx_lock(&sem->mtx);
     sem->signaled = true;
     mag_cv_broadcast(&sem->cv);
@@ -933,7 +938,7 @@ void mag_binary_semaphore_destroy(mag_binary_semaphore_t* sem) {
     mag_cv_destroy(&sem->cv);
 }
 
-void mag_thread_sched_set_prio(mag_thread_sched_prio_t prio) {
+void mag_thread_set_prio(mag_thread_sched_prio_t prio) {
 #ifdef _WIN32
 #error "Windows threading not supported yet."
 #else
@@ -957,6 +962,14 @@ void mag_thread_set_name(const char* name) {
         prctl(PR_SET_NAME, name);
     #elif defined(__APPLE__) && defined(__MACH__)
         pthread_setname_np(name);
+    #endif
+}
+
+void mag_thread_yield(void) {
+    #if defined(_WIN32)
+        YieldProcessor();
+    #else
+        sched_yield();
     #endif
 }
 

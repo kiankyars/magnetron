@@ -88,7 +88,16 @@ typedef uint32_t mag_char32_t;
 
 typedef struct mag_ctx_t mag_ctx_t; /* Opaque context type for managing memory pools */
 
-extern MAG_EXPORT mag_ctx_t* mag_ctx_create(mag_compute_device_type_t device); /* Create context with default config, and only specificy device. */
+typedef struct mag_device_descriptor_t {
+    mag_compute_device_type_t type; /* Device type */
+    union {
+        uint32_t thread_count;   /* Number of threads if type == MAG_COMPUTE_DEVICE_TYPE_CPU. If set to 0, hardware concurrency of host CPU is detected. */
+        uint32_t cuda_device_id; /* CUDA device ID if type == MAG_COMPUTE_DEVICE_TYPE_GPU_CUDA. Default: 0 (first GPU). */
+    };
+} mag_device_descriptor_t;
+
+extern MAG_EXPORT mag_ctx_t* mag_ctx_create(mag_compute_device_type_t device); /* Create context with default config, and only specify device type. */
+extern MAG_EXPORT mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info); /* Create context with customized device config, and only specify device type. */
 extern MAG_EXPORT mag_exec_mode_t mag_ctx_get_exec_mode(const mag_ctx_t* ctx); /* Get execution mode */
 extern MAG_EXPORT void mag_ctx_set_exec_mode(mag_ctx_t* ctx, mag_exec_mode_t mode); /* Set execution mode */
 extern MAG_EXPORT mag_prng_algorithm_t mag_ctx_get_prng_algorithm(const mag_ctx_t* ctx); /* Get PRNG algorithm */
