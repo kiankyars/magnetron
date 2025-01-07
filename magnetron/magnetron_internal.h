@@ -20,6 +20,17 @@
 #endif
 #endif
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#else
+#include <unistd.h>
+#include <pthread.h>
+#ifdef __FreeBSD__
+#include <pthread_np.h>
+#endif
+#endif
+
 #if defined(__GLIBC__) || defined(__GNU_LIBRARY__) || defined(__ANDROID__)
 #include <endian.h>
 #elif defined(__APPLE__) && defined(__MACH__)
@@ -327,16 +338,30 @@ static MAG_AINLINE void* mag_pincr(void** p, size_t sz, size_t align) {
     return pp;
 }
 
-typedef void mag_thread_t;
 #ifdef _WIN32
-typedef int32_t mag_thread_ret_t; /* DWORD */
+#error "TODO"
 #else
-typedef void* mag_thread_ret_t;
+
+typedef pthread_t mag_thread_t;
+#define mag_thread_create pthread_create
+#define mag_thread_join pthread_join
+
+typedef pthread_mutex_t mag_mutex_t;
+#define mag_mutex_init(mtx) pthread_mutex_init(mtx, NULL)
+#define mag_mutex_destroy(mtx) pthread_mutex_destroy(mtx)
+#define mag_mutex_lock(mtx) pthread_mutex_lock(mtx)
+#define mag_mutex_unlock(mtx) pthread_mutex_unlock(mtx)
+#define mag_mutex_lock_shared(mtx) pthread_mutex_lock(mtx)
+#define mag_mutex_unlock_shared(mtx) pthread_mutex_unlock(mtx)
+
+typedef pthread_cond_t mag_cv_t;
+#define mag_cond_init(cv) pthread_cond_init(cv, NULL)
+#define mag_cond_destroy(cv) pthread_cond_destroy(cv)
+#define mag_cond_wait(cv, mtx) pthread_cond_wait(c, mtx)
+#define mag_cond_broadcast(cv) pthread_cond_broadcast(cv)
+
 #endif
 
-extern MAG_EXPORT mag_thread_t* mag_thread_create(mag_thread_ret_t (*f)(void*), void* arg); /* Create thread. */
-extern MAG_EXPORT bool mag_thread_join(mag_thread_t* t); /* Join thread. */
-extern MAG_EXPORT void mag_thread_sched_yield(void); /* Yield thread to another thread. */
 extern MAG_EXPORT void mag_thread_sched_set_prio(mag_thread_sched_prio_t prio); /* Set thread scheduling priority of current thread. */
 
 typedef struct mag_intrusive_chunk mag_intrusive_chunk;

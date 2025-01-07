@@ -51,12 +51,8 @@
 #include <sys/sysctl.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <pthread.h>
-#include <sched.h>
 #else
 #include <unistd.h>
-#include <pthread.h>
-#include <sched.h>
 #endif
 
 #ifdef MAG_DEBUG
@@ -892,40 +888,6 @@ uint64_t mag_ctx_get_physical_memory_total(const mag_ctx_t* ctx) { return ctx->s
 uint64_t mag_ctx_get_physical_memory_free(const mag_ctx_t* ctx) { return ctx->sys.phys_mem_free; }
 bool mag_ctx_is_numa_system(const mag_ctx_t* ctx) { return false; /* TODO */ }
 size_t mag_ctx_get_total_tensors_created(const mag_ctx_t* ctx) { return 0; /* TODO */ }
-
-#ifdef _WIN32
-mag_static_assert(sizeof(HANDLE) == sizeof(mag_thread_t*));
-mag_static_assert(__alignof(HANDLE) == __alignof(mag_thread_t*));
-#else
-mag_static_assert(sizeof(pthread_t) == sizeof(mag_thread_t*));
-mag_static_assert(__alignof(pthread_t) == __alignof(mag_thread_t*));
-#endif
-
-mag_thread_t* mag_thread_create(mag_thread_ret_t (*f)(void*), void* arg) {
-    #ifdef _WIN32
-    #error "Windows threading not supported yet."
-    #else
-        pthread_t p;
-        mag_assert2(pthread_create(&p, NULL, f, arg) == 0);
-        return (mag_thread_t*)p;
-    #endif
-}
-
-bool mag_thread_join(mag_thread_t* t) {
-    #ifdef _WIN32
-    #error "Windows threading not supported yet."
-    #else
-        return pthread_join((pthread_t)t, NULL) == 0;
-    #endif
-}
-
-void mag_thread_sched_yield(void) {
-    #ifdef _WIN32
-    #error "Windows threading not supported yet."
-    #else
-        sched_yield();
-    #endif
-}
 
 void mag_thread_sched_set_prio(mag_thread_sched_prio_t prio) {
 #ifdef _WIN32
