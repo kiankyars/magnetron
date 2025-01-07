@@ -99,7 +99,7 @@ static void* mag_os_alloc_stub(void* blk, size_t size) {
         return blk;
     }
     void* block = realloc(blk, size);
-    if (mag_unlikely(!blk)) {
+    if (mag_unlikely(!block)) {
         double mem = 0.0;
         const char* unit = "";
         mag_humanize_memory_size(size, &mem, &unit);
@@ -2694,7 +2694,7 @@ static void mag_trim_quotes(char* in) {
 
 static void MAG_COLDPROC mag_system_host_info_query_os_name(char (*out_os_name)[128]) { /* Get OS name */
     #ifdef _WIN32
-        
+
     #elif defined(__APPLE__)
         size_t len;
         uint8_t tmp[256];
