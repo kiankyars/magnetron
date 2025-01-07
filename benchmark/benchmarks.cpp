@@ -14,19 +14,23 @@ auto main() -> int {
     ankerl::nanobench::Bench bench {};
     bench.title("Threaded ADD")
         .unit("ADD")
+        .minEpochIterations(1024)
         .relative(true);
     bench.performanceCounters(true);
     mag_set_log_mode(true);
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     mag_set_log_mode(false);
-    mag_tensor_t* A = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 8192, 8192, 8);
+    mag_tensor_t* A = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 128, 128, 128);
     mag_tensor_fill_random_uniform(A, -1.0f, 1.0f);
-    mag_tensor_t* B = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 8192, 8192, 8);
+    mag_tensor_t* B = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 128, 128, 128);
     mag_tensor_fill_random_uniform(B, -1.0f, 1.0f);
     bench.run("Threaded ADD", [&] {
         mag_tensor_t* R = mag_add(A, B);
         ankerl::nanobench::doNotOptimizeAway(R);
+        mag_tensor_decref(R);
     });
     ankerl::nanobench::doNotOptimizeAway(ctx);
+    mag_tensor_decref(B);
+    mag_tensor_decref(A);
     mag_ctx_destroy(ctx);
 }

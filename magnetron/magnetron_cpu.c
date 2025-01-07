@@ -2490,7 +2490,7 @@ static void* mag_cpu_thread_exec(void* arg) {
 
 static MAG_HOTPROC void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t* root) {
     mag_threadpool_t* pool = (mag_threadpool_t*)dvc->impl;
-    uint32_t num_workers = pool ? pool->num_workers : 1;
+    uint32_t num_workers = pool->num_workers;
     mag_compute_payload_t* payloads = (mag_compute_payload_t*)alloca(sizeof(*payloads)*num_workers);
     for (uint32_t i=0; i < num_workers; ++i) {
         payloads[i] = (mag_compute_payload_t){
@@ -2552,7 +2552,7 @@ static void mag_cpu_free_storage(mag_compute_device_t* dvc, mag_storage_buffer_t
 }
 
 static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx) {
-    uint32_t num_threads = 32;
+    uint32_t num_threads = 4;
     mag_threadpool_t* pool = mag_threadpool_create(num_threads, MAG_THREAD_SCHED_PRIO_NORMAL);
     mag_compute_device_t* dvc = (mag_compute_device_t*)(*mag_alloc)(NULL, sizeof(*dvc));
     *dvc = (mag_compute_device_t){ /* Initialize device interface */
@@ -2565,7 +2565,7 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx) {
         .alloc_storage = &mag_cpu_alloc_storage,
         .free_storage = &mag_cpu_free_storage
     };
-    snprintf(dvc->name, sizeof(dvc->name), "%s - %s - %u Compute Threads", mag_device_type_get_name(dvc->type), ctx->sys.cpu_name, num_threads);
+    snprintf(dvc->name, sizeof(dvc->name), "%s - %s - Using %u Compute Threads", mag_device_type_get_name(dvc->type), ctx->sys.cpu_name, num_threads);
     return dvc;
 }
 
