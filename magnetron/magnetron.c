@@ -889,6 +889,46 @@ uint64_t mag_ctx_get_physical_memory_free(const mag_ctx_t* ctx) { return ctx->sy
 bool mag_ctx_is_numa_system(const mag_ctx_t* ctx) { return false; /* TODO */ }
 size_t mag_ctx_get_total_tensors_created(const mag_ctx_t* ctx) { return 0; /* TODO */ }
 
+void mag_binary_semaphore_init(mag_binary_semaphore_t* sem, bool v) {
+    mag_mtx_init(&sem->mtx);
+    mag_cv_init(&sem->cv);
+    sem->signaled = v & 1;
+}
+
+void mag_binary_semaphore_reset(mag_binary_semaphore_t* sem) {
+    mag_mtx_destroy(&sem->mtx);
+    mag_cv_destroy(&sem->cv);
+    mag_binary_semaphore_init(sem, false);
+}
+
+void mag_binary_semaphore_post(mag_binary_semaphore_t* sem) {
+    mag_mtx_lock(&sem->mtx);
+    sem->signaled = true;
+    mag_cv_signal(&sem->cv);
+    mag_mtx_unlock(&sem->mtx);
+}
+
+void mag_binary_semaphore_post_all(mag_binary_semaphore_t* sem) {
+    mag_mtx_lock(&sem->mtx);
+    sem->signaled = true;
+    mag_cv_broadcast(&sem->cv);
+    mag_mtx_unlock(&sem->mtx);
+}
+
+void mag_binary_semaphore_await(mag_binary_semaphore_t* sem) {
+    mag_mtx_lock(&sem->mtx);
+    while (!sem->signaled) {
+        mag_cv_wait(&sem->cv, &sem->mtx);
+    }
+    sem->signaled = false;
+    mag_mtx_unlock(&sem->mtx);
+}
+
+void mag_binary_semaphore_destroy(mag_binary_semaphore_t* sem) {
+    mag_mtx_destroy(&sem->mtx);
+    mag_cv_destroy(&sem->cv);
+}
+
 void mag_thread_sched_set_prio(mag_thread_sched_prio_t prio) {
 #ifdef _WIN32
 #error "Windows threading not supported yet."
@@ -905,6 +945,14 @@ void mag_thread_sched_set_prio(mag_thread_sched_prio_t prio) {
     if (mag_unlikely(status)) {
         mag_log_warn("Failed to set thread scheduling priority: %d, error: %x", prio, status);
     }
+    #endif
+}
+
+void mag_thread_set_name(const char* name) {
+    #if defined(__linux__)
+        prctl(PR_SET_NAME, name);
+    #elif defined(__APPLE__) && defined(__MACH__)
+        pthread_setname_np(name);
     #endif
 }
 

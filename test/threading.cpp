@@ -5,6 +5,7 @@
 #include <chrono>
 
 #include "prelude.hpp"
+#include "magnetron_cpu.c"
 
 using namespace std::chrono_literals;
 
@@ -15,8 +16,7 @@ TEST(threading, create_thread) {
 
     std::cout << "Main thread ID: " << std::hex << main_tid.load(std::memory_order_seq_cst) << std::endl;
 
-    auto thread_func = [](void* arg) -> mag_thread_ret_t {
-        mag_thread_sched_set_prio(MAG_THREAD_SCHED_PRIO_MEDIUM);
+    auto thread_func = [](void* arg) -> void* {
         std::this_thread::sleep_for(1s); // Simulate some work
         second_tid.store(mag_thread_id(), std::memory_order_seq_cst);
         static_cast<std::atomic<bool>*>(arg)->store(true, std::memory_order_seq_cst);
@@ -24,40 +24,68 @@ TEST(threading, create_thread) {
         return NULL;
     };
 
-    mag_thread_t* thread = mag_thread_create(thread_func, &executed);
+    mag_thread_t thread;
+    mag_thread_create(&thread, nullptr, thread_func, &executed);
     ASSERT_NE(thread, nullptr);
-    mag_thread_join(thread);
+    mag_thread_join(thread, nullptr);
     EXPECT_EQ(true, executed.load(std::memory_order_seq_cst));
     ASSERT_NE(main_tid.load(std::memory_order_seq_cst), second_tid.load(std::memory_order_seq_cst));
 }
 
-TEST(threading, scheduler_yield) {
-    std::atomic<bool> thread_started = false;
-    std::atomic<bool> thread_done = false;
+TEST(thread_pool, create_destroy) {
+    mag_threadpool_t* pool = mag_threadpool_create(4, MAG_THREAD_SCHED_PRIO_NORMAL);
+    ASSERT_NE(pool, nullptr);
+    mag_threadpool_destroy(pool);
+}
 
-    auto thread_func = [](void* arg) -> mag_thread_ret_t {
-        auto* state = static_cast<std::pair<std::atomic<bool>*, std::atomic<bool>*>*>(arg);
-        std::atomic<bool>& started = *state->first;
-        std::atomic<bool>& done = *state->second;
-        started.store(true, std::memory_order_seq_cst);
-        for (int i = 0; i < 10; ++i) {
-            mag_thread_sched_yield();
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-        done.store(true, std::memory_order_seq_cst);
-        return nullptr;
-    };
-
-    std::pair<std::atomic<bool>*, std::atomic<bool>*> thread_state {&thread_started, &thread_done};
-    mag_thread_t* thread = mag_thread_create(thread_func, &thread_state);
-    ASSERT_NE(thread, nullptr);
-
-    while (!thread_started) {
-        mag_thread_sched_yield();
+TEST(thread_pool, simulated_work_some_tasks) {
+    constexpr std::size_t num_tasks = 4;
+    mag_threadpool_t* pool = mag_threadpool_create(2, MAG_THREAD_SCHED_PRIO_NORMAL);
+    ASSERT_NE(pool, nullptr);
+    for (std::size_t i = 0; i < num_tasks; ++i) {
+        mag_threadpool_enqueue_task(pool, [](void* arg) -> void* {
+            std::cout << "Working on thread: " << std::hex << mag_thread_id() << std::endl;
+            return nullptr;
+        }, pool);
     }
-    EXPECT_FALSE(thread_done.load(std::memory_order_seq_cst));
-    mag_thread_join(thread);
-    EXPECT_TRUE(thread_done.load(std::memory_order_seq_cst));
+    mag_threadpool_barrier(pool);
+    mag_threadpool_destroy(pool);
+}
+
+TEST(thread_pool, simulated_heavy_workload_some_slow_tasks) {
+    constexpr std::size_t num_tasks = 10;
+    mag_threadpool_t* pool = mag_threadpool_create(std::max(1u, std::thread::hardware_concurrency()), MAG_THREAD_SCHED_PRIO_NORMAL);
+    ASSERT_NE(pool, nullptr);
+    for (std::size_t i = 0; i < num_tasks; ++i) {
+        mag_threadpool_enqueue_task(pool, [](void* arg) -> void* {
+            volatile auto target = reinterpret_cast<std::uintptr_t>(arg);
+            volatile std::uintptr_t result = 0;
+            for (volatile std::size_t i = 0; i < target; ++i) {
+                result += i;
+            }
+            return reinterpret_cast<void*>(result);
+        }, reinterpret_cast<void*>(250'000'000));
+    }
+    mag_threadpool_barrier(pool);
+    mag_threadpool_destroy(pool);
+}
+
+TEST(thread_pool, simulated_heavy_workload_many_fast_tasks) {
+    constexpr std::size_t num_tasks = 8192;
+    mag_threadpool_t* pool = mag_threadpool_create(std::max(1u, std::thread::hardware_concurrency()), MAG_THREAD_SCHED_PRIO_NORMAL);
+    ASSERT_NE(pool, nullptr);
+    for (std::size_t i = 0; i < num_tasks; ++i) {
+        mag_threadpool_enqueue_task(pool, [](void* arg) -> void* {
+            volatile auto target = reinterpret_cast<std::uintptr_t>(arg);
+            volatile std::uintptr_t result = 0;
+            for (volatile std::size_t i = 0; i < target; ++i) {
+                result += i;
+            }
+            return reinterpret_cast<void*>(result);
+        }, reinterpret_cast<void*>(1'000));
+    }
+    mag_threadpool_barrier(pool);
+    mag_threadpool_destroy(pool);
 }
 
 TEST(threading, StoreLoadTest) {

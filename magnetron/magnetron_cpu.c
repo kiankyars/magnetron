@@ -4,6 +4,7 @@
 
 #include <math.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 
 #if defined(__APPLE__) && defined(MAG_ACCELERATE)
@@ -1637,7 +1638,7 @@ static void MAG_HOTPROC mag_blas_add_f32(
     const int64_t rpt = (nr + tc - 1)/tc;       /* Row partition size. */
     const int64_t ra = rpt*ti;                  /* Row partition start */
     const int64_t rb = mag_xmin(ra+rpt, nr);    /* Row partition end */
-    printf("# %ld processes [%ld, %ld), numel: %ld\n", ti, ra, rb, r->numel);
+    printf("# %zu processes [%zu, %zu), numel: %zu\n", (size_t)ti, (size_t)ra, (size_t)rb, (size_t)r->numel);
     if (y_s0 == 1) { /* Fast path for contiguous input tensors. */
         for (int64_t ri=ra; ri < rb; ++ri) { /* Iterate row partition: P := {ra, ..., rb-1} with |P| = rpt. */
             int64_t ro = ri;
@@ -2264,16 +2265,207 @@ static void (*mag_blas_dispatch_table_backward[MAG_OP__NUM])(const mag_cpu_threa
     [MAG_OP_MATMUL] = &mag_blas_matmul_f32
 };
 
-struct mag_threadpool_t {
-    mag_ctx_t* ctx;
-
+typedef struct mag_compute_task_t mag_compute_task_t;
+struct mag_compute_task_t {
+    mag_compute_task_t* prev;
+    void* (*f)(void*);
+    void* arg;
 };
 
-static mag_threadpool_t* mag_threadpool_init(uint32_t num_threads, mag_thread_sched_prio_t prio) {
+typedef struct mag_task_queue_t {
+    mag_mutex_t mtx;
+    mag_binary_semaphore_t has_task;
+    mag_compute_task_t* front;
+    mag_compute_task_t* rear;
+    size_t len;
+} mag_task_queue_t;
+
+static void mag_task_queue_init(mag_task_queue_t* queue) {
+    mag_mtx_init(&queue->mtx);
+    mag_binary_semaphore_init(&queue->has_task, false);
+    queue->front = queue->rear = NULL;
+    queue->len = 0;
+}
+
+static void mag_task_queue_push(mag_task_queue_t* queue, mag_compute_task_t* task) {
+    mag_mtx_lock(&queue->mtx);
+    task->prev = NULL;
+    if (queue->len) {
+        queue->rear->prev = task;
+        queue->rear = task;
+    } else {
+        queue->front = task;
+        queue->rear = task;
+    }
+    ++queue->len;
+    mag_binary_semaphore_post(&queue->has_task);
+    mag_mtx_unlock(&queue->mtx);
+}
+
+static mag_compute_task_t* mag_task_queue_pull(mag_task_queue_t* queue) {
+    mag_mtx_lock(&queue->mtx);
+    mag_compute_task_t* task = queue->front;
+    if (queue->len == 1) {
+        queue->front = queue->rear = NULL;
+        queue->len = 0;
+    } else if (queue->len > 1) {
+        queue->front = task->prev;
+        --queue->len;
+        mag_binary_semaphore_post(&queue->has_task);
+    }
+    mag_mtx_unlock(&queue->mtx);
+    return task;
+}
+
+static void mag_task_queue_clear(mag_task_queue_t* queue) {
+    while (queue->len) (*mag_alloc)(mag_task_queue_pull(queue), 0);
+    queue->front = queue->rear = NULL;
+    mag_binary_semaphore_reset(&queue->has_task);
+    queue->len = 0;
+}
+
+static void mag_task_queue_destroy(mag_task_queue_t* queue) {
+    mag_task_queue_clear(queue);
+    mag_mtx_destroy(&queue->mtx);
+    mag_binary_semaphore_destroy(&queue->has_task);
+}
+
+typedef struct mag_worker_t {
+    uint32_t id;
+    mag_threadpool_t* pool;
+    mag_thread_t thread;
+} mag_worker_t;
+
+static void* mag_worker_entry_fn(void* arg);
+
+static mag_worker_t* mag_worker_init(mag_threadpool_t* pool, uint32_t id) {
+    mag_worker_t* worker = (mag_worker_t*)(*mag_alloc)(NULL, sizeof(*worker));
+    worker->id = id;
+    worker->pool = pool;
+    mag_thread_create(&worker->thread, NULL, &mag_worker_entry_fn, worker);
+    pthread_detach(worker->thread);
+    return worker;
+}
+
+static volatile bool mag_workers_alive;
+static volatile bool mag_workers_on_hold;
+
+static void mag_worker_hold(int sig) {
+    mag_workers_on_hold = true;
+    while (mag_workers_on_hold) {
+        sleep(1);
+    }
+}
+
+static void mag_worker_destroy(mag_worker_t* worker) {
+
+}
+
+struct mag_threadpool_t {
+    mag_worker_t** workers;
+    mag_thread_sched_prio_t prio;
+    volatile mag_atomic_t workers_alive;
+    volatile mag_atomic_t workers_working;
+    mag_mutex_t count_mtx;
+    mag_cond_var_t all_idle;
+    mag_task_queue_t task_queue;
+};
+
+static void* mag_worker_entry_fn(void* arg) {
+    mag_worker_t* worker = (mag_worker_t*)arg;
+    mag_threadpool_t* pool = worker->pool;
+    char name[32];
+    snprintf(name, sizeof(name), "Magnetron Worker %u", worker->id);
+    mag_thread_set_name(name);
+    mag_thread_sched_set_prio(pool->prio);
+
+    struct sigaction act;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = SA_ONSTACK;
+    act.sa_handler = &mag_worker_hold;
+    mag_assert2(sigaction(SIGUSR1, &act, NULL) != -1);
+
+    mag_mtx_lock(&pool->count_mtx);
+    pool->workers_alive++;
+    mag_mtx_unlock(&pool->count_mtx);
+
+    while (mag_workers_alive) {
+        mag_binary_semaphore_await(&pool->task_queue.has_task);
+        if (!mag_workers_alive) continue;
+        mag_mtx_lock(&pool->count_mtx);
+        pool->workers_working++;
+        mag_mtx_unlock(&pool->count_mtx);
+        mag_compute_task_t* task = mag_task_queue_pull(&pool->task_queue);
+        if (task) {
+            void* (*f)(void*) = task->f;
+            void* ar = task->arg;
+            (*f)(ar);
+            (*mag_alloc)(task, 0);
+        }
+        mag_mtx_lock(&pool->count_mtx);
+        pool->workers_working--;
+        if (!pool->workers_working) mag_cv_signal(&pool->all_idle);
+        mag_mtx_unlock(&pool->count_mtx);
+    }
+
+    mag_mtx_lock(&pool->count_mtx);
+    pool->workers_alive--;
+    mag_mtx_unlock(&pool->count_mtx);
+
     return NULL;
 }
 
-static void mag_threadpool_join(mag_threadpool_t* pool) {
+static mag_threadpool_t* mag_threadpool_create(uint32_t num_threads, mag_thread_sched_prio_t prio) {
+    mag_workers_on_hold = false;
+    mag_workers_alive = true;
+    num_threads = mag_xmax(1, num_threads);
+    mag_threadpool_t* pool = (mag_threadpool_t*)(*mag_alloc)(NULL, sizeof(*pool));
+    memset(pool, 0, sizeof(*pool));
+    *pool = (mag_threadpool_t){
+        .workers = (mag_worker_t**)(*mag_alloc)(NULL, num_threads*sizeof(mag_worker_t*)),
+        .prio = prio,
+        .workers_alive = 0,
+        .workers_working = 0
+    };
+    mag_mtx_init(&pool->count_mtx);
+    mag_cv_init(&pool->all_idle);
+    mag_task_queue_init(&pool->task_queue);
+    for (uint32_t i=0; i < num_threads; ++i) {
+        pool->workers[i] = mag_worker_init(pool, i);
+    }
+    while (pool->workers_alive != num_threads); /* Wait for all workers to start. */
+    return pool;
+}
+
+static void mag_threadpool_enqueue_task(mag_threadpool_t* pool, void* (*f)(void*), void* arg) {
+    mag_compute_task_t* task = (mag_compute_task_t*)(*mag_alloc)(NULL, sizeof(*task));
+    *task = (mag_compute_task_t){
+        .f = f,
+        .arg = arg,
+        .prev = NULL
+    };
+    mag_task_queue_push(&pool->task_queue, task);
+}
+
+static void mag_threadpool_barrier(mag_threadpool_t* pool) { /* Wait for all workers to finish. */
+    mag_mtx_lock(&pool->count_mtx);
+    while (pool->task_queue.len || pool->workers_working) {
+        mag_cv_wait(&pool->all_idle, &pool->count_mtx);
+    }
+    mag_mtx_unlock(&pool->count_mtx);
+}
+
+static void mag_threadpool_pause(mag_threadpool_t* pool) {
+    for (uint32_t i=0; i < pool->workers_alive; ++i) {
+        pthread_kill(pool->workers[i]->thread, SIGUSR1);
+    }
+}
+
+static void mag_threadpool_resume(mag_threadpool_t* pool) {
+    mag_workers_on_hold = false;
+}
+
+static void mag_threadpool_destroy(mag_threadpool_t* pool) {
 
 }
 
@@ -2332,9 +2524,9 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx) {
     mag_thread_sched_prio_t prio = MAG_THREAD_SCHED_PRIO_NORMAL;
     uint32_t num_threads = 4;
 
-    mag_threadpool_t* pool = mag_threadpool_init(num_threads, prio);
+    mag_threadpool_t* pool = mag_threadpool_create(num_threads, prio);
 
-    mag_compute_device_t* dvc = (*mag_alloc)(ctx, sizeof(mag_compute_device_t));
+    mag_compute_device_t* dvc = (mag_compute_device_t*)(*mag_alloc)(ctx, sizeof(mag_compute_device_t));
     *dvc = (mag_compute_device_t){ /* Initialize device interface */
         .name = "CPU",
         .impl = pool,
@@ -2350,8 +2542,8 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx) {
 }
 
 static void mag_cpu_release_interface(mag_compute_device_t* ctx) {
-    mag_threadpool_t* pool = ctx->impl;
-    mag_threadpool_join(pool);
+    mag_threadpool_t* pool = (mag_threadpool_t*)ctx->impl;
+    mag_threadpool_destroy(pool);
     (*mag_alloc)(ctx, 0); /* Free all memory */
 }
 

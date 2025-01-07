@@ -347,22 +347,36 @@ typedef pthread_t mag_thread_t;
 #define mag_thread_join pthread_join
 
 typedef pthread_mutex_t mag_mutex_t;
-#define mag_mutex_init(mtx) pthread_mutex_init(mtx, NULL)
-#define mag_mutex_destroy(mtx) pthread_mutex_destroy(mtx)
-#define mag_mutex_lock(mtx) pthread_mutex_lock(mtx)
-#define mag_mutex_unlock(mtx) pthread_mutex_unlock(mtx)
-#define mag_mutex_lock_shared(mtx) pthread_mutex_lock(mtx)
-#define mag_mutex_unlock_shared(mtx) pthread_mutex_unlock(mtx)
+#define mag_mtx_init(mtx) pthread_mutex_init(mtx, NULL)
+#define mag_mtx_destroy(mtx) pthread_mutex_destroy(mtx)
+#define mag_mtx_lock(mtx) pthread_mutex_lock(mtx)
+#define mag_mtx_unlock(mtx) pthread_mutex_unlock(mtx)
+#define mag_mtx_lock_shared(mtx) pthread_mutex_lock(mtx)
+#define mag_mtx_unlock_shared(mtx) pthread_mutex_unlock(mtx)
 
-typedef pthread_cond_t mag_cv_t;
-#define mag_cond_init(cv) pthread_cond_init(cv, NULL)
-#define mag_cond_destroy(cv) pthread_cond_destroy(cv)
-#define mag_cond_wait(cv, mtx) pthread_cond_wait(c, mtx)
-#define mag_cond_broadcast(cv) pthread_cond_broadcast(cv)
+typedef pthread_cond_t mag_cond_var_t;
+#define mag_cv_init(cv) pthread_cond_init(cv, NULL)
+#define mag_cv_destroy(cv) pthread_cond_destroy(cv)
+#define mag_cv_wait(cv, mtx) pthread_cond_wait(cv, mtx)
+#define mag_cv_signal(cv) pthread_cond_signal(cv)
+#define mag_cv_broadcast(cv) pthread_cond_broadcast(cv)
 
 #endif
 
+typedef struct mag_binary_semaphore_t {
+    mag_mutex_t mtx;
+    mag_cond_var_t cv;
+    bool signaled;
+} mag_binary_semaphore_t;
+extern MAG_EXPORT void mag_binary_semaphore_init(mag_binary_semaphore_t* sem, bool v);
+extern MAG_EXPORT void mag_binary_semaphore_reset(mag_binary_semaphore_t* sem);
+extern MAG_EXPORT void mag_binary_semaphore_post(mag_binary_semaphore_t* sem);
+extern MAG_EXPORT void mag_binary_semaphore_post_all(mag_binary_semaphore_t* sem);
+extern MAG_EXPORT void mag_binary_semaphore_await(mag_binary_semaphore_t* sem);
+extern MAG_EXPORT void mag_binary_semaphore_destroy(mag_binary_semaphore_t* sem);
+
 extern MAG_EXPORT void mag_thread_sched_set_prio(mag_thread_sched_prio_t prio); /* Set thread scheduling priority of current thread. */
+extern MAG_EXPORT void mag_thread_set_name(const char* name); /* Set thread name. */
 
 typedef struct mag_intrusive_chunk mag_intrusive_chunk;
 struct mag_intrusive_chunk {
