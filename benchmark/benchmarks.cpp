@@ -7,6 +7,8 @@
 #include <nanobench.h>
 #include <thread>
 
+#include "magnetron_internal.h"
+
 auto main() -> int {
     ankerl::nanobench::Bench bench {};
     bench.title("Parallel ADD")
@@ -28,7 +30,7 @@ auto main() -> int {
         mag_tensor_t* B = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, tensor_dim, tensor_dim, tensor_dim);
         mag_tensor_fill_random_uniform(B, -1.0f, 1.0f);
 
-        bench.run("Parallel ADD on " + std::to_string(threads) + " threads", [&] {
+        bench.run("Parallel ADD on " + std::to_string(threads) + " threads, Elems = " + std::to_string(A->numel), [&] {
             mag_tensor_t* R = mag_add(A, B);
             ankerl::nanobench::doNotOptimizeAway(R);
             mag_tensor_decref(R);
@@ -42,7 +44,9 @@ auto main() -> int {
 
     std::uint32_t num_threads = std::max(1u, std::thread::hardware_concurrency());
 
-    for (std::uint32_t i=1; i <= num_threads; i <<= 1) {
+    for (std::uint32_t i=1; i <= num_threads;) {
         exec_bench(128, i);
+        if (i == 1) ++i;
+        else i += 2;
     }
 }

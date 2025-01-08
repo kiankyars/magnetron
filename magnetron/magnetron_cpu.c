@@ -1701,69 +1701,67 @@ static void (*mag_blas_dispatch_table_backward[MAG_OP__NUM])(const mag_compute_p
     [MAG_OP_MATMUL] = &mag_blas_matmul_f32
 };
 
-typedef struct mag_compute_task_t mag_compute_task_t;
-struct mag_compute_task_t {
-    mag_compute_task_t* prev;
-    void* (*f)(void*);
-    void* arg;
-};
-
-typedef struct mag_task_queue_t {
+typedef struct mag_signal_t {
     mag_mutex_t mtx;
-    mag_binary_semaphore_t has_task;
-    mag_compute_task_t* front;
-    mag_compute_task_t* rear;
-    size_t len;
-} mag_task_queue_t;
+    mag_cond_var_t cv;
+    volatile mag_atomic_t signaled;
+    volatile mag_atomic_t awakened;
+} mag_signal_t;
 
-static void mag_task_queue_init(mag_task_queue_t* queue) {
-    mag_mtx_init(&queue->mtx);
-    mag_binary_semaphore_init(&queue->has_task, false);
-    queue->front = queue->rear = NULL;
-    queue->len = 0;
+static void mag_sig_init(mag_signal_t* sig) {
+    mag_mtx_init(&sig->mtx);
+    mag_cv_init(&sig->cv);
+    sig->signaled = sig->awakened = 0;
 }
 
-static void mag_task_queue_push(mag_task_queue_t* queue, mag_compute_task_t* task) {
-    mag_mtx_lock(&queue->mtx);
-    task->prev = NULL;
-    if (queue->len) {
-        queue->rear->prev = task;
-        queue->rear = task;
-    } else {
-        queue->front = task;
-        queue->rear = task;
+static void mag_sig_trigger(mag_signal_t* sig, bool notify_all, mag_atomic_t val) {
+    /*
+        The thread that intends to modify the variable has to
+        -> acquire a mutex lock
+        -> perform the modification while the lock is held
+        -> execute notify_one or notify_all on the condition variable (the lock does not need to be held for notification)
+    */
+    mag_assert2(val);
+    mag_mtx_lock(&sig->mtx);
+    mag_assert2(!mag_atomic_load(&sig->signaled, MAG_MO_SEQ_CST) && !mag_atomic_load(&sig->awakened, MAG_MO_SEQ_CST));
+    mag_atomic_store(&sig->signaled, val, MAG_MO_SEQ_CST);
+    mag_mtx_unlock(&sig->mtx);
+    if (notify_all) mag_cv_broadcast(&sig->cv);
+    else mag_cv_signal(&sig->cv);
+}
+
+/* WARNING!
+** If multiple threads are waiting for a signal in an infinite loop,
+** auto-resetting the signal does not guarantee that one thread cannot
+** go through the loop twice. In this case, every thread must wait for its
+** own auto-reset signal or the threads must be blocked by another signal-
+*/
+static mag_atomic_t mag_sig_wait(mag_signal_t* sig, bool auto_reset, mag_atomic_t threads_waiting) {
+    /*  Any thread that intends to wait on condition variable has to
+    **  -> Acquire a mutex lock, on the SAME MUTEX as used to protect the shared variable
+    **  -> Execute wait, wait_for, or wait_until. The wait operations atomically release the mutex and suspend the execution of the thread.
+    **  -> When the condition variable is notified, a timeout expires, or a spurious wakeup occurs, the thread is awakened, and the mutex is atomically reacquired:
+    **    The thread should then check the condition and resume waiting if the wake-up was spurious.
+    */
+    mag_mtx_lock(&sig->mtx);
+    while (!mag_atomic_load(&sig->signaled, MAG_MO_SEQ_CST))
+        mag_cv_wait(&sig->cv, &sig->mtx);
+    mag_atomic_t signaled = mag_atomic_load(&sig->signaled, MAG_MO_SEQ_CST);
+    mag_atomic_t awakened = 1 + mag_atomic_fetch_add(&sig->awakened, 1, MAG_MO_SEQ_CST);
+    if (auto_reset) {
+        mag_assert2(threads_waiting);
+        if (awakened == threads_waiting) {
+            mag_atomic_store(&sig->signaled, 0, MAG_MO_SEQ_CST);
+            mag_atomic_store(&sig->awakened, 0, MAG_MO_SEQ_CST);
+        }
     }
-    ++queue->len;
-    mag_binary_semaphore_post(&queue->has_task);
-    mag_mtx_unlock(&queue->mtx);
+    mag_mtx_unlock(&sig->mtx);
+    return signaled;
 }
 
-static mag_compute_task_t* mag_task_queue_pull(mag_task_queue_t* queue) {
-    mag_mtx_lock(&queue->mtx);
-    mag_compute_task_t* task = queue->front;
-    if (queue->len == 1) {
-        queue->front = queue->rear = NULL;
-        queue->len = 0;
-    } else if (queue->len > 1) {
-        queue->front = task->prev;
-        --queue->len;
-        mag_binary_semaphore_post(&queue->has_task);
-    }
-    mag_mtx_unlock(&queue->mtx);
-    return task;
-}
-
-static void mag_task_queue_clear(mag_task_queue_t* queue) {
-    while (queue->len) (*mag_alloc)(mag_task_queue_pull(queue), 0);
-    queue->front = queue->rear = NULL;
-    mag_binary_semaphore_reset(&queue->has_task);
-    queue->len = 0;
-}
-
-static void mag_task_queue_destroy(mag_task_queue_t* queue) {
-    mag_task_queue_clear(queue);
-    mag_mtx_destroy(&queue->mtx);
-    mag_binary_semaphore_destroy(&queue->has_task);
+static void mag_sig_destroy(mag_signal_t* sig) {
+    mag_cv_destroy(&sig->cv);
+    mag_mtx_destroy(&sig->mtx);
 }
 
 typedef struct mag_worker_t {
@@ -1790,48 +1788,33 @@ struct mag_threadpool_t {
     uint32_t num_workers;
     mag_worker_t* workers;
     mag_thread_sched_prio_t prio;
-    volatile mag_atomic_t is_running;
-    volatile mag_atomic_t workers_alive;
-    volatile mag_atomic_t workers_working;
-    mag_mutex_t count_mtx;
-    mag_cond_var_t all_idle;
-    mag_task_queue_t task_queue;
+    volatile mag_atomic_t num_workers_alive;
+    volatile mag_atomic_t num_workers_done;
+    mag_signal_t start_work;
+    mag_signal_t work_done_signal;
 };
+
+static void mag_worker_thread_exec_op(const mag_compute_payload_t* payload) {
+    (*mag_blas_dispatch_table_forward[payload->node->op])(payload);
+}
 
 static void* mag_worker_entry_fn(void* arg) {
     mag_worker_t* worker = (mag_worker_t*)arg;
+    mag_compute_payload_t* payload = &worker->payload;
     mag_threadpool_t* pool = worker->pool;
     char name[32];
     snprintf(name, sizeof(name), "Magnetron Worker #%" PRIi64, worker->payload.thread_idx);
     mag_thread_set_name(name);
-
-    mag_mtx_lock(&pool->count_mtx);
-    pool->workers_alive++;
-    mag_mtx_unlock(&pool->count_mtx);
-
+    mag_atomic_fetch_add(&pool->num_workers_alive, 1, MAG_MO_RELAXED);
     for (;;) {
-        mag_binary_semaphore_await(&pool->task_queue.has_task);
-        if (mag_atomic_load(&pool->is_running, MAG_MO_RELAXED) == 0) break;
-        mag_mtx_lock(&pool->count_mtx);
-        pool->workers_working++;
-        mag_mtx_unlock(&pool->count_mtx);
-        mag_compute_task_t* task = mag_task_queue_pull(&pool->task_queue);
-        if (task) {
-            void* (*f)(void*) = task->f;
-            void* ar = task->arg;
-            (*f)(ar);
-            (*mag_alloc)(task, 0);
+        if (mag_sig_wait(&pool->start_work, true, pool->num_workers) == -1) break;
+        if (mag_likely(payload->node)) mag_worker_thread_exec_op(payload);
+        mag_atomic_t completed = 1 + mag_atomic_fetch_add(&pool->num_workers_done, 1, MAG_MO_SEQ_CST);
+        if (completed == pool->num_workers) {
+            mag_sig_trigger(&pool->work_done_signal, false, 1);
         }
-        mag_mtx_lock(&pool->count_mtx);
-        pool->workers_working--;
-        if (!pool->workers_working) mag_cv_signal(&pool->all_idle);
-        mag_mtx_unlock(&pool->count_mtx);
     }
-
-    mag_mtx_lock(&pool->count_mtx);
-    pool->workers_alive--;
-    mag_mtx_unlock(&pool->count_mtx);
-
+    mag_atomic_fetch_sub(&pool->num_workers_alive, 1, MAG_MO_RELAXED);
     return NULL;
 }
 
@@ -1849,13 +1832,11 @@ static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers, mag_thread_
         .num_workers = num_workers,
         .workers = workers,
         .prio = prio,
-        .is_running = 1,
-        .workers_alive = 0,
-        .workers_working = 0
+        .num_workers_alive = 0,
+        .num_workers_done = 0,
     };
-    mag_mtx_init(&pool->count_mtx);
-    mag_cv_init(&pool->all_idle);
-    mag_task_queue_init(&pool->task_queue);
+    mag_sig_init(&pool->start_work);
+    mag_sig_init(&pool->work_done_signal);
     for (uint32_t i=0; i < num_workers; ++i) {
         const mag_compute_payload_t payload = (mag_compute_payload_t){
             .thread_num = (int64_t)num_workers,
@@ -1864,58 +1845,30 @@ static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers, mag_thread_
         };
         mag_worker_init(pool->workers+i, pool, &payload);
     }
-    while (pool->workers_alive != num_workers) {
+    while (mag_atomic_load(&pool->num_workers_alive, MAG_MO_RELAXED) != num_workers)
         mag_thread_yield();
-    }
     return pool;
 }
 
-static void mag_threadpool_enqueue_task(mag_threadpool_t* pool, void* (*f)(void*), void* arg) {
-    mag_compute_task_t* task = (mag_compute_task_t*)(*mag_alloc)(NULL, sizeof(*task));
-    *task = (mag_compute_task_t){
-        .prev = NULL,
-        .f = f,
-        .arg = arg,
-    };
-    mag_task_queue_push(&pool->task_queue, task);
-}
-
-static void mag_threadpool_barrier(mag_threadpool_t* pool) { /* Wait for all workers to finish. */
-    mag_mtx_lock(&pool->count_mtx);
-    while (pool->task_queue.len || pool->workers_working) {
-        mag_cv_wait(&pool->all_idle, &pool->count_mtx);
-    }
-    mag_mtx_unlock(&pool->count_mtx);
+static void mag_threadpool_kickoff(mag_threadpool_t* pool, mag_tensor_t* node) {
+    mag_atomic_store(&pool->num_workers_done, 0, MAG_MO_SEQ_CST);
+    for (uint32_t i = 0; i < pool->num_workers; ++i) pool->workers[i].payload.node = node;
+    mag_sig_trigger(&pool->start_work, true, 1);
+    mag_sig_wait(&pool->work_done_signal, true, 1);
 }
 
 static void mag_threadpool_destroy(mag_threadpool_t* pool) {
-    mag_threadpool_barrier(pool);
-    mag_atomic_store(&pool->is_running, 0, MAG_MO_RELAXED);
-    while (pool->workers_alive != 0)
-        mag_binary_semaphore_broadcast(&pool->task_queue.has_task);
-    for (uint32_t i=0; i < pool->num_workers; ++i)
-        mag_worker_destroy(pool->workers+i);
-    mag_task_queue_destroy(&pool->task_queue);
-    mag_cv_destroy(&pool->all_idle);
-    mag_mtx_destroy(&pool->count_mtx);
+    mag_sig_trigger(&pool->start_work, true, -1);
+    for (uint32_t i = 0; i < pool->num_workers; ++i)
+        mag_worker_destroy(pool->workers + i);
+    mag_sig_destroy(&pool->work_done_signal);
+    mag_sig_destroy(&pool->start_work);
     (*mag_alloc)(pool, 0);
-}
-
-static void* mag_cpu_thread_exec(void* arg) {
-    mag_compute_payload_t* payload = (mag_compute_payload_t*)arg;
-    (*mag_blas_dispatch_table_forward[payload->node->op])(payload);
-    return NULL;
 }
 
 static MAG_HOTPROC void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t* node) {
     mag_threadpool_t* pool = (mag_threadpool_t*)dvc->impl;
-    mag_worker_t* worker = pool->workers;
-    uint32_t num_workers = pool->num_workers;
-    for (uint32_t i=0; i < num_workers; ++i) {
-        worker[i].payload.node = node;
-        mag_threadpool_enqueue_task(pool, &mag_cpu_thread_exec, &worker[i].payload);
-    }
-    mag_threadpool_barrier(pool);
+    mag_threadpool_kickoff(pool, node);
 }
 
 static MAG_HOTPROC void mag_cpu_exec_bwd(mag_compute_device_t* dvc, mag_tensor_t* root) {
