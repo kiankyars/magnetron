@@ -8,7 +8,7 @@ from bench import *
 mag.GlobalConfig.compute_device = mag.ComputeDevice.CPU(32)
 mag.GlobalConfig.verbose = True
 
-n: int = 2048
+n: int = 8192
 iters: int = 500
 
 print(f'Benchmarking addition of {n}x{n} matrices with {iters} iterations...')
@@ -18,7 +18,7 @@ np_a = numpy.full((n, n), fill_value=1.0)
 np_b = numpy.full((n, n), fill_value=2.0)
 
 print('Benchmarking numpy...')
-np_result: BenchInfo = bench(n, iters, np_a, np_b, lambda a, b: a - b)
+np_result: BenchInfo = bench(n, iters, np_a, np_b, lambda a, b: a + b)
 
 # bench torch
 device = torch.device('cpu')
@@ -26,14 +26,14 @@ np_a = torch.full((n, n), fill_value=1.0).to(device)
 np_b = torch.full((n, n), fill_value=2.0).to(device)
 
 print('Benchmarking torch...')
-torch_result: BenchInfo = bench(n, iters, np_a, np_b, lambda a, b: a - b)
+torch_result: BenchInfo = bench(n, iters, np_a, np_b, lambda a, b: a + b)
 
 # bench magnetron
 
 print('Benchmarking magnetron...')
 mag_a = mag.Tensor.full((n, n), fill_value=1.0)
 mag_b = mag.Tensor.full((n, n), fill_value=2.0)
-mag_result: BenchInfo = bench(n, iters, mag_a, mag_b, lambda a, b: a - b)
+mag_result: BenchInfo = bench(n, iters, mag_a, mag_b, lambda a, b: a + b)
 
 print('Numpy:')
 print(np_result)
