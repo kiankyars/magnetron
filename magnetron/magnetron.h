@@ -90,10 +90,8 @@ typedef struct mag_ctx_t mag_ctx_t; /* Opaque context type for managing memory p
 
 typedef struct mag_device_descriptor_t {
     mag_compute_device_type_t type; /* Device type */
-    union {
-        uint32_t thread_count;   /* Number of threads if type == MAG_COMPUTE_DEVICE_TYPE_CPU. If set to 0, hardware concurrency of host CPU is detected. */
-        uint32_t cuda_device_id; /* CUDA device ID if type == MAG_COMPUTE_DEVICE_TYPE_GPU_CUDA. Default: 0 (first GPU). */
-    };
+    uint32_t thread_count;   /* Number of threads if type == MAG_COMPUTE_DEVICE_TYPE_CPU. If set to 0, hardware concurrency of host CPU is detected. */
+    uint32_t cuda_device_id; /* CUDA device ID if type == MAG_COMPUTE_DEVICE_TYPE_GPU_CUDA. Default: 0 (first GPU). */
 } mag_device_descriptor_t;
 
 extern MAG_EXPORT mag_ctx_t* mag_ctx_create(mag_compute_device_type_t device); /* Create context with default config, and only specify device type. */

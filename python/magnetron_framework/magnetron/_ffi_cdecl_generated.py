@@ -1,4 +1,4 @@
-# Autogenered by /Users/mariosieg/Documents/projects/magnetron/python/magnetron_framework/bing_gen.py 2024-12-29 15:56:14.554105, do NOT edit!
+# Autogenered by /home/mario/Documents/projects/magnetron/python/magnetron_framework/bing_gen.py 2025-01-08 22:53:50.660079, do NOT edit!
 
 __MAG_CDECLS: str = '''
 
@@ -11,11 +11,18 @@ typedef struct mag_op_meta_t mag_op_meta_t;
 typedef int mag_compute_device_type_t;
 typedef int mag_exec_mode_t;
 typedef int mag_prng_algorithm_t;
+typedef int mag_thread_sched_prio_t;
 typedef int mag_color_channels_t;
 typedef int mag_dtype_t;
 typedef int mag_op_t;
 typedef int mag_op_param_type_t;
 typedef int mag_graph_eval_order_t;
+
+typedef struct mag_device_descriptor_t {
+    mag_compute_device_type_t type;
+    uint32_t thread_count;
+    uint32_t cuda_device_id;
+} mag_device_descriptor_t;
 
 extern   const char* mag_device_type_get_name(mag_compute_device_type_t op);
 extern   void* (*mag_get_alloc_fn(void))(void* blk, size_t size);
@@ -23,6 +30,7 @@ extern   void mag_set_alloc_fn(void* (*alloc)(void* blk, size_t size));
 extern   void mag_set_log_mode(bool enabled);
 typedef uint32_t mag_char32_t;
 extern   mag_ctx_t* mag_ctx_create(mag_compute_device_type_t device);
+extern   mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info);
 extern   mag_exec_mode_t mag_ctx_get_exec_mode(const mag_ctx_t* ctx);
 extern   void mag_ctx_set_exec_mode(mag_ctx_t* ctx, mag_exec_mode_t mode);
 extern   mag_prng_algorithm_t mag_ctx_get_prng_algorithm(const mag_ctx_t* ctx);

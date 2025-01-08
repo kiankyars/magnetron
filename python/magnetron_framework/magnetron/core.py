@@ -25,6 +25,7 @@ MAX_ARG_TENSORS: int = 2
 MAG_MAX_OP_PARAMS: int = 6
 DIM_MAX: int = ((1 << 64) - 1) >> 1
 
+
 def enable_log(enable: bool) -> None:
     """
     Set logging mode for the magnetron backend.
@@ -35,6 +36,7 @@ def enable_log(enable: bool) -> None:
         If True, enables logging of operations and internal states.
     """
     C.mag_set_log_mode(enable)
+
 
 def pack_color(r: int, g: int, b: int) -> int:
     """
@@ -56,12 +58,42 @@ def pack_color(r: int, g: int, b: int) -> int:
     """
     return C.mag_pack_color_u8(r, g, b)
 
-class ComputeDevice(Enum):
+
+class ComputeDevice:
     """
     Compute devices available for parallel computations.
     """
-    CPU = 0
-    CUDA = auto()
+    class CPU:
+        """
+        CPU device configuration.
+        """
+        def __init__(self, num_threads: int = 0):
+            """
+            Initializes a new CPU device configuration.
+
+            Parameters
+            ----------
+            num_threads : int, optional
+                Number of threads to use, 0 for automatic, by default 0.
+            """
+
+            self.num_threads = num_threads
+
+    class CUDA:
+        """
+        CUDA device configuration.
+        """
+        def __init__(self, device_id: int = 0):
+            """
+            Initializes a new CUDA device configuration.
+
+            Parameters
+            ----------
+            device_id : int, optional
+                CUDA device ID, by default 0.
+            """
+
+            self.device_id = device_id
 
 class PRNGAlgorithm(Enum):
     """
@@ -70,38 +102,37 @@ class PRNGAlgorithm(Enum):
     MERSENNE_TWISTER = 0  # Default - Mersenne Twister
     PCG = auto()  # Permuted Congruential Generator
 
+
 class DType(Enum):
     """
     Supported data types for tensors.
     """
     F32 = 0
 
+
 class ColorChannels(Enum):
     """
     Desired color channels when loading images.
     """
-    AUTO = 0   # Automatically determine the number of color channels
-    GRAY = auto()   # Grayscale F32
-    GRAY_A = auto() # Grayscale F32 + Alpha
-    RGB = auto()    # R32G32B32
-    RGBA = auto()   # R32G32B32A32
+    AUTO = 0  # Automatically determine the number of color channels
+    GRAY = auto()  # Grayscale F32
+    GRAY_A = auto()  # Grayscale F32 + Alpha
+    RGB = auto()  # R32G32B32
+    RGBA = auto()  # R32G32B32A32
 
     @property
     def name(self) -> str:
         """Returns the operator name as a string."""
-        assert self.value < self._COUNT.value
         return ffi.string(C.mag_op_get_name(self.value)).decode('utf-8')
 
     @property
     def mnemonic(self) -> str:
         """Returns a short mnemonic name for the operator."""
-        assert self.value < self._COUNT.value
         return ffi.string(C.mag_op_get_mnemonic(self.value)).decode('utf-8')
 
     @property
     def argument_count(self) -> int:
         """Returns the number of tensor arguments required by this operator."""
-        assert self.value < self._COUNT.value
         return C.mag_op_get_argcount(self.value)
 
     @property
@@ -119,25 +150,29 @@ class ColorChannels(Enum):
         """Checks if the operator is a binary operator."""
         return self.argument_count == 2
 
+
 class GraphEvalOrder(Enum):
     """
     Order in which the computation graph should be evaluated.
     Applies to deferred execution mode only.
     """
-    FORWARD = 0   # Evaluate graph left-to-right
-    REVERSE = 1   # Evaluate graph right-to-left
+    FORWARD = 0  # Evaluate graph left-to-right
+    REVERSE = 1  # Evaluate graph right-to-left
+
 
 class ExecutionMode(Enum):
     """
     Execution modes for the magnetron context.
     """
-    EAGER = 0     # Execute operations immediately (dynamic graph)
+    EAGER = 0  # Execute operations immediately (dynamic graph)
     DEFERRED = 1  # Build computation graph and execute later (static graph)
+
 
 @dataclass
 class GlobalConfig:
     verbose: bool = (getenv('MAG_VERBOSE', '0') == '1')
-    compute_device: ComputeDevice = ComputeDevice.CUDA if getenv('MAG_COMPUTE_DEVICE') == 'CUDA' else ComputeDevice.CPU
+    compute_device: ComputeDevice.CPU | ComputeDevice.CUDA = ComputeDevice.CPU()
+
 
 class Context:
     """
@@ -164,7 +199,7 @@ class Context:
             Context._active = Context(GlobalConfig.compute_device)
         return Context._active
 
-    def __init__(self, device: ComputeDevice, *, execution_mode: ExecutionMode = ExecutionMode.EAGER):
+    def __init__(self, device: ComputeDevice.CPU | ComputeDevice.CUDA, *, execution_mode: ExecutionMode = ExecutionMode.EAGER):
         """
         Initializes a new magnetron context.
 
@@ -175,20 +210,15 @@ class Context:
         execution_mode : ExecutionMode, optional
             The execution mode (eager or deferred), by default EAGER.
         """
-        self.ctx = C.mag_ctx_create(device.value)
+        descriptor: ffi.CData = ffi.new('mag_device_descriptor_t*')
+        if isinstance(device, ComputeDevice.CPU):
+            descriptor.type = 0
+            descriptor.thread_count = abs(device.num_threads)
+        elif isinstance(device, ComputeDevice.CUDA):
+            descriptor.type = 1
+            descriptor.cuda_device_id = abs(device.device_id)
+        self.ctx = C.mag_ctx_create2(descriptor)
         self.execution_mode = execution_mode
-
-    @property
-    def compute_device(self) -> ComputeDevice:
-        """
-        Returns the compute device used by this context.
-
-        Returns
-        -------
-        ComputeDevice
-            The compute device (CPU or CUDA).
-        """
-        return ComputeDevice(C.mag_ctx_get_compute_device_type(self.ctx))
 
     @property
     def compute_device_name(self) -> str:
@@ -420,6 +450,7 @@ class Context:
         C.mag_ctx_destroy(self.ctx)
         self.ctx = ffi.NULL
 
+
 class Tensor:
     """
     Represents a tensor in the magnetron library. Supports various operations and transformations.
@@ -544,6 +575,7 @@ class Tensor:
         Tensor
             The constructed tensor.
         """
+
         def flatten_nested_lists(nested):
             if not isinstance(nested, list):
                 return (), [nested]
@@ -688,7 +720,7 @@ class Tensor:
         """
         assert isfile(file_path), f'File not found: {file_path}'
         instance = C.mag_tensor_load_image(Context.active().ctx, bytes(file_path, 'utf-8'), channels.value,
-                                          resize_to[0], resize_to[1])
+                                           resize_to[0], resize_to[1])
         tensor = cls(instance)
         if name is not None:
             tensor.name = name
@@ -1391,35 +1423,43 @@ class Tensor:
 
     def __add__(self, other: object | int | float) -> 'Tensor':
         """Element-wise addition with another tensor or scalar."""
-        return Tensor(C.mag_add(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_adds(self.tensor, float(other)))
+        return Tensor(C.mag_add(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_adds(self.tensor,
+                                                                                                        float(other)))
 
     def __iadd__(self, other: object | int | float) -> 'Tensor':
         """In-place element-wise addition."""
-        return Tensor(C.mag_add_(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_adds_(self.tensor, float(other)))
+        return Tensor(C.mag_add_(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_adds_(self.tensor,
+                                                                                                          float(other)))
 
     def __sub__(self, other: object | int | float) -> 'Tensor':
         """Element-wise subtraction with another tensor or scalar."""
-        return Tensor(C.mag_sub(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_subs(self.tensor, float(other)))
+        return Tensor(C.mag_sub(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_subs(self.tensor,
+                                                                                                        float(other)))
 
     def __isub__(self, other: object | int | float) -> 'Tensor':
         """In-place element-wise subtraction."""
-        return Tensor(C.mag_sub_(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_subs_(self.tensor, float(other)))
+        return Tensor(C.mag_sub_(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_subs_(self.tensor,
+                                                                                                          float(other)))
 
     def __mul__(self, other: object | int | float) -> 'Tensor':
         """Element-wise multiplication with another tensor or scalar."""
-        return Tensor(C.mag_mul(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_muls(self.tensor, float(other)))
+        return Tensor(C.mag_mul(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_muls(self.tensor,
+                                                                                                        float(other)))
 
     def __imul__(self, other: object | int | float) -> 'Tensor':
         """In-place element-wise multiplication."""
-        return Tensor(C.mag_mul_(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_muls_(self.tensor, float(other)))
+        return Tensor(C.mag_mul_(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_muls_(self.tensor,
+                                                                                                          float(other)))
 
     def __truediv__(self, other: object | int | float) -> 'Tensor':
         """Element-wise division with another tensor or scalar."""
-        return Tensor(C.mag_div(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_divs(self.tensor, float(other)))
+        return Tensor(C.mag_div(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_divs(self.tensor,
+                                                                                                        float(other)))
 
     def __itruediv__(self, other: object | int | float) -> 'Tensor':
         """In-place element-wise division."""
-        return Tensor(C.mag_div_(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_divs_(self.tensor, float(other)))
+        return Tensor(C.mag_div_(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_divs_(self.tensor,
+                                                                                                          float(other)))
 
     def __matmul__(self, other: 'Tensor') -> 'Tensor':
         """Matrix multiplication with another tensor: A @ B."""
