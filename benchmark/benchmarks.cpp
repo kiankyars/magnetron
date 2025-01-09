@@ -1,52 +1,135 @@
-// (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
-
-// ON LINUX: Before running the benchmark, execute: linux_prepare_perf.sh to setup the system for performance measurements.
-
-#include <magnetron.h>
-#define ANKERL_NANOBENCH_IMPLEMENT
-#include <nanobench.h>
+#include <atomic>
+#include <iostream>
+#include <deque>
+#include <functional>
 #include <thread>
+#include <condition_variable>
+#include <mutex>
+#include <random>
 
-#include "magnetron_internal.h"
+//thread pool
+class ThreadPool
+{
+public:
+    ThreadPool(unsigned int n = std::thread::hardware_concurrency());
 
-auto main() -> int {
-    ankerl::nanobench::Bench bench {};
-    bench.title("Parallel ADD")
-        .unit("ADD")
-        .minEpochIterations(1024)
-        .warmup(100)
-        .relative(true)
-        .performanceCounters(true);
+    template<class F> void enqueue(F&& f);
+    void waitFinished();
+    ~ThreadPool();
 
-    auto exec_bench = [&](std::int64_t tensor_dim, std::uint32_t threads) {
+    unsigned int getProcessed() const { return processed;  }
 
-        const mag_device_descriptor_t desc = {
-            .type = MAG_COMPUTE_DEVICE_TYPE_CPU,
-            .thread_count = threads,
-        };
-        mag_ctx_t* ctx = mag_ctx_create2(&desc);
-        mag_tensor_t* A = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, tensor_dim, tensor_dim, tensor_dim);
-        mag_tensor_fill_random_uniform(A, -1.0f, 1.0f);
-        mag_tensor_t* B = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, tensor_dim, tensor_dim, tensor_dim);
-        mag_tensor_fill_random_uniform(B, -1.0f, 1.0f);
+private:
+    std::vector< std::thread > workers;
+    std::deque< std::function<void()> > tasks;
+    std::mutex queue_mutex;
+    std::condition_variable cv_task;
+    std::condition_variable cv_finished;
+    std::atomic_uint busy, processed;
+    bool stop;
 
-        bench.run("Parallel ADD on " + std::to_string(threads) + " threads, Elems = " + std::to_string(A->numel), [&] {
-            mag_tensor_t* R = mag_add(A, B);
-            ankerl::nanobench::doNotOptimizeAway(R);
-            mag_tensor_decref(R);
-        });
+    void thread_proc();
+};
 
-        ankerl::nanobench::doNotOptimizeAway(ctx);
-        mag_tensor_decref(B);
-        mag_tensor_decref(A);
-        mag_ctx_destroy(ctx);
-    };
+ThreadPool::ThreadPool(unsigned int n)
+    : busy(ATOMIC_VAR_INIT(0U))
+    , processed(ATOMIC_VAR_INIT(0U))
+    , stop()
+{
+    for (unsigned int i=0; i<n; ++i)
+        workers.emplace_back(std::bind(&ThreadPool::thread_proc, this));
+}
 
-    std::uint32_t num_threads = std::max(1u, std::thread::hardware_concurrency());
+ThreadPool::~ThreadPool()
+{
+    // set stop-condition
+    std::unique_lock<std::mutex> lock(queue_mutex);
+    stop = true;
+    cv_task.notify_all();
+    lock.unlock();
 
-    for (std::uint32_t i=1; i <= num_threads;) {
-        exec_bench(128, i);
-        if (i == 1) ++i;
-        else i += 2;
+    // all threads terminate, then we're done.
+    for (auto& t : workers)
+        t.join();
+}
+
+void ThreadPool::thread_proc()
+{
+    while (true)
+    {
+        std::unique_lock<std::mutex> lock(queue_mutex);
+        cv_task.wait(lock, [this](){ return stop || !tasks.empty(); });
+        if (!tasks.empty())
+        {
+            // got work. set busy.
+            ++busy;
+
+            // pull from queue
+            auto fn = tasks.front();
+            tasks.pop_front();
+
+            // release lock. run async
+            lock.unlock();
+
+            // run function outside context
+            fn();
+
+            lock.lock();
+            ++processed;
+            --busy;
+            cv_finished.notify_one();
+        }
+        else if (stop)
+        {
+            break;
+        }
     }
+}
+
+// generic function push
+template<class F>
+void ThreadPool::enqueue(F&& f)
+{
+    std::unique_lock<std::mutex> lock(queue_mutex);
+    tasks.emplace_back(std::forward<F>(f));
+    cv_task.notify_one();
+}
+
+// waits until the queue is empty.
+void ThreadPool::waitFinished()
+{
+    std::unique_lock<std::mutex> lock(queue_mutex);
+    cv_finished.wait(lock, [this](){ return tasks.empty() && (busy == 0); });
+}
+
+// a cpu-busy task.
+void work_proc()
+{
+    std::random_device rd;
+    std::mt19937 rng(rd());
+
+    // build a vector of random numbers
+    std::vector<int> data;
+    data.reserve(100000);
+    std::generate_n(std::back_inserter(data), data.capacity(), [&](){ return rng(); });
+    std::sort(data.begin(), data.end());
+}
+
+int main()
+{
+    ThreadPool tp;
+
+    // run five batches of 100 items
+    for (int x=0; x<5; ++x)
+    {
+        // queue 100 work tasks
+        for (int i=0; i<100; ++i)
+            tp.enqueue(work_proc);
+
+        tp.waitFinished();
+        std::cout << tp.getProcessed() << '\n';
+    }
+
+    // destructor will close down thread pool
+    return EXIT_SUCCESS;
 }

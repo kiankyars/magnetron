@@ -17,6 +17,7 @@ typedef struct mag_compute_payload_t {
     int64_t thread_num;
     int64_t thread_idx;
     mag_tensor_t* node;
+    size_t cycle;
 } mag_compute_payload_t;
 
 #define mag_f32p(t) ((const float*)(t)->storage.base)
@@ -1198,386 +1199,85 @@ mag_cpu_blas_impl_unary_scalar(div)
 
 #undef mag_cpu_blas_impl_unary_scalar
 
-static void MAG_HOTPROC mag_blas_add_f32(const mag_compute_payload_t* payload) {
-    mag_tensor_t* r = payload->node;
-    const mag_tensor_t* const x = r->op_inputs[0];
-    const mag_tensor_t* const y = r->op_inputs[1];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    const float* const b_y = mag_f32p(y);
-    mag_load_local_storage_group(r, r_d, shape);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_d, shape);
-    mag_load_local_storage_group(x, x_s, strides);
-    mag_load_local_storage_group(y, y_d, shape);
-    mag_load_local_storage_group(y, y_s, strides);
-    const int64_t tc = payload->thread_num;         /* Thread count */
-    const int64_t ti = payload->thread_idx;         /* Thread idx ∈ {1, 2, ..., tc-1} */
-    const int64_t nr = mag_tensor_num_rows(x);  /* Number of rows */
-    const int64_t rpt = (nr + tc - 1)/tc;       /* Row partition size. */
-    const int64_t ra = rpt*ti;                  /* Row partition start */
-    const int64_t rb = mag_xmin(ra+rpt, nr);    /* Row partition end */
-    if (y_s0 == 1) { /* Fast path for contiguous input tensors. */
-        for (int64_t ri=ra; ri < rb; ++ri) { /* Iterate row partition: P := {ra, ..., rb-1} with |P| = rpt. */
-            int64_t ro = ri;
-            const int64_t x_i1 = ro % x_d1; ro /= x_d1;
-            const int64_t x_i2 = ro % x_d2; ro /= x_d2;
-            const int64_t x_i3 = ro % x_d3; ro /= x_d3;
-            const int64_t x_i4 = ro % x_d4; ro /= x_d4;
-            const int64_t x_i5 = ro;
-            const int64_t y_i5 = x_i5 % y_d5;
-            const int64_t y_i4 = x_i4 % y_d4;
-            const int64_t y_i3 = x_i3 % y_d3;
-            const int64_t y_i2 = x_i2 % y_d2;
-            const int64_t y_i1 = x_i1 % y_d1;
-            float* const p_r = b_r + x_i1*r_s1 + x_i2*r_s2 + x_i3*r_s3 + x_i4*r_s4 + x_i5*r_s5;
-            const float* const p_x = b_x + x_i1*x_s1 + x_i2*x_s2 + x_i3*x_s3 + x_i4*x_s4 + x_i5*x_s5;
-            const float* const p_y = b_y + y_i1*y_s1 + y_i2*y_s2 + y_i3*y_s3 + y_i4*y_s4 + y_i5*y_s5;
-            mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y));
-            const int64_t pa = x_d0 / y_d0;
-            for (int64_t i=0; i < pa; ++i) {  /* For each element in row */
-                float* const pp_r = p_r + i*y_d0; /* Compute result ptr. */
-                const float* const pp_x = p_x + i*y_d0; /* Compute x ptr. */
-                mag_bnd_chk(pp_r, b_r, mag_tensor_data_size(r));
-                mag_bnd_chk(pp_x, b_x, mag_tensor_data_size(x));
-                mag_vadd_f32(y_d0, pp_r, pp_x, p_y);  /* Apply micro kernel vector op */
-            }
-        }
-    } else { /* Slow path for non-contiguous input tensors. */
-        const int64_t rc = mag_tensor_num_rows(x);  /* Number of rows */
-        int64_t x_i1 = 0;
-        int64_t x_i2 = 0;
-        int64_t x_i3 = 0;
-        int64_t x_i4 = 0;
-        int64_t x_i5 = 0;
-        for (int64_t ri=0; ri < rc; ++ri) { /* For each row */
-            /* Compute broadcasted 5D indices for y and the resulting buffer ptrs for r,x,y. */
-            const int64_t y_i5 = x_i5 % y_d5;
-            const int64_t y_i4 = x_i4 % y_d4;
-            const int64_t y_i3 = x_i3 % y_d3;
-            const int64_t y_i2 = x_i2 % y_d2;
-            const int64_t y_i1 = x_i1 % y_d1;
-            float* const p_r = b_r + x_i1*r_s1 + x_i2*r_s2 + x_i3*r_s3 + x_i4*r_s4 + x_i5*r_s5;
-            const float* const p_x = b_x + x_i1*x_s1 + x_i2*x_s2 + x_i3*x_s3 + x_i4*x_s4 + x_i5*x_s5;
-            for (int64_t i=0; i < r_d0; ++i) {  /* For each element in row */
-                const float* const p_y = b_y + i%y_d0*y_s0 + y_i1*y_s1 + y_i2*y_s2 + y_i3*y_s3 + y_i4*y_s4 + y_i5*y_s5; /* Compute result ptr. */
-                mag_bnd_chk(p_r+i, b_r, mag_tensor_data_size(r));
-                mag_bnd_chk(p_x+i, b_x, mag_tensor_data_size(x));
-                mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y));
-                p_r[i] = p_x[i] + *p_y; /* Apply scalar op. */
-            }
-            /* Incremental index computation. */
-            ++x_i1;
-            if (x_i1 >= x_d1) {
-                x_i1 = 0;
-                ++x_i2;
-                if (x_i2 >= x_d2) {
-                    x_i2 = 0;
-                    ++x_i3;
-                    if (x_i3 >= x_d3) {
-                        x_i3 = 0;
-                        ++x_i4;
-                        if (x_i4 >= x_d4) {
-                            x_i4 = 0;
-                            ++x_i5;
-                        }
-                    }
-                }
-            }
-        }
+#define mag_cpu_blas_impl_binary(name, op) \
+    static void MAG_HOTPROC mag_blas_##name##_f32(const mag_compute_payload_t* payload) { \
+        mag_tensor_t* r = payload->node; \
+        const mag_tensor_t* const x = r->op_inputs[0]; \
+        const mag_tensor_t* const y = r->op_inputs[1]; \
+        float* const b_r = mag_f32p_mut(r); \
+        const float* const b_x = mag_f32p(x); \
+        const float* const b_y = mag_f32p(y); \
+        mag_load_local_storage_group(r, r_d, shape); \
+        mag_load_local_storage_group(r, r_s, strides); \
+        mag_load_local_storage_group(x, x_d, shape); \
+        mag_load_local_storage_group(x, x_s, strides); \
+        mag_load_local_storage_group(y, y_d, shape); \
+        mag_load_local_storage_group(y, y_s, strides); \
+        const int64_t tc = payload->thread_num; \
+        const int64_t ti = payload->thread_idx; \
+        const int64_t nr = mag_tensor_num_rows(x); \
+        const int64_t rpt = (nr + tc - 1)/tc;\
+        const int64_t ra = rpt*ti; \
+        const int64_t rb = mag_xmin(ra+rpt, nr); \
+        printf("#%ld \n", ti); \
+        return; \
+        \
+        if (y_s0 == 1) { \
+            for (int64_t ri=ra; ri < rb; ++ri) { \
+                int64_t ro = ri; \
+                const int64_t x_i1 = ro % x_d1; ro /= x_d1; \
+                const int64_t x_i2 = ro % x_d2; ro /= x_d2; \
+                const int64_t x_i3 = ro % x_d3; ro /= x_d3; \
+                const int64_t x_i4 = ro % x_d4; ro /= x_d4; \
+                const int64_t x_i5 = ro; \
+                const int64_t y_i5 = x_i5 % y_d5; \
+                const int64_t y_i4 = x_i4 % y_d4; \
+                const int64_t y_i3 = x_i3 % y_d3; \
+                const int64_t y_i2 = x_i2 % y_d2; \
+                const int64_t y_i1 = x_i1 % y_d1; \
+                float* const p_r = b_r + x_i1*r_s1 + x_i2*r_s2 + x_i3*r_s3 + x_i4*r_s4 + x_i5*r_s5; \
+                const float* const p_x = b_x + x_i1*x_s1 + x_i2*x_s2 + x_i3*x_s3 + x_i4*x_s4 + x_i5*x_s5; \
+                const float* const p_y = b_y + y_i1*y_s1 + y_i2*y_s2 + y_i3*y_s3 + y_i4*y_s4 + y_i5*y_s5; \
+                mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y)); \
+                const int64_t pa = x_d0 / y_d0; \
+                for (int64_t i=0; i < pa; ++i) { \
+                    float* const pp_r = p_r + i*y_d0; \
+                    const float* const pp_x = p_x + i*y_d0;\
+                    mag_bnd_chk(pp_r, b_r, mag_tensor_data_size(r)); \
+                    mag_bnd_chk(pp_x, b_x, mag_tensor_data_size(x)); \
+                    mag_v##name##_f32(y_d0, pp_r, pp_x, p_y); \
+                } \
+            } \
+        } else { \
+            for (int64_t ri=ra; ri < rb; ++ri) { \
+                int64_t ro = ri; \
+                const int64_t x_i1 = ro % x_d1; ro /= x_d1; \
+                const int64_t x_i2 = ro % x_d2; ro /= x_d2; \
+                const int64_t x_i3 = ro % x_d3; ro /= x_d3; \
+                const int64_t x_i4 = ro % x_d4; ro /= x_d4; \
+                const int64_t x_i5 = ro; \
+                const int64_t y_i5 = x_i5 % y_d5; \
+                const int64_t y_i4 = x_i4 % y_d4; \
+                const int64_t y_i3 = x_i3 % y_d3; \
+                const int64_t y_i2 = x_i2 % y_d2; \
+                const int64_t y_i1 = x_i1 % y_d1; \
+                float* const p_r = b_r + x_i1*r_s1 + x_i2*r_s2 + x_i3*r_s3 + x_i4*r_s4 + x_i5*r_s5; \
+                const float* const p_x = b_x + x_i1*x_s1 + x_i2*x_s2 + x_i3*x_s3 + x_i4*x_s4 + x_i5*x_s5; \
+                for (int64_t i=0; i < r_d0; ++i) { \
+                    const float* const p_y = b_y + i%y_d0*y_s0 + y_i1*y_s1 + y_i2*y_s2 + y_i3*y_s3 + y_i4*y_s4 + y_i5*y_s5; \
+                    mag_bnd_chk(p_r+i, b_r, mag_tensor_data_size(r)); \
+                    mag_bnd_chk(p_x+i, b_x, mag_tensor_data_size(x)); \
+                    mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y)); \
+                    p_r[i] = p_x[i] op *p_y; \
+                } \
+            } \
+        } \
     }
-}
 
-static void MAG_HOTPROC mag_blas_sub_f32(const mag_compute_payload_t* payload) {
-    mag_tensor_t* r = payload->node;
-    const mag_tensor_t* const x = r->op_inputs[0];
-    const mag_tensor_t* const y = r->op_inputs[1];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    const float* const b_y = mag_f32p(y);
-    mag_load_local_storage_group(r, r_d, shape);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_d, shape);
-    mag_load_local_storage_group(x, x_s, strides);
-    mag_load_local_storage_group(y, y_d, shape);
-    mag_load_local_storage_group(y, y_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    int64_t x_i1 = 0;
-    int64_t x_i2 = 0;
-    int64_t x_i3 = 0;
-    int64_t x_i4 = 0;
-    int64_t x_i5 = 0;
-    if (y_s0 == 1) { /* Fast path for contiguous input tensors. */
-        for (int64_t ri=0; ri < rc; ++ri) { /* For each row */
-            /* Compute broadcasted 5D indices for y and the resulting buffer ptrs for r,x,y. */
-            const int64_t y_i5 = x_i5 % y_d5;
-            const int64_t y_i4 = x_i4 % y_d4;
-            const int64_t y_i3 = x_i3 % y_d3;
-            const int64_t y_i2 = x_i2 % y_d2;
-            const int64_t y_i1 = x_i1 % y_d1;
-            float* const p_r = b_r + x_i1*r_s1 + x_i2*r_s2 + x_i3*r_s3 + x_i4*r_s4 + x_i5*r_s5;
-            const float* const p_x = b_x + x_i1*x_s1 + x_i2*x_s2 + x_i3*x_s3 + x_i4*x_s4 + x_i5*x_s5;
-            const float* const p_y = b_y + y_i1*y_s1 + y_i2*y_s2 + y_i3*y_s3 + y_i4*y_s4 + y_i5*y_s5;
-            mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y));
-            const int64_t pa = x_d0 / y_d0;
-            for (int64_t i=0; i < pa; ++i) {  /* For each element in row */
-                float* const pp_r = p_r + i*y_d0; /* Compute result ptr. */
-                const float* const pp_x = p_x + i*y_d0; /* Compute x ptr. */
-                mag_bnd_chk(pp_r, b_r, mag_tensor_data_size(r));
-                mag_bnd_chk(pp_x, b_x, mag_tensor_data_size(x));
-                mag_vsub_f32(y_d0, pp_r, pp_x, p_y);  /* Apply micro kernel vector op */
-            }
-            /* Incremental index computation. */
-            ++x_i1;
-            if (x_i1 >= x_d1) {
-                x_i1 = 0;
-                ++x_i2;
-                if (x_i2 >= x_d2) {
-                    x_i2 = 0;
-                    ++x_i3;
-                    if (x_i3 >= x_d3) {
-                        x_i3 = 0;
-                        ++x_i4;
-                        if (x_i4 >= x_d4) {
-                            x_i4 = 0;
-                            ++x_i5;
-                        }
-                    }
-                }
-            }
-        }
-    } else { /* Slow path for non-contiguous input tensors. */
-        for (int64_t ri=0; ri < rc; ++ri) { /* For each row */
-            /* Compute broadcasted 5D indices for y and the resulting buffer ptrs for r,x,y. */
-            const int64_t y_i5 = x_i5 % y_d5;
-            const int64_t y_i4 = x_i4 % y_d4;
-            const int64_t y_i3 = x_i3 % y_d3;
-            const int64_t y_i2 = x_i2 % y_d2;
-            const int64_t y_i1 = x_i1 % y_d1;
-            float* const p_r = b_r + x_i1*r_s1 + x_i2*r_s2 + x_i3*r_s3 + x_i4*r_s4 + x_i5*r_s5;
-            const float* const p_x = b_x + x_i1*x_s1 + x_i2*x_s2 + x_i3*x_s3 + x_i4*x_s4 + x_i5*x_s5;
-            for (int64_t i=0; i < r_d0; ++i) {  /* For each element in row */
-                const float* const p_y = b_y + i%y_d0*y_s0 + y_i1*y_s1 + y_i2*y_s2 + y_i3*y_s3 + y_i4*y_s4 + y_i5*y_s5; /* Compute result ptr. */
-                mag_bnd_chk(p_r+i, b_r, mag_tensor_data_size(r));
-                mag_bnd_chk(p_x+i, b_x, mag_tensor_data_size(x));
-                mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y));
-                p_r[i] = p_x[i] - *p_y; /* Apply scalar op. */
-            }
-            /* Incremental index computation. */
-            ++x_i1;
-            if (x_i1 >= x_d1) {
-                x_i1 = 0;
-                ++x_i2;
-                if (x_i2 >= x_d2) {
-                    x_i2 = 0;
-                    ++x_i3;
-                    if (x_i3 >= x_d3) {
-                        x_i3 = 0;
-                        ++x_i4;
-                        if (x_i4 >= x_d4) {
-                            x_i4 = 0;
-                            ++x_i5;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-static void MAG_HOTPROC mag_blas_mul_f32(const mag_compute_payload_t* payload) {
-    mag_tensor_t* r = payload->node;
-    const mag_tensor_t* const x = r->op_inputs[0];
-    const mag_tensor_t* const y = r->op_inputs[1];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    const float* const b_y = mag_f32p(y);
-    mag_load_local_storage_group(r, r_d, shape);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_d, shape);
-    mag_load_local_storage_group(x, x_s, strides);
-    mag_load_local_storage_group(y, y_d, shape);
-    mag_load_local_storage_group(y, y_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    int64_t x_i1 = 0;
-    int64_t x_i2 = 0;
-    int64_t x_i3 = 0;
-    int64_t x_i4 = 0;
-    int64_t x_i5 = 0;
-    if (y_s0 == 1) { /* Fast path for contiguous input tensors. */
-        for (int64_t ri=0; ri < rc; ++ri) { /* For each row */
-            /* Compute broadcasted 5D indices for y and the resulting buffer ptrs for r,x,y. */
-            const int64_t y_i5 = x_i5 % y_d5;
-            const int64_t y_i4 = x_i4 % y_d4;
-            const int64_t y_i3 = x_i3 % y_d3;
-            const int64_t y_i2 = x_i2 % y_d2;
-            const int64_t y_i1 = x_i1 % y_d1;
-            float* const p_r = b_r + x_i1*r_s1 + x_i2*r_s2 + x_i3*r_s3 + x_i4*r_s4 + x_i5*r_s5;
-            const float* const p_x = b_x + x_i1*x_s1 + x_i2*x_s2 + x_i3*x_s3 + x_i4*x_s4 + x_i5*x_s5;
-            const float* const p_y = b_y + y_i1*y_s1 + y_i2*y_s2 + y_i3*y_s3 + y_i4*y_s4 + y_i5*y_s5;
-            mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y));
-            const int64_t pa = x_d0 / y_d0;
-            for (int64_t i=0; i < pa; ++i) {  /* For each element in row */
-                float* const pp_r = p_r + i*y_d0; /* Compute result ptr. */
-                const float* const pp_x = p_x + i*y_d0; /* Compute x ptr. */
-                mag_bnd_chk(pp_r, b_r, mag_tensor_data_size(r));
-                mag_bnd_chk(pp_x, b_x, mag_tensor_data_size(x));
-                mag_vmul_f32(y_d0, pp_r, pp_x, p_y);  /* Apply micro kernel vector op */
-            }
-            /* Incremental index computation. */
-            ++x_i1;
-            if (x_i1 >= x_d1) {
-                x_i1 = 0;
-                ++x_i2;
-                if (x_i2 >= x_d2) {
-                    x_i2 = 0;
-                    ++x_i3;
-                    if (x_i3 >= x_d3) {
-                        x_i3 = 0;
-                        ++x_i4;
-                        if (x_i4 >= x_d4) {
-                            x_i4 = 0;
-                            ++x_i5;
-                        }
-                    }
-                }
-            }
-        }
-    } else { /* Slow path for non-contiguous input tensors. */
-        for (int64_t ri=0; ri < rc; ++ri) { /* For each row */
-            /* Compute broadcasted 5D indices for y and the resulting buffer ptrs for r,x,y. */
-            const int64_t y_i5 = x_i5 % y_d5;
-            const int64_t y_i4 = x_i4 % y_d4;
-            const int64_t y_i3 = x_i3 % y_d3;
-            const int64_t y_i2 = x_i2 % y_d2;
-            const int64_t y_i1 = x_i1 % y_d1;
-            float* const p_r = b_r + x_i1*r_s1 + x_i2*r_s2 + x_i3*r_s3 + x_i4*r_s4 + x_i5*r_s5;
-            const float* const p_x = b_x + x_i1*x_s1 + x_i2*x_s2 + x_i3*x_s3 + x_i4*x_s4 + x_i5*x_s5;
-            for (int64_t i=0; i < r_d0; ++i) {  /* For each element in row */
-                const float* const p_y = b_y + i%y_d0*y_s0 + y_i1*y_s1 + y_i2*y_s2 + y_i3*y_s3 + y_i4*y_s4 + y_i5*y_s5; /* Compute result ptr. */
-                mag_bnd_chk(p_r+i, b_r, mag_tensor_data_size(r));
-                mag_bnd_chk(p_x+i, b_x, mag_tensor_data_size(x));
-                mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y));
-                p_r[i] = p_x[i] * *p_y; /* Apply scalar op. */
-            }
-            /* Incremental index computation. */
-            ++x_i1;
-            if (x_i1 >= x_d1) {
-                x_i1 = 0;
-                ++x_i2;
-                if (x_i2 >= x_d2) {
-                    x_i2 = 0;
-                    ++x_i3;
-                    if (x_i3 >= x_d3) {
-                        x_i3 = 0;
-                        ++x_i4;
-                        if (x_i4 >= x_d4) {
-                            x_i4 = 0;
-                            ++x_i5;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-static void MAG_HOTPROC mag_blas_div_f32(const mag_compute_payload_t* payload) {
-    mag_tensor_t* r = payload->node;
-    const mag_tensor_t* const x = r->op_inputs[0];
-    const mag_tensor_t* const y = r->op_inputs[1];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
-    const float* const b_y = mag_f32p(y);
-    mag_load_local_storage_group(r, r_d, shape);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_d, shape);
-    mag_load_local_storage_group(x, x_s, strides);
-    mag_load_local_storage_group(y, y_d, shape);
-    mag_load_local_storage_group(y, y_s, strides);
-    const int64_t rc = mag_tensor_num_rows(x);
-    int64_t x_i1 = 0;
-    int64_t x_i2 = 0;
-    int64_t x_i3 = 0;
-    int64_t x_i4 = 0;
-    int64_t x_i5 = 0;
-    if (y_s0 == 1) { /* Fast path for contiguous input tensors. */
-        for (int64_t ri=0; ri < rc; ++ri) { /* For each row */
-            /* Compute broadcasted 5D indices for y and the resulting buffer ptrs for r,x,y. */
-            const int64_t y_i5 = x_i5 % y_d5;
-            const int64_t y_i4 = x_i4 % y_d4;
-            const int64_t y_i3 = x_i3 % y_d3;
-            const int64_t y_i2 = x_i2 % y_d2;
-            const int64_t y_i1 = x_i1 % y_d1;
-            float* const p_r = b_r + x_i1*r_s1 + x_i2*r_s2 + x_i3*r_s3 + x_i4*r_s4 + x_i5*r_s5;
-            const float* const p_x = b_x + x_i1*x_s1 + x_i2*x_s2 + x_i3*x_s3 + x_i4*x_s4 + x_i5*x_s5;
-            const float* const p_y = b_y + y_i1*y_s1 + y_i2*y_s2 + y_i3*y_s3 + y_i4*y_s4 + y_i5*y_s5;
-            mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y));
-            const int64_t pa = x_d0 / y_d0;
-            for (int64_t i=0; i < pa; ++i) {  /* For each element in row */
-                float* const pp_r = p_r + i*y_d0; /* Compute result ptr. */
-                const float* const pp_x = p_x + i*y_d0; /* Compute x ptr. */
-                mag_bnd_chk(pp_r, b_r, mag_tensor_data_size(r));
-                mag_bnd_chk(pp_x, b_x, mag_tensor_data_size(x));
-                mag_vdiv_f32(y_d0, pp_r, pp_x, p_y);  /* Apply micro kernel vector op */
-            }
-            /* Incremental index computation. */
-            ++x_i1;
-            if (x_i1 >= x_d1) {
-                x_i1 = 0;
-                ++x_i2;
-                if (x_i2 >= x_d2) {
-                    x_i2 = 0;
-                    ++x_i3;
-                    if (x_i3 >= x_d3) {
-                        x_i3 = 0;
-                        ++x_i4;
-                        if (x_i4 >= x_d4) {
-                            x_i4 = 0;
-                            ++x_i5;
-                        }
-                    }
-                }
-            }
-        }
-    } else { /* Slow path for non-contiguous input tensors. */
-        for (int64_t ri=0; ri < rc; ++ri) { /* For each row */
-            /* Compute broadcasted 5D indices for y and the resulting buffer ptrs for r,x,y. */
-            const int64_t y_i5 = x_i5 % y_d5;
-            const int64_t y_i4 = x_i4 % y_d4;
-            const int64_t y_i3 = x_i3 % y_d3;
-            const int64_t y_i2 = x_i2 % y_d2;
-            const int64_t y_i1 = x_i1 % y_d1;
-            float* const p_r = b_r + x_i1*r_s1 + x_i2*r_s2 + x_i3*r_s3 + x_i4*r_s4 + x_i5*r_s5;
-            const float* const p_x = b_x + x_i1*x_s1 + x_i2*x_s2 + x_i3*x_s3 + x_i4*x_s4 + x_i5*x_s5;
-            for (int64_t i=0; i < r_d0; ++i) {  /* For each element in row */
-                const float* const p_y = b_y + i%y_d0*y_s0 + y_i1*y_s1 + y_i2*y_s2 + y_i3*y_s3 + y_i4*y_s4 + y_i5*y_s5; /* Compute result ptr. */
-                mag_bnd_chk(p_r+i, b_r, mag_tensor_data_size(r));
-                mag_bnd_chk(p_x+i, b_x, mag_tensor_data_size(x));
-                mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y));
-                p_r[i] = p_x[i] / *p_y; /* Apply scalar op. */
-            }
-            /* Incremental index computation. */
-            ++x_i1;
-            if (x_i1 >= x_d1) {
-                x_i1 = 0;
-                ++x_i2;
-                if (x_i2 >= x_d2) {
-                    x_i2 = 0;
-                    ++x_i3;
-                    if (x_i3 >= x_d3) {
-                        x_i3 = 0;
-                        ++x_i4;
-                        if (x_i4 >= x_d4) {
-                            x_i4 = 0;
-                            ++x_i5;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+mag_cpu_blas_impl_binary(add, +)
+mag_cpu_blas_impl_binary(sub, -)
+mag_cpu_blas_impl_binary(mul, *)
+mag_cpu_blas_impl_binary(div, /)
 
 /*
 ** Matrix multiplication.
@@ -1701,69 +1401,6 @@ static void (*mag_blas_dispatch_table_backward[MAG_OP__NUM])(const mag_compute_p
     [MAG_OP_MATMUL] = &mag_blas_matmul_f32
 };
 
-typedef struct mag_signal_t {
-    mag_mutex_t mtx;
-    mag_cond_var_t cv;
-    volatile mag_atomic_t signaled;
-    volatile mag_atomic_t awakened;
-} mag_signal_t;
-
-static void mag_sig_init(mag_signal_t* sig) {
-    mag_mtx_init(&sig->mtx);
-    mag_cv_init(&sig->cv);
-    sig->signaled = sig->awakened = 0;
-}
-
-static void mag_sig_trigger(mag_signal_t* sig, bool notify_all, mag_atomic_t val) {
-    /*
-        The thread that intends to modify the variable has to
-        -> acquire a mutex lock
-        -> perform the modification while the lock is held
-        -> execute notify_one or notify_all on the condition variable (the lock does not need to be held for notification)
-    */
-    mag_assert2(val);
-    mag_mtx_lock(&sig->mtx);
-    mag_assert2(!mag_atomic_load(&sig->signaled, MAG_MO_SEQ_CST) && !mag_atomic_load(&sig->awakened, MAG_MO_SEQ_CST));
-    mag_atomic_store(&sig->signaled, val, MAG_MO_SEQ_CST);
-    mag_mtx_unlock(&sig->mtx);
-    if (notify_all) mag_cv_broadcast(&sig->cv);
-    else mag_cv_signal(&sig->cv);
-}
-
-/* WARNING!
-** If multiple threads are waiting for a signal in an infinite loop,
-** auto-resetting the signal does not guarantee that one thread cannot
-** go through the loop twice. In this case, every thread must wait for its
-** own auto-reset signal or the threads must be blocked by another signal-
-*/
-static mag_atomic_t mag_sig_wait(mag_signal_t* sig, bool auto_reset, mag_atomic_t threads_waiting) {
-    /*  Any thread that intends to wait on condition variable has to
-    **  -> Acquire a mutex lock, on the SAME MUTEX as used to protect the shared variable
-    **  -> Execute wait, wait_for, or wait_until. The wait operations atomically release the mutex and suspend the execution of the thread.
-    **  -> When the condition variable is notified, a timeout expires, or a spurious wakeup occurs, the thread is awakened, and the mutex is atomically reacquired:
-    **    The thread should then check the condition and resume waiting if the wake-up was spurious.
-    */
-    mag_mtx_lock(&sig->mtx);
-    while (!mag_atomic_load(&sig->signaled, MAG_MO_SEQ_CST))
-        mag_cv_wait(&sig->cv, &sig->mtx);
-    mag_atomic_t signaled = mag_atomic_load(&sig->signaled, MAG_MO_SEQ_CST);
-    mag_atomic_t awakened = 1 + mag_atomic_fetch_add(&sig->awakened, 1, MAG_MO_SEQ_CST);
-    if (auto_reset) {
-        mag_assert2(threads_waiting);
-        if (awakened == threads_waiting) {
-            mag_atomic_store(&sig->signaled, 0, MAG_MO_SEQ_CST);
-            mag_atomic_store(&sig->awakened, 0, MAG_MO_SEQ_CST);
-        }
-    }
-    mag_mtx_unlock(&sig->mtx);
-    return signaled;
-}
-
-static void mag_sig_destroy(mag_signal_t* sig) {
-    mag_cv_destroy(&sig->cv);
-    mag_mtx_destroy(&sig->mtx);
-}
-
 typedef struct mag_worker_t {
     mag_threadpool_t* pool;
     mag_thread_t thread;
@@ -1789,30 +1426,52 @@ struct mag_threadpool_t {
     mag_worker_t* workers;
     mag_thread_sched_prio_t prio;
     volatile mag_atomic_t num_workers_alive;
-    volatile mag_atomic_t num_workers_done;
-    mag_signal_t start_work;
-    mag_signal_t work_done_signal;
+    volatile mag_atomic_t working;
+    volatile mag_atomic_t count;
+    volatile mag_atomic_t shutdown;
+    mag_mutex_t mutx;
+    mag_cond_var_t cond_workers;
+    mag_cond_var_t cond_main;
+    size_t cycle;
 };
 
-static void mag_worker_thread_exec_op(const mag_compute_payload_t* payload) {
+static void mag_worker_thread_exec_op(mag_compute_payload_t* payload) {
+    ++payload->cycle;
     (*mag_blas_dispatch_table_forward[payload->node->op])(payload);
 }
 
-static void* mag_worker_entry_fn(void* arg) {
+static MAG_HOTPROC void* mag_worker_entry_fn(void* arg) {
     mag_worker_t* worker = (mag_worker_t*)arg;
     mag_compute_payload_t* payload = &worker->payload;
     mag_threadpool_t* pool = worker->pool;
-    char name[32];
-    snprintf(name, sizeof(name), "Magnetron Worker #%" PRIi64, worker->payload.thread_idx);
-    mag_thread_set_name(name);
+    {
+        char name[32];
+        snprintf(name, sizeof(name), "Magnetron Worker #%" PRIi64, worker->payload.thread_idx);
+        printf("Thread name: %s\n", name);
+        mag_thread_set_name(name);
+    }
+    mag_thread_set_prio(pool->prio);
     mag_atomic_fetch_add(&pool->num_workers_alive, 1, MAG_MO_RELAXED);
     for (;;) {
-        if (mag_sig_wait(&pool->start_work, true, pool->num_workers) == -1) break;
-        if (mag_likely(payload->node)) mag_worker_thread_exec_op(payload);
-        mag_atomic_t completed = 1 + mag_atomic_fetch_add(&pool->num_workers_done, 1, MAG_MO_SEQ_CST);
-        if (completed == pool->num_workers) {
-            mag_sig_trigger(&pool->work_done_signal, false, 1);
+        mag_mtx_lock(&pool->mutx);
+        while (!pool->shutdown && mag_atomic_load(&pool->working, MAG_MO_RELAXED) == 0) {
+            mag_cv_wait(&pool->cond_workers, &pool->mutx);
         }
+        bool shutdown = pool->shutdown;
+        mag_mtx_unlock(&pool->mutx);
+        if (shutdown) break;
+
+        if (mag_likely(payload->node)) mag_worker_thread_exec_op(payload);
+        payload->node = NULL;
+
+        mag_mtx_lock(&pool->mutx);
+        mag_atomic_t completed = 1 + mag_atomic_fetch_add(&pool->count, 1, MAG_MO_SEQ_CST);
+        if (completed == pool->num_workers) {
+            mag_atomic_store(&pool->working, 0, MAG_MO_SEQ_CST);
+            mag_atomic_store(&pool->count, 0, MAG_MO_SEQ_CST);
+            mag_cv_signal(&pool->cond_main);
+        }
+        mag_mtx_unlock(&pool->mutx);
     }
     mag_atomic_fetch_sub(&pool->num_workers_alive, 1, MAG_MO_RELAXED);
     return NULL;
@@ -1833,10 +1492,13 @@ static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers, mag_thread_
         .workers = workers,
         .prio = prio,
         .num_workers_alive = 0,
-        .num_workers_done = 0,
+        .working = 0,
+        .count = 0,
+        .shutdown = 0,
     };
-    mag_sig_init(&pool->start_work);
-    mag_sig_init(&pool->work_done_signal);
+    mag_mtx_init(&pool->mutx);
+    mag_cv_init(&pool->cond_workers);
+    mag_cv_init(&pool->cond_main);
     for (uint32_t i=0; i < num_workers; ++i) {
         const mag_compute_payload_t payload = (mag_compute_payload_t){
             .thread_num = (int64_t)num_workers,
@@ -1850,25 +1512,40 @@ static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers, mag_thread_
     return pool;
 }
 
-static void mag_threadpool_kickoff(mag_threadpool_t* pool, mag_tensor_t* node) {
-    mag_atomic_store(&pool->num_workers_done, 0, MAG_MO_SEQ_CST);
-    for (uint32_t i = 0; i < pool->num_workers; ++i) pool->workers[i].payload.node = node;
-    mag_sig_trigger(&pool->start_work, true, 1);
-    mag_sig_wait(&pool->work_done_signal, true, 1);
+static void mag_threadpool_compute_barrier(mag_threadpool_t* pool, mag_tensor_t* node) {
+    mag_mtx_lock(&pool->mutx);
+    mag_atomic_store(&pool->count, 0, MAG_MO_SEQ_CST);
+    mag_atomic_store(&pool->working, 1, MAG_MO_SEQ_CST);
+    for (uint32_t i=0; i < pool->num_workers; ++i) pool->workers[i].payload.node = node;
+    mag_cv_broadcast(&pool->cond_workers);
+    while (pool->working) {
+        mag_cv_wait(&pool->cond_main, &pool->mutx);
+    }
+    ++pool->cycle;
+    for (uint32_t i=0; i < pool->num_workers; ++i) {
+        if (mag_unlikely(pool->cycle != pool->workers[i].payload.cycle)) {
+            //mag_log_error("Thread %u: Expected %zu computes, got %zu\n", i, pool->cycle, pool->workers[i].payload.cycle);
+        }
+    }
+    mag_mtx_unlock(&pool->mutx);
 }
 
 static void mag_threadpool_destroy(mag_threadpool_t* pool) {
-    mag_sig_trigger(&pool->start_work, true, -1);
+    mag_mtx_lock(&pool->mutx);
+    pool->shutdown = 1;
+    mag_cv_broadcast(&pool->cond_workers);
+    mag_mtx_unlock(&pool->mutx);
     for (uint32_t i = 0; i < pool->num_workers; ++i)
-        mag_worker_destroy(pool->workers + i);
-    mag_sig_destroy(&pool->work_done_signal);
-    mag_sig_destroy(&pool->start_work);
+        mag_worker_destroy(pool->workers+i);
+    mag_mtx_destroy(&pool->mutx);
+    mag_cv_destroy(&pool->cond_workers);
+    mag_cv_destroy(&pool->cond_main);
     (*mag_alloc)(pool, 0);
 }
 
 static MAG_HOTPROC void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t* node) {
     mag_threadpool_t* pool = (mag_threadpool_t*)dvc->impl;
-    mag_threadpool_kickoff(pool, node);
+    mag_threadpool_compute_barrier(pool, node);
 }
 
 static MAG_HOTPROC void mag_cpu_exec_bwd(mag_compute_device_t* dvc, mag_tensor_t* root) {

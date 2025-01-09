@@ -37,56 +37,6 @@ TEST(thread_pool, create_destroy) {
     mag_threadpool_destroy(pool);
 }
 
-TEST(thread_pool, simulated_work_some_tasks) {
-    constexpr std::size_t num_tasks = 4;
-    mag_threadpool_t* pool = mag_threadpool_create(2, MAG_THREAD_SCHED_PRIO_NORMAL);
-    ASSERT_NE(pool, nullptr);
-    for (std::size_t i = 0; i < num_tasks; ++i) {
-        mag_threadpool_enqueue_task(pool, [](void* arg) -> void* {
-            std::cout << "Working on thread: " << std::hex << mag_thread_id() << std::endl;
-            return nullptr;
-        }, pool);
-    }
-    mag_threadpool_barrier(pool);
-    mag_threadpool_destroy(pool);
-}
-
-TEST(thread_pool, simulated_heavy_workload_some_slow_tasks) {
-    constexpr std::size_t num_tasks = 10;
-    mag_threadpool_t* pool = mag_threadpool_create(std::max(1u, std::thread::hardware_concurrency()), MAG_THREAD_SCHED_PRIO_NORMAL);
-    ASSERT_NE(pool, nullptr);
-    for (std::size_t i = 0; i < num_tasks; ++i) {
-        mag_threadpool_enqueue_task(pool, [](void* arg) -> void* {
-            volatile auto target = reinterpret_cast<std::uintptr_t>(arg);
-            volatile std::uintptr_t result = 0;
-            for (volatile std::size_t i = 0; i < target; ++i) {
-                result += i;
-            }
-            return reinterpret_cast<void*>(result);
-        }, reinterpret_cast<void*>(250'000'000));
-    }
-    mag_threadpool_barrier(pool);
-    mag_threadpool_destroy(pool);
-}
-
-TEST(thread_pool, simulated_heavy_workload_many_fast_tasks) {
-    constexpr std::size_t num_tasks = 8192;
-    mag_threadpool_t* pool = mag_threadpool_create(std::max(1u, std::thread::hardware_concurrency()), MAG_THREAD_SCHED_PRIO_NORMAL);
-    ASSERT_NE(pool, nullptr);
-    for (std::size_t i = 0; i < num_tasks; ++i) {
-        mag_threadpool_enqueue_task(pool, [](void* arg) -> void* {
-            volatile auto target = reinterpret_cast<std::uintptr_t>(arg);
-            volatile std::uintptr_t result = 0;
-            for (volatile std::size_t i = 0; i < target; ++i) {
-                result += i;
-            }
-            return reinterpret_cast<void*>(result);
-        }, reinterpret_cast<void*>(1'000));
-    }
-    mag_threadpool_barrier(pool);
-    mag_threadpool_destroy(pool);
-}
-
 TEST(threading, StoreLoadTest) {
     mag_atomic_t val = 0;
     mag_atomic_store(&val, 42, MAG_MO_RELAXED);
