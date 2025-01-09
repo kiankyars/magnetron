@@ -1405,8 +1405,9 @@ static void* mag_worker_thread_exec_op(void* arg) {
     return NULL;
 }
 
+static uint32_t num_workers = 1;
+
 static void mag_threadpool_compute_barrier(mag_tensor_t* node) {
-    uint32_t num_workers = 10;
     mag_thread_t* threads = (mag_thread_t*)alloca(sizeof(*threads)*num_workers);
     mag_compute_payload_t* payloads = (mag_compute_payload_t*)alloca(sizeof(*payloads)*num_workers);
     for (uint32_t i=0; i < num_workers; ++i) {
@@ -1466,6 +1467,7 @@ static void mag_cpu_free_storage(mag_compute_device_t* dvc, mag_storage_buffer_t
 }
 
 static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num_threads) {
+    num_workers = num_threads;
     mag_compute_device_t* dvc = (mag_compute_device_t*)(*mag_alloc)(NULL, sizeof(*dvc));
     *dvc = (mag_compute_device_t){ /* Initialize device interface */
         .name = "CPU",
