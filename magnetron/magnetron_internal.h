@@ -319,12 +319,12 @@ extern MAG_EXPORT uintptr_t mag_thread_id(void);
 #ifdef MAG_DEBUG
 #define mag_bnd_chk(ptr, base, n) \
     mag_assert((uintptr_t)(ptr) >= (uintptr_t)(base) && (uintptr_t)(ptr) < (uintptr_t)(base) + (n), \
-        "\nBound check failed: %p not in [%p, %p), base+%zu, end+%zu", \
+        "\nBound check failed: %p not in [%p, %p), base+0x%x, end+0x%x", \
         (void*)(ptr), \
         (void*)(base), \
         (void*)((uintptr_t)(base)+(n)), \
-        (size_t)llabs((long long)((int64_t)(ptr)-(int64_t)(base))), \
-        (size_t)llabs((long long)(((int64_t)(base)+(n))-(int64_t)(ptr))) \
+        (int)llabs((long long)((int64_t)(ptr)-(int64_t)(base))), \
+        (int)llabs((long long)(((int64_t)(base)+(n))-(int64_t)(ptr))) \
     )
 #else
 #define mag_bnd_chk(ptr, base, n)
