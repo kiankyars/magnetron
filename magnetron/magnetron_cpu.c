@@ -11,8 +11,6 @@
 #include <Accelerate/Accelerate.h>
 #endif
 
-typedef struct mag_threadpool_t mag_threadpool_t;
-
 typedef struct mag_compute_payload_t {
     int64_t thread_num;
     int64_t thread_idx;
@@ -1401,167 +1399,31 @@ static void (*mag_blas_dispatch_table_backward[MAG_OP__NUM])(const mag_compute_p
     [MAG_OP_MATMUL] = &mag_blas_matmul_f32
 };
 
-typedef struct mag_worker_t {
-    mag_threadpool_t* pool;
-    mag_thread_t thread;
-    mag_compute_payload_t payload;
-} mag_worker_t;
-
-static void* mag_worker_entry_fn(void* arg);
-
-static void mag_worker_init(mag_worker_t* worker, mag_threadpool_t* pool, const mag_compute_payload_t* payload) {
-    memset(worker, 0, sizeof(*worker));
-    worker->pool = pool;
-    mag_assert2(mag_thread_create(&worker->thread, NULL, &mag_worker_entry_fn, worker) == 0);
-    worker->payload = *payload;
-}
-
-static void mag_worker_destroy(mag_worker_t* worker) {
-    mag_assert2(mag_thread_join(worker->thread, NULL) == 0);
-    memset(worker, 0, sizeof(*worker));
-}
-
-struct mag_threadpool_t {
-    uint32_t num_workers;
-    mag_worker_t* workers;
-    mag_thread_sched_prio_t prio;
-    volatile mag_atomic_t num_workers_alive;
-    volatile mag_atomic_t working;
-    volatile mag_atomic_t count;
-    volatile mag_atomic_t shutdown;
-    mag_mutex_t mutx;
-    mag_cond_var_t cond_workers;
-    mag_cond_var_t cond_main;
-    size_t cycle;
-};
-
 static void* mag_worker_thread_exec_op(void* arg) {
     mag_compute_payload_t* payload = (mag_compute_payload_t*)arg;
-    ++payload->cycle;
-    (*mag_blas_dispatch_table_forward[payload->node->op])(payload);
+    mag_blas_dispatch_table_forward[payload->node->op](payload);
     return NULL;
 }
 
-static MAG_HOTPROC void* mag_worker_entry_fn(void* arg) {
-    mag_worker_t* worker = (mag_worker_t*)arg;
-    mag_compute_payload_t* payload = &worker->payload;
-    mag_threadpool_t* pool = worker->pool;
-    {
-        char name[32];
-        snprintf(name, sizeof(name), "Magnetron Worker #%" PRIi64, worker->payload.thread_idx);
-        mag_thread_set_name(name);
-    }
-    mag_thread_set_prio(pool->prio);
-    mag_atomic_fetch_add(&pool->num_workers_alive, 1, MAG_MO_RELAXED);
-    for (;;) {
-        mag_mtx_lock(&pool->mutx);
-        while (!pool->shutdown && mag_atomic_load(&pool->working, MAG_MO_RELAXED) == 0) {
-            mag_cv_wait(&pool->cond_workers, &pool->mutx);
-        }
-        bool shutdown = pool->shutdown;
-        mag_mtx_unlock(&pool->mutx);
-        if (shutdown) break;
-
-        if (mag_likely(payload->node)) mag_worker_thread_exec_op(payload);
-        payload->node = NULL;
-
-        mag_mtx_lock(&pool->mutx);
-        mag_atomic_t completed = 1 + mag_atomic_fetch_add(&pool->count, 1, MAG_MO_SEQ_CST);
-        if (completed == pool->num_workers) {
-            mag_atomic_store(&pool->working, 0, MAG_MO_SEQ_CST);
-            mag_atomic_store(&pool->count, 0, MAG_MO_SEQ_CST);
-            mag_cv_signal(&pool->cond_main);
-        }
-        mag_mtx_unlock(&pool->mutx);
-    }
-    mag_atomic_fetch_sub(&pool->num_workers_alive, 1, MAG_MO_RELAXED);
-    return NULL;
-}
-
-static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers, mag_thread_sched_prio_t prio) {
-    num_workers = mag_xmax(1, num_workers);
-    uintptr_t mem = 0;
-    mag_pincr((void**)&mem, sizeof(mag_threadpool_t), __alignof(mag_threadpool_t));
-    mag_pincr((void**)&mem, sizeof(mag_worker_t)*num_workers, __alignof(mag_worker_t));
-    void* base = (*mag_alloc)(NULL, mem);
-    void* needle = base;
-    memset(base, 0, mem);
-    mag_threadpool_t* pool = (mag_threadpool_t*)mag_pincr(&needle, sizeof(mag_threadpool_t), __alignof(mag_threadpool_t));
-    mag_worker_t* workers = (mag_worker_t*)mag_pincr(&needle, sizeof(mag_worker_t)*num_workers, __alignof(mag_worker_t));
-    *pool = (mag_threadpool_t){
-        .num_workers = num_workers,
-        .workers = workers,
-        .prio = prio,
-        .num_workers_alive = 0,
-        .working = 0,
-        .count = 0,
-        .shutdown = 0,
-    };
-    mag_mtx_init(&pool->mutx);
-    mag_cv_init(&pool->cond_workers);
-    mag_cv_init(&pool->cond_main);
+static void mag_threadpool_compute_barrier(mag_tensor_t* node) {
+    uint32_t num_workers = 10;
+    mag_thread_t* threads = (mag_thread_t*)alloca(sizeof(*threads)*num_workers);
+    mag_compute_payload_t* payloads = (mag_compute_payload_t*)alloca(sizeof(*payloads)*num_workers);
     for (uint32_t i=0; i < num_workers; ++i) {
-        const mag_compute_payload_t payload = (mag_compute_payload_t){
-            .thread_num = (int64_t)num_workers,
-            .thread_idx = (int64_t)i,
-            .node = NULL // Will be set in OP
-        };
-        mag_worker_init(pool->workers+i, pool, &payload);
-    }
-    while (mag_atomic_load(&pool->num_workers_alive, MAG_MO_RELAXED) != num_workers)
-        mag_thread_yield();
-    return pool;
-}
-
-static void mag_threadpool_compute_barrier(mag_threadpool_t* pool, mag_tensor_t* node) {
-    mag_thread_t* threads = (mag_thread_t*)alloca(sizeof(*threads)*pool->num_workers);
-    mag_compute_payload_t* payloads = (mag_compute_payload_t*)alloca(sizeof(*payloads)*pool->num_workers);
-    for (uint32_t i=0; i < pool->num_workers; ++i) {
         payloads[i] = (mag_compute_payload_t){
-            .thread_num = pool->num_workers,
+            .thread_num = num_workers,
             .thread_idx = i,
             .node = node,
             .cycle = 0
         };
         mag_assert2(mag_thread_create(threads+i, NULL, &mag_worker_thread_exec_op, &payloads[i]) == 0);
     }
-    for (uint32_t i=0; i < pool->num_workers; ++i)
+    for (uint32_t i=0; i < num_workers; ++i)
         mag_assert2(mag_thread_join(threads[i], NULL) == 0);
-#if 0
-    mag_mtx_lock(&pool->mutx);
-    mag_atomic_store(&pool->count, 0, MAG_MO_SEQ_CST);
-    mag_atomic_store(&pool->working, 1, MAG_MO_SEQ_CST);
-    for (uint32_t i=0; i < pool->num_workers; ++i) pool->workers[i].payload.node = node;
-    mag_cv_broadcast(&pool->cond_workers);
-    while (pool->working) {
-        mag_cv_wait(&pool->cond_main, &pool->mutx);
-    }
-    ++pool->cycle;
-    for (uint32_t i=0; i < pool->num_workers; ++i) {
-        if (mag_unlikely(pool->cycle != pool->workers[i].payload.cycle)) {
-            //mag_log_error("Thread %u: Expected %zu computes, got %zu\n", i, pool->cycle, pool->workers[i].payload.cycle);
-        }
-    }
-    mag_mtx_unlock(&pool->mutx);
-#endif
-}
-
-static void mag_threadpool_destroy(mag_threadpool_t* pool) {
-    mag_mtx_lock(&pool->mutx);
-    pool->shutdown = 1;
-    mag_cv_broadcast(&pool->cond_workers);
-    mag_mtx_unlock(&pool->mutx);
-    for (uint32_t i = 0; i < pool->num_workers; ++i)
-        mag_worker_destroy(pool->workers+i);
-    mag_mtx_destroy(&pool->mutx);
-    mag_cv_destroy(&pool->cond_workers);
-    mag_cv_destroy(&pool->cond_main);
-    (*mag_alloc)(pool, 0);
 }
 
 static MAG_HOTPROC void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t* node) {
-    mag_threadpool_t* pool = (mag_threadpool_t*)dvc->impl;
-    mag_threadpool_compute_barrier(pool, node);
+    mag_threadpool_compute_barrier(node);
 }
 
 static MAG_HOTPROC void mag_cpu_exec_bwd(mag_compute_device_t* dvc, mag_tensor_t* root) {
@@ -1604,11 +1466,10 @@ static void mag_cpu_free_storage(mag_compute_device_t* dvc, mag_storage_buffer_t
 }
 
 static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num_threads) {
-    mag_threadpool_t* pool = mag_threadpool_create(num_threads, MAG_THREAD_SCHED_PRIO_NORMAL);
     mag_compute_device_t* dvc = (mag_compute_device_t*)(*mag_alloc)(NULL, sizeof(*dvc));
     *dvc = (mag_compute_device_t){ /* Initialize device interface */
         .name = "CPU",
-        .impl = pool,
+        .impl = NULL,
         .is_async = false,
         .type = MAG_COMPUTE_DEVICE_TYPE_CPU,
         .eager_exec_fwd = &mag_cpu_exec_fwd,
@@ -1621,8 +1482,6 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num
 }
 
 static void mag_cpu_release_interface(mag_compute_device_t* ctx) {
-    mag_threadpool_t* pool = (mag_threadpool_t*)ctx->impl;
-    mag_threadpool_destroy(pool);
     (*mag_alloc)(ctx, 0); /* Free all memory */
 }
 

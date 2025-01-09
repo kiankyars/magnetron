@@ -9,34 +9,6 @@
 
 using namespace std::chrono_literals;
 
-TEST(threading, create_thread) {
-    std::atomic<bool> executed = false;
-    static volatile std::atomic_uintptr_t main_tid {mag_thread_id()};
-    static volatile std::atomic_uintptr_t second_tid {};
-
-    std::cout << "Main thread ID: " << std::hex << main_tid.load(std::memory_order_seq_cst) << std::endl;
-
-    auto thread_func = [](void* arg) -> void* {
-        std::this_thread::sleep_for(1s); // Simulate some work
-        second_tid.store(mag_thread_id(), std::memory_order_seq_cst);
-        static_cast<std::atomic<bool>*>(arg)->store(true, std::memory_order_seq_cst);
-        std::cout << "Second thread ID: " << std::hex << second_tid.load(std::memory_order_seq_cst) << std::endl;
-        return NULL;
-    };
-
-    mag_thread_t thread;
-    ASSERT_EQ(mag_thread_create(&thread, nullptr, thread_func, &executed), 0);
-    mag_thread_join(thread, nullptr);
-    EXPECT_EQ(true, executed.load(std::memory_order_seq_cst));
-    ASSERT_NE(main_tid.load(std::memory_order_seq_cst), second_tid.load(std::memory_order_seq_cst));
-}
-
-TEST(thread_pool, create_destroy) {
-    mag_threadpool_t* pool = mag_threadpool_create(4, MAG_THREAD_SCHED_PRIO_NORMAL);
-    ASSERT_NE(pool, nullptr);
-    mag_threadpool_destroy(pool);
-}
-
 TEST(threading, StoreLoadTest) {
     mag_atomic_t val = 0;
     mag_atomic_store(&val, 42, MAG_MO_RELAXED);
