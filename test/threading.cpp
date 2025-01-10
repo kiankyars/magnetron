@@ -5,7 +5,6 @@
 #include <chrono>
 
 #include "prelude.hpp"
-#include "magnetron_cpu.c"
 
 using namespace std::chrono_literals;
 
