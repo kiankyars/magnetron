@@ -15,7 +15,6 @@ typedef struct mag_compute_payload_t {
     int64_t thread_num;
     int64_t thread_idx;
     mag_tensor_t* node;
-    size_t cycle;
 } mag_compute_payload_t;
 
 #define mag_f32p(t) ((const float*)(t)->storage.base)
@@ -1399,32 +1398,116 @@ static void (*mag_blas_dispatch_table_backward[MAG_OP__NUM])(const mag_compute_p
     [MAG_OP_MATMUL] = &mag_blas_matmul_f32
 };
 
+#if defined(__aarch64__) && (defined(__clang__) || defined(__GNUC__))
+#define mag_cpu_spinlock_pause() __asm__ volatile("yield" ::: "memory")
+#elif defined(__x86_64__) || defined(_M_X64)
+#define mag_cpu_spinlock_pause() _mm_pause()
+#else
+#define mag_cpu_spinlock_pause() mag_thread_yield()
+#endif
+
+typedef struct mag_worker_t {
+    volatile mag_atomic_t has_work;
+    volatile mag_atomic_t interrupt;
+    mag_thread_t thread;
+    mag_compute_payload_t payload;
+} mag_worker_t;
+
 static void* mag_worker_thread_exec_op(void* arg) {
-    mag_compute_payload_t* payload = (mag_compute_payload_t*)arg;
-    mag_blas_dispatch_table_forward[payload->node->op](payload);
+    mag_worker_t* worker = arg;
+    mag_compute_payload_t* payload = &worker->payload;
+    for (;;) {
+        while (!mag_atomic_load(&worker->has_work, MAG_MO_SEQ_CST)) {
+            if (mag_unlikely(mag_atomic_load(&worker->interrupt, MAG_MO_RELAXED))) {
+                return NULL;
+            }
+            mag_cpu_spinlock_pause();
+        }
+        if (mag_likely(payload->node)) {
+            (*mag_blas_dispatch_table_forward[payload->node->op])(payload);
+            payload->node = NULL;
+        }
+        mag_atomic_store(&worker->has_work, 0, MAG_MO_SEQ_CST);
+    }
     return NULL;
 }
 
-static uint32_t num_workers = 1;
-
-static void mag_threadpool_compute_barrier(mag_tensor_t* node) {
-    mag_thread_t* threads = (mag_thread_t*)alloca(sizeof(*threads)*num_workers);
-    mag_compute_payload_t* payloads = (mag_compute_payload_t*)alloca(sizeof(*payloads)*num_workers);
-    for (uint32_t i=0; i < num_workers; ++i) {
-        payloads[i] = (mag_compute_payload_t){
+static void mag_worker_init(mag_worker_t* worker, uint32_t idx, uint32_t num_workers) {
+    *worker = (mag_worker_t){
+        .has_work = 0,
+        .interrupt = 0,
+        .thread = NULL,
+        .payload = (mag_compute_payload_t){
             .thread_num = num_workers,
-            .thread_idx = i,
-            .node = node,
-            .cycle = 0
-        };
-        mag_assert2(mag_thread_create(threads+i, NULL, &mag_worker_thread_exec_op, &payloads[i]) == 0);
+            .thread_idx = idx,
+            .node = NULL,
+        }
+    };
+    mag_assert(mag_thread_create(&worker->thread, NULL, &mag_worker_thread_exec_op, worker) == 0, "Failed to create magnetron worker thread");
+}
+
+static void mag_worker_kickoff(mag_worker_t* worker, mag_tensor_t* node) {
+    worker->payload.node = node;
+    mag_atomic_store(&worker->has_work, 1, MAG_MO_SEQ_CST);
+}
+
+static void mag_worker_interrupt(mag_worker_t* worker) {
+    mag_atomic_store(&worker->interrupt, 1, MAG_MO_RELAXED);
+    mag_atomic_store(&worker->has_work, 1, MAG_MO_SEQ_CST);
+}
+
+static void mag_worker_barrier(mag_worker_t* worker) {
+    while (mag_atomic_load(&worker->has_work, MAG_MO_SEQ_CST)) {
+        mag_cpu_spinlock_pause();
     }
+}
+
+static void mag_worker_destroy(mag_worker_t* worker) {
+    mag_worker_interrupt(worker);
+    mag_assert(mag_thread_join(worker->thread, NULL) == 0, "Failed to join magnetron worker thread");
+}
+
+typedef struct mag_threadpool_t {
+    void* base;
+    uint32_t num_workers;
+    mag_worker_t* workers;
+} mag_threadpool_t;
+
+static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers) {
+    uintptr_t mem = 0;
+    mag_pincr((void**)&mem, sizeof(mag_threadpool_t), __alignof(mag_threadpool_t));
+    mag_pincr((void**)&mem, sizeof(mag_worker_t)*num_workers, __alignof(mag_worker_t));
+    void* base = (*mag_alloc)(NULL, mem);
+    memset(base, 0, mem);
+    void* needle = base;
+    mag_threadpool_t* pool = mag_pincr(&needle, sizeof(*pool), __alignof(mag_threadpool_t));
+    mag_worker_t* workers = mag_pincr(&needle, sizeof(*workers)*num_workers, __alignof(mag_worker_t));
+    *pool = (mag_threadpool_t){
+        .base = base,
+        .num_workers = num_workers,
+        .workers = workers
+    };
     for (uint32_t i=0; i < num_workers; ++i)
-        mag_assert2(mag_thread_join(threads[i], NULL) == 0);
+        mag_worker_init(workers+i, i, num_workers);
+    return pool;
+}
+
+static void mag_threadpool_destroy(mag_threadpool_t* pool) {
+    for (uint32_t i=0; i < pool->num_workers; ++i)
+        mag_worker_destroy(pool->workers+i);
+    (*mag_alloc)(pool->base, 0);
+}
+
+static void mag_threadpool_compute_barrier(mag_threadpool_t* pool, mag_tensor_t* node) {
+    for (uint32_t i=0; i < pool->num_workers; ++i)
+        mag_worker_kickoff(pool->workers+i, node);
+    for (uint32_t i=0; i < pool->num_workers; ++i)
+        mag_worker_barrier(pool->workers+i);
 }
 
 static MAG_HOTPROC void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t* node) {
-    mag_threadpool_compute_barrier(node);
+    mag_threadpool_t* pool = dvc->impl;
+    mag_threadpool_compute_barrier(pool, node);
 }
 
 static MAG_HOTPROC void mag_cpu_exec_bwd(mag_compute_device_t* dvc, mag_tensor_t* root) {
@@ -1467,11 +1550,11 @@ static void mag_cpu_free_storage(mag_compute_device_t* dvc, mag_storage_buffer_t
 }
 
 static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num_threads) {
-    num_workers = num_threads;
-    mag_compute_device_t* dvc = (mag_compute_device_t*)(*mag_alloc)(NULL, sizeof(*dvc));
+    mag_threadpool_t* pool = mag_threadpool_create(num_threads);
+    mag_compute_device_t* dvc = (*mag_alloc)(NULL, sizeof(*dvc));
     *dvc = (mag_compute_device_t){ /* Initialize device interface */
         .name = "CPU",
-        .impl = NULL,
+        .impl = pool,
         .is_async = false,
         .type = MAG_COMPUTE_DEVICE_TYPE_CPU,
         .eager_exec_fwd = &mag_cpu_exec_fwd,
@@ -1484,6 +1567,8 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num
 }
 
 static void mag_cpu_release_interface(mag_compute_device_t* ctx) {
+    mag_threadpool_t* pool = ctx->impl;
+    mag_threadpool_destroy(pool);
     (*mag_alloc)(ctx, 0); /* Free all memory */
 }
 
