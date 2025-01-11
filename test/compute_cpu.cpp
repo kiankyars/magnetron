@@ -537,10 +537,10 @@ TEST(compute_cpu, heavy_compute_single_op_scalar) {
 
 TEST(compute_cpu, threaded_add) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
-    mag_tensor_t* A = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 512, 512, 8);
+    mag_tensor_t* A = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 512, 512, 32);
     mag_tensor_fill(A, 1.0f);
 
-    mag_tensor_t* B = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 512, 512, 8);
+    mag_tensor_t* B = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 512, 512, 32);
     mag_tensor_fill(B, 2.0f);
 
     ASSERT_EQ(A->numel, B->numel);
