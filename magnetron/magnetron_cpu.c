@@ -11,14 +11,17 @@
 #include <Accelerate/Accelerate.h>
 #endif
 
+typedef float mag_f32_t;
+typedef double mag_f64_t;
+
 typedef struct mag_compute_payload_t {
     int64_t thread_num;
     int64_t thread_idx;
     mag_tensor_t* node;
 } mag_compute_payload_t;
 
-#define mag_f32p(t) ((const float*)(t)->storage.base)
-#define mag_f32p_mut(t) ((float*)(t)->storage.base)
+#define mag_f32p(t) ((const mag_f32_t*)(t)->storage.base)
+#define mag_f32p_mut(t) ((mag_f32_t*)(t)->storage.base)
 
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
 
@@ -249,9 +252,9 @@ static void mag_simd_sincos(__m128 x, __m128 *osin, __m128 *ocos) {
 
 static void MAG_HOTPROC mag_vadd_f32(
     const int64_t n,
-    float* const o,
-    const float* const x,
-    const float* const y
+    mag_f32_t* const o,
+    const mag_f32_t* const x,
+    const mag_f32_t* const y
 ) {
 #ifdef MAG_ACCELERATE
     vDSP_vadd(y, 1, x, 1, o, 1, n);
@@ -264,9 +267,9 @@ static void MAG_HOTPROC mag_vadd_f32(
 
 static void MAG_HOTPROC mag_vsub_f32(
     const int64_t n,
-    float* const o,
-    const float* const x,
-    const float* const y
+    mag_f32_t* const o,
+    const mag_f32_t* const x,
+    const mag_f32_t* const y
 ) {
 #ifdef MAG_ACCELERATE
     vDSP_vsub(y, 1, x, 1, o, 1, n);
@@ -279,9 +282,9 @@ static void MAG_HOTPROC mag_vsub_f32(
 
 static void MAG_HOTPROC mag_vmul_f32(
     const int64_t n,
-    float* const o,
-    const float* const x,
-    const float* const y
+    mag_f32_t* const o,
+    const mag_f32_t* const x,
+    const mag_f32_t* const y
 ) {
 #ifdef MAG_ACCELERATE
     vDSP_vmul(y, 1, x, 1, o, 1, n);
@@ -294,9 +297,9 @@ static void MAG_HOTPROC mag_vmul_f32(
 
 static void MAG_HOTPROC mag_vdiv_f32(
     const int64_t n,
-    float* const o,
-    const float* const x,
-    const float* const y
+    mag_f32_t* const o,
+    const mag_f32_t* const x,
+    const mag_f32_t* const y
 ) {
 #ifdef MAG_ACCELERATE
     vDSP_vdiv(y, 1, x, 1, o, 1, n);
@@ -309,9 +312,9 @@ static void MAG_HOTPROC mag_vdiv_f32(
 
 static void MAG_HOTPROC mag_vadds_f32(
     const int64_t n,
-    float* const o,
-    const float* const x,
-    const float y
+    mag_f32_t* const o,
+    const mag_f32_t* const x,
+    const mag_f32_t y
 ) {
     for (int64_t i=0; i < n; ++i) {
         o[i] = x[i] + y;
@@ -320,9 +323,9 @@ static void MAG_HOTPROC mag_vadds_f32(
 
 static void MAG_HOTPROC mag_vsubs_f32(
     const int64_t n,
-    float* const o,
-    const float* const x,
-    const float y
+    mag_f32_t* const o,
+    const mag_f32_t* const x,
+    const mag_f32_t y
 ) {
     for (int64_t i=0; i < n; ++i) {
         o[i] = x[i] - y;
@@ -331,9 +334,9 @@ static void MAG_HOTPROC mag_vsubs_f32(
 
 static void MAG_HOTPROC mag_vmuls_f32(
     const int64_t n,
-    float* const o,
-    const float* const x,
-    const float y
+    mag_f32_t* const o,
+    const mag_f32_t* const x,
+    const mag_f32_t y
 ) {
     for (int64_t i=0; i < n; ++i) {
         o[i] = x[i] * y;
@@ -342,19 +345,19 @@ static void MAG_HOTPROC mag_vmuls_f32(
 
 static void MAG_HOTPROC mag_vdivs_f32(
     const int64_t n,
-    float* const o,
-    const float* const x,
-    const float y
+    mag_f32_t* const o,
+    const mag_f32_t* const x,
+    const mag_f32_t y
 ) {
     for (int64_t i=0; i < n; ++i) {
         o[i] = x[i] / y;
     }
 }
 
-static float MAG_UNUSED MAG_HOTPROC mag_vdot_f32(
+static mag_f32_t MAG_UNUSED MAG_HOTPROC mag_vdot_f32(
     const int64_t n,
-    const float* const x,
-    const float* const y
+    const mag_f32_t* const x,
+    const mag_f32_t* const y
 ) {
 #if (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
     const int64_t k = n & -16;
@@ -378,7 +381,7 @@ static float MAG_UNUSED MAG_HOTPROC mag_vdot_f32(
     acc[1] = vaddq_f32(acc[1], acc[3]); /* Fold acc[1] += acc[3] */
     *acc = vaddq_f32(*acc, acc[2]);     /* Fold acc[0] += acc[2] */
     *acc = vaddq_f32(*acc, acc[1]);     /* Fold acc[0] += acc[1] */
-    float sum = vaddvq_f32(*acc);       /* Reduce to scalar with horizontal sum. */
+    mag_f32_t sum = vaddvq_f32(*acc);       /* Reduce to scalar with horizontal sum. */
     for (int64_t i=k; i < n; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
     return sum;
 #elif defined(__AVX512F__) && defined(__FMA__)
@@ -403,7 +406,7 @@ static float MAG_UNUSED MAG_HOTPROC mag_vdot_f32(
     acc[1] = _mm512_add_ps(acc[1], acc[3]);
     *acc = _mm512_add_ps(*acc, acc[2]);
     *acc = _mm512_add_ps(*acc, acc[1]);
-    float sum = _mm512_reduce_add_ps(*acc);
+    mag_f32_t sum = _mm512_reduce_add_ps(*acc);
     for (int64_t i=k; i < n; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
     return sum;
 #elif defined(__AVX__) && defined(__FMA__)
@@ -431,7 +434,7 @@ static float MAG_UNUSED MAG_HOTPROC mag_vdot_f32(
     __m128 v0 = _mm_add_ps(_mm256_castps256_ps128(*acc), _mm256_extractf128_ps(*acc, 1));
     v0 = _mm_hadd_ps(v0, v0);
     v0 = _mm_hadd_ps(v0, v0);
-    float sum = _mm_cvtss_f32(v0);
+    mag_f32_t sum = _mm_cvtss_f32(v0);
     for (int64_t i=k; i < n; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
     return sum;
 #elif defined(__SSE2__)
@@ -459,56 +462,56 @@ static float MAG_UNUSED MAG_HOTPROC mag_vdot_f32(
         *acc = _mm_add_ps(*acc, acc[1]);
         *acc = _mm_hadd_ps(*acc, *acc);
         *acc = _mm_hadd_ps(*acc, *acc);
-        float sum = _mm_cvtss_f32(*acc);
+        mag_f32_t sum = _mm_cvtss_f32(*acc);
     #else
         __m128 shuf = _mm_shuffle_ps(*acc, *acc, _MM_SHUFFLE(2, 3, 0, 1));
         __m128 sums = _mm_add_ps(*acc, shuf);
         shuf = _mm_movehl_ps(shuf, sums);
         sums = _mm_add_ss(sums, shuf);
-        float sum = _mm_cvtss_f32(sums);
+        mag_f32_t sum = _mm_cvtss_f32(sums);
     #endif
     for (int64_t i=k; i < n; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
     return sum;
 #else
-    double r = 0.0;
-    for (int64_t i=0; i < n; ++i) r += (double)x[i] * (double)y[i];
-    return (float)r;
+    mag_f64_t r = 0.0;
+    for (int64_t i=0; i < n; ++i) r += (mag_f64_t)x[i] * (mag_f64_t)y[i];
+    return (mag_f32_t)r;
 #endif
 }
 
-static double MAG_HOTPROC mag_vsum_f64_f32( /* Σx. */
+static mag_f64_t MAG_HOTPROC mag_vsum_f64_f32( /* Σx. */
     const int64_t n,
-    const float* const x
+    const mag_f32_t* const x
 ) {
 #ifdef MAG_ACCELERATE
-    float sum;
+    mag_f32_t sum;
     vDSP_sve(x, 1, &sum, n);
-    return (double)sum;
+    return (mag_f64_t)sum;
 #else
-    double sum = 0.0;
+    mag_f64_t sum = 0.0;
     for (int64_t i=0; i < n; ++i) {
-        sum += (double)x[i];
+        sum += (mag_f64_t)x[i];
     }
     return sum;
 #endif
 }
 
-static float MAG_HOTPROC mag_vmin_f32( /* min x */
+static mag_f32_t MAG_HOTPROC mag_vmin_f32( /* min x */
     const int64_t n,
-    const float* const x
+    const mag_f32_t* const x
 ) {
-    float min = INFINITY;
+    mag_f32_t min = INFINITY;
     for (int64_t i=0; i < n; ++i) {
         min = fminf(min, x[i]);
     }
     return min;
 }
 
-static float MAG_HOTPROC mag_vmax_f32( /* max x */
+static mag_f32_t MAG_HOTPROC mag_vmax_f32( /* max x */
     const int64_t n,
-    const float* const x
+    const mag_f32_t* const x
 ) {
-    float min = -INFINITY;
+    mag_f32_t min = -INFINITY;
     for (int64_t i=0; i < n; ++i) {
         min = fmaxf(min, x[i]);
     }
@@ -517,8 +520,8 @@ static float MAG_HOTPROC mag_vmax_f32( /* max x */
 
 static void MAG_HOTPROC mag_vabs_f32( /* o = |x| */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     for (int64_t i=0; i < n; ++i) {
         o[i] = fabsf(x[i]);
@@ -527,8 +530,8 @@ static void MAG_HOTPROC mag_vabs_f32( /* o = |x| */
 
 static void MAG_HOTPROC mag_vneg_f32( /* o = -x */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     for (int64_t i=0; i < n; ++i) {
         o[i] = -x[i];
@@ -537,8 +540,8 @@ static void MAG_HOTPROC mag_vneg_f32( /* o = -x */
 
 static void MAG_HOTPROC mag_vlog_f32( /* o = log x */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
@@ -629,8 +632,8 @@ static void MAG_HOTPROC mag_vlog_f32( /* o = log x */
 
 static void MAG_HOTPROC mag_vsqr_f32( /* o = x² */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     for (int64_t i=0; i < n; ++i)
         o[i] = x[i]*x[i];
@@ -638,8 +641,8 @@ static void MAG_HOTPROC mag_vsqr_f32( /* o = x² */
 
 static void MAG_HOTPROC mag_vsqrt_f32( /* o = √x */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     for (int64_t i=0; i < n; ++i) {
         o[i] = sqrtf(x[i]);
@@ -648,8 +651,8 @@ static void MAG_HOTPROC mag_vsqrt_f32( /* o = √x */
 
 static void MAG_HOTPROC mag_vsin_f32( /* o = sin x */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
        int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
@@ -678,8 +681,8 @@ static void MAG_HOTPROC mag_vsin_f32( /* o = sin x */
 
 static void MAG_HOTPROC mag_vcos_f32( /* o = cos x */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
@@ -708,8 +711,8 @@ static void MAG_HOTPROC mag_vcos_f32( /* o = cos x */
 
 static void MAG_HOTPROC mag_vstep_f32( /* Heaviside step function. */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     for (int64_t i=0; i < n; ++i) {
         o[i] = x[i] >= 0.0f ? 1.0f : 0.0f;
@@ -718,8 +721,8 @@ static void MAG_HOTPROC mag_vstep_f32( /* Heaviside step function. */
 
 static void MAG_HOTPROC mag_vsoftmax_f32( /* softmax : ℝ -> (0, ∞), x |-> e^x */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
@@ -744,16 +747,16 @@ static void MAG_HOTPROC mag_vsoftmax_f32( /* softmax : ℝ -> (0, ∞), x |-> e^
 
 static void MAG_HOTPROC mag_vsoftmax_dv_f32( /* softmax' = softmax : ℝ -> (0, ∞), x |-> e^x */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     mag_vsoftmax_f32(n, o, x);
 }
 
 static void MAG_HOTPROC mag_vsigmoid_f32( /* σ : ℝ -> (0, 1), x |-> 1/(1 + e^(-x)) */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
@@ -802,8 +805,8 @@ static void MAG_HOTPROC mag_vsigmoid_f32( /* σ : ℝ -> (0, 1), x |-> 1/(1 + e^
 
 static void MAG_HOTPROC mag_vsigmoid_dv_f32( /* σ' : ℝ -> (0, 1), x |-> x * (1-x) */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     for (int64_t i=0; i < n; ++i) {
         o[i] = x[i] * (1.0f - x[i]);
@@ -812,8 +815,8 @@ static void MAG_HOTPROC mag_vsigmoid_dv_f32( /* σ' : ℝ -> (0, 1), x |-> x * (
 
 static void MAG_HOTPROC mag_vhard_sigmoid_f32( /* σ^ : ℝ -> (0, 1), x |-> min(1, max(0, (x + 3)/6)) */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     for (int64_t i=0; i < n; ++i) {
         o[i] = fminf(1.0f, fmaxf(0.0f, (x[i] + 3.0f) / 6.0f));
@@ -822,8 +825,8 @@ static void MAG_HOTPROC mag_vhard_sigmoid_f32( /* σ^ : ℝ -> (0, 1), x |-> min
 
 static void MAG_HOTPROC mag_vsilu_f32( /* silu : ℝ -> ℝ, x |-> x/(1 + e^(-x)) */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
@@ -874,8 +877,8 @@ static void MAG_HOTPROC mag_vsilu_f32( /* silu : ℝ -> ℝ, x |-> x/(1 + e^(-x)
 
 static void MAG_HOTPROC mag_vsilu_dv_f32( /* silu' : ℝ -> TODO */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     for (int64_t i=0; i < n; ++i) {
         mag_panic("NYI!");
@@ -884,8 +887,8 @@ static void MAG_HOTPROC mag_vsilu_dv_f32( /* silu' : ℝ -> TODO */
 
 static void MAG_HOTPROC mag_vtanh_f32( /* tanh : ℝ -> (-1, 1), x |-> tanh x */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
@@ -912,19 +915,19 @@ static void MAG_HOTPROC mag_vtanh_f32( /* tanh : ℝ -> (-1, 1), x |-> tanh x */
 
 static void MAG_HOTPROC mag_vtanh_dv_f32( /* tanh' : ℝ -> (-1, 1), x |-> 1 / ((cosh x)^2) */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     for (int64_t i=0; i < n; ++i) {
-        const float cx = coshf(x[i]);
+        const mag_f32_t cx = coshf(x[i]);
         o[i] = 1.0f / (cx*cx);
     }
 }
 
 static void MAG_HOTPROC mag_vrelu_f32( /* relu : ℝ -> ℝ^+, x |-> max {x, 0} */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     for (int64_t i=0; i < n; ++i) {
         o[i] = mag_xmax(x[i], 0.0f);
@@ -933,8 +936,8 @@ static void MAG_HOTPROC mag_vrelu_f32( /* relu : ℝ -> ℝ^+, x |-> max {x, 0} 
 
 static void MAG_HOTPROC mag_vrelu_dv_f32( /* relu' : ℝ -> ℝ^+, x |-> { 0 if x < 0, UB if x = 0, else 1 */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     for (int64_t i=0; i < n; ++i) {
         o[i] = x[i] <= 0.0f ? 0.0f : 1.0f; /* relu' is mathematically undefined for x = 0, but we return 0 in this case. */
@@ -943,8 +946,8 @@ static void MAG_HOTPROC mag_vrelu_dv_f32( /* relu' : ℝ -> ℝ^+, x |-> { 0 if 
 
 static void MAG_HOTPROC mag_vgelu_f32( /* gelu : ℝ -> ℝ, x |-> TODO */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
@@ -1003,8 +1006,8 @@ static void MAG_HOTPROC mag_vgelu_f32( /* gelu : ℝ -> ℝ, x |-> TODO */
 
 static void MAG_HOTPROC mag_vgelu_dv_f32( /* gelu' : ℝ -> ℝ, x |-> TODO */
     const int64_t n,
-    float* const o,
-    const float* const x
+    mag_f32_t* const o,
+    const mag_f32_t* const x
 ) {
     for (int64_t i=0; i < n; ++i) {
         mag_panic("NYI"); /* TODO */
@@ -1017,26 +1020,26 @@ static void mag_blas_clone(const mag_compute_payload_t* payload) {
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* x = r->op_inputs[0];
     mag_assert2(mag_tensor_is_shape_eq(x, r));
-    float* b_r = mag_f32p_mut(r);
-    const float* b_x = mag_f32p(x);
+    mag_f32_t* b_r = mag_f32p_mut(r);
+    const mag_f32_t* b_x = mag_f32p(x);
     memcpy(b_r, b_x, mag_tensor_data_size(r));
 }
 
 static void MAG_HOTPROC mag_blas_mean_f32(const mag_compute_payload_t* payload) {
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* x = r->op_inputs[0];
-    float* b_r = mag_f32p_mut(r);
-    const float* b_x = mag_f32p(x);
+    mag_f32_t* b_r = mag_f32p_mut(r);
+    const mag_f32_t* b_x = mag_f32p(x);
     mag_load_local_storage_group(r, r_s, strides);
     mag_load_local_storage_group(x, x_d, shape);
     mag_load_local_storage_group(x, x_s, strides);
-    double sum = 0.0;
+    mag_f64_t sum = 0.0;
     for (int64_t i5=0; i5 < x_d5; ++i5) {
         for (int64_t i4=0; i4 < x_d4; ++i4) {
             for (int64_t i3=0; i3 < x_d3; ++i3) {
                 for (int64_t i2=0; i2 < x_d2; ++i2) {
                     for (int64_t i1=0; i1 < x_d1; ++i1) {
-                        const float* p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
+                        const mag_f32_t* p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
                         mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
                         sum += mag_vsum_f64_f32(
                             x_d0,
@@ -1047,25 +1050,25 @@ static void MAG_HOTPROC mag_blas_mean_f32(const mag_compute_payload_t* payload) 
             }
         }
     }
-    sum /= (double)x->numel;
-    *b_r = (float)sum;
+    sum /= (mag_f64_t)x->numel;
+    *b_r = (mag_f32_t)sum;
 }
 
 static void MAG_HOTPROC mag_blas_min_f32(const mag_compute_payload_t* payload) {
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* const x = r->op_inputs[0];
-    float* b_r = mag_f32p_mut(r);
-    const float* b_x = mag_f32p(x);
+    mag_f32_t* b_r = mag_f32p_mut(r);
+    const mag_f32_t* b_x = mag_f32p(x);
     mag_load_local_storage_group(r, r_s, strides);
     mag_load_local_storage_group(x, x_d, shape);
     mag_load_local_storage_group(x, x_s, strides);
-    float min = INFINITY;
+    mag_f32_t min = INFINITY;
     for (int64_t i5=0; i5 < x_d5; ++i5) {
         for (int64_t i4=0; i4 < x_d4; ++i4) {
             for (int64_t i3=0; i3 < x_d3; ++i3) {
                 for (int64_t i2=0; i2 < x_d2; ++i2) {
                     for (int64_t i1=0; i1 < x_d1; ++i1) {
-                        const float* p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
+                        const mag_f32_t* p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
                         mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
                         min = fminf(mag_vmin_f32(x_d0, p_x), min);
                     }
@@ -1079,18 +1082,18 @@ static void MAG_HOTPROC mag_blas_min_f32(const mag_compute_payload_t* payload) {
 static void MAG_HOTPROC mag_blas_max_f32(const mag_compute_payload_t* payload) {
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* const x = r->op_inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
+    mag_f32_t* const b_r = mag_f32p_mut(r);
+    const mag_f32_t* const b_x = mag_f32p(x);
     mag_load_local_storage_group(r, r_s, strides);
     mag_load_local_storage_group(x, x_d, shape);
     mag_load_local_storage_group(x, x_s, strides);
-    float max = -INFINITY;
+    mag_f32_t max = -INFINITY;
     for (int64_t i5=0; i5 < x_d5; ++i5) {
         for (int64_t i4=0; i4 < x_d4; ++i4) {
             for (int64_t i3=0; i3 < x_d3; ++i3) {
                 for (int64_t i2=0; i2 < x_d2; ++i2) {
                     for (int64_t i1=0; i1 < x_d1; ++i1) {
-                        const float* p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
+                        const mag_f32_t* p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
                         mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
                         max = fmaxf(mag_vmax_f32(x_d0, p_x), max);
                     }
@@ -1104,18 +1107,18 @@ static void MAG_HOTPROC mag_blas_max_f32(const mag_compute_payload_t* payload) {
 static void MAG_HOTPROC mag_blas_sum_f32(const mag_compute_payload_t* payload) {
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* const x = r->op_inputs[0];
-    float* const b_r = mag_f32p_mut(r);
-    const float* const b_x = mag_f32p(x);
+    mag_f32_t* const b_r = mag_f32p_mut(r);
+    const mag_f32_t* const b_x = mag_f32p(x);
     mag_load_local_storage_group(r, r_s, strides);
     mag_load_local_storage_group(x, x_d, shape);
     mag_load_local_storage_group(x, x_s, strides);
-    double sum = 0.0;
+    mag_f64_t sum = 0.0;
     for (int64_t i5=0; i5 < x_d5; ++i5) {
         for (int64_t i4=0; i4 < x_d4; ++i4) {
             for (int64_t i3=0; i3 < x_d3; ++i3) {
                 for (int64_t i2=0; i2 < x_d2; ++i2) {
                     for (int64_t i1=0; i1 < x_d1; ++i1) {
-                        const float* p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
+                        const mag_f32_t* p_x = b_x + i1*x_s1 + i2*x_s2 + i3*x_s3 + i4*x_s4 + i5*x_s5;
                         mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
                         sum += mag_vsum_f64_f32(x_d0, p_x);
                     }
@@ -1123,158 +1126,161 @@ static void MAG_HOTPROC mag_blas_sum_f32(const mag_compute_payload_t* payload) {
             }
         }
     }
-    *b_r = (float)sum;
+    *b_r = (mag_f32_t)sum;
 }
 
-#define mag_cpu_blas_impl_unary(name) \
-    static void MAG_HOTPROC mag_blas_##name##_f32(const mag_compute_payload_t* payload) { \
+#define mag_cpu_blas_impl_unary(T, name) \
+    static void MAG_HOTPROC mag_blas_##name##_##T(const mag_compute_payload_t* payload) { \
         mag_tensor_t* r = payload->node; \
         const mag_tensor_t* x = r->op_inputs[0]; \
-        float* b_r = mag_f32p_mut(r); \
-        const float* b_x = mag_f32p(x); \
+        mag_##T##_t* br = mag_##T##p_mut(r); \
+        const mag_##T##_t* bx = mag_##T##p(x); \
         mag_load_local_storage_group(r, r_s, strides); \
         mag_load_local_storage_group(x, x_s, strides); \
-        const int64_t tc = payload->thread_num; \
-        const int64_t ti = payload->thread_idx; \
-        const int64_t numel = r->numel; \
-        const int64_t chunk = (numel + tc - 1)/tc; \
-        const int64_t ra = ti*chunk; \
-        const int64_t vmel = (ra < numel) ? mag_xmin(ra + chunk, numel) - ra : 0; \
+        int64_t tc = payload->thread_num; \
+        int64_t ti = payload->thread_idx; \
+        int64_t numel = r->numel; \
+        int64_t chunk = (numel + tc - 1)/tc; \
+        int64_t ra = ti*chunk; \
+        int64_t vmel = (ra < numel) ? mag_xmin(ra + chunk, numel) - ra : 0; \
         if (mag_unlikely(vmel <= 0)) return; \
-        float* p_r = b_r + ra; \
-        const float* p_x = b_x + ra; \
-        mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r)); \
-        mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x)); \
-        mag_v##name##_f32(vmel, p_r, p_x); \
+        mag_##T##_t* pr = br + ra; \
+        const mag_##T##_t* px = bx + ra; \
+        mag_bnd_chk(pr, br, mag_tensor_data_size(r)); \
+        mag_bnd_chk(px, bx, mag_tensor_data_size(x)); \
+        mag_v##name##_##T(vmel, pr, px); \
     }
 
-mag_cpu_blas_impl_unary(abs)
-mag_cpu_blas_impl_unary(neg)
-mag_cpu_blas_impl_unary(log)
-mag_cpu_blas_impl_unary(sqr)
-mag_cpu_blas_impl_unary(sqrt)
-mag_cpu_blas_impl_unary(sin)
-mag_cpu_blas_impl_unary(cos)
-mag_cpu_blas_impl_unary(step)
-mag_cpu_blas_impl_unary(softmax)
-mag_cpu_blas_impl_unary(softmax_dv)
-mag_cpu_blas_impl_unary(sigmoid)
-mag_cpu_blas_impl_unary(sigmoid_dv)
-mag_cpu_blas_impl_unary(hard_sigmoid)
-mag_cpu_blas_impl_unary(silu)
-mag_cpu_blas_impl_unary(silu_dv)
-mag_cpu_blas_impl_unary(tanh)
-mag_cpu_blas_impl_unary(tanh_dv)
-mag_cpu_blas_impl_unary(relu)
-mag_cpu_blas_impl_unary(relu_dv)
-mag_cpu_blas_impl_unary(gelu)
-mag_cpu_blas_impl_unary(gelu_dv)
+mag_cpu_blas_impl_unary(f32, abs)
+mag_cpu_blas_impl_unary(f32, neg)
+mag_cpu_blas_impl_unary(f32, log)
+mag_cpu_blas_impl_unary(f32, sqr)
+mag_cpu_blas_impl_unary(f32, sqrt)
+mag_cpu_blas_impl_unary(f32, sin)
+mag_cpu_blas_impl_unary(f32, cos)
+mag_cpu_blas_impl_unary(f32, step)
+mag_cpu_blas_impl_unary(f32, softmax)
+mag_cpu_blas_impl_unary(f32, softmax_dv)
+mag_cpu_blas_impl_unary(f32, sigmoid)
+mag_cpu_blas_impl_unary(f32, sigmoid_dv)
+mag_cpu_blas_impl_unary(f32, hard_sigmoid)
+mag_cpu_blas_impl_unary(f32, silu)
+mag_cpu_blas_impl_unary(f32, silu_dv)
+mag_cpu_blas_impl_unary(f32, tanh)
+mag_cpu_blas_impl_unary(f32, tanh_dv)
+mag_cpu_blas_impl_unary(f32, relu)
+mag_cpu_blas_impl_unary(f32, relu_dv)
+mag_cpu_blas_impl_unary(f32, gelu)
+mag_cpu_blas_impl_unary(f32, gelu_dv)
 
 #undef mag_cpu_blas_impl_unary
 
-#define mag_cpu_blas_impl_unary_scalar(name) \
-    static void MAG_HOTPROC mag_blas_##name##s_f32(const mag_compute_payload_t* payload) { \
+#define mag_cpu_blas_impl_unary_scalar(T, name) \
+    static void MAG_HOTPROC mag_blas_##name##s_##T(const mag_compute_payload_t* payload) { \
         mag_tensor_t* r = payload->node; \
         const mag_tensor_t* x = r->op_inputs[0]; \
-        float xi = r->op_params->x.f32; \
-        float* b_r = mag_f32p_mut(r); \
-        const float* b_x = mag_f32p(x); \
+        mag_##T##_t xi = r->op_params->x.T; \
+        mag_##T##_t* br = mag_##T##p_mut(r); \
+        const mag_##T##_t* bx = mag_##T##p(x); \
         mag_load_local_storage_group(r, r_s, strides); \
         mag_load_local_storage_group(x, x_s, strides); \
-        int64_t rc = mag_tensor_num_rows(x); \
-        int64_t cc = mag_tensor_num_cols(x); \
-        for (int64_t ri=0; ri < rc; ++ri) { \
-            float* p_r = b_r + ri*r_s1; \
-            const float* p_x = b_x + ri*x_s1; \
-            mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r)); \
-            mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x)); \
-            mag_v##name##s_f32(cc, p_r, p_x, xi); \
-        } \
+        int64_t tc = payload->thread_num; \
+        int64_t ti = payload->thread_idx; \
+        int64_t numel = r->numel; \
+        int64_t chunk = (numel + tc - 1)/tc; \
+        int64_t ra = ti*chunk; \
+        int64_t vmel = (ra < numel) ? mag_xmin(ra + chunk, numel) - ra : 0; \
+        if (mag_unlikely(vmel <= 0)) return; \
+        mag_##T##_t* pr = br + ra; \
+        const mag_##T##_t* px = bx + ra; \
+        mag_bnd_chk(pr, br, mag_tensor_data_size(r)); \
+        mag_bnd_chk(px, bx, mag_tensor_data_size(x)); \
+        mag_v##name##s_##T(vmel, pr, px, xi); \
     }
 
-mag_cpu_blas_impl_unary_scalar(add)
-mag_cpu_blas_impl_unary_scalar(sub)
-mag_cpu_blas_impl_unary_scalar(mul)
-mag_cpu_blas_impl_unary_scalar(div)
+mag_cpu_blas_impl_unary_scalar(f32, add)
+mag_cpu_blas_impl_unary_scalar(f32, sub)
+mag_cpu_blas_impl_unary_scalar(f32, mul)
+mag_cpu_blas_impl_unary_scalar(f32, div)
 
 #undef mag_cpu_blas_impl_unary_scalar
 
-#define mag_cpu_blas_impl_binary(name, op) \
-    static void MAG_HOTPROC mag_blas_##name##_f32(const mag_compute_payload_t* payload) { \
+#define mag_cpu_blas_impl_binary(T, name, op) \
+    static void MAG_HOTPROC mag_blas_##name##_##T(const mag_compute_payload_t* payload) { \
         mag_tensor_t* r = payload->node; \
-        const mag_tensor_t* const x = r->op_inputs[0]; \
-        const mag_tensor_t* const y = r->op_inputs[1]; \
-        float* const b_r = mag_f32p_mut(r); \
-        const float* const b_x = mag_f32p(x); \
-        const float* const b_y = mag_f32p(y); \
-        mag_load_local_storage_group(r, r_d, shape); \
-        mag_load_local_storage_group(r, r_s, strides); \
-        mag_load_local_storage_group(x, x_d, shape); \
-        mag_load_local_storage_group(x, x_s, strides); \
-        mag_load_local_storage_group(y, y_d, shape); \
-        mag_load_local_storage_group(y, y_s, strides); \
+        const mag_tensor_t* x = r->op_inputs[0]; \
+        const mag_tensor_t* y = r->op_inputs[1]; \
+        mag_##T##_t* br = mag_##T##p_mut(r); \
+        const mag_##T##_t* bx = mag_##T##p(x); \
+        const mag_##T##_t* by = mag_##T##p(y); \
+        mag_load_local_storage_group(r, rd, shape); \
+        mag_load_local_storage_group(r, rs, strides); \
+        mag_load_local_storage_group(x, xd, shape); \
+        mag_load_local_storage_group(x, xs, strides); \
+        mag_load_local_storage_group(y, yd, shape); \
+        mag_load_local_storage_group(y, ys, strides); \
         int64_t tc = payload->thread_num; \
         int64_t ti = payload->thread_idx; \
-        int64_t nr = mag_tensor_num_rows(x); \
+        int64_t nr = xd5*xd4*xd3*xd2*xd1; \
         int64_t rpt = (nr + tc - 1)/tc;\
         int64_t ra = rpt*ti; \
         int64_t rb = mag_xmin(ra+rpt, nr); \
-        if (y_s0 == 1) { \
+        if (ys0 == 1) { \
             for (int64_t ri=ra; ri < rb; ++ri) { \
-                int64_t x_i5 = ri/(x_d4*x_d3*x_d2*x_d1); \
-                int64_t x_i4 = (ri - x_i5*x_d4*x_d3*x_d2*x_d1)/(x_d3*x_d2*x_d1); \
-                int64_t x_i3 = (ri - x_i5*x_d4*x_d3*x_d2*x_d1 - x_i4*x_d3*x_d2*x_d1)/(x_d2*x_d1); \
-                int64_t x_i2 = (ri - x_i5*x_d4*x_d3*x_d2*x_d1 - x_i4*x_d3*x_d2*x_d1 - x_i3*x_d2*x_d1)/x_d1; \
-                int64_t x_i1 =  ri - x_i5*x_d4*x_d3*x_d2*x_d1 - x_i4*x_d3*x_d2*x_d1 - x_i3*x_d2*x_d1 - x_i2*x_d1; \
-                int64_t y_i5 = x_i5 % y_d5; \
-                int64_t y_i4 = x_i4 % y_d4; \
-                int64_t y_i3 = x_i3 % y_d3; \
-                int64_t y_i2 = x_i2 % y_d2; \
-                int64_t y_i1 = x_i1 % y_d1; \
-                float* p_r = b_r + x_i1*r_s1 + x_i2*r_s2 + x_i3*r_s3 + x_i4*r_s4 + x_i5*r_s5; \
-                const float* p_x = b_x + x_i1*x_s1 + x_i2*x_s2 + x_i3*x_s3 + x_i4*x_s4 + x_i5*x_s5; \
-                const float* p_y = b_y + y_i1*y_s1 + y_i2*y_s2 + y_i3*y_s3 + y_i4*y_s4 + y_i5*y_s5; \
-                mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y)); \
-                int64_t yor = x_d0 / y_d0; \
+                int64_t ro = ri; \
+                int64_t xi1 = ro % xd1; ro /= xd1; \
+                int64_t xi2 = ro % xd2; ro /= xd2; \
+                int64_t xi3 = ro % xd3; ro /= xd3; \
+                int64_t xi4 = ro % xd4; ro /= xd4; \
+                int64_t xi5 = ro; \
+                int64_t yi5 = xi5 % yd5; \
+                int64_t yi4 = xi4 % yd4; \
+                int64_t yi3 = xi3 % yd3; \
+                int64_t yi2 = xi2 % yd2; \
+                int64_t yi1 = xi1 % yd1; \
+                mag_##T##_t* pr = br + xi5*rs5 + xi4*rs4 + xi3*rs3 + xi2*rs2 + xi1*rs1; \
+                const mag_##T##_t* px = bx + xi5*xs5 + xi4*xs4 + xi3*xs3 + xi2*xs2 + xi1*xs1; \
+                const mag_##T##_t* py = by + yi5*ys5 + yi4*ys4 + yi3*ys3 + yi2*ys2 + yi1*ys1; \
+                mag_bnd_chk(py, by, mag_tensor_data_size(y)); \
+                int64_t yor = xd0 / yd0; \
                 for (int64_t i=0; i < yor; ++i) { \
-                    float* pp_r = p_r + i*y_d0; \
-                    const float* pp_x = p_x + i*y_d0; \
-                    mag_bnd_chk(pp_r, b_r, mag_tensor_data_size(r)); \
-                    mag_bnd_chk(pp_x, b_x, mag_tensor_data_size(x)); \
-                    mag_v##name##_f32(y_d0, pp_r, pp_x, p_y); \
+                    mag_##T##_t* ppr = pr + i*yd0; \
+                    const mag_##T##_t* ppx = px + i*yd0; \
+                    mag_bnd_chk(ppr, br, mag_tensor_data_size(r)); \
+                    mag_bnd_chk(ppx, bx, mag_tensor_data_size(x)); \
+                    mag_v##name##_##T(yd0, ppr, ppx, py); \
                 } \
             } \
         } else { \
-            mag_panic("NYI"); \
             for (int64_t ri=ra; ri < rb; ++ri) { \
                 int64_t ro = ri; \
-                int64_t x_i1 = ro % x_d1; ro /= x_d1; \
-                int64_t x_i2 = ro % x_d2; ro /= x_d2; \
-                int64_t x_i3 = ro % x_d3; ro /= x_d3; \
-                int64_t x_i4 = ro % x_d4; ro /= x_d4; \
-                int64_t x_i5 = ro; \
-                int64_t y_i5 = x_i5 % y_d5; \
-                int64_t y_i4 = x_i4 % y_d4; \
-                int64_t y_i3 = x_i3 % y_d3; \
-                int64_t y_i2 = x_i2 % y_d2; \
-                int64_t y_i1 = x_i1 % y_d1; \
-                float* p_r = b_r + x_i1*r_s1 + x_i2*r_s2 + x_i3*r_s3 + x_i4*r_s4 + x_i5*r_s5; \
-                const float* p_x = b_x + x_i1*x_s1 + x_i2*x_s2 + x_i3*x_s3 + x_i4*x_s4 + x_i5*x_s5; \
-                for (int64_t i=0; i < r_d0; ++i) { \
-                    const float* p_y = b_y + i%y_d0*y_s0 + y_i1*y_s1 + y_i2*y_s2 + y_i3*y_s3 + y_i4*y_s4 + y_i5*y_s5; \
-                    mag_bnd_chk(p_r+i, b_r, mag_tensor_data_size(r)); \
-                    mag_bnd_chk(p_x+i, b_x, mag_tensor_data_size(x)); \
-                    mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y)); \
-                    p_r[i] = p_x[i] op *p_y; \
+                int64_t xi1 = ro % xd1; ro /= xd1; \
+                int64_t xi2 = ro % xd2; ro /= xd2; \
+                int64_t xi3 = ro % xd3; ro /= xd3; \
+                int64_t xi4 = ro % xd4; ro /= xd4; \
+                int64_t xi5 = ro; \
+                int64_t yi5 = xi5 % yd5; \
+                int64_t yi4 = xi4 % yd4; \
+                int64_t yi3 = xi3 % yd3; \
+                int64_t yi2 = xi2 % yd2; \
+                int64_t yi1 = xi1 % yd1; \
+                mag_##T##_t* pr = br + xi5*rs5 + xi4*rs4 + xi3*rs3 + xi2*rs2 + xi1*rs1; \
+                const mag_##T##_t* px = bx + xi5*xs5 + xi4*xs4 + xi3*xs3 + xi2*xs2 + xi1*xs1; \
+                for (int64_t i=0; i < rd0; ++i) { \
+                    const mag_##T##_t* py = by + yi5*ys5 + yi4*ys4 + yi3*ys3 + yi2*ys2 + yi1*ys1 + i%yd0*ys0; \
+                    mag_bnd_chk(pr+i, br, mag_tensor_data_size(r)); \
+                    mag_bnd_chk(px+i, bx, mag_tensor_data_size(x)); \
+                    mag_bnd_chk(py, by, mag_tensor_data_size(y)); \
+                    pr[i] = (px[i]) op (*py); \
                 } \
             } \
         } \
     }
 
-mag_cpu_blas_impl_binary(add, +)
-mag_cpu_blas_impl_binary(sub, -)
-mag_cpu_blas_impl_binary(mul, *)
-mag_cpu_blas_impl_binary(div, /)
+mag_cpu_blas_impl_binary(f32, add, +)
+mag_cpu_blas_impl_binary(f32, sub, -)
+mag_cpu_blas_impl_binary(f32, mul, *)
+mag_cpu_blas_impl_binary(f32, div, /)
 
 /*
 ** Matrix multiplication.
@@ -1284,9 +1290,9 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* x = r->op_inputs[0];
     const mag_tensor_t* y = r->op_inputs[1];
-    float* b_r = mag_f32p_mut(r);
-    const float* b_x = mag_f32p(x);
-    const float* b_y = mag_f32p(y);
+    mag_f32_t* b_r = mag_f32p_mut(r);
+    const mag_f32_t* b_x = mag_f32p(x);
+    const mag_f32_t* b_y = mag_f32p(y);
     mag_load_local_storage_group(r, r_d, shape);
     mag_load_local_storage_group(r, r_s, strides);
     mag_load_local_storage_group(x, x_d, shape);
@@ -1300,12 +1306,12 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
     int64_t inners = y_d1;
     for (int64_t i=0; i < rows; ++i) {
         for (int64_t k=0; k < cols; ++k) {
-            const float* p_x = b_x + x_d1*i + k;
+            const mag_f32_t* p_x = b_x + x_d1*i + k;
             mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
             for (int64_t j = 0; j < inners; ++j) b_r[r_d1*i + j] = 0.0f; /* Zero out result */
             for (int64_t j = 0; j < inners; ++j) {
-                float* p_r = b_r + r_d1*i + j;
-                const float* p_y = b_y + y_d1*k + j;
+                mag_f32_t* p_r = b_r + r_d1*i + j;
+                const mag_f32_t* p_y = b_y + y_d1*k + j;
                 mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
                 mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y));
                 *p_r += *p_x * *p_y;
@@ -1398,22 +1404,14 @@ static void (*mag_blas_dispatch_table_backward[MAG_OP__NUM])(const mag_compute_p
     [MAG_OP_MATMUL] = &mag_blas_matmul_f32
 };
 
-#if defined(__aarch64__) && (defined(__clang__) || defined(__GNUC__))
-#define mag_cpu_spinlock_pause() __asm__ volatile("yield" ::: "memory")
-#elif defined(__x86_64__) || defined(_M_X64)
-#define mag_cpu_spinlock_pause() _mm_pause()
-#else
-#define mag_cpu_spinlock_pause() mag_thread_yield()
-#endif
-
 typedef struct mag_worker_t mag_worker_t;
 typedef struct mag_threadpool_t {
     void* base;
     volatile bool interrupt;
     uint32_t num_workers;
     mag_worker_t* workers;
-    uint64 cycle;
-    uint64_t done_count;
+    uint64_t cycle;
+    uint64_t num_completed;
     mag_cond_var_t cv;
     mag_mutex_t mtx;
 } mag_threadpool_t;
@@ -1442,7 +1440,7 @@ static void* mag_worker_thread_exec_op(void* arg) {
         if (mag_likely(payload->node)) /* Do the work 🦾 */
             (*mag_blas_dispatch_table_forward[payload->node->op])(payload);
         mag_mtx_lock(&pool->mtx);
-            if (++pool->done_count == pool->num_workers) /* If we are the last to finish, wake the main thread */
+            if (++pool->num_completed == pool->num_workers) /* If we are the last to finish, wake the main thread */
                 mag_cv_broadcast(&pool->cv);
         mag_mtx_unlock(&pool->mtx);
     }
@@ -1481,7 +1479,7 @@ static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers) {
         .num_workers = num_workers,
         .workers = workers,
         .cycle = 0,
-        .done_count = 0,
+        .num_completed = 0,
     };
     mag_cv_init(&pool->cv);
     mag_mtx_init(&pool->mtx);
@@ -1509,11 +1507,11 @@ static void mag_threadpool_parallel_compute(mag_threadpool_t* pool, mag_tensor_t
             pool->workers[i].payload.node = node;
         }
         ++pool->cycle;
-        pool->done_count = 0;
+        pool->num_completed = 0;
     mag_mtx_unlock(&pool->mtx);
     mag_cv_broadcast(&pool->cv);
     mag_mtx_lock(&pool->mtx);
-        while (pool->done_count != pool->num_workers) { /* Wait for all workers to finish */
+        while (pool->num_completed != pool->num_workers) { /* Wait for all workers to finish */
             mag_cv_wait(&pool->cv, &pool->mtx);
         }
 #ifdef MAG_DEBUG
