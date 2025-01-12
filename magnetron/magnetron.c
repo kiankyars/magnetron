@@ -515,7 +515,7 @@ static uint32_t mag_crc32c(const void* buffer, size_t size) { /* Compute CRC32 c
             uint64x2_t x10 = vld1q_u64((const uint64_t*)(buf+160)), y10;
             uint64x2_t x11 = vld1q_u64((const uint64_t*)(buf+176)), y11;
             uint64x2_t k;
-            { static const uint64_t MAG_ALIGN(16) k_[] = {0xa87ab8a8, 0xab7aff2a}; k = vld1q_u64(k_); }
+            { static const uint64_t mag_alignas(16) k_[] = {0xa87ab8a8, 0xab7aff2a}; k = vld1q_u64(k_); }
             x0 = veorq_u64((uint64x2_t){crc, 0}, x0);
             buf += 192;
             size -= 192;
@@ -536,18 +536,18 @@ static uint32_t mag_crc32c(const void* buffer, size_t size) { /* Compute CRC32 c
                 size -= 192;
             }
             /* Reduce x0 ... x11 to just x0. */
-            { static const uint64_t MAG_ALIGN(16) k_[] = {0xf20c0dfe, 0x493c7d27}; k = vld1q_u64(k_); }
+            { static const uint64_t mag_alignas(16) k_[] = {0xf20c0dfe, 0x493c7d27}; k = vld1q_u64(k_); }
             y0 = mag_clmul_lo_e(x0, k, x1), x0 = mag_clmul_hi_e(x0, k, y0);
             y2 = mag_clmul_lo_e(x2, k, x3), x2 = mag_clmul_hi_e(x2, k, y2);
             y4 = mag_clmul_lo_e(x4, k, x5), x4 = mag_clmul_hi_e(x4, k, y4);
             y6 = mag_clmul_lo_e(x6, k, x7), x6 = mag_clmul_hi_e(x6, k, y6);
             y8 = mag_clmul_lo_e(x8, k, x9), x8 = mag_clmul_hi_e(x8, k, y8);
             y10 = mag_clmul_lo_e(x10, k, x11), x10 = mag_clmul_hi_e(x10, k, y10);
-            { static const uint64_t MAG_ALIGN(16) k_[] = {0x3da6d0cb, 0xba4fc28e}; k = vld1q_u64(k_); }
+            { static const uint64_t mag_alignas(16) k_[] = {0x3da6d0cb, 0xba4fc28e}; k = vld1q_u64(k_); }
             y0 = mag_clmul_lo_e(x0, k, x2), x0 = mag_clmul_hi_e(x0, k, y0);
             y4 = mag_clmul_lo_e(x4, k, x6), x4 = mag_clmul_hi_e(x4, k, y4);
             y8 = mag_clmul_lo_e(x8, k, x10), x8 = mag_clmul_hi_e(x8, k, y8);
-            { static const uint64_t MAG_ALIGN(16) k_[] = {0x740eef02, 0x9e4addf8}; k = vld1q_u64(k_); }
+            { static const uint64_t mag_alignas(16) k_[] = {0x740eef02, 0x9e4addf8}; k = vld1q_u64(k_); }
             y0 = mag_clmul_lo_e(x0, k, x4), x0 = mag_clmul_hi_e(x0, k, y0);
             x4 = x8;
             y0 = mag_clmul_lo_e(x0, k, x4), x0 = mag_clmul_hi_e(x0, k, y0);
