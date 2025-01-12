@@ -1407,7 +1407,7 @@ static void (*mag_blas_dispatch_table_backward[MAG_OP__NUM])(const mag_compute_p
 typedef struct mag_worker_t mag_worker_t;
 typedef struct mag_threadpool_t {
     mag_alignas(MAG_HDI) volatile bool interrupt;
-    mag_alignas(MAG_HDI) uint64_t cycle;
+    mag_alignas(MAG_HDI) uint64_t phase;
     mag_alignas(MAG_HDI) uint64_t num_completed;
     mag_alignas(MAG_HDI) mag_cond_var_t cv;
     mag_alignas(MAG_HDI) mag_mutex_t mtx;
@@ -1417,7 +1417,7 @@ typedef struct mag_threadpool_t {
 } mag_threadpool_t;
 
 struct mag_worker_t {
-    mag_alignas(MAG_HDI) uint64_t cycle;
+    mag_alignas(MAG_HDI) uint64_t phase;
     mag_alignas(MAG_HDI) mag_compute_payload_t payload;
     mag_threadpool_t* pool;
     mag_thread_t thread;
@@ -1429,13 +1429,13 @@ static void* mag_worker_thread_exec_op(void* arg) {
     mag_compute_payload_t* payload = &worker->payload;
     for (;;) {
         mag_mtx_lock(&pool->mtx);
-            while (!(pool->interrupt || pool->cycle > worker->cycle)) /* Wait for work 🥱*/
+            while (!(pool->interrupt || pool->phase > worker->phase)) /* Wait for work 🥱*/
                 mag_cv_wait(&pool->cv, &pool->mtx);
             if (mag_unlikely(pool->interrupt)) { /* Exit if interrupted */
                 mag_mtx_unlock(&pool->mtx);
                 break;
             }
-            worker->cycle = pool->cycle;
+            worker->phase = pool->phase;
         mag_mtx_unlock(&pool->mtx);
         if (mag_likely(payload->node)) /* Do the work 🦾 */
             (*mag_blas_dispatch_table_forward[payload->node->op])(payload);
@@ -1450,7 +1450,7 @@ static void* mag_worker_thread_exec_op(void* arg) {
 static void mag_worker_init(mag_worker_t* worker, mag_threadpool_t* pool, uint32_t idx, uint32_t num_workers) {
     *worker = (mag_worker_t){
         .pool = pool,
-        .cycle = 0,
+        .phase = 0,
         .payload = (mag_compute_payload_t){
             .thread_num = num_workers,
             .thread_idx = idx,
@@ -1478,7 +1478,7 @@ static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers) {
         .base = base,
         .num_workers = num_workers,
         .workers = workers,
-        .cycle = 0,
+        .phase = 0,
         .num_completed = 0,
     };
     mag_cv_init(&pool->cv);
@@ -1491,7 +1491,7 @@ static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers) {
 static void mag_threadpool_destroy(mag_threadpool_t* pool) {
     mag_mtx_lock(&pool->mtx);
         pool->interrupt = true;
-        ++pool->cycle;
+        ++pool->phase;
     mag_mtx_unlock(&pool->mtx);
     mag_cv_broadcast(&pool->cv);
     for (uint32_t i=0; i < pool->num_workers; ++i)
@@ -1506,7 +1506,7 @@ static void mag_threadpool_parallel_compute(mag_threadpool_t* pool, mag_tensor_t
         for (uint32_t i=0; i < pool->num_workers; ++i) {  /* Set up payload */
             pool->workers[i].payload.node = node;
         }
-        ++pool->cycle;
+        ++pool->phase;
         pool->num_completed = 0;
     mag_mtx_unlock(&pool->mtx);
     mag_cv_broadcast(&pool->cv);
