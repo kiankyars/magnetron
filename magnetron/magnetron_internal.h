@@ -349,26 +349,59 @@ static MAG_AINLINE void* mag_pincr(void** p, size_t sz, size_t align) {
 #error "TODO"
 #else
 
+typedef void* mag_thread_ret_t;
+#define THREAD_RET_NONE NULL
+
 typedef pthread_t mag_thread_t;
-#define mag_thread_create pthread_create
-#define mag_thread_join pthread_join
+static inline mag_thread_t mag_thread_create(mag_thread_ret_t (*fn)(void*), void* arg) {
+    mag_thread_t th;
+    mag_assert2(pthread_create(&th, NULL, fn, arg) == 0);
+    return th;
+}
+static inline void mag_thread_join(mag_thread_t th) {
+    mag_assert2(pthread_join(th, NULL) == 0);
+}
 
 typedef pthread_mutex_t mag_mutex_t;
-#define mag_mtx_init(mtx) pthread_mutex_init(mtx, NULL)
-#define mag_mtx_destroy(mtx) pthread_mutex_destroy(mtx)
-#define mag_mtx_lock(mtx) pthread_mutex_lock(mtx)
-#define mag_mtx_unlock(mtx) pthread_mutex_unlock(mtx)
-#define mag_mtx_lock_shared(mtx) pthread_mutex_lock(mtx)
-#define mag_mtx_unlock_shared(mtx) pthread_mutex_unlock(mtx)
+static mag_mutex_t mag_mutex_create(void) {
+    mag_mutex_t mtx;
+    mag_assert2(pthread_mutex_init(&mtx, NULL) == 0);
+    return mtx;
+}
+static inline void mag_mutex_destroy(mag_mutex_t* mtx) {
+    mag_assert2(pthread_mutex_destroy(mtx) == 0);
+}
+static inline void mag_mutex_lock(mag_mutex_t* mtx) {
+    mag_assert2(pthread_mutex_lock(mtx) == 0);
+}
+static inline void mag_mutex_unlock(mag_mutex_t* mtx) {
+    mag_assert2(pthread_mutex_unlock(mtx) == 0);
+}
 
 typedef pthread_cond_t mag_cond_var_t;
-#define mag_cv_init(cv) pthread_cond_init(cv, NULL)
-#define mag_cv_destroy(cv) pthread_cond_destroy(cv)
-#define mag_cv_wait(cv, mtx) pthread_cond_wait(cv, mtx)
-#define mag_cv_signal(cv) pthread_cond_signal(cv)
-#define mag_cv_broadcast(cv) pthread_cond_broadcast(cv)
+static inline mag_cond_var_t mag_cv_create() {
+    mag_cond_var_t cv;
+    mag_assert2(pthread_cond_init(&cv, NULL) == 0);
+    return cv;
+}
+static inline void mag_cv_destroy(mag_cond_var_t* cv) {
+    mag_assert2(pthread_cond_destroy(cv) == 0);
+}
+static inline void mag_cv_wait(mag_cond_var_t* cv, mag_mutex_t* mtx) {
+    mag_assert2(pthread_cond_wait(cv, mtx) == 0);
+}
+static inline void mag_cv_signal(mag_cond_var_t* cv) {
+    mag_assert2(pthread_cond_signal(cv) == 0);
+}
+static inline void mag_cv_broadcast(mag_cond_var_t* cv) {
+    mag_assert2(pthread_cond_broadcast(cv) == 0);
+}
 
 #endif
+
+extern MAG_EXPORT void mag_thread_set_prio(mag_thread_sched_prio_t prio); /* Set thread scheduling priority of current thread. */
+extern MAG_EXPORT void mag_thread_set_name(const char* name); /* Set thread name. */
+extern MAG_EXPORT void mag_thread_yield(void); /* Yield current thread. */
 
 typedef enum mag_op_t {
     MAG_OP_NOP,
@@ -444,22 +477,6 @@ typedef struct mag_op_meta_t {
     bool (*validator)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_op_param_t*);
 } mag_op_meta_t;
 extern MAG_EXPORT const mag_op_meta_t* mag_op_meta_of(mag_op_t type);
-
-typedef struct mag_binary_semaphore_t {
-    mag_mutex_t mtx;
-    mag_cond_var_t cv;
-    bool signaled;
-} mag_binary_semaphore_t;
-extern MAG_EXPORT void mag_binary_semaphore_init(mag_binary_semaphore_t* sem, bool v);
-extern MAG_EXPORT void mag_binary_semaphore_reset(mag_binary_semaphore_t* sem);
-extern MAG_EXPORT void mag_binary_semaphore_post(mag_binary_semaphore_t* sem);
-extern MAG_EXPORT void mag_binary_semaphore_broadcast(mag_binary_semaphore_t* sem);
-extern MAG_EXPORT void mag_binary_semaphore_await(mag_binary_semaphore_t* sem);
-extern MAG_EXPORT void mag_binary_semaphore_destroy(mag_binary_semaphore_t* sem);
-
-extern MAG_EXPORT void mag_thread_set_prio(mag_thread_sched_prio_t prio); /* Set thread scheduling priority of current thread. */
-extern MAG_EXPORT void mag_thread_set_name(const char* name); /* Set thread name. */
-extern MAG_EXPORT void mag_thread_yield(void); /* Yield current thread. */
 
 typedef struct mag_intrusive_chunk mag_intrusive_chunk;
 struct mag_intrusive_chunk {
