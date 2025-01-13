@@ -46,6 +46,10 @@
   </ol>
 </details>
 
+## News
+- **[2025/01/14]** 🎉 CPU backend now uses multiple threads with dynamic scaling and thread pooling.
+- **[2025/01/02]** 🎈 Magnetron released on GitHub.
+
 ## About
 
 ![ScreenShot](media/xor.png)
@@ -81,25 +85,139 @@ Some examples use matplotlib and numpy for plotting and data generation, but the
 See the [Examples](python/examples) directory for examples on how to use the framework.
 For usage in C and C++ see the [Unit Tests](test) directory in the root of the project.
 
+## Features
+* 6 Dimensional, linearized tensors
+* Automatic Differentiation
+* Multithreaded CPU Compute, SIMD optimized operators (SSE4, AVX2, AVX512, ARM NEON)
+* Modern Python API (similar to PyTorch)
+* Many operators with broadcasting support and in-place variants
+* High level neural network building blocks
+* Dynamic computation graph (eager evaluation)
+* Modern PRNGs: Mersenne Twister and PCG
+* Validation and friendly error messages
+* Custom compressed tensor file formats
+
+### Example
+Code from the XOR example:
+```python
+def forward(self, x: Tensor) -> Tensor:
+    return (self.weight @ prev + self.bias).sigmoid()
+```
+
+### Operators
+<table>
+  <thead>
+    <tr>
+      <th>Operation</th>
+      <th><div align="center">Description</div></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>clone(x)</td>
+      <td><div align="center">Creates a copy of the tensor</div></td>
+    </tr>
+    <tr>
+      <td>view(x)</td>
+      <td><div align="center">Reshapes without changing data</div></td>
+    </tr>
+    <tr>
+      <td>transpose(x)</td>
+      <td><div align="center">Swaps tensor dimensions</div></td>
+    </tr>
+    <tr>
+      <td>permute(x, d0, ...)</td>
+      <td><div align="center">Reorders tensor dimensions</div></td>
+    </tr>
+    <tr>
+      <td>mean(x)</td>
+      <td><div align="center">Mean across dimensions</div></td>
+    </tr>
+    <tr>
+      <td>min(x)</td>
+      <td><div align="center">Minimum value of tensor</div></td>
+    </tr>
+    <tr>
+      <td>max(x)</td>
+      <td><div align="center">Maximum value of tensor</div></td>
+    </tr>
+    <tr>
+      <td>sum(x)</td>
+      <td><div align="center">Sum of elements</div></td>
+    </tr>
+    <tr>
+      <td>abs(x)</td>
+      <td><div align="center">Element-wise absolute value</div></td>
+    </tr>
+    <tr>
+      <td>neg(x)</td>
+      <td><div align="center">Element-wise negation</div></td>
+    </tr>
+    <tr>
+      <td>log(x)</td>
+      <td><div align="center">Element-wise natural logarithm</div></td>
+    </tr>
+    <tr>
+      <td>sqr(x)</td>
+      <td><div align="center">Element-wise square</div></td>
+    </tr>
+    <tr>
+      <td>sqrt(x)</td>
+      <td><div align="center">Element-wise square root</div></td>
+    </tr>
+    <tr>
+      <td>sin(x)</td>
+      <td><div align="center">Element-wise sine</div></td>
+    </tr>
+    <tr>
+      <td>cos(x)</td>
+      <td><div align="center">Element-wise cosine</div></td>
+    </tr>
+    <tr>
+      <td>softmax(x)</td>
+      <td><div align="center">Softmax along dimension</div></td>
+    </tr>
+    <tr>
+      <td>sigmoid(x)</td>
+      <td><div align="center">Element-wise sigmoid</div></td>
+    </tr>
+    <tr>
+      <td>relu(x)</td>
+      <td><div align="center">ReLU activation</div></td>
+    </tr>
+    <tr>
+      <td>gelu(x)</td>
+      <td><div align="center">GELU activation</div></td>
+    </tr>
+    <tr>
+      <td>add(x, y)</td>
+      <td><div align="center">Element-wise addition</div></td>
+    </tr>
+    <tr>
+      <td>sub(x, y)</td>
+      <td><div align="center">Element-wise subtraction</div></td>
+    </tr>
+    <tr>
+      <td>mul(x, y)</td>
+      <td><div align="center">Element-wise multiplication</div></td>
+    </tr>
+    <tr>
+      <td>div(x, y)</td>
+      <td><div align="center">Element-wise division</div></td>
+    </tr>
+    <tr>
+      <td>matmul(A, B)</td>
+      <td><div align="center">Matrix multiplication</div></td>
+    </tr>
+  </tbody>
+</table>
+
 ## Roadmap
 
 The goal is to implement training and inference for LLMs and other state of the art models, while providing a simple and small codebase that is easy to understand and modify.
 
-- [X] 6 Dimensional, Linearized Tensors
-- [X] Dynamic Computation Graph
-- [X] Static Computation Graph
-- [X] Modern Python API
-- [X] High level neural network building blocks
-- [X] CPU Compute and optimization
-- [X] SIMD Optimized operators (SSE4, AVX2, AVX512, ARM NEON)
-- [X] Compressed tensor file format
-- [X] Validation and friendly error messages
-- [X] Fast, custom memory allocators for CPU and GPU
-- [X] Modern PRNGs: Mersenne Twister and PCG
-- [X] Automatic differentiation
 - [ ] Compute on GPU (Cuda)
-- [ ] Other Datatypes (f16, bf16, int8)
-- [ ] Multithreaded CPU Compute with intra-op parallelism
+- [ ] Low-precision datatypes (f16, bf16, int8)
 - [ ] Distributed Training and Inference
 - [ ] CPU and GPU kernel JIT compilation
 - [ ] Better examples with real world models (LLMs and state of the art models)
