@@ -1082,8 +1082,8 @@ static void MAG_HOTPROC mag_blas_min_f32(const mag_compute_payload_t* payload) {
 static void MAG_HOTPROC mag_blas_max_f32(const mag_compute_payload_t* payload) {
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* const x = r->op_inputs[0];
-    mag_f32_t* const b_r = mag_f32p_mut(r);
-    const mag_f32_t* const b_x = mag_f32p(x);
+    mag_f32_t* b_r = mag_f32p_mut(r);
+    const mag_f32_t* b_x = mag_f32p(x);
     mag_load_local_storage_group(r, r_s, strides);
     mag_load_local_storage_group(x, x_d, shape);
     mag_load_local_storage_group(x, x_s, strides);
@@ -1107,8 +1107,8 @@ static void MAG_HOTPROC mag_blas_max_f32(const mag_compute_payload_t* payload) {
 static void MAG_HOTPROC mag_blas_sum_f32(const mag_compute_payload_t* payload) {
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* const x = r->op_inputs[0];
-    mag_f32_t* const b_r = mag_f32p_mut(r);
-    const mag_f32_t* const b_x = mag_f32p(x);
+    mag_f32_t* b_r = mag_f32p_mut(r);
+    const mag_f32_t* b_x = mag_f32p(x);
     mag_load_local_storage_group(r, r_s, strides);
     mag_load_local_storage_group(x, x_d, shape);
     mag_load_local_storage_group(x, x_s, strides);
@@ -1221,10 +1221,10 @@ mag_cpu_blas_impl_unary_scalar(f32, div)
         mag_load_local_storage_group(y, ys, strides); \
         int64_t tc = payload->thread_num; \
         int64_t ti = payload->thread_idx; \
-        int64_t nr = xd5*xd4*xd3*xd2*xd1; \
-        int64_t rpt = (nr + tc - 1)/tc;\
-        int64_t ra = rpt*ti; \
-        int64_t rb = mag_xmin(ra+rpt, nr); \
+        int64_t numel = xd5*xd4*xd3*xd2*xd1; \
+        int64_t chunk = (numel + tc - 1)/tc;\
+        int64_t ra = chunk*ti; \
+        int64_t rb = mag_xmin(ra+chunk, numel); \
         if (ys0 == 1) { \
             for (int64_t ri=ra; ri < rb; ++ri) { \
                 int64_t ro = ri; \
@@ -1301,20 +1301,22 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
     mag_load_local_storage_group(y, y_s, strides);
     mag_assert2(x_d2 == 1 && x_d3 == 1);
     mag_assert2(y_d2 == 1 && y_d3 == 1);
-    int64_t rows = x_d0;
-    int64_t cols = x_d1;
-    int64_t inners = y_d1;
-    for (int64_t i=0; i < rows; ++i) {
-        for (int64_t k=0; k < cols; ++k) {
+    int64_t tc = payload->thread_num;
+    int64_t ti = payload->thread_idx;
+    int64_t nr = x_d0;
+    int64_t rpt = (nr + tc - 1)/tc;
+    int64_t ra = rpt*ti;
+    int64_t rb = mag_xmin(ra+rpt, nr);
+    for (int64_t i = ra; i < rb; ++i) {
+        for (int64_t j = 0; j < y_d1; ++j) {
+            b_r[r_d1 * i + j] = 0.0f;
+        }
+        for (int64_t k = 0; k < x_d1; ++k) {
             const mag_f32_t* p_x = b_x + x_d1*i + k;
-            mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-            for (int64_t j = 0; j < inners; ++j) b_r[r_d1*i + j] = 0.0f; /* Zero out result */
-            for (int64_t j = 0; j < inners; ++j) {
+            for (int64_t j = 0; j < y_d1; ++j) {
                 mag_f32_t* p_r = b_r + r_d1*i + j;
                 const mag_f32_t* p_y = b_y + y_d1*k + j;
-                mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-                mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y));
-                *p_r += *p_x * *p_y;
+                *p_r += (*p_x) * (*p_y);
             }
         }
     }
@@ -1542,8 +1544,9 @@ static void mag_cpu_buf_cpy_device_host(mag_storage_buffer_t* sto, size_t offs, 
     memcpy(dst, (void*)(sto->base+offs), n); /* On CPU just plain old memcpy with offset. */
 }
 
-static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer_t* out, size_t size, size_t align) {
+static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer_t* out, size_t size) {
     mag_assert2(size);
+    size_t align = MAG_HDI; /* Align to cache line size. */
     void* block = mag_alloc_aligned(size, align);
     *out = (mag_storage_buffer_t){ /* Set up storage buffer. */
         .base = (uintptr_t)block,

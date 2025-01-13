@@ -1,6 +1,6 @@
 // (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
-// ON LINUX: Before running the benchmark, execute: linux_prepare_perf.sh to setup the system for performance measurements.
+// ON LINUX: Before running the benchmark, execute: prepare_system.sh to setup the system for performance measurements.
 
 #include <magnetron.h>
 #define ANKERL_NANOBENCH_IMPLEMENT
@@ -11,14 +11,13 @@
 
 static auto bench_cpu_compute(std::int64_t numel_per_dim) -> void {
     ankerl::nanobench::Bench bench {};
-    bench.title("Parallel ADD Big Tensor | Numel per Dim: " + std::to_string(numel_per_dim))
-        .unit("ADD")
-        .minEpochIterations(1024)
+    bench.title("Parallel MM Big Tensor | Numel per Dim: " + std::to_string(numel_per_dim))
+        .unit("MM")
         .warmup(100)
         .relative(true)
         .performanceCounters(true);
 
-    std::cout << "Benchmarking Parallel ADD on CPU with Numel per Dim: " << numel_per_dim << std::endl;
+    std::cout << "Benchmarking Parallel MM on CPU with Numel per Dim: " << numel_per_dim << std::endl;
 
     auto exec_bench = [&](std::uint32_t threads) {
         const mag_device_descriptor_t desc = {
@@ -26,12 +25,12 @@ static auto bench_cpu_compute(std::int64_t numel_per_dim) -> void {
             .thread_count = threads,
         };
         mag_ctx_t* ctx = mag_ctx_create2(&desc);
-        mag_tensor_t* A = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, numel_per_dim, numel_per_dim, numel_per_dim);
+        mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, numel_per_dim, numel_per_dim);
         mag_tensor_fill_random_normal(A, 0.0f, 1.0f);
-        mag_tensor_t* B = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, numel_per_dim, numel_per_dim, numel_per_dim);
+        mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, numel_per_dim, numel_per_dim);
         mag_tensor_fill_random_normal(B, 0.0f, 1.0f);
-        bench.run("Parallel ADD on " + std::to_string(threads) + " threads, Elems = " + std::to_string(A->numel), [&] {
-            mag_tensor_t* R = mag_add(A, B);
+        bench.run("Parallel MM on " + std::to_string(threads) + " threads, Elems = " + std::to_string(A->numel), [&] {
+            mag_tensor_t* R = mag_matmul(A, B);
             ankerl::nanobench::doNotOptimizeAway(R);
             mag_tensor_decref(R);
         });
@@ -52,7 +51,7 @@ static auto bench_cpu_compute(std::int64_t numel_per_dim) -> void {
 }
 
 auto main() -> int {
-    bench_cpu_compute(80);
+    bench_cpu_compute(128*8);
     bench_cpu_compute(10);
     bench_cpu_compute(2);
     //bench_cpu_compute(250);

@@ -1860,9 +1860,9 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
     mag_tensor_incref(t); /* First strong RC=1 */
     /* Allocate device memory */
     mag_compute_device_t* dvc = ctx->device;
-    void (*allocator)(mag_compute_device_t*, mag_storage_buffer_t*, size_t, size_t) = dvc->alloc_storage;
+    void (*allocator)(mag_compute_device_t*, mag_storage_buffer_t*, size_t) = dvc->alloc_storage;
     if (view) t->storage = view->storage; /* Reference memory from view */
-    else (*allocator)(dvc, &t->storage, numbytes, dts); /* Allocate new device memory */
+    else (*allocator)(dvc, &t->storage, numbytes); /* Allocate new device memory */
     #pragma GCC unroll 6
     for (uint32_t i=0; i < MAG_MAX_DIMS; ++i)    /* Copy dimensions and set unused to identity. */
         t->shape[i] = i < rank ? dims[i] : 1;

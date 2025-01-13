@@ -511,7 +511,7 @@ struct mag_compute_device_t {
     mag_compute_device_type_t type;                                             /* Device type enum. */
     void (*eager_exec_fwd)(mag_compute_device_t* dvc, mag_tensor_t* root);      /* Execute a single op forward. */
     void (*eager_exec_bwd)(mag_compute_device_t* dvc, mag_tensor_t* root);      /* Execute a single op backwards. */
-    void (*alloc_storage)(mag_compute_device_t* dvc, mag_storage_buffer_t* out, size_t size, size_t align);
+    void (*alloc_storage)(mag_compute_device_t* dvc, mag_storage_buffer_t* out, size_t size);
     void (*free_storage)(mag_compute_device_t* dvc, mag_storage_buffer_t* buf);
 };
 
