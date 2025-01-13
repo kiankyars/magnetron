@@ -1406,22 +1406,22 @@ static void (*mag_blas_dispatch_table_backward[MAG_OP__NUM])(const mag_compute_p
 
 typedef struct mag_worker_t mag_worker_t;
 typedef struct mag_threadpool_t {
-    mag_alignas(MAG_HDI) volatile bool interrupt;
-    mag_alignas(MAG_HDI) uint64_t phase;
-    mag_alignas(MAG_HDI) uint64_t num_completed;
-    mag_alignas(MAG_HDI) mag_cond_var_t cv;
-    mag_alignas(MAG_HDI) mag_mutex_t mtx;
+    volatile bool interrupt;
+    uint64_t phase;
+    uint64_t num_completed;
+    mag_cond_var_t cv;
+    mag_mutex_t mtx;
     uint32_t num_workers;
     mag_worker_t* workers;
     void* base;
 } mag_threadpool_t;
 
 struct mag_worker_t {
-    mag_alignas(MAG_HDI) uint64_t phase;
-    mag_alignas(MAG_HDI) mag_compute_payload_t payload;
+    uint64_t phase;
+    mag_compute_payload_t payload;
     mag_threadpool_t* pool;
     mag_thread_t thread;
-} mag_alignas(MAG_HDI);
+};
 
 static void* mag_worker_thread_exec_op(void* arg) {
     mag_worker_t* worker = arg;
@@ -1437,8 +1437,10 @@ static void* mag_worker_thread_exec_op(void* arg) {
             }
             worker->phase = pool->phase;
         mag_mtx_unlock(&pool->mtx);
-        if (mag_likely(payload->node)) /* Do the work 🦾 */
+        if (mag_likely(payload->node)) { /* Do the work 🦾 */
             (*mag_blas_dispatch_table_forward[payload->node->op])(payload);
+            payload->node = NULL;
+        }
         mag_mtx_lock(&pool->mtx);
             if (++pool->num_completed == pool->num_workers) /* If we are the last to finish, wake the main thread */
                 mag_cv_broadcast(&pool->cv);
@@ -1515,8 +1517,8 @@ static void mag_threadpool_parallel_compute(mag_threadpool_t* pool, mag_tensor_t
             mag_cv_wait(&pool->cv, &pool->mtx);
         }
 #ifdef MAG_DEBUG
-        for (uint32_t i=0; i < pool->num_workers; ++i) { /* Verify cycles executed */
-            mag_assert2(pool->workers[i].cycle == pool->cycle);
+        for (uint32_t i=0; i < pool->num_workers; ++i) { /* Verify phases executed */
+            mag_assert2(pool->workers[i].phase == pool->phase);
         }
 #endif
     mag_mtx_unlock(&pool->mtx);
