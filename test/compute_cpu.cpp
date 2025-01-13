@@ -4,6 +4,7 @@
 // because the BLAS uses SIMD for certain functions which have higher accuracy than the scalar high-precision lambdas.
 
 #include "prelude.hpp"
+#include <algorithm>
 #include <cmath>
 
 static constexpr std::int64_t k_lim_same_shape = 4;
