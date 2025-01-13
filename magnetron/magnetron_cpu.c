@@ -1406,14 +1406,13 @@ static void (*mag_blas_dispatch_table_backward[MAG_OP__NUM])(const mag_compute_p
 
 typedef struct mag_worker_t mag_worker_t;
 typedef struct mag_threadpool_t {
-    volatile bool interrupt;
-    uint64_t phase;
-    uint64_t num_completed;
+    mag_alignas(MAG_HDI) volatile bool interrupt;
+    mag_alignas(MAG_HDI) uint64_t phase;
+    mag_alignas(MAG_HDI) uint64_t num_completed;
     mag_cond_var_t cv;
     mag_mutex_t mtx;
     uint32_t num_workers;
     mag_worker_t* workers;
-    void* base;
 } mag_threadpool_t;
 
 struct mag_worker_t {
@@ -1421,7 +1420,7 @@ struct mag_worker_t {
     mag_compute_payload_t payload;
     mag_threadpool_t* pool;
     mag_thread_t thread;
-};
+} mag_alignas(MAG_HDI);
 
 static void* mag_worker_thread_exec_op(void* arg) {
     mag_worker_t* worker = arg;
@@ -1468,16 +1467,9 @@ static void mag_worker_destroy(mag_worker_t* worker) {
 }
 
 static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers) {
-    uintptr_t mem = 0;
-    mag_pincr((void**)&mem, sizeof(mag_threadpool_t), __alignof(mag_threadpool_t));
-    mag_pincr((void**)&mem, sizeof(mag_worker_t)*num_workers, __alignof(mag_worker_t));
-    void* base = (*mag_alloc)(NULL, mem);
-    memset(base, 0, mem);
-    void* needle = base;
-    mag_threadpool_t* pool = mag_pincr(&needle, sizeof(*pool), __alignof(mag_threadpool_t));
-    mag_worker_t* workers = mag_pincr(&needle, sizeof(*workers)*num_workers, __alignof(mag_worker_t));
+    mag_threadpool_t* pool = mag_alloc_aligned(sizeof(*pool), __alignof(mag_threadpool_t));
+    mag_worker_t* workers = mag_alloc_aligned(num_workers*sizeof(*workers), __alignof(mag_worker_t));
     *pool = (mag_threadpool_t){
-        .base = base,
         .num_workers = num_workers,
         .workers = workers,
         .phase = 0,
@@ -1500,7 +1492,8 @@ static void mag_threadpool_destroy(mag_threadpool_t* pool) {
         mag_worker_destroy(&pool->workers[i]);
     mag_cv_destroy(&pool->cv);
     mag_mtx_destroy(&pool->mtx);
-    (*mag_alloc)(pool->base, 0);
+    mag_free_aligned(pool->workers);
+    mag_free_aligned(pool);
 }
 
 static void mag_threadpool_parallel_compute(mag_threadpool_t* pool, mag_tensor_t* node) {

@@ -52,9 +52,9 @@ static auto bench_cpu_compute(std::int64_t numel_per_dim) -> void {
 }
 
 auto main() -> int {
-    bench_cpu_compute(2);
-    bench_cpu_compute(10);
     bench_cpu_compute(80);
+    bench_cpu_compute(10);
+    bench_cpu_compute(2);
     //bench_cpu_compute(250);
     return 0;
 }
