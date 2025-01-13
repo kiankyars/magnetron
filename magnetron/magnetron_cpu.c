@@ -1452,7 +1452,7 @@ static void mag_worker_exec_and_broadcast(mag_threadpool_t* pool, mag_compute_pa
     mag_mtx_unlock(&pool->mtx);
 }
 
-static void* MAG_HOTPROC mag_worker_thread_exec_op(void* arg) {
+static MAG_HOTPROC void* mag_worker_thread_exec_op(void* arg) {
     mag_worker_t* worker = arg;
     mag_threadpool_t* pool = worker->pool;
     mag_compute_payload_t* payload = &worker->payload;
@@ -1535,7 +1535,7 @@ static void mag_threadpool_barrier(mag_threadpool_t* pool) {
     mag_mtx_unlock(&pool->mtx);
 }
 
-static void mag_threadpool_parallel_compute(mag_threadpool_t* pool, mag_tensor_t* node) {
+static MAG_HOTPROC void mag_threadpool_parallel_compute(mag_threadpool_t* pool, mag_tensor_t* node) {
     if (!pool) { /* If no thread pool, main thread does the work (single threaded mode). */
         mag_compute_payload_t payload = {
             .node = node,
@@ -1624,10 +1624,6 @@ mag_compute_device_t* mag_init_device_cpu(mag_ctx_t* ctx, const mag_device_descr
     uint32_t hw_concurrency = mag_xmax(1, ctx->sys.cpu_virtual_cores);
     uint32_t num_threads = desc->thread_count;
     num_threads = num_threads ? num_threads : hw_concurrency;
-    if (mag_unlikely(num_threads > hw_concurrency)) {
-        mag_log_warn("Number of threads requested (%u) exceeds number of virtual cores (%u). Using %u threads.", num_threads, hw_concurrency, hw_concurrency);
-        num_threads = hw_concurrency;
-    }
     mag_compute_device_t* dvc = mag_cpu_init_interface(ctx, num_threads);
     return dvc;
 }
