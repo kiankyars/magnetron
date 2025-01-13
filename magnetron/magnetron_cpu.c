@@ -1488,7 +1488,9 @@ static void mag_worker_join(mag_worker_t* worker) {
 
 static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers, mag_thread_sched_prio_t prio) {
     mag_threadpool_t* pool = mag_alloc_aligned(sizeof(*pool), __alignof(mag_threadpool_t));
+    memset(pool, 0, sizeof(*pool));
     mag_worker_t* workers = mag_alloc_aligned(num_workers*sizeof(*workers), __alignof(mag_worker_t));
+    memset(workers, 0, num_workers*sizeof(*workers));
     *pool = (mag_threadpool_t){
         .num_workers = num_workers,
         .workers = workers,
