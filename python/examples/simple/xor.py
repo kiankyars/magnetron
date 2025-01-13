@@ -4,7 +4,7 @@ import magnetron as mag
 from magnetron.models import SequentialModel, DenseLayer
 import matplotlib.pyplot as plt
 
-mag.GlobalConfig.compute_device = mag.ComputeDevice.CPU(2)
+mag.GlobalConfig.compute_device = mag.ComputeDevice.CPU(1)
 
 EPOCHS: int = 10000
 LEARNING_RATE: float = 0.8

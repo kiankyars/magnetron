@@ -5,10 +5,9 @@ import numpy
 import torch
 from bench import *
 
-mag.GlobalConfig.compute_device = mag.ComputeDevice.CPU(32)
 mag.GlobalConfig.verbose = True
 
-n: int = 8192
+n: int = 1024
 iters: int = 500
 
 print(f'Benchmarking addition of {n}x{n} matrices with {iters} iterations...')

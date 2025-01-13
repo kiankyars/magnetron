@@ -24,6 +24,7 @@ _deps
 /python/__pycache__
 /python/magnetron/__pycache__/
 /python/examples/__pycache__/
+/python/benchmarks/__pycache__/
 /python/extra/__pycache__/
 /python/tests/__pycache__/
 **/.DS_Store

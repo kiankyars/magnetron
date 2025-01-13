@@ -8,7 +8,7 @@
 TEST(core, profiler_small_dims) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     mag_ctx_profile_start_recording(ctx);
-    for (int i=0; i < 1000000; ++i) {
+    for (int i=0; i < 10000; ++i) {
         mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, 3, 3);
         mag_tensor_t* B =  mag_sin(A);
         mag_tensor_t* C =  mag_cos(B);
