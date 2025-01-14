@@ -4,8 +4,72 @@
 
 #include <math.h>
 
-#define MAG_BLAS_SPECIALIZATION mag_cpu_blas_specialization_generic
-#include "mag_cpu_blas.h"
+extern void mag_cpu_blas_specialization_fallback(mag_kernel_registry_t* kernels); /* Generic any CPU impl */
+
+#if defined(__x86_64__) || defined(_M_X64) /* Specialized impls for x86-64 with runtime CPU detection */
+
+typedef struct mag_amd64_blas_specialization {
+    const char* name;
+    const mag_x86_64_feature_t* (*get_feature_permutation)(size_t* out_num);
+    void (*inject_kernels)(mag_kernel_registry_t* kernels);
+} mag_amd64_blas_specialization;
+
+#define mag_cpu_blas_spec_decl(feat) \
+    const mag_x86_64_feature_t* mag_cpu_blas_specialization_amd64_##feat##_features(size_t* out_num); \
+    extern void mag_cpu_blas_specialization_amd64_##feat(mag_kernel_registry_t* kernels)
+
+#define mag_amd64_blas_spec_permute(feat) \
+    (mag_amd64_blas_specialization) { \
+        .name = "amd64_"#feat, \
+        .get_feature_permutation = &mag_cpu_blas_specialization_amd64_##feat##_features, \
+        .inject_kernels = &mag_cpu_blas_specialization_amd64_##feat \
+    }
+
+mag_cpu_blas_spec_decl(avx512f);
+mag_cpu_blas_spec_decl(avx2);
+mag_cpu_blas_spec_decl(avx);
+mag_cpu_blas_spec_decl(sse41);
+
+const mag_amd64_blas_specialization mag_amd64_blas_specializations[] = { /* Dynamic selectable BLAS permutations, sorted from best to worst score. */
+    mag_amd64_blas_spec_permute(avx512f),
+    mag_amd64_blas_spec_permute(avx2),
+    mag_amd64_blas_spec_permute(avx),
+    mag_amd64_blas_spec_permute(sse41),
+};
+
+static bool mag_amd64_blas_detect_optimal_specialization(const mag_ctx_t* ctx, mag_kernel_registry_t* kernels) {
+    for (size_t i=0; i < sizeof(mag_amd64_blas_specializations)/sizeof(*mag_amd64_blas_specializations); ++i) { /* Find best blas spec for the host CPU */
+        const mag_amd64_blas_specialization* spec = mag_amd64_blas_specializations+i;
+        size_t num_features = 0;
+        const mag_x86_64_feature_t* features = (*spec->get_feature_permutation)(&num_features); /* Get requires features */
+        if (mag_unlikely(!num_features || !features)) continue;
+        bool has_all_features = true;
+        for (size_t j=0; j < num_features; ++j) /* For each requested feature, check if host CPU supports it */
+            has_all_features &= mag_ctx_x86_64_cpu_has_feature(ctx, features[j]);
+        if (has_all_features) { /* Since specializations are sorted by score, we found the perfect spec. */
+            (*spec->inject_kernels)(kernels);
+            mag_log_info("Using BLAS specialization: %s", spec->name);
+            return true;
+        }
+    }
+    /* No matching specialization found, use generic */
+    mag_cpu_blas_specialization_fallback(kernels);
+    return false; /* No spec used, fallback is active */
+}
+
+#undef mag_amd64_blas_spec_permute
+#undef mag_cpu_blas_spec_decl
+
+#endif
+
+static bool mag_blas_detect_optimal_specialization(const mag_ctx_t* ctx, mag_kernel_registry_t* kernels) {
+    #if defined(__x86_64__) || defined(_M_X64)
+        return mag_amd64_blas_detect_optimal_specialization(ctx, kernels);
+    #else
+        mag_cpu_blas_specialization_fallback(kernels);
+        return false; /* No spec used, fallback is active */
+    #endif
+}
 
 typedef struct mag_worker_t mag_worker_t;
 typedef struct mag_threadpool_t {
@@ -244,7 +308,7 @@ static mag_cpu_device_t* mag_cpu_init_device(mag_ctx_t* ctx, uint32_t num_thread
         .growth_scale = 0.3, /* TODO: better value and heuristic */
         .numel_threshold = 250000 /* TODO: better value and heuristic */
     };
-    mag_cpu_blas_specialization_generic(&dvc->kernels);
+    mag_blas_detect_optimal_specialization(ctx, &dvc->kernels);
     if (num_threads > 1) {
         dvc->pool = mag_threadpool_create(num_threads, &dvc->kernels, sched_prio);
         dvc->num_allocated_workers = num_threads;

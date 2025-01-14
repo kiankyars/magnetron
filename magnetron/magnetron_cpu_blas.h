@@ -1,3 +1,5 @@
+#include "magnetron_internal.h"
+
 #include <math.h>
 #include <signal.h>
 #include <stdio.h>
@@ -572,9 +574,9 @@ static void MAG_HOTPROC mag_vlog_f32( /* o = log x */
         vst1q_f32(o+i, xi);
     }
 #elif MAG_APPROXMATH && defined(__AVX512F__) && defined(__AVX512DQ__)
-#error TODO
+/* TODO */
 #elif MAG_APPROXMATH && defined(__AVX2__) && defined(__FMA__)
-#error TODO
+/* TODO */
 #elif MAG_APPROXMATH && defined(__SSE2__)
     const __m128 one = _mm_set1_ps(1.0f);
     for (; i+3 < n; i += 4) {
@@ -652,9 +654,9 @@ static void MAG_HOTPROC mag_vsin_f32( /* o = sin x */
         vst1q_f32(o+i, xi);
     }
 #elif MAG_APPROXMATH && defined(__AVX512F__) && defined(__AVX512DQ__)
-#error TODO
+    /* TODO */
 #elif MAG_APPROXMATH && defined(__AVX2__) && defined(__FMA__)
-#error TODO
+    /* TODO */
 #elif MAG_APPROXMATH && defined(__SSE2__)
     for (; i+3 < n; i += 4) {
         __m128 xi = _mm_loadu_ps(x+i);
@@ -682,9 +684,9 @@ static void MAG_HOTPROC mag_vcos_f32( /* o = cos x */
         vst1q_f32(o+i, xi);
     }
 #elif MAG_APPROXMATH && defined(__AVX512F__) && defined(__AVX512DQ__)
-#error TODO
+    /* TODO */
 #elif MAG_APPROXMATH && defined(__AVX2__) && defined(__FMA__)
-#error TODO
+    /* TODO */
 #elif MAG_APPROXMATH && defined(__SSE2__)
     for (; i+3 < n; i += 4) {
         __m128 xi = _mm_loadu_ps(x+i);
@@ -1311,8 +1313,149 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
     }
 }
 
-#ifndef MAG_BLAS_SPECIALIZATION
+#if !defined(MAG_BLAS_SPECIALIZATION) || !defined(MAG_BLAS_SPECIALIZATION_FEAT_REQUEST)
 #error "BLAS specialization undefined"
+#endif
+
+#if defined(__x86_64__) || defined(_M_X64)
+const mag_x86_64_feature_t* MAG_BLAS_SPECIALIZATION_FEAT_REQUEST(size_t* out_num) {
+    static const mag_x86_64_feature_t required_features[] = {
+        #ifdef __AVX512F__
+            MAG_X86_64_FEATURE_AVX512F,
+        #endif
+        #ifdef __AVX512BW__
+            MAG_X86_64_FEATURE_AVX512BW,
+        #endif
+        #ifdef __AVX512CD__
+            MAG_X86_64_FEATURE_AVX512CD,
+        #endif
+        #ifdef __AVX512DQ__
+            MAG_X86_64_FEATURE_AVX512DQ,
+        #endif
+        #ifdef __AVX512ER__
+            MAG_X86_64_FEATURE_AVX512ER,
+        #endif
+        #ifdef __AVX512IFMA__
+            MAG_X86_64_FEATURE_AVX512IFMA,
+        #endif
+        #ifdef __AVX512PF__
+            MAG_X86_64_FEATURE_AVX512PF,
+        #endif
+        #ifdef __AVX512VBMI__
+            MAG_X86_64_FEATURE_AVX512VBMI,
+        #endif
+        #ifdef __AVX512VL__
+            MAG_X86_64_FEATURE_AVX512VL,
+        #endif
+        #ifdef __AVX512_4FMAPS__
+            MAG_X86_64_FEATURE_AVX512_4FMAPS,
+        #endif
+        #ifdef __AVX512_4VNNIW__
+            MAG_X86_64_FEATURE_AVX512_4VNNIW,
+        #endif
+        #ifdef __AVX512_FP16__
+            MAG_X86_64_FEATURE_AVX512_FP16,
+        #endif
+        #ifdef __AVX512_BF16__
+            MAG_X86_64_FEATURE_AVX512_BF16,
+        #endif
+        #ifdef __AVX512_BITALG__
+            MAG_X86_64_FEATURE_AVX512_BITALG,
+        #endif
+        #ifdef __AVX512_VBMI2__
+            MAG_X86_64_FEATURE_AVX512_VBMI2,
+        #endif
+        #ifdef __AVX512_VNNI__
+            MAG_X86_64_FEATURE_AVX512_VNNI,
+        #endif
+        #ifdef __AVX512_VP2INTERSECT__
+            MAG_X86_64_FEATURE_AVX512_VP2INTERSECT,
+        #endif
+        #ifdef __AVX512_VPOPCNTDQ__
+            MAG_X86_64_FEATURE_AVX512_VPOPCNTDQ,
+        #endif
+        #ifdef __AVX__
+            MAG_X86_64_FEATURE_AVX,
+        #endif
+        #ifdef __AVX2__
+            MAG_X86_64_FEATURE_AVX2,
+        #endif
+        #ifdef __AVXVNNI__
+            MAG_X86_64_FEATURE_AVXVNNI,
+        #endif
+        #ifdef __AVXVNNIINT8__
+            MAG_X86_64_FEATURE_AVXVNNIINT8,
+        #endif
+        #ifdef __AVXVNNIINT16__
+            MAG_X86_64_FEATURE_AVXVNNIINT16,
+        #endif
+        #ifdef __BMI__
+            MAG_X86_64_FEATURE_BMI,
+        #endif
+        #ifdef __BMI2__
+            MAG_X86_64_FEATURE_BMI2,
+        #endif
+        #ifdef __F16C__
+            MAG_X86_64_FEATURE_F16C,
+        #endif
+        #ifdef __FMA__
+            MAG_X86_64_FEATURE_FMA,
+        #endif
+        #ifdef __GFNI__
+            MAG_X86_64_FEATURE_GFNI,
+        #endif
+        #ifdef __PCLMUL__
+            MAG_X86_64_FEATURE_PCLMUL,
+        #endif
+        #ifdef __RDRND__
+            MAG_X86_64_FEATURE_RDRND,
+        #endif
+        #ifdef __RDSEED__
+            MAG_X86_64_FEATURE_RDSEED,
+        #endif
+        #ifdef __RDTSCP__
+            MAG_X86_64_FEATURE_RDTSCP,
+        #endif
+        #ifdef __SHA__
+            MAG_X86_64_FEATURE_SHA,
+        #endif
+        /* SSE and SSE2 are baseline fallback impl
+
+            #ifdef __SSE__
+                MAG_X86_64_FEATURE_SSE,
+            #endif
+            #ifdef __SSE2__
+                MAG_X86_64_FEATURE_SSE2,
+            #endif
+            #ifdef __MMX__
+                MAG_X86_64_FEATURE_MMX,
+            #endif
+        */
+        #ifdef __SSE3__
+            MAG_X86_64_FEATURE_SSE3,
+        #endif
+        #ifdef __SSE4_1__
+            MAG_X86_64_FEATURE_SSE4_1,
+        #endif
+        #ifdef __SSE4_2__
+            MAG_X86_64_FEATURE_SSE4_2,
+        #endif
+        #ifdef __SSSE3__
+            MAG_X86_64_FEATURE_SSSE3,
+        #endif
+        #ifdef __VAES__
+            MAG_X86_64_FEATURE_VAES,
+        #endif
+        #ifdef __VPCLMULQDQ__
+            MAG_X86_64_FEATURE_VPCLMULQDQ,
+        #endif
+        #ifdef __XSAVE__
+            MAG_X86_64_FEATURE_XSAVE,
+        #endif
+    };
+    *out_num = sizeof(required_features)/sizeof(*required_features);
+    return required_features;
+}
 #endif
 
 void MAG_BLAS_SPECIALIZATION(mag_kernel_registry_t* kernels) {

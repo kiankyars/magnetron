@@ -86,10 +86,4 @@ else() # GCC/Clang specific config
     if (${MAGNETRON_DEBUG})
         target_compile_definitions(magnetron PRIVATE MAG_DEBUG)
     endif()
-
-    if (${IS_AMD64}) # x86-64 specific compilation options
-        target_compile_options(magnetron PRIVATE -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mpclmul)
-    elseif(${IS_ARM64})
-        target_compile_options(magnetron PRIVATE -march=armv8-a+simd)
-    endif()
 endif()
