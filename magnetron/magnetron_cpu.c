@@ -1415,7 +1415,7 @@ typedef struct mag_threadpool_t {
     mag_mutex_t mtx;                                /* Mutex for synchronization */
     uint32_t num_allocated_workers;                 /* Number of intra-op workers allocated */
     uint32_t num_active_workers;                    /* Number of intra-op workers that are actively used in this compute step. */
-    /*volatile mag_atomic_t num_workers_online;        Number of workers that are online */
+    volatile mag_atomic_t num_workers_online;       /* Number of workers that are online */
     mag_worker_t* workers;                          /* Array of workers */
     mag_thread_sched_prio_t sched_prio;             /* Scheduling priority */
 } mag_threadpool_t;
@@ -1469,10 +1469,10 @@ static MAG_HOTPROC void* mag_worker_thread_exec_op(void* arg) {
     snprintf(name, sizeof(name), "mag_worker_%" PRIx64, payload->thread_idx);
     mag_thread_set_name(name);
     /*mag_thread_set_prio(pool->sched_prio);*/
-    /*mag_atomic_fetch_add(&pool->num_workers_online, 1, MAG_MO_SEQ_CST);*/
+    mag_atomic_fetch_add(&pool->num_workers_online, 1, MAG_MO_SEQ_CST);
     while (mag_likely(mag_worker_await_work(worker, pool)))  /* Main work loop: wait, work, signal status */
         mag_worker_exec_and_broadcast(pool, payload);
-    /*mag_atomic_fetch_sub(&pool->num_workers_online, 1, MAG_MO_SEQ_CST);*/
+    mag_atomic_fetch_sub(&pool->num_workers_online, 1, MAG_MO_SEQ_CST);
     return MAG_THREAD_RET_NONE;
 }
 
@@ -1481,15 +1481,16 @@ static void mag_worker_init(mag_worker_t* worker, mag_threadpool_t* pool, uint32
         .pool = pool,
         .phase = 0,
         .payload = (mag_compute_payload_t){.thread_num = num_workers, .thread_idx = idx, .node = NULL, },
-        .thread = spawn_thread ? mag_thread_create(&mag_worker_thread_exec_op, worker) : (mag_thread_t){0},
         .is_async = spawn_thread
     };
+    if (spawn_thread)
+        mag_thread_create(&worker->thread, NULL, &mag_worker_thread_exec_op, worker);
 }
 
 static void mag_worker_join(mag_worker_t* worker) {
     worker->payload.node = NULL;
     if (worker->is_async)
-        mag_thread_join(worker->thread);
+        mag_thread_join(worker->thread, NULL);
 }
 
 /* Create thread pool and allocate threads */
@@ -1506,12 +1507,12 @@ static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers, mag_thread_
         .num_completed = 0,
         .sched_prio = prio
     };
-    pool->cv = mag_cv_create();
-    pool->mtx = mag_mutex_create();
+    mag_cv_create(&pool->cv);
+    mag_mutex_create(&pool->mtx);
     for (uint32_t i=0; i < num_workers; ++i) /* Initialize workers */
         mag_worker_init(workers+i, pool, i, num_workers, i != 0); /* Spawn threads for all but the first worker (main thread is worker 0) */
-    /*while (mag_atomic_load(&pool->num_workers_online, MAG_MO_SEQ_CST) != num_workers-1)  Wait for all workers to come online */
-        /*mag_thread_yield();*/
+    while (mag_atomic_load(&pool->num_workers_online, MAG_MO_SEQ_CST) != num_workers-1)  /* Wait for all workers to come online */
+        mag_thread_yield();
     return pool;
 }
 
@@ -1522,8 +1523,8 @@ static void mag_threadpool_destroy(mag_threadpool_t* pool) {
         ++pool->phase;
     mag_mutex_unlock(&pool->mtx);
     mag_cv_broadcast(&pool->cv); /* Wake up all workers to exit */
-    /*while (mag_atomic_load(&pool->num_workers_online, MAG_MO_SEQ_CST))  Wait for all workers to exit */
-        /*mag_thread_yield();*/
+    while (mag_atomic_load(&pool->num_workers_online, MAG_MO_SEQ_CST))  /* Wait for all workers to exit */
+        mag_thread_yield();
     for (uint32_t i=0; i < pool->num_allocated_workers; ++i) /* Join all worker threads */
         mag_worker_join(&pool->workers[i]);
     mag_cv_destroy(&pool->cv);

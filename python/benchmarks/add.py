@@ -7,7 +7,7 @@ from bench import *
 
 mag.GlobalConfig.verbose = True
 
-n: int = 1024
+n: int = 8192
 iters: int = 500
 
 print(f'Benchmarking addition of {n}x{n} matrices with {iters} iterations...')
