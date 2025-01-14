@@ -377,7 +377,7 @@ typedef SRWLOCK mag_mutex_t;
 typedef CONDITION_VARIABLE mag_cond_var_t;
 #define mag_cv_create(cv) InitializeConditionVariable(cv)
 #define mag_cv_destroy(cv)
-#define mag_cv_wait(cv, mtx) SleepConditionVariableSRW(cv, mtx, INFINITE, CONDITION_VARIABLE_LOCKMODE_SHARED)
+#define mag_cv_wait(cv, mtx) SleepConditionVariableSRW(cv, mtx, INFINITE, 0)
 #define mag_cv_signal(cv) WakeConditionVariable(cv)
 #define mag_cv_broadcast(cv) WakeAllConditionVariable(cv)
 
