@@ -1501,7 +1501,7 @@ static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers, mag_thread_
     *pool = (mag_threadpool_t){
         .num_allocated_workers = num_workers,
         .num_active_workers = num_workers,
-        .num_workers_online = 1,  /* Main thread as worker 0 */
+        .num_workers_online = 0,  /* Main thread as worker 0 */
         .workers = workers,
         .phase = 0,
         .num_completed = 0,
@@ -1511,7 +1511,7 @@ static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers, mag_thread_
     mag_mutex_create(&pool->mtx);
     for (uint32_t i=0; i < num_workers; ++i) /* Initialize workers */
         mag_worker_init(workers+i, pool, i, num_workers, i != 0); /* Spawn threads for all but the first worker (main thread is worker 0) */
-    while (mag_atomic_load(&pool->num_workers_online, MAG_MO_SEQ_CST) != num_workers)  /* Wait for all workers to come online */
+    while (mag_atomic_load(&pool->num_workers_online, MAG_MO_SEQ_CST) != num_workers-1)  /* Wait for all workers to come online */
         mag_thread_yield();
     return pool;
 }
