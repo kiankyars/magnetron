@@ -8,6 +8,11 @@
 #include <Accelerate/Accelerate.h>
 #endif
 
+#if defined(_MSC_VER) && defined(__AVX2__) /*MSVC does not define FMA and F16C with AVX 2*/
+#define __FMA__ 1
+#define __F16C__ 1
+#endif
+
 typedef float mag_f32_t;
 typedef double mag_f64_t;
 
@@ -1419,18 +1424,6 @@ const mag_x86_64_feature_t* MAG_BLAS_SPECIALIZATION_FEAT_REQUEST(size_t* out_num
         #ifdef __SHA__
             MAG_X86_64_FEATURE_SHA,
         #endif
-        /* SSE and SSE2 are baseline fallback impl
-
-            #ifdef __SSE__
-                MAG_X86_64_FEATURE_SSE,
-            #endif
-            #ifdef __SSE2__
-                MAG_X86_64_FEATURE_SSE2,
-            #endif
-            #ifdef __MMX__
-                MAG_X86_64_FEATURE_MMX,
-            #endif
-        */
         #ifdef __SSE3__
             MAG_X86_64_FEATURE_SSE3,
         #endif
@@ -1452,6 +1445,7 @@ const mag_x86_64_feature_t* MAG_BLAS_SPECIALIZATION_FEAT_REQUEST(size_t* out_num
         #ifdef __XSAVE__
             MAG_X86_64_FEATURE_XSAVE,
         #endif
+        MAG_X86_64_FEATURE_SSE2, /* always required */
     };
     *out_num = sizeof(required_features)/sizeof(*required_features);
     return required_features;

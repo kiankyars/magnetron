@@ -1,9 +1,9 @@
 /* (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
 
-#ifndef __SSE4_1__
+#ifndef __SSE4_2__
 #error "BLAS specialization requires matching compile flags"
 #endif
-#ifdef __SSE4_2__
+#ifdef __AVX__
 #error "BLAS specialization feature too high"
 #endif
 

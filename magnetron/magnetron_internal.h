@@ -355,17 +355,16 @@ typedef DWORD mag_thread_ret_t;
 
 typedef HANDLE mag_thread_t;
 
-static int mag_thread_create(mag_thread_t* out, void* unused, mag_thread_ret_t (*f)(void*), void* arg) { /* WIN32 -> pthread style wrapper. */
+static void mag_thread_create(mag_thread_t* out, mag_thread_ret_t (*f)(void*), void* arg) { /* WIN32 -> pthread style wrapper. */
     HANDLE handle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)f, arg, 0, NULL);
-    if (mag_unlikely(!handle)) return EAGAIN;
+    mag_assert2(handle != 0);
     *out = handle;
-    return 0;
 }
 
-static int mag_thread_join(mag_thread_t th, void* unused) { /* WIN32 -> pthread style wrapper. */
+static void mag_thread_join(mag_thread_t th) { /* WIN32 -> pthread style wrapper. */
     int ret = (int)WaitForSingleObject(th, INFINITE);
     CloseHandle(th);
-    return ret;
+    mag_assert2(ret == 0);
 }
 
 typedef SRWLOCK mag_mutex_t;
@@ -387,21 +386,21 @@ typedef void* mag_thread_ret_t;
 #define MAG_THREAD_RET_NONE NULL
 
 typedef pthread_t mag_thread_t;
-#define mag_thread_create pthread_create
-#define mag_thread_join pthread_join
+#define mag_thread_create(out, fn, arg) mag_assert2(pthread_create((out), NULL, (fn), (arg)) == 0)
+#define mag_thread_join(th) mag_assert2(pthread_join((th), NULL) == 0)
 
 typedef pthread_mutex_t mag_mutex_t;
-#define mag_mutex_create(mtx) pthread_mutex_init(mtx, NULL)
-#define mag_mutex_destroy(mtx) pthread_mutex_destroy(mtx)
-#define mag_mutex_lock(mtx) pthread_mutex_lock(mtx)
-#define mag_mutex_unlock(mtx) pthread_mutex_unlock(mtx)
+#define mag_mutex_create(mtx) mag_assert2(pthread_mutex_init(mtx, NULL)) == 0)
+#define mag_mutex_destroy(mtx) mag_assert2(pthread_mutex_destroy(mtx)) == 0)
+#define mag_mutex_lock(mtx) mag_assert2(pthread_mutex_lock(mtx)) == 0)
+#define mag_mutex_unlock(mtx) mag_assert2(pthread_mutex_unlock(mtx)) == 0)
 
 typedef pthread_cond_t mag_cond_var_t;
-#define mag_cv_create(cv) pthread_cond_init(cv, NULL)
-#define mag_cv_destroy(cv) pthread_cond_destroy(cv)
-#define mag_cv_wait(cv, mtx) pthread_cond_wait(cv, mtx)
-#define mag_cv_signal(cv) pthread_cond_signal(cv)
-#define mag_cv_broadcast(cv) pthread_cond_broadcast(cv)
+#define mag_cv_create(cv) mag_assert2(pthread_cond_init(cv, NULL)) == 0)
+#define mag_cv_destroy(cv) mag_assert2(pthread_cond_destroy(cv)) == 0)
+#define mag_cv_wait(cv, mtx) mag_assert2(pthread_cond_wait(cv, mtx)) == 0)
+#define mag_cv_signal(cv) mag_assert2(pthread_cond_signal(cv)) == 0)
+#define mag_cv_broadcast(cv) mag_assert2(pthread_cond_broadcast(cv)) == 0)
 
 #endif
 

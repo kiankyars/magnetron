@@ -3,6 +3,7 @@
 set(MAG_MSVC_COMPILE_FLAGS
     /W3
     /Oi
+    /arch:SSE2
 )
 set(MAG_MSVC_RELEASE_COMPILE_FLAGS
     /O2
