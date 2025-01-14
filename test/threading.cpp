@@ -1,6 +1,12 @@
 // (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
+#include <thread>
+#include <atomic>
+#include <chrono>
+
 #include "prelude.hpp"
+
+using namespace std::chrono_literals;
 
 TEST(threading, StoreLoadTest) {
     mag_atomic_t val = 0;

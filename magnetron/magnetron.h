@@ -50,25 +50,32 @@ typedef enum mag_compute_device_type_t {
 extern MAG_EXPORT const char* mag_device_type_get_name(mag_compute_device_type_t op);
 
 typedef enum mag_exec_mode_t {
-    MAG_EXEC_MODE_EAGER = 0, /* Execute operations immediately. (Dynamic computation graph, like PyTorch). */
-    MAG_EXEC_MODE_DEFERRED = 1, /* Build computation graph and execute later. (Static computation graph, like TensorFlow 1.0). */
+    MAG_EXEC_MODE_EAGER = 0,        /* Execute operations immediately. (Dynamic computation graph, like PyTorch). */
+    MAG_EXEC_MODE_DEFERRED = 1,     /* Build computation graph and execute later. (Static computation graph, like TensorFlow 1.0). */
 
     MAG_EXEC_MODE__NUM
 } mag_exec_mode_t;
 
 typedef enum mag_prng_algorithm_t {
-    MAG_PRNG_MERSENNE_TWISTER = 0, /* Mersenne Twister PRNG */
-    MAG_PRNG_PCG = 1, /* Permuted Congruential Generator PRNG */
+    MAG_PRNG_MERSENNE_TWISTER = 0,  /* Mersenne Twister PRNG */
+    MAG_PRNG_PCG = 1,               /* Permuted Congruential Generator PRNG */
 
     MAG_PRNG__NUM
 } mag_prng_algorithm_t;
 
+typedef enum mag_thread_sched_prio_t {  /* Thread scheduling priority for CPU compute */
+    MAG_THREAD_SCHED_PRIO_NORMAL = 0,   /* Normal thread priority */
+    MAG_THREAD_SCHED_PRIO_MEDIUM = 1,   /* Medium thread priority */
+    MAG_THREAD_SCHED_PRIO_HIGH = 2,     /* High thread priority */
+    MAG_THREAD_SCHED_PRIO_REALTIME = 3, /* Real-time thread priority */
+} mag_thread_sched_prio_t;
+
 typedef enum mag_color_channels_t {
-    MAG_COLOR_CHANNELS_AUTO,  /* Automatically detect number of color channels */
-    MAG_COLOR_CHANNELS_GRAY,  /* Grayscale F32 */
-    MAG_COLOR_CHANNELS_GRAY_A,/* Grayscale F32 + Alpha F32 */
-    MAG_COLOR_CHANNELS_RGB,   /* R32G32B32 */
-    MAG_COLOR_CHANNELS_RGBA,   /* R32G32B32A32 */
+    MAG_COLOR_CHANNELS_AUTO,    /* Automatically detect number of color channels */
+    MAG_COLOR_CHANNELS_GRAY,    /* Grayscale F32 */
+    MAG_COLOR_CHANNELS_GRAY_A,  /* Grayscale F32 + Alpha F32 */
+    MAG_COLOR_CHANNELS_RGB,     /* R32G32B32 */
+    MAG_COLOR_CHANNELS_RGBA,    /* R32G32B32A32 */
 
     MAG_COLOR_CHANNELS__NUM
 } mag_color_channels_t;
@@ -81,7 +88,14 @@ typedef uint32_t mag_char32_t;
 
 typedef struct mag_ctx_t mag_ctx_t; /* Opaque context type for managing memory pools */
 
-extern MAG_EXPORT mag_ctx_t* mag_ctx_create(mag_compute_device_type_t device); /* Create context with default config, and only specificy device. */
+typedef struct mag_device_descriptor_t {
+    mag_compute_device_type_t type; /* Device type */
+    uint32_t thread_count;   /* Number of threads if type == MAG_COMPUTE_DEVICE_TYPE_CPU. If set to 0, hardware concurrency of host CPU is detected. */
+    uint32_t cuda_device_id; /* CUDA device ID if type == MAG_COMPUTE_DEVICE_TYPE_GPU_CUDA. Default: 0 (first GPU). */
+} mag_device_descriptor_t;
+
+extern MAG_EXPORT mag_ctx_t* mag_ctx_create(mag_compute_device_type_t device); /* Create context with default config, and only specify device type. */
+extern MAG_EXPORT mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info); /* Create context with customized device config, and only specify device type. */
 extern MAG_EXPORT mag_exec_mode_t mag_ctx_get_exec_mode(const mag_ctx_t* ctx); /* Get execution mode */
 extern MAG_EXPORT void mag_ctx_set_exec_mode(mag_ctx_t* ctx, mag_exec_mode_t mode); /* Set execution mode */
 extern MAG_EXPORT mag_prng_algorithm_t mag_ctx_get_prng_algorithm(const mag_ctx_t* ctx); /* Get PRNG algorithm */
@@ -125,81 +139,6 @@ typedef struct mag_dtype_meta_t {
 extern MAG_EXPORT const mag_dtype_meta_t* mag_dtype_meta_of(mag_dtype_t type);
 
 #define MAG_SEP ,
-
-typedef enum mag_op_t {
-    MAG_OP_NOP,
-    MAG_OP_CLONE,
-    MAG_OP_VIEW,
-    MAG_OP_TRANSPOSE,
-    MAG_OP_PERMUTE,
-    MAG_OP_MEAN,
-    MAG_OP_MIN,
-    MAG_OP_MAX,
-    MAG_OP_SUM,
-    MAG_OP_ABS,
-    MAG_OP_NEG,
-    MAG_OP_LOG,
-    MAG_OP_SQR,
-    MAG_OP_SQRT,
-    MAG_OP_SIN,
-    MAG_OP_COS,
-    MAG_OP_STEP,
-    MAG_OP_SOFTMAX,
-    MAG_OP_SOFTMAX_DV,
-    MAG_OP_SIGMOID,
-    MAG_OP_SIGMOID_DV,
-    MAG_OP_HARD_SIGMOID,
-    MAG_OP_SILU,
-    MAG_OP_SILU_DV,
-    MAG_OP_TANH,
-    MAG_OP_TANH_DV,
-    MAG_OP_RELU,
-    MAG_OP_RELU_DV,
-    MAG_OP_GELU,
-    MAG_OP_GELU_DV,
-    MAG_OP_ADD,
-    MAG_OP_SUB,
-    MAG_OP_MUL,
-    MAG_OP_DIV,
-    MAG_OP_ADDS,
-    MAG_OP_SUBS,
-    MAG_OP_MULS,
-    MAG_OP_DIVS,
-    MAG_OP_MATMUL,
-    MAG_OP__NUM
-} mag_op_t;
-mag_static_assert(MAG_OP_NOP == 0);
-mag_static_assert(MAG_OP_MATMUL+1 == MAG_OP__NUM);
-mag_static_assert(MAG_OP__NUM <= 0xff);
-
-typedef enum mag_op_param_type_t {
-    MAG_OP_TPARAM_NONE  = 0,
-    MAG_OP_TPARAM_F32   = 1,
-    MAG_OP_TPARAM_I32   = 2,
-    MAG_OP_TPARAM_U32   = 3,
-
-    MAG_OP_TPARAM__NUM
-} mag_op_param_type_t;
-
-typedef struct mag_op_param_t {
-    mag_op_param_type_t type : 8; /* Parameter type */
-    union {
-        float f32;
-        int32_t i32;
-        uint32_t u32;
-    } x;
-} mag_op_param_t;
-
-typedef struct mag_op_meta_t {
-    const char* mnemonic;                                   /* Operation mnemonic */
-    uint8_t argcount;                                       /* Number of arguments */
-    uint8_t paramcount;                                     /* Number of parameters */
-    mag_op_param_type_t param_types[MAG_MAX_OP_PARAMS];     /* Parameter types */
-    bool inplace;                                           /* Supports inplace execution */
-    mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_op_param_t*);
-    bool (*validator)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_op_param_t*);
-} mag_op_meta_t;
-extern MAG_EXPORT const mag_op_meta_t* mag_op_meta_of(mag_op_t type);
 
 extern MAG_EXPORT uint32_t mag_pack_color_u8(uint8_t r, uint8_t g, uint8_t b);
 extern MAG_EXPORT uint32_t mag_pack_color_f32(float r, float g, float b);

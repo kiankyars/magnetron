@@ -18,12 +18,19 @@ option(MAGNETRON_BUILD_FUZZERS "Build fuzzers" OFF)                         # (E
 option(MAGNETRON_DEBUG "Enable debug mode" OFF)                             # Enable debug assertions, bound checks and other debug features. (Always enabled in Debug builds)
 option(MAGNETRON_CPU_APPROX_MATH "Trade precision for performance" ON)      # (CPU only) Enable SIMD math function approximations. Greatly increases performance. Try disabling if you encounter numerical instability. Does NOT enable -ffast-math or similar compiler flags.
 option(MAGNETRON_ENABLE_CUDA "Enable CUDA support" ON)                      # Enable CUDA support
-option(MAGNETRON_ENABLE_ACCELERATE "Use Apple's Accelerate framework" ON)   # Use Apple's Accelerate framework for optimized math functions (only on Apple platforms)
+option(MAGNETRON_ENABLE_ACCELERATE "Use Apple's Accelerate framework" OFF)   # Use Apple's Accelerate framework for optimized math functions (only on Apple platforms)
 
 set(MAGNETRON_CUDA_COMPILER "/usr/local/cuda-12.6/bin/nvcc" CACHE STRING "Path to the CUDA compiler") # Set to your CUDA compiler path
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 if (${MAGNETRON_BUILD_TESTS})
     enable_testing()
+endif()
+
+if (${MAGNETRON_BUILD_TESTS} OR ${MAGNETRON_BUILD_BENCHMARKS} OR ${MAGNETRON_BUILD_FUZZERS})
+    enable_language(CXX)
+    set(CMAKE_CXX_STANDARD 20)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
 endif()
 
 include(cmake/arch.cmake)

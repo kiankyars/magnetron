@@ -1,96 +1,63 @@
 // (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
-// ON LINUX: Before running the benchmark, execute: linux_prepare_perf.sh to setup the system for performance measurements.
-
-#include <functional>
+// ON LINUX: Before running the benchmark, execute: prepare_system.sh to setup the system for performance measurements.
 
 #include <magnetron.h>
 #define ANKERL_NANOBENCH_IMPLEMENT
 #include <nanobench.h>
+#include <thread>
 
 #include "magnetron_internal.h"
 
-template <typename F, typename... Args>
-static auto run_bench(
-    std::string_view name,
-    std::string_view unit,
-    F&& callback,
-    Args&&... args
-) -> void;
+static auto bench_cpu_compute(std::int64_t numel_per_dim) -> void {
+    ankerl::nanobench::Bench bench {};
+    bench.title("Parallel MM Big Tensor | Numel per Dim: " + std::to_string(numel_per_dim))
+        .unit("MM")
+        .warmup(100)
+        .relative(true)
+        .performanceCounters(true);
 
-auto main() -> int {
-    mag_set_log_mode(true);
-    mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU); // Create context to print CPU and system info
-    mag_ctx_destroy(ctx);
-    mag_set_log_mode(false);
+    std::cout << "Benchmarking Parallel MM on CPU with Numel per Dim: " << numel_per_dim << std::endl;
 
-    volatile std::size_t alloc_n = 400;
+    auto exec_bench = [&](std::uint32_t threads) {
+        mag_device_descriptor_t desc {};
+        desc.type = MAG_COMPUTE_DEVICE_TYPE_CPU;
+        desc.thread_count = threads;
+        mag_ctx_t* ctx = mag_ctx_create2(&desc);
+        mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, numel_per_dim, numel_per_dim);
+        mag_tensor_fill_random_normal(A, 0.0f, 1.0f);
+        mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, numel_per_dim, numel_per_dim);
+        mag_tensor_fill_random_normal(B, 0.0f, 1.0f);
+        bench.run("Parallel MM on " + std::to_string(threads) + " threads, Elems = " + std::to_string(A->numel), [&] {
+            mag_tensor_t* R = mag_add(A, B);
+            ankerl::nanobench::doNotOptimizeAway(R);
+            mag_tensor_decref(R);
+        });
 
-    run_bench("Fixed Malloc Free", "malloc", [=](mag_ctx_t* ctx) -> void {
-        void* p = std::malloc(alloc_n);
-        ankerl::nanobench::doNotOptimizeAway(p);
-        std::free(p);
-    });
-
-    mag_fixed_intrusive_pool cache {};
-    mag_fixed_intrusive_pool_init(&cache, alloc_n, 8, 8192);
-    run_bench("Fixed Cached Pool Alloc Free", "malloc", [&cache](mag_ctx_t* ctx) -> void {
-        void* p = mag_fixed_intrusive_pool_malloc(&cache);
-        ankerl::nanobench::doNotOptimizeAway(p);
-        mag_fixed_intrusive_pool_free(&cache, p);
-    });
-    mag_fixed_intrusive_pool_destroy(&cache);
-
-    run_bench("Tensor CPU Allocation", "alloc", [](mag_ctx_t* ctx) -> void {
-        mag_tensor_t* A = mag_tensor_create_1d(ctx, MAG_DTYPE_F32, 8);
-        mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, 8, 8);
-        mag_tensor_t* C = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 8, 8, 8);
-        mag_tensor_t* D = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 8, 8, 8, 8);
-        mag_tensor_t* E = mag_tensor_create_5d(ctx, MAG_DTYPE_F32, 8, 8, 8, 8, 8);
-        mag_tensor_t* F = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, 8, 8, 8, 8, 8, 8);
-        mag_tensor_decref(A);
+        ankerl::nanobench::doNotOptimizeAway(ctx);
         mag_tensor_decref(B);
-        mag_tensor_decref(C);
-        mag_tensor_decref(D);
-        mag_tensor_decref(E);
-        mag_tensor_decref(F);
-    });
-
-    run_bench("Tensor Add", "add", [](mag_ctx_t* ctx) -> void {
-        constexpr std::int64_t N = 1024;
-
-        mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, N, N);
-        mag_tensor_fill(A, 1.0f);
-
-        mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, N, N);
-        mag_tensor_fill(A, 1.0f);
-
-        mag_tensor_t* C = mag_add(A, B);
-
         mag_tensor_decref(A);
-        mag_tensor_decref(B);
-        mag_tensor_decref(C);
-    });
+        mag_ctx_destroy(ctx);
+    };
+
+    std::uint32_t num_threads = std::max(1u, std::thread::hardware_concurrency());
+
+    for (std::uint32_t i=1; i <= num_threads;) {
+        exec_bench(i);
+        if (i == 1) ++i;
+        else i += 2;
+    }
 }
 
-template <typename F, typename... Args>
-static auto run_bench(
-    std::string_view name,
-    std::string_view unit,
-    F&& callback,
-    Args&&... args
-) -> void {
-    static_assert(std::is_invocable_r_v<void, F, mag_ctx_t*, Args...>);
-    ankerl::nanobench::Bench bench {};
-    bench.title(name.data())
-        .unit(unit.data())
-        .minEpochIterations(10)
-        .relative(true);
-    bench.performanceCounters(true);
-    mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
-    bench.run(name.data(), [&] {
-        std::invoke(callback, ctx, std::forward<Args>(args)...);
-    });
-    ankerl::nanobench::doNotOptimizeAway(ctx);
-    mag_ctx_destroy(ctx);
+auto main() -> int {
+    bench_cpu_compute(10000);
+    bench_cpu_compute(1000);
+    bench_cpu_compute(750);
+    bench_cpu_compute(500);
+    bench_cpu_compute(250);
+    bench_cpu_compute(100);
+    bench_cpu_compute(10);
+    bench_cpu_compute(2);
+    //bench_cpu_compute(250);
+    return 0;
 }

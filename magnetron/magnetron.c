@@ -53,6 +53,10 @@
 #include <unistd.h>
 #else
 #include <unistd.h>
+#ifdef __linux__
+#include <linux/prctl.h>
+#include <sys/prctl.h>
+#endif
 #endif
 
 #ifdef MAG_DEBUG
@@ -86,11 +90,21 @@ static void* mag_os_alloc_stub(void* blk, size_t size) {
     }
     if(!blk) {
         blk = malloc(size);
-        mag_assert(blk, "Failed to allocate %.03fKiB memory", (double)size/(double)(1<<10));
+        if (mag_unlikely(!blk)) {
+            double mem = 0.0;
+            const char* unit = "";
+            mag_humanize_memory_size(size, &mem, &unit);
+            mag_panic("Failed to allocate %.01f %s memory", mem, unit);
+        }
         return blk;
     }
     void* block = realloc(blk, size);
-    mag_assert(blk, "Failed to reallocate %.03fKiB memory", (double)size/(double)(1<<10));
+    if (mag_unlikely(!block)) {
+        double mem = 0.0;
+        const char* unit = "";
+        mag_humanize_memory_size(size, &mem, &unit);
+        mag_panic("Failed to reallocate %.01f %s memory", mem, unit);
+    }
     return block;
 }
 
@@ -310,7 +324,7 @@ static FILE* mag_fopen(const char* file, const char* mode) {
     return f;
 }
 
-static inline uintptr_t mag_thread_id(void) {
+uintptr_t mag_thread_id(void) {
     uintptr_t tid;
     #if defined(_MSC_VER) && defined(_M_X64)
         tid = __readgsqword(48);
@@ -399,6 +413,41 @@ mag_static_assert(sizeof(mag_bitset_t) == 4);
 #define mag_bitset_clear(sets, i) (sets[(i)>>5]&=~(1u<<((i)&((4<<3)-1))))
 #define mag_bitset_toggle(sets, i) (sets[(i)>>5]^=(1u<<((i)&((4<<3)-1))))
 
+/* Eval Chebyshev coeffs steps for some x. f(x) : [a, b] -> ℝ. */
+static double mag_chebyshev_eval(double x, double a, double b, const double* coeffs, uint32_t steps) {
+    double scale = 4.0/(b - a);
+    double rls = -2.0 + (x - a)*scale;
+    double k1 = 0.0, k2 = 0.0;
+    for (uint32_t j = steps-1; j; --j) {
+        double tmp = k1;
+        k1 = rls*k1 - k2 + coeffs[j];
+        k2 = tmp;
+    }
+    return 0.5*rls*k1 - k2 + 0.5**coeffs;
+}
+
+/* Generate Chebyshev coeffs for f(x) : [a, b] -> ℝ. */
+static double* mag_chebyshev_setup(double (*f)(double), double a, double b, uint32_t steps, bool linear_l, bool linear_r) {
+    mag_assert2(steps);
+    double* r = (*mag_alloc)(NULL, sizeof(*r)*steps);
+    memset(r, 0, sizeof(*r)*steps);
+    double dsteps = (double)steps;
+    for (uint32_t i=0; i < steps; ++i) {
+        for (uint32_t j=0; j < steps; ++j) {
+            double wav = 0.5*(1.0 + cos(M_PI*(j + 0.5)/dsteps));
+            double x = a + (b - a)*wav, y = (*f)(x);
+            double weight = cos(M_PI*(double)i*(j + 0.5)/dsteps);
+            r[i] += 2.0*y*weight/dsteps;
+        }
+    }
+    double xmi = 0.0, xma = 0.0;
+    if (linear_l) xmi = (*f)(a) - mag_chebyshev_eval(a, a, b, r, steps);
+    if (linear_r) xma = (*f)(b) - mag_chebyshev_eval(b, a, b, r, steps);
+    r[0] += 2.0*(xma + xmi)*0.5;
+    r[1] += (xma - xmi)*0.5;
+    return r;
+}
+
 #if defined(__aarch64__) && defined(__ARM_FEATURE_CRC32) && defined(__ARM_FEATURE_CRYPTO)
 static uint64x2_t MAG_AINLINE mag_clmul_lo_e(uint64x2_t a, uint64x2_t b, uint64x2_t c) {
     register uint64x2_t r;
@@ -419,7 +468,7 @@ static uint64x2_t MAG_AINLINE mag_clmul_hi_e(uint64x2_t a, uint64x2_t b, uint64x
     return r;
 }
 #elif defined(__x86_64__) || defined(_M_X64)
-static uint32_t mag_xnmodp(uint64_t n) { /* x^n mod P, in log(n) time */
+static uint32_t mag_xnmodp(uint64_t n) {
     uint64_t stack = ~(uint64_t)1;
     uint32_t low;
     for (; n > 191; n = (n>>1) - 16) stack = (stack<<1) + (n & 1);
@@ -466,7 +515,7 @@ static uint32_t mag_crc32c(const void* buffer, size_t size) { /* Compute CRC32 c
             uint64x2_t x10 = vld1q_u64((const uint64_t*)(buf+160)), y10;
             uint64x2_t x11 = vld1q_u64((const uint64_t*)(buf+176)), y11;
             uint64x2_t k;
-            { static const uint64_t MAG_ALIGN(16) k_[] = {0xa87ab8a8, 0xab7aff2a}; k = vld1q_u64(k_); }
+            { static const uint64_t mag_alignas(16) k_[] = {0xa87ab8a8, 0xab7aff2a}; k = vld1q_u64(k_); }
             x0 = veorq_u64((uint64x2_t){crc, 0}, x0);
             buf += 192;
             size -= 192;
@@ -487,18 +536,18 @@ static uint32_t mag_crc32c(const void* buffer, size_t size) { /* Compute CRC32 c
                 size -= 192;
             }
             /* Reduce x0 ... x11 to just x0. */
-            { static const uint64_t MAG_ALIGN(16) k_[] = {0xf20c0dfe, 0x493c7d27}; k = vld1q_u64(k_); }
+            { static const uint64_t mag_alignas(16) k_[] = {0xf20c0dfe, 0x493c7d27}; k = vld1q_u64(k_); }
             y0 = mag_clmul_lo_e(x0, k, x1), x0 = mag_clmul_hi_e(x0, k, y0);
             y2 = mag_clmul_lo_e(x2, k, x3), x2 = mag_clmul_hi_e(x2, k, y2);
             y4 = mag_clmul_lo_e(x4, k, x5), x4 = mag_clmul_hi_e(x4, k, y4);
             y6 = mag_clmul_lo_e(x6, k, x7), x6 = mag_clmul_hi_e(x6, k, y6);
             y8 = mag_clmul_lo_e(x8, k, x9), x8 = mag_clmul_hi_e(x8, k, y8);
             y10 = mag_clmul_lo_e(x10, k, x11), x10 = mag_clmul_hi_e(x10, k, y10);
-            { static const uint64_t MAG_ALIGN(16) k_[] = {0x3da6d0cb, 0xba4fc28e}; k = vld1q_u64(k_); }
+            { static const uint64_t mag_alignas(16) k_[] = {0x3da6d0cb, 0xba4fc28e}; k = vld1q_u64(k_); }
             y0 = mag_clmul_lo_e(x0, k, x2), x0 = mag_clmul_hi_e(x0, k, y0);
             y4 = mag_clmul_lo_e(x4, k, x6), x4 = mag_clmul_hi_e(x4, k, y4);
             y8 = mag_clmul_lo_e(x8, k, x10), x8 = mag_clmul_hi_e(x8, k, y8);
-            { static const uint64_t MAG_ALIGN(16) k_[] = {0x740eef02, 0x9e4addf8}; k = vld1q_u64(k_); }
+            { static const uint64_t mag_alignas(16) k_[] = {0x740eef02, 0x9e4addf8}; k = vld1q_u64(k_); }
             y0 = mag_clmul_lo_e(x0, k, x4), x0 = mag_clmul_hi_e(x0, k, y0);
             x4 = x8;
             y0 = mag_clmul_lo_e(x0, k, x4), x0 = mag_clmul_hi_e(x0, k, y0);
@@ -588,54 +637,6 @@ static uint32_t mag_crc32c(const void* buffer, size_t size) { /* Compute CRC32 c
         return ~crc;
     #endif
 }
-
-typedef enum mag_format_type {
-    MAG_FMT_EOF, MAG_FMT_ERR, MAG_FMT_LIT, MAG_FMT_INT,
-    MAG_FMT_UINT, MAG_FMT_NUM, MAG_FMT_STR, MAG_FMT_CHAR,
-    MAG_FMT_PTR
-} mag_format_type; /* Format types for formatted output */
-
-typedef uint32_t mag_format_flags; /* Flags for formatting output */
-
-/* Format flags */
-#define MAG_FMT_F_LEFT  0x0100 /* Left-align the output */
-#define MAG_FMT_F_PLUS  0x0200 /* Prefix positive numbers with a plus sign */
-#define MAG_FMT_F_ZERO  0x0400 /* Pad with zeros instead of spaces */
-#define MAG_FMT_F_SPACE 0x0800 /* Prefix a space for positive numbers */
-#define MAG_FMT_F_ALT   0x1000 /* Alternate format flag */
-#define MAG_FMT_F_UPPER 0x2000 /* Use uppercase letters for hex output */
-
-/* Format subtypes (bits reused) */
-#define MAG_FMT_T_HEX   0x0010 /* Hexadecimal format for unsigned integers */
-#define MAG_FMT_T_OCT   0x0020 /* Octal format for unsigned integers */
-#define MAG_FMT_T_FP_A  0x0000 /* 'a' format for floating-point numbers */
-#define MAG_FMT_T_FP_E  0x0010 /* 'e' format for floating-point numbers */
-#define MAG_FMT_T_FP_F  0x0020 /* 'f' format for floating-point numbers */
-#define MAG_FMT_T_FP_G  0x0030 /* 'g' format for floating-point numbers */
-#define MAG_FMT_T_QUOTED 0x0010 /* Quoted string format */
-
-#define MAG_FMT_SH_WIDTH 16    /* Shift width for formatting */
-#define MAG_FMT_SH_PREC  24    /* Shift precision for formatting */
-#define MAG_FMT_TYPE(sf) ((mag_format_type)((sf) & 15))  /* Extract format type */
-#define MAG_FMT_WIDTH(sf) (((sf) >> MAG_FMT_SH_WIDTH) & 255u) /* Extract width */
-#define MAG_FMT_PREC(sf) ((((sf) >> MAG_FMT_SH_PREC) & 255u) - 1u) /* Extract precision */
-#define MAG_FMT_FP(sf) (((sf) >> 4) & 3) /* Extract floating-point format */
-
-/* Formats for conversion characters */
-#define MAG_FMT_A (MAG_FMT_NUM|MAG_FMT_T_FP_A) /* 'a' format */
-#define MAG_FMT_C (MAG_FMT_CHAR) /* 'c' format */
-#define MAG_FMT_D (MAG_FMT_INT)  /* 'd' format */
-#define MAG_FMT_E (MAG_FMT_NUM|MAG_FMT_T_FP_E) /* 'e' format */
-#define MAG_FMT_F (MAG_FMT_NUM|MAG_FMT_T_FP_F) /* 'f' format */
-#define MAG_FMT_G (MAG_FMT_NUM|MAG_FMT_T_FP_G) /* 'g' format */
-#define MAG_FMT_I MAG_FMT_D /* 'i' format (same as 'd') */
-#define MAG_FMT_O (MAG_FMT_UINT|MAG_FMT_T_OCT) /* 'o' format */
-#define MAG_FMT_P (MAG_FMT_PTR) /* 'p' format */
-#define MAG_FMT_Q (MAG_FMT_STR|MAG_FMT_T_QUOTED) /* Quoted string */
-#define MAG_FMT_S (MAG_FMT_STR) /* 's' format */
-#define MAG_FMT_U (MAG_FMT_UINT) /* 'u' format */
-#define MAG_FMT_X (MAG_FMT_UINT|MAG_FMT_T_HEX) /* 'x' format */
-#define MAG_FMT_G14 (MAG_FMT_G | ((14+1) << MAG_FMT_SH_PREC)) /* 'g' format with precision 14 */
 
 static bool MAG_AINLINE mag_imull64_ov(int64_t a, int64_t b, int64_t* out) { /* Performs c = a*b with overflow checking. Returns true on overflow, else false. */
     #ifdef _MSC_VER
@@ -796,6 +797,11 @@ static MAG_COLDPROC void mag_ctx_dump_compiler_info(void) {
 }
 
 mag_ctx_t* mag_ctx_create(mag_compute_device_type_t device) {
+    const mag_device_descriptor_t info = {device};
+    return mag_ctx_create2(&info);
+}
+
+mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
     mag_log_info("Creating magnetron context...");
 
     uint64_t time_stamp_start = mag_hpc_clock_ns();
@@ -825,8 +831,8 @@ mag_ctx_t* mag_ctx_create(mag_compute_device_type_t device) {
 
     /* Create selected compute device. */
     ctx->exec_mode = MAG_EXEC_MODE_EAGER;
-    ctx->device_type = device;
-    ctx->device = mag_init_dynamic_device(ctx, &ctx->device_type);
+    ctx->device_type = device_info->type;
+    ctx->device = mag_init_dynamic_device(ctx, device_info);
     mag_log_info("Compute device: %s", ctx->device->name);
 
 
@@ -891,6 +897,50 @@ uint64_t mag_ctx_get_physical_memory_total(const mag_ctx_t* ctx) { return ctx->s
 uint64_t mag_ctx_get_physical_memory_free(const mag_ctx_t* ctx) { return ctx->sys.phys_mem_free; }
 bool mag_ctx_is_numa_system(const mag_ctx_t* ctx) { return false; /* TODO */ }
 size_t mag_ctx_get_total_tensors_created(const mag_ctx_t* ctx) { return 0; /* TODO */ }
+
+void mag_thread_set_prio(mag_thread_sched_prio_t prio) {
+#ifdef _WIN32
+    DWORD policy = THREAD_PRIORITY_NORMAL;
+    switch (prio) {
+        case MAG_THREAD_SCHED_PRIO_NORMAL: policy = THREAD_PRIORITY_NORMAL; break;
+        case MAG_THREAD_SCHED_PRIO_MEDIUM: policy = THREAD_PRIORITY_ABOVE_NORMAL; break;
+        case MAG_THREAD_SCHED_PRIO_HIGH: policy = THREAD_PRIORITY_HIGHEST; break;
+        case MAG_THREAD_SCHED_PRIO_REALTIME: policy = THREAD_PRIORITY_TIME_CRITICAL; break;
+    }
+    if (mag_unlikely(!SetThreadPriority(GetCurrentThread(), policy))) {
+        mag_log_warn("Failed to set thread scheduling priority: %d", prio);
+    }
+#else
+    int32_t policy = SCHED_OTHER;
+    struct sched_param p;
+    switch (prio) {
+        case MAG_THREAD_SCHED_PRIO_NORMAL: p.sched_priority = 0;  policy = SCHED_OTHER; break;
+        case MAG_THREAD_SCHED_PRIO_MEDIUM: p.sched_priority = 40; policy = SCHED_FIFO; break;
+        case MAG_THREAD_SCHED_PRIO_HIGH: p.sched_priority = 80; policy = SCHED_FIFO; break;
+        case MAG_THREAD_SCHED_PRIO_REALTIME: p.sched_priority = 90; policy = SCHED_FIFO; break;
+    }
+    int status = pthread_setschedparam(pthread_self(), policy, &p);
+    if (mag_unlikely(status)) {
+        mag_log_warn("Failed to set thread scheduling priority: %d, error: %x", prio, status);
+    }
+    #endif
+}
+
+void mag_thread_set_name(const char* name) {
+    #if defined(__linux__)
+        prctl(PR_SET_NAME, name);
+    #elif defined(__APPLE__) && defined(__MACH__)
+        pthread_setname_np(name);
+    #endif
+}
+
+void mag_thread_yield(void) {
+    #if defined(_WIN32)
+        YieldProcessor();
+    #else
+        sched_yield();
+    #endif
+}
 
 static mag_intrusive_chunk* mag_fixed_pool_chunk_new(size_t block_size, size_t block_align, size_t blocks_per_chunk) {
     size_t cap = blocks_per_chunk*block_size;
@@ -1779,9 +1829,9 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
     mag_tensor_incref(t); /* First strong RC=1 */
     /* Allocate device memory */
     mag_compute_device_t* dvc = ctx->device;
-    void (*allocator)(mag_compute_device_t*, mag_storage_buffer_t*, size_t, size_t) = dvc->alloc_storage;
+    void (*allocator)(mag_compute_device_t*, mag_storage_buffer_t*, size_t) = dvc->alloc_storage;
     if (view) t->storage = view->storage; /* Reference memory from view */
-    else (*allocator)(dvc, &t->storage, numbytes, dts); /* Allocate new device memory */
+    else (*allocator)(dvc, &t->storage, numbytes); /* Allocate new device memory */
     #pragma GCC unroll 6
     for (uint32_t i=0; i < MAG_MAX_DIMS; ++i)    /* Copy dimensions and set unused to identity. */
         t->shape[i] = i < rank ? dims[i] : 1;
@@ -2626,7 +2676,7 @@ static void mag_trim_quotes(char* in) {
 
 static void MAG_COLDPROC mag_system_host_info_query_os_name(char (*out_os_name)[128]) { /* Get OS name */
     #ifdef _WIN32
-        
+
     #elif defined(__APPLE__)
         size_t len;
         uint8_t tmp[256];
