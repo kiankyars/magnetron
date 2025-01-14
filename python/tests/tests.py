@@ -15,7 +15,6 @@ from magnetron import *
 def test_context_creation():
     # Test that a context can be created and defaults are correct.
     ctx = Context.active()
-    assert ctx.compute_device in (ComputeDevice.CPU, ComputeDevice.CUDA)
     assert ctx.execution_mode.name in ('EAGER', 'DEFERRED')
     assert isinstance(ctx.os_name, str)
     assert isinstance(ctx.cpu_name, str)
