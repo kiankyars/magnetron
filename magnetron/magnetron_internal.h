@@ -672,6 +672,17 @@ struct mag_tensor_t {
     (void)prefix##4; \
     (void)prefix##5
 
+typedef struct mag_compute_payload_t {
+    int64_t thread_num;
+    int64_t thread_idx;
+    mag_tensor_t* node;
+} mag_compute_payload_t;
+
+typedef struct mag_kernel_registry_t {
+    void (*fwd[MAG_OP__NUM])(const mag_compute_payload_t*);
+    void (*bwd[MAG_OP__NUM])(const mag_compute_payload_t*);
+} mag_kernel_registry_t;
+
 #define mag_load_local_storage_group(xk, prefix, var) mag_load_local_storage_group_arr((xk)->var, prefix)
 
 #ifdef __cplusplus
