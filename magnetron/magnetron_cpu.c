@@ -1408,25 +1408,27 @@ static void (*mag_blas_dispatch_table_backward[MAG_OP__NUM])(const mag_compute_p
 
 typedef struct mag_worker_t mag_worker_t;
 typedef struct mag_threadpool_t {
-    mag_alignas(MAG_HDI) volatile bool interrupt;
-    mag_alignas(MAG_HDI) uint64_t phase;
-    mag_alignas(MAG_HDI) uint64_t num_completed;
-    mag_cond_var_t cv;
-    mag_mutex_t mtx;
-    uint32_t num_workers;
-    volatile mag_atomic_t num_workers_online;
-    mag_worker_t* workers;
-    mag_thread_sched_prio_t sched_prio;
+    mag_alignas(MAG_HDI) volatile bool interrupt;   /* Interrupt flag, 1=stop */
+    mag_alignas(MAG_HDI) uint64_t phase;            /* Current compute phase */
+    mag_alignas(MAG_HDI) uint64_t num_completed;    /* Number of workers that have completed their work */
+    mag_cond_var_t cv;                              /* Condition variable for thread wakeup */
+    mag_mutex_t mtx;                                /* Mutex for synchronization */
+    uint32_t num_allocated_workers;                 /* Number of intra-op workers allocated */
+    uint32_t num_active_workers;                    /* Number of intra-op workers that are actively used in this compute step. */
+    /*volatile mag_atomic_t num_workers_online;        Number of workers that are online */
+    mag_worker_t* workers;                          /* Array of workers */
+    mag_thread_sched_prio_t sched_prio;             /* Scheduling priority */
 } mag_threadpool_t;
 
 struct mag_worker_t {
-    uint64_t phase;
-    mag_compute_payload_t payload;
-    mag_threadpool_t* pool;
-    mag_thread_t thread;
-    bool has_thread;
+    uint64_t phase;                 /* Current compute phase */
+    mag_compute_payload_t payload;  /* Compute op payload */
+    mag_threadpool_t* pool;         /* Host thread pool */
+    mag_thread_t thread;            /* Thread handle */
+    bool is_async;                  /* True if worker is async (executed on a different thread)  */
 } mag_alignas(MAG_HDI);
 
+/* Await signal to start work */
 static bool mag_worker_await_work(mag_worker_t* worker, mag_threadpool_t* pool) {
     mag_mutex_lock(&pool->mtx);
     while (!(pool->interrupt || pool->phase > worker->phase)) /* Wait for work 🥱*/
@@ -1440,6 +1442,7 @@ static bool mag_worker_await_work(mag_worker_t* worker, mag_threadpool_t* pool) 
     return true;
 }
 
+/* Execute the operation on the current thread */
 static void mag_worker_exec_thread_local(mag_compute_payload_t* payload) {
     if (mag_likely(payload->node)) { /* Do the work 🦾 */
         (*mag_blas_dispatch_table_forward[payload->node->op])(payload);
@@ -1447,14 +1450,17 @@ static void mag_worker_exec_thread_local(mag_compute_payload_t* payload) {
     }
 }
 
+/* Execute the operation and broadcast completion if last chunk was done */
 static void mag_worker_exec_and_broadcast(mag_threadpool_t* pool, mag_compute_payload_t* payload) {
-    mag_worker_exec_thread_local(payload);
+    if (mag_likely(payload->thread_idx < pool->num_active_workers)) /* Execute the operation if we are an active thread. */
+        mag_worker_exec_thread_local(payload);
     mag_mutex_lock(&pool->mtx);
-    if (++pool->num_completed == pool->num_workers) /* If we are the last to finish, wake the main thread */
+    if (++pool->num_completed == pool->num_allocated_workers) /* If we are the last to finish, wake the main thread */
         mag_cv_broadcast(&pool->cv);
     mag_mutex_unlock(&pool->mtx);
 }
 
+/* Worker thread entry point */
 static MAG_HOTPROC void* mag_worker_thread_exec_op(void* arg) {
     mag_worker_t* worker = arg;
     mag_threadpool_t* pool = worker->pool;
@@ -1463,11 +1469,11 @@ static MAG_HOTPROC void* mag_worker_thread_exec_op(void* arg) {
     snprintf(name, sizeof(name), "mag_worker_%" PRIx64, payload->thread_idx);
     mag_thread_set_name(name);
     /*mag_thread_set_prio(pool->sched_prio);*/
-    mag_atomic_fetch_add(&pool->num_workers_online, 1, MAG_MO_SEQ_CST);
-    while (mag_likely(mag_worker_await_work(worker, pool)))
+    /*mag_atomic_fetch_add(&pool->num_workers_online, 1, MAG_MO_SEQ_CST);*/
+    while (mag_likely(mag_worker_await_work(worker, pool)))  /* Main work loop: wait, work, signal status */
         mag_worker_exec_and_broadcast(pool, payload);
-    mag_atomic_fetch_sub(&pool->num_workers_online, 1, MAG_MO_SEQ_CST);
-    return NULL;
+    /*mag_atomic_fetch_sub(&pool->num_workers_online, 1, MAG_MO_SEQ_CST);*/
+    return MAG_THREAD_RET_NONE;
 }
 
 static void mag_worker_init(mag_worker_t* worker, mag_threadpool_t* pool, uint32_t idx, uint32_t num_workers, bool spawn_thread) {
@@ -1476,45 +1482,49 @@ static void mag_worker_init(mag_worker_t* worker, mag_threadpool_t* pool, uint32
         .phase = 0,
         .payload = (mag_compute_payload_t){.thread_num = num_workers, .thread_idx = idx, .node = NULL, },
         .thread = spawn_thread ? mag_thread_create(&mag_worker_thread_exec_op, worker) : (mag_thread_t){0},
-        .has_thread = spawn_thread
+        .is_async = spawn_thread
     };
 }
 
 static void mag_worker_join(mag_worker_t* worker) {
     worker->payload.node = NULL;
-    if (worker->has_thread)
+    if (worker->is_async)
         mag_thread_join(worker->thread);
 }
 
-static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers, mag_thread_sched_prio_t prio) {
+/* Create thread pool and allocate threads */
+static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers, mag_thread_sched_prio_t prio) { /* Create a thread pool */
     mag_threadpool_t* pool = mag_alloc_aligned(sizeof(*pool), __alignof(mag_threadpool_t));
     memset(pool, 0, sizeof(*pool));
     mag_worker_t* workers = mag_alloc_aligned(num_workers*sizeof(*workers), __alignof(mag_worker_t));
     memset(workers, 0, num_workers*sizeof(*workers));
     *pool = (mag_threadpool_t){
-        .num_workers = num_workers,
+        .num_allocated_workers = num_workers,
+        .num_active_workers = num_workers,
         .workers = workers,
         .phase = 0,
         .num_completed = 0,
+        .sched_prio = prio
     };
     pool->cv = mag_cv_create();
     pool->mtx = mag_mutex_create();
     for (uint32_t i=0; i < num_workers; ++i) /* Initialize workers */
         mag_worker_init(workers+i, pool, i, num_workers, i != 0); /* Spawn threads for all but the first worker (main thread is worker 0) */
-    while (mag_atomic_load(&pool->num_workers_online, MAG_MO_SEQ_CST) != num_workers-1) /* Wait for all workers to come online */
-        mag_thread_yield();
+    /*while (mag_atomic_load(&pool->num_workers_online, MAG_MO_SEQ_CST) != num_workers-1)  Wait for all workers to come online */
+        /*mag_thread_yield();*/
     return pool;
 }
 
+/* Destroy thread pool */
 static void mag_threadpool_destroy(mag_threadpool_t* pool) {
     mag_mutex_lock(&pool->mtx);
         pool->interrupt = true;
         ++pool->phase;
     mag_mutex_unlock(&pool->mtx);
-    mag_cv_broadcast(&pool->cv);
-    while (mag_atomic_load(&pool->num_workers_online, MAG_MO_SEQ_CST)) /* Wait for all workers to exit */
-        mag_thread_yield();
-    for (uint32_t i=0; i < pool->num_workers; ++i)
+    mag_cv_broadcast(&pool->cv); /* Wake up all workers to exit */
+    /*while (mag_atomic_load(&pool->num_workers_online, MAG_MO_SEQ_CST))  Wait for all workers to exit */
+        /*mag_thread_yield();*/
+    for (uint32_t i=0; i < pool->num_allocated_workers; ++i) /* Join all worker threads */
         mag_worker_join(&pool->workers[i]);
     mag_cv_destroy(&pool->cv);
     mag_mutex_destroy(&pool->mtx);
@@ -1522,18 +1532,24 @@ static void mag_threadpool_destroy(mag_threadpool_t* pool) {
     mag_free_aligned(pool);
 }
 
-static void mag_threadpool_kickoff(mag_threadpool_t* pool, mag_tensor_t* node) {
+/* Submits work payload and awakens all threads */
+static void mag_threadpool_kickoff(mag_threadpool_t* pool, mag_tensor_t* node, uint32_t num_active_workers) {
     mag_mutex_lock(&pool->mtx);
-    for (uint32_t i=0; i < pool->num_workers; ++i)  /* Set up payload */
-        pool->workers[i].payload.node = node;
+    pool->num_active_workers = num_active_workers;
+    for (uint32_t i=0; i < pool->num_allocated_workers; ++i) { /* Set up payload */
+        mag_compute_payload_t* payload = &pool->workers[i].payload;
+        payload->node = node;
+        payload->thread_num = num_active_workers;
+    }
     ++pool->phase;
-    pool->num_completed = 0;
+    pool->num_completed = 0; /* Reset completion counter */
     mag_mutex_unlock(&pool->mtx);
 }
 
+/* Blocks until all threads have completed their work */
 static void mag_threadpool_barrier(mag_threadpool_t* pool) {
     mag_mutex_lock(&pool->mtx);
-    while (pool->num_completed != pool->num_workers) /* Wait for all workers to finish */
+    while (pool->num_completed != pool->num_allocated_workers) /* Wait for all workers to finish */
         mag_cv_wait(&pool->cv, &pool->mtx);
     #ifdef MAG_DEBUG
         for (uint32_t i=0; i < pool->num_workers; ++i) /* Verify phases executed */
@@ -1542,8 +1558,9 @@ static void mag_threadpool_barrier(mag_threadpool_t* pool) {
     mag_mutex_unlock(&pool->mtx);
 }
 
-static MAG_HOTPROC void mag_threadpool_parallel_compute(mag_threadpool_t* pool, mag_tensor_t* node) {
-    if (!pool) { /* If no thread pool, main thread does the work (single threaded mode). */
+/* Execute an operator tensor on the CPU */
+static MAG_HOTPROC void mag_threadpool_parallel_compute(mag_threadpool_t* pool, mag_tensor_t* node, uint32_t num_active_workers) {
+    if (!pool || num_active_workers <= 1) { /* Main thread does the work (single threaded mode). */
         mag_compute_payload_t payload = {
             .node = node,
             .thread_idx = 0,
@@ -1553,15 +1570,31 @@ static MAG_HOTPROC void mag_threadpool_parallel_compute(mag_threadpool_t* pool, 
         return; /* Done */
     }
     /* Else parallel mode */
-    mag_threadpool_kickoff(pool, node);                             /* Kick off workers */
+    mag_threadpool_kickoff(pool, node, num_active_workers);                             /* Kick off workers */
     mag_cv_broadcast(&pool->cv);                                    /* Wake up all workers */
     mag_worker_exec_and_broadcast(pool, &pool->workers->payload);   /* Main thread does work too */
     mag_threadpool_barrier(pool);                                   /* Wait for all workers to finish */
 }
 
+/*
+** Computes how many workers to use for intra-op parallelism depending on the number of elements.
+** A logarithmic scaling is used, see: https://www.desmos.com/calculator/xiunrskpwu
+** TODO: This can be improved by using a more sophisticated heuristic and a benchmarked, numerical approach.
+*/
+static uint32_t dynamic_work_scaling(uint32_t max_workers, int64_t numel, int64_t numel_threshold, double growth_scale) {
+    if (numel < numel_threshold) return 1; /* If numel is small, use a single worker. */
+    numel -= numel_threshold;
+    uint32_t workers = (uint32_t)ceil(growth_scale * log2((int64_t)numel)); /* Logarithmic scaling */
+    workers = mag_xmin(max_workers, mag_xmax(1, workers));
+    return workers;
+}
+
 static MAG_HOTPROC void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t* node) {
     mag_threadpool_t* pool = dvc->impl;
-    mag_threadpool_parallel_compute(pool, node);
+    double growth_scale = 0.3; /* Growth scale for dynamic work scaling. TODO: Find better value and benchmark. */
+    int64_t numel_threshold = 250000; /* Threshold for dynamic work scaling. */
+    uint32_t intra_op_workers = pool ? dynamic_work_scaling(pool->num_allocated_workers, node->numel, numel_threshold, growth_scale) : 1;
+    mag_threadpool_parallel_compute(pool, node, intra_op_workers);
 }
 
 static MAG_HOTPROC void mag_cpu_exec_bwd(mag_compute_device_t* dvc, mag_tensor_t* root) {

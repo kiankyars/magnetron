@@ -350,7 +350,7 @@ static MAG_AINLINE void* mag_pincr(void** p, size_t sz, size_t align) {
 #else
 
 typedef void* mag_thread_ret_t;
-#define THREAD_RET_NONE NULL
+#define MAG_THREAD_RET_NONE NULL
 
 typedef pthread_t mag_thread_t;
 static inline mag_thread_t mag_thread_create(mag_thread_ret_t (*fn)(void*), void* arg) {
