@@ -20,6 +20,7 @@ option(MAGNETRON_ENABLE_CUDA "Enable CUDA support" ON)                      # En
 option(MAGNETRON_ENABLE_ACCELERATE "Use Apple's Accelerate framework" OFF)   # Use Apple's Accelerate framework for optimized math functions (only on Apple platforms)
 
 set(MAGNETRON_CUDA_COMPILER "/usr/local/cuda-12.6/bin/nvcc" CACHE STRING "Path to the CUDA compiler") # Set to your CUDA compiler path
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 if (${MAGNETRON_BUILD_TESTS})
     enable_testing()

@@ -900,7 +900,16 @@ size_t mag_ctx_get_total_tensors_created(const mag_ctx_t* ctx) { return 0; /* TO
 
 void mag_thread_set_prio(mag_thread_sched_prio_t prio) {
 #ifdef _WIN32
-#error "Windows threading not supported yet."
+    DWORD policy = THREAD_PRIORITY_NORMAL;
+    switch (prio) {
+        case MAG_THREAD_SCHED_PRIO_NORMAL: policy = THREAD_PRIORITY_NORMAL; break;
+        case MAG_THREAD_SCHED_PRIO_MEDIUM: policy = THREAD_PRIORITY_ABOVE_NORMAL; break;
+        case MAG_THREAD_SCHED_PRIO_HIGH: policy = THREAD_PRIORITY_HIGHEST; break;
+        case MAG_THREAD_SCHED_PRIO_REALTIME: policy = THREAD_PRIORITY_TIME_CRITICAL; break;
+    }
+    if (mag_unlikely(!SetThreadPriority(GetCurrentThread(), policy))) {
+        mag_log_warn("Failed to set thread scheduling priority: %d", prio);
+    }
 #else
     int32_t policy = SCHED_OTHER;
     struct sched_param p;

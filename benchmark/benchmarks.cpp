@@ -20,10 +20,9 @@ static auto bench_cpu_compute(std::int64_t numel_per_dim) -> void {
     std::cout << "Benchmarking Parallel MM on CPU with Numel per Dim: " << numel_per_dim << std::endl;
 
     auto exec_bench = [&](std::uint32_t threads) {
-        const mag_device_descriptor_t desc = {
-            .type = MAG_COMPUTE_DEVICE_TYPE_CPU,
-            .thread_count = threads,
-        };
+        mag_device_descriptor_t desc {};
+        desc.type = MAG_COMPUTE_DEVICE_TYPE_CPU;
+        desc.thread_count = threads;
         mag_ctx_t* ctx = mag_ctx_create2(&desc);
         mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, numel_per_dim, numel_per_dim);
         mag_tensor_fill_random_normal(A, 0.0f, 1.0f);

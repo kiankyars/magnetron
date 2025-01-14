@@ -22,6 +22,9 @@
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <Windows.h>
 #else
 #include <unistd.h>
@@ -144,7 +147,7 @@ static MAG_AINLINE uint32_t mag_fls64(const uint64_t x) {
   unsigned long r; _BitScanReverse64(&r, x); return (uint32_t)r;
 }
 
-typedef long mag_atomic_t;       /* Atomic integer type */
+typedef __int64 mag_atomic_t;       /* Atomic integer type */
 typedef enum mag_mo_t {             /* Atomic memory order */
     MAG_MO_RELAXED,
     MAG_MO_CONSUME,
@@ -346,7 +349,38 @@ static MAG_AINLINE void* mag_pincr(void** p, size_t sz, size_t align) {
 }
 
 #ifdef _WIN32
-#error "TODO"
+
+typedef DWORD mag_thread_ret_t;
+#define MAG_THREAD_RET_NONE 0
+
+typedef HANDLE mag_thread_t;
+
+static int mag_thread_create(mag_thread_t* out, void* unused, mag_thread_ret_t (*f)(void*), void* arg) { /* WIN32 -> pthread style wrapper. */
+    HANDLE handle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)f, arg, 0, NULL);
+    if (mag_unlikely(!handle)) return EAGAIN;
+    *out = handle;
+    return 0;
+}
+
+static int mag_thread_join(mag_thread_t th, void* unused) { /* WIN32 -> pthread style wrapper. */
+    int ret = (int)WaitForSingleObject(th, INFINITE);
+    CloseHandle(th);
+    return ret;
+}
+
+typedef SRWLOCK mag_mutex_t;
+#define mag_mutex_create(mtx) InitializeSRWLock(mtx)
+#define mag_mutex_destroy(mtx)
+#define mag_mutex_lock(mtx) AcquireSRWLockExclusive(mtx)
+#define mag_mutex_unlock(mtx) ReleaseSRWLockExclusive(mtx)
+
+typedef CONDITION_VARIABLE mag_cond_var_t;
+#define mag_cv_create(cv) InitializeConditionVariable(cv)
+#define mag_cv_destroy(cv)
+#define mag_cv_wait(cv, mtx) SleepConditionVariableSRW(cv, mtx, INFINITE, CONDITION_VARIABLE_LOCKMODE_SHARED)
+#define mag_cv_signal(cv) WakeConditionVariable(cv)
+#define mag_cv_broadcast(cv) WakeAllConditionVariable(cv)
+
 #else
 
 typedef void* mag_thread_ret_t;
