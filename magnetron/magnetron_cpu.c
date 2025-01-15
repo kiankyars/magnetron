@@ -37,7 +37,7 @@ static const mag_amd64_blas_specialization mag_amd64_blas_specializations[] = { 
     mag_amd64_blas_spec_permute(sse41),
 };
 
-static bool mag_amd64_blas_detect_optimal_specialization(const mag_ctx_t* ctx, mag_kernel_registry_t* kernels) {
+static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_registry_t* kernels) {
     for (size_t i=0; i < sizeof(mag_amd64_blas_specializations)/sizeof(*mag_amd64_blas_specializations); ++i) { /* Find best blas spec for the host CPU */
         const mag_amd64_blas_specialization* spec = mag_amd64_blas_specializations+i;
         size_t num_features = 0;
@@ -60,15 +60,37 @@ static bool mag_amd64_blas_detect_optimal_specialization(const mag_ctx_t* ctx, m
 #undef mag_amd64_blas_spec_permute
 #undef mag_cpu_blas_spec_decl
 
+#elif defined(__aarch64__) || defined(_M_ARM64)
+
+#define mag_cpu_blas_spec_name(feat) mag_cpu_blas_specialization_arm64_##feat
+#define mag_cpu_blas_spec_decl(feat) extern void mag_cpu_blas_spec_name(feat)(mag_kernel_registry_t* kernels)
+
+mag_cpu_blas_spec_decl(82);
+
+static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_registry_t* kernels) {
+#ifdef __linux__
+    long hwcap = ctx->sys.cpu_arm64_hwcap;
+    if (hwcap & HWCAP_FPHP) && (hwcap & HWCAP_ASIMDHP) && (hwcap && HWCAP_ASIMDDP)) { /* ARM v.8.2 f16 scalar + f16 vec + dotprod */
+        mag_cpu_blas_spec_name(82)(kernels);
+        return true;
+    }
+#elif defined(__APPLE__)
+    /* TODO - currently using ARM v8 baseline but Apple M2/M3 have newer arm versions we could target */
+    /* mag_cpu_blas_spec_name(82)(kernels); */
+#endif
+    /* No matching specialization found, use generic */
+    mag_cpu_blas_specialization_fallback(kernels);
+    return false; /* No spec used, fallback is active */
+}
+
+#undef mag_cpu_blas_spec_decl
+
 #endif
 
 static bool mag_blas_detect_optimal_specialization(const mag_ctx_t* ctx, mag_kernel_registry_t* kernels) {
-    #if defined(__x86_64__) || defined(_M_X64)
-        return mag_amd64_blas_detect_optimal_specialization(ctx, kernels);
-    #else
-        mag_cpu_blas_specialization_fallback(kernels);
-        return false; /* No spec used, fallback is active */
-    #endif
+    if (mag_likely(mag_blas_detect_gen_optimal_spec(ctx, kernels))) return true;
+    mag_cpu_blas_specialization_fallback(kernels);
+    return false; /* No spec used, fallback is active */
 }
 
 typedef struct mag_worker_t mag_worker_t;

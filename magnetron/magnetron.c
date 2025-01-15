@@ -56,6 +56,10 @@
 #ifdef __linux__
 #include <linux/prctl.h>
 #include <sys/prctl.h>
+#ifdef __aarch64__
+#include <libc/sysv/consts/hwcap.h>
+#include <sys/auxv.h
+#endif
 #endif
 #endif
 
@@ -538,7 +542,7 @@ mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
     mag_ctx_dump_compiler_info(); /* Dump compiler info. */
 
     /* Initialize context with default values or from context info. */
-    mag_ctx_t* ctx = (mag_ctx_t*)(*mag_alloc)(NULL, sizeof(*ctx)); /* Allocate context. */
+    mag_ctx_t* ctx = (*mag_alloc)(NULL, sizeof(*ctx)); /* Allocate context. */
     memset(ctx, 0, sizeof(*ctx));
 
     /* Init allocators */
@@ -2711,6 +2715,11 @@ static void MAG_COLDPROC mag_system_host_info_query_memory(uint64_t* out_phys_me
         }
     }
     #undef mag_cpy_regs
+
+#elif defined(__aarch64__) && defined(__linux__)
+static void MAG_COLDPROC mag_system_info_query_arm64_cpu_features(long* hwcap) {
+    *hwcap = getauxval(AT_HWCAP);
+}
 #endif
 
 static void MAG_COLDPROC mag_system_host_info_query(mag_ctx_t* ctx) {
@@ -2720,6 +2729,8 @@ static void MAG_COLDPROC mag_system_host_info_query(mag_ctx_t* ctx) {
     mag_system_host_info_query_memory(&ctx->sys.phys_mem_total, &ctx->sys.phys_mem_free);
     #if defined(__x86_64__) || defined(_M_X64)
         mag_system_info_query_x86_64_cpu_features(&ctx->sys.x86_64_cpu_features);
+    #elif defined(__aarch64__) && defined(__linux__)
+        mag_system_info_query_arm64_cpu_features(&ctx->sys.cpu_arm64_hwcap);
     #endif
     if (mag_unlikely(!*ctx->sys.os_name)) snprintf(ctx->sys.os_name, sizeof(ctx->sys.os_name), "Unknown");
     if (mag_unlikely(!*ctx->sys.cpu_name)) snprintf(ctx->sys.cpu_name, sizeof(ctx->sys.cpu_name), "Unknown");

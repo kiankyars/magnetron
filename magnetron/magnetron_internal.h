@@ -584,6 +584,8 @@ struct mag_ctx_t {
         uint64_t phys_mem_free;                     /* Free physical memory in bytes. */
 #if defined(__x86_64__) || defined(_M_X64)
         uint32_t x86_64_cpu_features[8][4];         /* x86-64 CPU features. */
+#elif defined (__aarch64__)
+        long cpu_arm64_hwcap;                           /* ARM 64 hardware capabilities */
 #endif
     } sys;
 #ifdef MAG_DEBUG

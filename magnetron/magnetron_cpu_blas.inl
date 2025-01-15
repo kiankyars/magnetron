@@ -1318,11 +1318,15 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
     }
 }
 
-#if !defined(MAG_BLAS_SPECIALIZATION) || !defined(MAG_BLAS_SPECIALIZATION_FEAT_REQUEST)
+#ifndef MAG_BLAS_SPECIALIZATION
 #error "BLAS specialization undefined"
 #endif
 
 #if defined(__x86_64__) || defined(_M_X64)
+#ifndef MAG_BLAS_SPECIALIZATION_FEAT_REQUEST
+#error "Feature request routine undefined"
+#endif
+
 const mag_x86_64_feature_t* MAG_BLAS_SPECIALIZATION_FEAT_REQUEST(size_t* out_num) {
     static const mag_x86_64_feature_t required_features[] = {
         #ifdef __AVX512F__
