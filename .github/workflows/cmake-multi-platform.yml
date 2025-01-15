@@ -62,7 +62,7 @@ jobs:
         run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }} -j4
 
       - name: Prepare C++ Test Data
-        run: cp -r ${{ github.workspace }}/test_data ${{ steps.strings.outputs.build-output-dir }}/test/test_data
+        run: cp -r ${{ github.workspace }}/test_data ${{ steps.strings.outputs.build-output-dir }}/test/unit/test_data
 
       - name: Run C++ Runtime Tests
         working-directory: ${{ steps.strings.outputs.build-output-dir }}
