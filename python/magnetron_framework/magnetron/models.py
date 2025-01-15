@@ -43,6 +43,7 @@ class Optim:
 
 class DenseLayer(Layer):
     def __init__(self, in_features: int, out_features: int):
+        super().__init__()
         self.weight = mag.Tensor.uniform(shape=(out_features, in_features))
         self.bias = mag.Tensor.uniform(shape=(out_features, 1))
         self.cache = None

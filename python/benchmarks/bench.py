@@ -1,40 +1,66 @@
 # (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
-import time
+from bench_tool import benchmark, BenchParticipant
 
-class BenchInfo:
-    def __init__(self, flops: list[float]):
-        self.flops = flops
+import magnetron as mag
+import numpy as np
+import torch
 
-    def avg_flops(self) -> float:
-        return sum(self.flops) / len(self.flops)
+class NumpyBenchmark(BenchParticipant):
+    def __init__(self):
+        super().__init__('Numpy')
 
-    def avg_tflops(self) -> float:
-        return self.avg_flops() * 1e-12
+    def allocate_args(self, dim: int):
+        x = np.full((dim, dim), fill_value=1.0, dtype=np.float32)
+        y = np.full((dim, dim), fill_value=2.0, dtype=np.float32)
+        return x, y
 
-    def min_flops(self) -> float:
-        return min(self.flops)
+class PyTorchBenchmark(BenchParticipant):
+    def __init__(self):
+        super().__init__('PyTorch')
+        self.device = torch.device('cpu')
 
-    def min_tflops(self) -> float:
-        return min(self.flops) * 1e-12
+    def allocate_args(self, dim: int):
+        x = torch.full((dim, dim), fill_value=1.0, dtype=torch.float32).to(self.device)
+        y = torch.full((dim, dim), fill_value=2.0, dtype=torch.float32).to(self.device)
+        return x, y
 
-    def max_flops(self) -> float:
-        return max(self.flops)
+class MagnetronBenchmark(BenchParticipant):
+    def __init__(self):
+        super().__init__('Magnetron')
 
-    def max_tflops(self) -> float:
-        return max(self.flops) * 1e-12
+    def allocate_args(self, dim: int):
+        x = mag.Tensor.full((dim, dim), fill_value=1.0, dtype=mag.DType.F32)
+        y = mag.Tensor.full((dim, dim), fill_value=2.0, dtype=mag.DType.F32)
+        return x, y
 
-    def __str__(self) -> str:
-        return f'Average: {self.avg_tflops()} TFLOP/s\nMin: {self.min_tflops()} TFLOP/s\nMax: {self.max_tflops()} TFLOP/s'
+participants = [
+    MagnetronBenchmark(),
+    NumpyBenchmark(),
+    PyTorchBenchmark(),
+]
 
-def bench(dim: int, iters: int, a, b, func: callable) -> BenchInfo:
-    flop: int = 2*dim**3
-    flops: list[float] = []
-    for _ in range(iters):
-        st: float = time.monotonic()
-        _r = func(a, b)
-        et: float = time.monotonic()
-        s: float = et - st
-        flops.append(flop/s)
+operators: list[tuple[str, callable]] = [
+    ('Addition', lambda x, y: x + y),
+    ('Subtraction', lambda x, y: x - y),
+    ('Hadamard Product', lambda x, y: x * y),
+    ('Divison', lambda x, y: x / y),
+    ('Multiplication', lambda x, y: x @ y)
+]
 
-    return BenchInfo(flops)
+lim: int = 512
+step: int = 8
+
+print('Running performance benchmark...')
+print('Magnetron VS')
+for participant in participants:
+    if not isinstance(participant, MagnetronBenchmark):
+        print(f'    {participant.name}')
+print(f'The benchmark profiles every {step}th shape permutations up to {lim}')
+print('The benchmark might take a while')
+
+for op in operators:
+    name, fn = op
+    print(f'Benchmarking {name} Operator')
+    result = benchmark(name, participants, fn, lim, step)
+    result.plot()
