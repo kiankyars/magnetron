@@ -4,6 +4,7 @@ import time
 from abc import ABC
 import matplotlib.pyplot as plt
 import magnetron as mag
+from cycler import cycler
 
 class BenchParticipant(ABC):
     def __init__(self, name: str):
@@ -33,6 +34,7 @@ class PerformanceInfo:
 
     def plot(self):
         plt.figure(figsize=(10, 6))
+        plt.gca().set_prop_cycle(cycler(marker=['o', '+', 'x', '*', '.', 'X', '^']))
         for participant in self.participants:
             plt.plot(self.shapes, participant.timings, label=participant.name)
         plt.xlabel('Matrix Size (NxN)')
