@@ -101,7 +101,7 @@ For usage in C and C++ see the [Unit Tests](test) directory in the root of the p
 Code from the XOR example:
 ```python
 def forward(self, x: Tensor) -> Tensor:
-    return (self.weight @ prev + self.bias).sigmoid()
+    return (self.weight @ x + self.bias).sigmoid()
 ```
 
 ### Operators
