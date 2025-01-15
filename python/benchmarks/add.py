@@ -1,56 +1,66 @@
 # (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
 import magnetron as mag
-import numpy
+import numpy as np
 import torch
+import matplotlib.pyplot as plt
+
 from bench import *
 
-mag.GlobalConfig.verbose = True
 
-n: int = 8192
-iters: int = 500
+shapes: list[int] = []
+timings_np: list[float] = []
+timings_torch: list[float] = []
+timings_mag: list[float] = []
 
-print(f'Benchmarking addition of {n}x{n} matrices with {iters} iterations...')
+iters: int = 10000
 
-# bench numpy
-np_a = numpy.full((n, n), fill_value=1.0)
-np_b = numpy.full((n, n), fill_value=2.0)
+def bench_operator(dim: int):
+    print(f'Benchmarking {dim}x{dim}')
 
-print('Benchmarking numpy...')
-np_result: BenchInfo = bench(n, iters, np_a, np_b, lambda a, b: a + b)
+    # bench numpy
+    np_a = np.full((dim, dim), fill_value=1.0, dtype=np.float32)
+    np_b = np.full((dim, dim), fill_value=2.0, dtype=np.float32)
+    np_result: BenchInfo = bench(dim, iters, np_a, np_b, lambda a, b: a + b)
 
-# bench torch
-device = torch.device('cpu')
-np_a = torch.full((n, n), fill_value=1.0).to(device)
-np_b = torch.full((n, n), fill_value=2.0).to(device)
+    # bench torch
+    device = torch.device('cpu')
+    np_a = torch.full((dim, dim), fill_value=1.0, dtype=torch.float32).to(device)
+    np_b = torch.full((dim, dim), fill_value=2.0, dtype=torch.float32).to(device)
+    torch_result: BenchInfo = bench(dim, iters, np_a, np_b, lambda a, b: a + b)
 
-print('Benchmarking torch...')
-torch_result: BenchInfo = bench(n, iters, np_a, np_b, lambda a, b: a + b)
+    # bench magnetron
+    mag_a = mag.Tensor.full((dim, dim), fill_value=1.0, dtype=mag.DType.F32)
+    mag_b = mag.Tensor.full((dim, dim), fill_value=2.0, dtype=mag.DType.F32)
+    mag_result: BenchInfo = bench(dim, iters, mag_a, mag_b, lambda a, b: a + b)
 
-# bench magnetron
+    shapes.append(dim)
+    timings_np.append(np_result.avg_flops())
+    timings_torch.append(torch_result.avg_flops())
+    timings_mag.append(mag_result.avg_flops())
 
-print('Benchmarking magnetron...')
-mag_a = mag.Tensor.full((n, n), fill_value=1.0)
-mag_b = mag.Tensor.full((n, n), fill_value=2.0)
-mag_result: BenchInfo = bench(n, iters, mag_a, mag_b, lambda a, b: a + b)
+# Bench different matrix sizes
+lim: int = 2048
+step: int = 32
+i: int = 1
+while i <= lim:
+    bench_operator(i)
+    if i == 1:
+        i = 2
+    else:
+        i += step
 
-print('Numpy:')
-print(np_result)
-print('Torch:')
-print(torch_result)
-print('Magnetron:')
-print(mag_result)
+# Plot results
+# Create the plot
+plt.figure(figsize=(10, 6))
+plt.plot(shapes, timings_np, label="NumPy", marker='^')
+plt.plot(shapes, timings_torch, label="PyTorch", marker='s')
+plt.plot(shapes, timings_mag, label="Magnetron", marker='o')
 
-avg_np: float = np_result.avg_flops()
-avg_torch: float = torch_result.avg_flops()
-avg_mag: float = mag_result.avg_flops()
-
-print('==========================================================')
-if avg_np < avg_mag:
-    print(f'Magnetron is {avg_mag / avg_np:.2f} times faster than numpy.')
-else:
-    print(f'Magnetron is {avg_np / avg_mag:.2f} times slower than numpy.')
-if avg_torch < avg_mag:
-    print(f'Magnetron is {avg_mag / avg_torch:.2f} times faster than torch.')
-else:
-    print(f'Magnetron is {avg_torch / avg_mag:.2f} times slower than torch.')
+# Add labels and title
+plt.xlabel("Matrix Size (NxN)")
+plt.ylabel("Average FLOP/s")
+plt.title("Performance Comparison of Tensor Libraries")
+plt.legend()
+plt.grid(True)
+plt.show()
