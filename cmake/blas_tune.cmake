@@ -14,6 +14,7 @@ set(MAGNETRON_BLAS_SPEC_AMD64_SOURCES
     magnetron/magnetron_cpu_blas_amd64_avx.c
     magnetron/magnetron_cpu_blas_amd64_avx2.c
     magnetron/magnetron_cpu_blas_amd64_avx512f.c
+    magnetron/magnetron_cpu_blas_amd64_znver4.c
 )
 
 set(MAGNETRON_BLAS_SPEC_ARM64_SOURCES
@@ -26,6 +27,7 @@ if (${IS_AMD64}) # x86-64 specific compilation options
     set_blas_spec_arch("magnetron_cpu_blas_amd64_avx.c" "-mtune=sandybridge -mavx"  "/arch:AVX")
     set_blas_spec_arch("magnetron_cpu_blas_amd64_avx2.c" "-mtune=skylake -mavx -mavx2 -mfma -mf16c"  "/arch:AVX2")
     set_blas_spec_arch("magnetron_cpu_blas_amd64_avx512f.c" "-mtune=cannonlake -mavx -mavx2 -mfma -mf16c -mavx512f" "/arch:AVX512")
+    set_blas_spec_arch("magnetron_cpu_blas_amd64_znver4.c" "-mavx -mavx2 -mfma -mf16c -mavx512f -mavx512vl -mavx512vnni -mavx512bf16 -mavx512bw -mavx512dq" "/arch:AVX512")
  elseif(${IS_ARM64})
     set(MAGNETRON_SOURCES ${MAGNETRON_SOURCES} ${MAGNETRON_BLAS_SPEC_ARM64_SOURCES})
     set_blas_spec_arch("magnetron_cpu_blas_arm64_82.c" "-march=armv8.2-a+dotprod+fp16" "")

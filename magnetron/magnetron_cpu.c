@@ -25,12 +25,14 @@ typedef struct mag_amd64_blas_specialization {
         .inject_kernels = &mag_cpu_blas_specialization_amd64_##feat \
     }
 
+mag_cpu_blas_spec_decl(znver4);
 mag_cpu_blas_spec_decl(avx512f);
 mag_cpu_blas_spec_decl(avx2);
 mag_cpu_blas_spec_decl(avx);
 mag_cpu_blas_spec_decl(sse41);
 
 static const mag_amd64_blas_specialization mag_amd64_blas_specializations[] = { /* Dynamic selectable BLAS permutations, sorted from best to worst score. */
+    mag_amd64_blas_spec_permute(znver4),
     mag_amd64_blas_spec_permute(avx512f),
     mag_amd64_blas_spec_permute(avx2),
     mag_amd64_blas_spec_permute(avx),
@@ -93,11 +95,59 @@ static bool mag_blas_detect_optimal_specialization(const mag_ctx_t* ctx, mag_ker
     return false; /* No spec used, fallback is active */
 }
 
+typedef struct mag_cpu_op_info_t {
+    bool mt_support;
+    double growth;
+    int64_t threshold;
+} mag_cpu_op_info_t;
+
+static const mag_cpu_op_info_t mag_cpu_op_infos[MAG_OP__NUM] = {
+    [MAG_OP_NOP]            = {.mt_support = false, .growth = 0.0, .threshold = 0},
+    [MAG_OP_CLONE]          = {.mt_support = false, .growth = 0.0, .threshold = 0},
+    [MAG_OP_VIEW]           = {.mt_support = false, .growth = 0.0, .threshold = 0},
+    [MAG_OP_TRANSPOSE]      = {.mt_support = false, .growth = 0.0, .threshold = 0},
+    [MAG_OP_PERMUTE]        = {.mt_support = false, .growth = 0.0, .threshold = 0},
+    [MAG_OP_MEAN]           = {.mt_support = false, .growth = 0.0, .threshold = 0},
+    [MAG_OP_MIN]            = {.mt_support = false, .growth = 0.0, .threshold = 0},
+    [MAG_OP_MAX]            = {.mt_support = false, .growth = 0.0, .threshold = 0},
+    [MAG_OP_SUM]            = {.mt_support = false, .growth = 0.0, .threshold = 0},
+    [MAG_OP_ABS]            = {.mt_support = false, .growth = 0.0, .threshold = 0},
+    [MAG_OP_NEG]            = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_LOG]            = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_SQR]            = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_SQRT]           = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_SIN]            = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_COS]            = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_STEP]           = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_SOFTMAX]        = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_SOFTMAX_DV]     = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_SIGMOID]        = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_SIGMOID_DV]     = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_HARD_SIGMOID]   = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_SILU]           = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_SILU_DV]        = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_TANH]           = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_TANH_DV]        = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_RELU]           = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_RELU_DV]        = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_GELU]           = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_GELU_DV]        = {.mt_support = true, .growth = 0.1, .threshold = 250000},
+    [MAG_OP_ADD]            = {.mt_support = true, .growth = 0.2, .threshold = 250000},
+    [MAG_OP_SUB]            = {.mt_support = true, .growth = 0.2, .threshold = 250000},
+    [MAG_OP_MUL]            = {.mt_support = true, .growth = 0.2, .threshold = 250000},
+    [MAG_OP_DIV]            = {.mt_support = true, .growth = 0.2, .threshold = 250000},
+    [MAG_OP_ADDS]           = {.mt_support = true, .growth = 0.2, .threshold = 250000},
+    [MAG_OP_SUBS]           = {.mt_support = true, .growth = 0.2, .threshold = 250000},
+    [MAG_OP_MULS]           = {.mt_support = true, .growth = 0.2, .threshold = 250000},
+    [MAG_OP_DIVS]           = {.mt_support = true, .growth = 0.2, .threshold = 250000},
+    [MAG_OP_MATMUL]         = {.mt_support = true, .growth = 3.0, .threshold =  10000},
+};
+
 typedef struct mag_worker_t mag_worker_t;
 typedef struct mag_threadpool_t {
-    mag_alignas(MAG_HDI) volatile bool interrupt;   /* Interrupt flag, 1=stop */
-    mag_alignas(MAG_HDI) uint64_t phase;            /* Current compute phase */
-    mag_alignas(MAG_HDI) uint64_t num_completed;    /* Number of workers that have completed their work */
+    mag_alignas(MAG_CACHE_LINE_SIZE) volatile bool interrupt;   /* Interrupt flag, 1=stop */
+    mag_alignas(MAG_CACHE_LINE_SIZE) uint64_t phase;            /* Current compute phase */
+    mag_alignas(MAG_CACHE_LINE_SIZE) uint64_t num_completed;    /* Number of workers that have completed their work */
     mag_cond_var_t cv;                              /* Condition variable for thread wakeup */
     mag_mutex_t mtx;                                /* Mutex for synchronization */
     uint32_t num_allocated_workers;                 /* Number of intra-op workers allocated */
@@ -114,15 +164,13 @@ struct mag_worker_t {
     mag_threadpool_t* pool;                 /* Host thread pool */
     bool is_async;                          /* True if worker is async (executed on a different thread)  */
     mag_thread_t thread;                    /* Thread handle */
-} mag_alignas(MAG_HDI);
+} mag_alignas(MAG_CACHE_LINE_SIZE);
 
 typedef struct mag_cpu_device_t {
     mag_ctx_t* ctx;
     mag_threadpool_t* pool;             /* Thread pool. NULL if num_allocated_workers <= 1 */
     uint32_t num_allocated_workers;     /* Amount of worker thread used. if == 1 then single threaded mode and thread pool is not created */
     mag_kernel_registry_t kernels;      /* Compute kernels. Specialized by arch optimized version at boot (e.g. AVX, AVX512 etc..) */
-    double growth_scale;                /* Growth scale for dynamic work scaling. TODO: Find better value and benchmark. */
-    int64_t numel_threshold;            /* Numel treshold from where to enable dynamic work scaling. */
 } mag_cpu_device_t;
 
 /* Await signal to start work */
@@ -261,12 +309,12 @@ static MAG_HOTPROC void mag_threadpool_parallel_compute(mag_threadpool_t* pool, 
     mag_threadpool_barrier(pool);                                                   /* Wait for all workers to finish */
 }
 
-static uint32_t mag_cpu_dynamic_work_scaling(mag_cpu_device_t* dvc, int64_t numel);
+static uint32_t mag_cpu_dynamic_work_scaling(mag_cpu_device_t* dvc, mag_op_t op, int64_t numel);
+
 static MAG_HOTPROC void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t* node) {
     mag_cpu_device_t* cpu_dvc = dvc->impl;
-    mag_threadpool_t* pool = cpu_dvc->pool;
-    uint32_t num_active_workers = mag_cpu_dynamic_work_scaling(cpu_dvc, node->numel);
-    if (!pool || num_active_workers <= 1) { /* Main thread does the work (single threaded mode). */
+    uint32_t intraop_workers = mag_cpu_dynamic_work_scaling(cpu_dvc, node->op, node->numel);
+    if (intraop_workers <= 1) { /* Main thread does the work (single threaded mode). */
         mag_compute_payload_t payload = {
             .node = node,
             .thread_idx = 0,
@@ -275,7 +323,7 @@ static MAG_HOTPROC void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t
         mag_worker_exec_thread_local(&cpu_dvc->kernels, &payload);
         return; /* Done */
     }
-    mag_threadpool_parallel_compute(pool, node, num_active_workers);
+    mag_threadpool_parallel_compute(cpu_dvc->pool, node, intraop_workers); /* Multithreaded mode. */
 }
 
 static MAG_HOTPROC void mag_cpu_exec_bwd(mag_compute_device_t* dvc, mag_tensor_t* root) {
@@ -300,7 +348,7 @@ static void mag_cpu_buf_cpy_device_host(mag_storage_buffer_t* sto, size_t offs, 
 
 static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer_t* out, size_t size) {
     mag_assert2(size);
-    size_t align = 16; /* Align to cache line size. */
+    size_t align = MAG_CACHE_LINE_SIZE; /* Align to cache line size. */
     void* block = mag_alloc_aligned(size, align);
     *out = (mag_storage_buffer_t){ /* Set up storage buffer. */
         .base = (uintptr_t)block,
@@ -327,8 +375,6 @@ static mag_cpu_device_t* mag_cpu_init_device(mag_ctx_t* ctx, uint32_t num_thread
         .pool = NULL,
         .num_allocated_workers = 0,
         .kernels = {},
-        .growth_scale = 0.3, /* TODO: better value and heuristic */
-        .numel_threshold = 250000 /* TODO: better value and heuristic */
     };
     mag_blas_detect_optimal_specialization(ctx, &dvc->kernels);
     if (num_threads > 1) {
@@ -343,10 +389,11 @@ static mag_cpu_device_t* mag_cpu_init_device(mag_ctx_t* ctx, uint32_t num_thread
 ** A logarithmic scaling is used, see: https://www.desmos.com/calculator/xiunrskpwu
 ** TODO: This can be improved by using a more sophisticated heuristic and a benchmarked, numerical approach.
 */
-static uint32_t mag_cpu_dynamic_work_scaling(mag_cpu_device_t* dvc, int64_t numel) {
-    if (!dvc->pool || numel < dvc->numel_threshold) return 1; /* If numel is small, use a single worker. */
-    numel -= dvc->numel_threshold;
-    uint32_t workers = (uint32_t)ceil(dvc->growth_scale * log2((int64_t)numel)); /* Logarithmic scaling */
+static uint32_t mag_cpu_dynamic_work_scaling(mag_cpu_device_t* dvc, mag_op_t op, int64_t numel) {
+    const mag_cpu_op_info_t* info = mag_cpu_op_infos+op;
+    if (!dvc->pool || !info->mt_support || numel < info->threshold) return 1;       /* Use a single worker (main thread). */
+    numel -= info->threshold;                                                       /* Saturate threshold */
+    uint32_t workers = (uint32_t)ceil(info->growth * log2((double)numel));       /* Logarithmic scaling */
     workers = mag_xmin(dvc->num_allocated_workers, mag_xmax(1, workers));
     return workers;
 }
