@@ -346,14 +346,19 @@ static void mag_cpu_buf_cpy_device_host(mag_storage_buffer_t* sto, size_t offs, 
     memcpy(dst, (void*)(sto->base+offs), n); /* On CPU just plain old memcpy with offset. */
 }
 
+/* Align CPU buffer to cache line size, which should also be satisfy alignment requirements for SSE, AVX and AVX512 on x86-64. */
+#define MAG_CPU_BUF_ALIGN MAG_CACHE_LINE_SIZE
+mag_static_assert((MAG_CPU_BUF_ALIGN & 15) == 0);
+mag_static_assert((MAG_CPU_BUF_ALIGN & 31) == 0);
+mag_static_assert((MAG_CPU_BUF_ALIGN & 63) == 0);
+
 static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer_t* out, size_t size) {
     mag_assert2(size);
-    size_t align = MAG_CACHE_LINE_SIZE; /* Align to cache line size. */
-    void* block = mag_alloc_aligned(size, align);
+    void* block = mag_alloc_aligned(size, MAG_CPU_BUF_ALIGN);
     *out = (mag_storage_buffer_t){ /* Set up storage buffer. */
         .base = (uintptr_t)block,
         .size = size,
-        .alignment = align,
+        .alignment = MAG_CPU_BUF_ALIGN,
         .host = host,
         .set = &mag_cpu_buf_set,
         .cpy_host_device = &mag_cpu_buf_cpy_host_device,
