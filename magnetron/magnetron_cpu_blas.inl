@@ -1320,7 +1320,7 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
     int64_t rb = mag_xmin(ra+chunk, numel);
     #ifdef MAG_ACCELERATE
         int64_t vmel = rb - ra;
-        if (mag_unlikely(vmel <= 0)) return; \
+        if (mag_unlikely(vmel <= 0)) return;
         const mag_f32_t* px = bx + ra*xd1;
         mag_f32_t* pr = br + ra*yd1;
         memset(pr, 0, vmel*yd1*sizeof(float));

@@ -23,16 +23,28 @@ class PerformanceInfo:
         self.shapes = shapes
         self.participants = participants
 
-    def plot(self):
-        plt.figure(figsize=(10, 6))
+    def plot(self, flops_per_op: int=2):
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 6))
         markers = ['o', '+', 'x', '*', '.', 'X', '^']
         for (i, participant) in enumerate(self.participants):
-            plt.plot(self.shapes, participant.timings, label=participant.name, marker=markers[i%len(markers)])
-        plt.xlabel('Matrix Size (NxN)')
-        plt.ylabel('Average Time (s)')
-        plt.title(f'Matrix {self.name} Benchmark - (Lower is Better) - {mag.Context.active().cpu_name}')
-        plt.legend()
-        plt.grid(True)
+            ax1.plot(self.shapes, participant.timings, label=participant.name, marker=markers[i%len(markers)])
+        ax1.set_xlabel('Matrix Size (NxN)')
+        ax1.set_ylabel('Average Time (s)')
+        ax1.set_title(f'Matrix {self.name} Benchmark\n(Lower is Better)')
+        ax1.legend()
+        ax1.grid(True)
+        for (i, participant) in enumerate(self.participants):
+            gflops = [(shape * shape * flops_per_op) / (time * 1e9)
+                      for shape, time in zip(self.shapes, participant.timings)]
+            ax2.plot(self.shapes, gflops, label=participant.name, marker=markers[i%len(markers)])
+        ax2.set_xlabel('Matrix Size (NxN)')
+        ax2.set_ylabel('Performance (GFLOPS)')
+        ax2.set_title(f'Matrix {self.name} Throughput\n(Higher is Better)')
+        ax2.legend()
+        ax2.grid(True)
+
+        plt.suptitle(f'{mag.Context.active().cpu_name}', y=1.05)
+        plt.tight_layout()
         plt.show()
 
 def benchmark(name: str, participants: list[BenchParticipant], func: callable, dim_lim: int=2048, step: int=8, iters: int=10000) -> PerformanceInfo:
