@@ -48,7 +48,7 @@ operators: list[tuple[str, callable]] = [
     ('Multiplication', lambda x, y: x @ y)
 ]
 
-lim: int = 1024
+lim: int = 128
 step: int = 8
 
 print('Running performance benchmark...')

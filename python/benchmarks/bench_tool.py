@@ -1,10 +1,9 @@
 # (c) 2024 Mario 'Neo' Sieg. <mario.sieg.64@gmail.com>
 
-import time
 from abc import ABC
 import matplotlib.pyplot as plt
 import magnetron as mag
-from cycler import cycler
+import timeit
 
 class BenchParticipant(ABC):
     def __init__(self, name: str):
@@ -15,16 +14,8 @@ class BenchParticipant(ABC):
     def allocate_args(self, dim: int) -> tuple:
         pass
 
-def bench_iter_avg(dim: int, iters: int, a, b, func: callable) -> float:
-    flop: int = 2*dim**3
-    flops: list[float] = []
-    for _ in range(iters):
-        st: float = time.monotonic()
-        _r = func(a, b)
-        et: float = time.monotonic()
-        s: float = et - st
-        flops.append(flop/s)
-    return sum(flops) / len(flops)
+def bench_fn(iters: int, x, y, func: callable) -> float:
+    return timeit.timeit(lambda: func(x, y), number=iters) / iters
 
 class PerformanceInfo:
     def __init__(self, name: str, shapes: list[int], participants: list[BenchParticipant]):
@@ -34,12 +25,12 @@ class PerformanceInfo:
 
     def plot(self):
         plt.figure(figsize=(10, 6))
-        plt.gca().set_prop_cycle(cycler(marker=['o', '+', 'x', '*', '.', 'X', '^']))
-        for participant in self.participants:
-            plt.plot(self.shapes, participant.timings, label=participant.name)
+        markers = ['o', '+', 'x', '*', '.', 'X', '^']
+        for (i, participant) in enumerate(self.participants):
+            plt.plot(self.shapes, participant.timings, label=participant.name, marker=markers[i%len(markers)])
         plt.xlabel('Matrix Size (NxN)')
-        plt.ylabel('Average FLOP/s')
-        plt.title(f'Matrix {self.name} Benchmark - {mag.Context.active().cpu_name}')
+        plt.ylabel('Average Time (s)')
+        plt.title(f'Matrix {self.name} Benchmark - (Lower is Better) - {mag.Context.active().cpu_name}')
         plt.legend()
         plt.grid(True)
         plt.show()
@@ -53,5 +44,5 @@ def benchmark(name: str, participants: list[BenchParticipant], func: callable, d
         shapes.append(dim)
         for participant in participants:
             x, y = participant.allocate_args(dim)
-            participant.timings.append(bench_iter_avg(dim, iters, x, y, func))
+            participant.timings.append(bench_fn(iters, x, y, func))
     return PerformanceInfo(name, shapes, participants)

@@ -1301,41 +1301,81 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* x = r->op_inputs[0];
     const mag_tensor_t* y = r->op_inputs[1];
-    mag_f32_t* b_r = mag_f32p_mut(r);
-    const mag_f32_t* b_x = mag_f32p(x);
-    const mag_f32_t* b_y = mag_f32p(y);
-    mag_load_local_storage_group(r, r_d, shape);
-    mag_load_local_storage_group(r, r_s, strides);
-    mag_load_local_storage_group(x, x_d, shape);
-    mag_load_local_storage_group(x, x_s, strides);
-    mag_load_local_storage_group(y, y_d, shape);
-    mag_load_local_storage_group(y, y_s, strides);
-    mag_assert2(x_d2 == 1 && x_d3 == 1);
-    mag_assert2(y_d2 == 1 && y_d3 == 1);
+    mag_f32_t* br = mag_f32p_mut(r);
+    const mag_f32_t* bx = mag_f32p(x);
+    const mag_f32_t* by = mag_f32p(y);
+    mag_load_local_storage_group(r, rd, shape);
+    mag_load_local_storage_group(r, rs, strides);
+    mag_load_local_storage_group(x, xd, shape);
+    mag_load_local_storage_group(x, xs, strides);
+    mag_load_local_storage_group(y, yd, shape);
+    mag_load_local_storage_group(y, ys, strides);
+    mag_assert2(xd2 == 1 && xd3 == 1);
+    mag_assert2(yd2 == 1 && yd3 == 1);
     int64_t tc = payload->thread_num;
     int64_t ti = payload->thread_idx;
-    int64_t nr = x_d0;
-    int64_t rpt = (nr + tc - 1)/tc;
-    int64_t ra = rpt*ti;
-    int64_t rb = mag_xmin(ra+rpt, nr);
-    for (int64_t i = ra; i < rb; ++i) {
-        for (int64_t j = 0; j < y_d1; ++j) {
-            float* xo = b_r + r_d1*i + j;
-            mag_bnd_chk(xo, b_r, mag_tensor_data_size(r));
-            *xo = 0.0f;
-        }
-        for (int64_t k = 0; k < x_d1; ++k) {
-            const mag_f32_t* p_x = b_x + x_d1*i + k;
-            mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-            for (int64_t j = 0; j < y_d1; ++j) {
-                mag_f32_t* p_r = b_r + r_d1*i + j;
-                const mag_f32_t* p_y = b_y + y_d1*k + j;
-                mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
-                mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y));
-                *p_r += (*p_x) * (*p_y);
+    int64_t numel = xd0;
+    int64_t chunk = (numel + tc - 1)/tc;
+    int64_t ra = chunk*ti;
+    int64_t rb = mag_xmin(ra+chunk, numel);
+    #ifdef MAG_ACCELERATE
+        int64_t vmel = rb - ra;
+        if (mag_unlikely(vmel <= 0)) return; \
+        const mag_f32_t* px = bx + ra*xd1;
+        mag_f32_t* pr = br + ra*yd1;
+        memset(pr, 0, vmel*yd1*sizeof(float));
+        vDSP_mmul(
+            px,
+            1,
+            by,
+            1,
+            pr,
+            1,
+            vmel,
+            yd1,
+            xd1
+        );
+    #else
+        if (xd0==yd0 && xd1==yd1) { /* Square matrices */
+            for (int64_t i = ra; i < rb; ++i) { /* Rows */
+                for (int64_t j = 0; j < yd1; ++j) {
+                    float* xo = br + rd1*i + j;
+                    mag_bnd_chk(xo, br, mag_tensor_data_size(r));
+                    *xo = 0.0f;
+                }
+                for (int64_t k = 0; k < xd1; ++k) { /* Inner dim */
+                    const mag_f32_t* px = bx + xd1*i + k;
+                    mag_bnd_chk(px, bx, mag_tensor_data_size(x));
+                    for (int64_t j = 0; j < yd1; ++j) { /* Columns */
+                        mag_f32_t* pr = br + rd1*i + j;
+                        const mag_f32_t* py = by + yd1*k + j;
+                        mag_bnd_chk(pr, br, mag_tensor_data_size(r));
+                        mag_bnd_chk(py, by, mag_tensor_data_size(y));
+                        *pr += (*px) * (*py);
+                    }
+                }
+            }
+        } else {
+            for (int64_t i = ra; i < rb; ++i) { /* Rows */
+                for (int64_t j = 0; j < yd1; ++j) {
+                    float* xo = br + rd1*i + j;
+                    mag_bnd_chk(xo, br, mag_tensor_data_size(r));
+                    *xo = 0.0f;
+                }
+                for (int64_t k = 0; k < xd1; ++k) { /* Inner dim */
+                    const mag_f32_t* px = bx + xd1*i + k;
+                    mag_bnd_chk(px, bx, mag_tensor_data_size(x));
+                    for (int64_t j = 0; j < yd1; ++j) { /* Columns */
+                        mag_f32_t* pr = br + rd1*i + j;
+                        const mag_f32_t* py = by + yd1*k + j;
+                        mag_bnd_chk(pr, br, mag_tensor_data_size(r));
+                        mag_bnd_chk(py, by, mag_tensor_data_size(y));
+                        *pr += (*px) * (*py);
+                    }
+                }
             }
         }
-    }
+    #endif
 }
 
 #ifndef MAG_BLAS_SPECIALIZATION
