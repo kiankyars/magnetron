@@ -1317,19 +1317,21 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
     int64_t nr = x_d0;
     int64_t rpt = (nr + tc - 1)/tc;
     int64_t ra = rpt*ti;
-    int64_t rb = mag_xmin(ra+rpt, nr);
-    for (int64_t i = ra; i < rb; ++i) {
-        for (int64_t j = 0; j < y_d1; ++j) {
-            float* xo = b_r + r_d1*i + j;
+    int64_t rows = mag_xmin(ra+rpt, nr);
+    int64_t cols = x_d1;
+    int64_t inner = y_d1;
+    for (int64_t row = ra; row < rows; ++row) {
+        for (int64_t j = 0; j < inner; ++j) {
+            float* xo = b_r + r_d1*row + j;
             mag_bnd_chk(xo, b_r, mag_tensor_data_size(r));
             *xo = 0.0f;
         }
-        for (int64_t k = 0; k < x_d1; ++k) {
-            const mag_f32_t* p_x = b_x + x_d1*i + k;
+        for (int64_t col = 0; col < cols; ++col) {
+            const mag_f32_t* p_x = b_x + cols*row + col;
             mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
-            for (int64_t j = 0; j < y_d1; ++j) {
-                mag_f32_t* p_r = b_r + r_d1*i + j;
-                const mag_f32_t* p_y = b_y + y_d1*k + j;
+            for (int64_t i = 0; i < inner; ++i) {
+                mag_f32_t* p_r = b_r + r_d1*row + i;
+                const mag_f32_t* p_y = b_y + inner*col + i;
                 mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
                 mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y));
                 *p_r += (*p_x) * (*p_y);
