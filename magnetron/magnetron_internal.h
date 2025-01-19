@@ -7,6 +7,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -327,7 +328,7 @@ extern MAG_EXPORT uintptr_t mag_thread_id(void);
     }
 #define mag_assert2(expr) mag_assert(expr, "")
 
-#ifdef MAG_DEBUG
+#if defined(MAG_DEBUG) || (!defined(NDEBUG) && !NDEBUG)
 #define mag_bnd_chk(ptr, base, n) \
     mag_assert((uintptr_t)(ptr) >= (uintptr_t)(base) && (uintptr_t)(ptr) < (uintptr_t)(base) + (n), \
         "\nBound check failed: %p not in [%p, %p), base+0x%x, end+0x%x", \
@@ -337,8 +338,12 @@ extern MAG_EXPORT uintptr_t mag_thread_id(void);
         (int)llabs((long long)((int64_t)(ptr)-(int64_t)(base))), \
         (int)llabs((long long)(((int64_t)(base)+(n))-(int64_t)(ptr))) \
     )
+#define mag_dassert mag_assert
+#define mag_dassert2 mag_assert2
 #else
 #define mag_bnd_chk(ptr, base, n)
+#define mag_dassert(...)
+#define mag_dassert2(...)
 #endif
 
 /* Increment pointer or size with correct type alignment. */

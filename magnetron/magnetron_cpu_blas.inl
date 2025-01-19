@@ -247,116 +247,116 @@ static void mag_simd_sincos(__m128 x, __m128 *osin, __m128 *ocos) {
 #endif
 
 static void MAG_HOTPROC mag_vadd_f32(
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x,
-    const mag_f32_t* const y
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x,
+    const mag_f32_t* y
 ) {
 #ifdef MAG_ACCELERATE
-    vDSP_vadd(y, 1, x, 1, o, 1, n);
+    vDSP_vadd(y, 1, x, 1, o, 1, numel);
 #else
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = x[i] + y[i];
     }
 #endif
 }
 
 static void MAG_HOTPROC mag_vsub_f32(
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x,
-    const mag_f32_t* const y
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x,
+    const mag_f32_t* y
 ) {
 #ifdef MAG_ACCELERATE
-    vDSP_vsub(y, 1, x, 1, o, 1, n);
+    vDSP_vsub(y, 1, x, 1, o, 1, numel);
 #else
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = x[i] - y[i];
     }
 #endif
 }
 
 static void MAG_HOTPROC mag_vmul_f32(
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x,
-    const mag_f32_t* const y
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x,
+    const mag_f32_t* y
 ) {
 #ifdef MAG_ACCELERATE
-    vDSP_vmul(y, 1, x, 1, o, 1, n);
+    vDSP_vmul(y, 1, x, 1, o, 1, numel);
 #else
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = x[i] * y[i];
     }
 #endif
 }
 
 static void MAG_HOTPROC mag_vdiv_f32(
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x,
-    const mag_f32_t* const y
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x,
+    const mag_f32_t* y
 ) {
 #ifdef MAG_ACCELERATE
-    vDSP_vdiv(y, 1, x, 1, o, 1, n);
+    vDSP_vdiv(y, 1, x, 1, o, 1, numel);
 #else
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = x[i] / y[i];
     }
 #endif
 }
 
 static void MAG_HOTPROC mag_vadds_f32(
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x,
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x,
     const mag_f32_t y
 ) {
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = x[i] + y;
     }
 }
 
 static void MAG_HOTPROC mag_vsubs_f32(
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x,
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x,
     const mag_f32_t y
 ) {
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = x[i] - y;
     }
 }
 
 static void MAG_HOTPROC mag_vmuls_f32(
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x,
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x,
     const mag_f32_t y
 ) {
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = x[i] * y;
     }
 }
 
 static void MAG_HOTPROC mag_vdivs_f32(
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x,
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x,
     const mag_f32_t y
 ) {
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = x[i] / y;
     }
 }
 
 static mag_f32_t MAG_UNUSED MAG_HOTPROC mag_vdot_f32(
-    const int64_t n,
-    const mag_f32_t* const x,
-    const mag_f32_t* const y
+    int64_t numel,
+    const mag_f32_t* x,
+    const mag_f32_t* y
 ) {
 #if (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
-    const int64_t k = n & -16;
+    int64_t k = numel & -16;
     float32x4_t acc[4] = {vdupq_n_f32(0)};
     float32x4_t vx[4];
     float32x4_t vy[4];
@@ -378,10 +378,10 @@ static mag_f32_t MAG_UNUSED MAG_HOTPROC mag_vdot_f32(
     *acc = vaddq_f32(*acc, acc[2]);     /* Fold acc[0] += acc[2] */
     *acc = vaddq_f32(*acc, acc[1]);     /* Fold acc[0] += acc[1] */
     mag_f32_t sum = vaddvq_f32(*acc);       /* Reduce to scalar with horizontal sum. */
-    for (int64_t i=k; i < n; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
+    for (int64_t i=k; i < numel; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
     return sum;
 #elif defined(__AVX512F__) && defined(__FMA__)
-    const int64_t k = n & -64;
+    int64_t k = numel & -64;
     __m512 acc[4] = {_mm512_setzero_ps()};
     __m512 vx[4];
     __m512 vy[4];
@@ -403,10 +403,10 @@ static mag_f32_t MAG_UNUSED MAG_HOTPROC mag_vdot_f32(
     *acc = _mm512_add_ps(*acc, acc[2]);
     *acc = _mm512_add_ps(*acc, acc[1]);
     mag_f32_t sum = _mm512_reduce_add_ps(*acc);
-    for (int64_t i=k; i < n; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
+    for (int64_t i=k; i < numel; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
     return sum;
 #elif defined(__AVX__) && defined(__FMA__)
-    const int64_t k = n & -32;
+    int64_t k = numel & -32;
     __m256 acc[4] = {_mm256_setzero_ps()};
     __m256 vx[4];
     __m256 vy[4];
@@ -431,10 +431,10 @@ static mag_f32_t MAG_UNUSED MAG_HOTPROC mag_vdot_f32(
     v0 = _mm_hadd_ps(v0, v0);
     v0 = _mm_hadd_ps(v0, v0);
     mag_f32_t sum = _mm_cvtss_f32(v0);
-    for (int64_t i=k; i < n; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
+    for (int64_t i=k; i < numel; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
     return sum;
 #elif defined(__SSE2__)
-    const int64_t k = n & -16;
+    int64_t k = numel & -16;
     __m128 acc[4] = {_mm_setzero_ps()};
     __m128 vx[4];
     __m128 vy[4];
@@ -466,26 +466,26 @@ static mag_f32_t MAG_UNUSED MAG_HOTPROC mag_vdot_f32(
         sums = _mm_add_ss(sums, shuf);
         mag_f32_t sum = _mm_cvtss_f32(sums);
     #endif
-    for (int64_t i=k; i < n; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
+    for (int64_t i=k; i < numel; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
     return sum;
 #else
     mag_f64_t r = 0.0;
-    for (int64_t i=0; i < n; ++i) r += (mag_f64_t)x[i] * (mag_f64_t)y[i];
+    for (int64_t i=0; i < numel; ++i) r += (mag_f64_t)x[i] * (mag_f64_t)y[i];
     return (mag_f32_t)r;
 #endif
 }
 
 static mag_f64_t MAG_HOTPROC mag_vsum_f64_f32( /* Σx. */
-    const int64_t n,
-    const mag_f32_t* const x
+    int64_t numel,
+    const mag_f32_t* x
 ) {
 #ifdef MAG_ACCELERATE
     mag_f32_t sum;
-    vDSP_sve(x, 1, &sum, n);
+    vDSP_sve(x, 1, &sum, numel);
     return (mag_f64_t)sum;
 #else
     mag_f64_t sum = 0.0;
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         sum += (mag_f64_t)x[i];
     }
     return sum;
@@ -493,56 +493,56 @@ static mag_f64_t MAG_HOTPROC mag_vsum_f64_f32( /* Σx. */
 }
 
 static mag_f32_t MAG_HOTPROC mag_vmin_f32( /* min x */
-    const int64_t n,
-    const mag_f32_t* const x
+    int64_t numel,
+    const mag_f32_t* x
 ) {
     mag_f32_t min = INFINITY;
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         min = fminf(min, x[i]);
     }
     return min;
 }
 
 static mag_f32_t MAG_HOTPROC mag_vmax_f32( /* max x */
-    const int64_t n,
-    const mag_f32_t* const x
+    int64_t numel,
+    const mag_f32_t* x
 ) {
     mag_f32_t min = -INFINITY;
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         min = fmaxf(min, x[i]);
     }
     return min;
 }
 
 static void MAG_HOTPROC mag_vabs_f32( /* o = |x| */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = fabsf(x[i]);
     }
 }
 
 static void MAG_HOTPROC mag_vneg_f32( /* o = -x */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = -x[i];
     }
 }
 
 static void MAG_HOTPROC mag_vlog_f32( /* o = log x */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
     int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
     const float32x4_t one = vdupq_n_f32(1);
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         float32x4_t xi = vld1q_f32(x+i);
         xi = vmaxq_f32(xi, vdupq_n_f32(0));
         uint32x4_t invalid_mask = vcleq_f32(xi, vdupq_n_f32(0));
@@ -584,7 +584,7 @@ static void MAG_HOTPROC mag_vlog_f32( /* o = log x */
 /* TODO */
 #elif MAG_APPROXMATH && defined(__SSE2__)
     const __m128 one = _mm_set1_ps(1.0f);
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         __m128 xi = _mm_loadu_ps(x+i);
         xi = _mm_max_ps(xi, _mm_set1_ps(0.0f));
         __m128 invalid_mask = _mm_cmple_ps(xi, _mm_set1_ps(0.0f));
@@ -621,38 +621,38 @@ static void MAG_HOTPROC mag_vlog_f32( /* o = log x */
         _mm_storeu_ps(o+i, xi);
     }
 #endif
-    for (; i < n; ++i) { /* Process leftovers scalar-wise */
+    for (; i < numel; ++i) { /* Process leftovers scalar-wise */
         o[i] = logf(x[i]);
     }
 }
 
 static void MAG_HOTPROC mag_vsqr_f32( /* o = x² */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
-    for (int64_t i=0; i < n; ++i)
+    for (int64_t i=0; i < numel; ++i)
         o[i] = x[i]*x[i];
 }
 
 static void MAG_HOTPROC mag_vsqrt_f32( /* o = √x */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = sqrtf(x[i]);
     }
 }
 
 static void MAG_HOTPROC mag_vsin_f32( /* o = sin x */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
        int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         float32x4_t xi = vld1q_f32(x+i);
         float32x4_t ocos;
         mag_simd_sincos(xi, &xi, &ocos);
@@ -663,26 +663,26 @@ static void MAG_HOTPROC mag_vsin_f32( /* o = sin x */
 #elif MAG_APPROXMATH && defined(__AVX2__) && defined(__FMA__)
     /* TODO */
 #elif MAG_APPROXMATH && defined(__SSE2__)
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         __m128 xi = _mm_loadu_ps(x+i);
         __m128 ocos;
         mag_simd_sincos(xi, &xi, &ocos);
         _mm_storeu_ps(o+i, xi);
     }
 #endif
-    for (; i < n; ++i) { /* Process leftovers scalar-wise */
+    for (; i < numel; ++i) { /* Process leftovers scalar-wise */
         o[i] = sinf(x[i]);
     }
 }
 
 static void MAG_HOTPROC mag_vcos_f32( /* o = cos x */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
     int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         float32x4_t xi = vld1q_f32(x+i);
         float32x4_t osin;
         mag_simd_sincos(xi, &osin, &xi);
@@ -693,72 +693,72 @@ static void MAG_HOTPROC mag_vcos_f32( /* o = cos x */
 #elif MAG_APPROXMATH && defined(__AVX2__) && defined(__FMA__)
     /* TODO */
 #elif MAG_APPROXMATH && defined(__SSE2__)
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         __m128 xi = _mm_loadu_ps(x+i);
         __m128 osin;
         mag_simd_sincos(xi, &osin, &xi);
         _mm_storeu_ps(o+i, xi);
     }
 #endif
-    for (; i < n; ++i) { /* Process leftovers scalar-wise */
+    for (; i < numel; ++i) { /* Process leftovers scalar-wise */
         o[i] = cosf(x[i]);
     }
 }
 
 static void MAG_HOTPROC mag_vstep_f32( /* Heaviside step function. */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = x[i] >= 0.0f ? 1.0f : 0.0f;
     }
 }
 
 static void MAG_HOTPROC mag_vsoftmax_f32( /* softmax : ℝ -> (0, ∞), x |-> e^x */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
     int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         vst1q_f32(o+i, mag_simd_expf(vld1q_f32(x+i)));
     }
 #elif MAG_APPROXMATH && defined(__AVX512F__) && defined(__AVX512DQ__)
-    for (; i+15 < n; i += 16) {
+    for (; i+15 < numel; i += 16) {
         _mm512_storeu_ps(o+i, mag_simd_expf(_mm512_loadu_ps(x+i)));
     }
 #elif MAG_APPROXMATH && defined(__AVX2__) && defined(__FMA__)
-    for (; i+7 < n; i += 8) {
+    for (; i+7 < numel; i += 8) {
         _mm256_storeu_ps(o+i, mag_simd_expf(_mm256_loadu_ps(x+i)));
     }
 #elif MAG_APPROXMATH && defined(__SSE2__)
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         _mm_storeu_ps(o+i, mag_simd_expf(_mm_loadu_ps(x+i)));
     }
 #endif
-    for (; i < n; ++i) o[i] = expf(x[i]); /* Process leftovers scalar-wise */
+    for (; i < numel; ++i) o[i] = expf(x[i]); /* Process leftovers scalar-wise */
 }
 
 static void MAG_HOTPROC mag_vsoftmax_dv_f32( /* softmax' = softmax : ℝ -> (0, ∞), x |-> e^x */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
-    mag_vsoftmax_f32(n, o, x);
+    mag_vsoftmax_f32(numel, o, x);
 }
 
 static void MAG_HOTPROC mag_vsigmoid_f32( /* σ : ℝ -> (0, 1), x |-> 1/(1 + e^(-x)) */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
     int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
     const float32x4_t one = vdupq_n_f32(1.0f);
     const float32x4_t zero = vdupq_n_f32(0.0f);
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         float32x4_t xx = vld1q_f32(x+i);
         float32x4_t neg_x = vsubq_f32(zero, xx);
         float32x4_t exp_neg_x = mag_simd_expf(neg_x);
@@ -768,7 +768,7 @@ static void MAG_HOTPROC mag_vsigmoid_f32( /* σ : ℝ -> (0, 1), x |-> 1/(1 + e^
 #elif MAG_APPROXMATH && defined(__AVX512F__) && defined(__AVX512DQ__)
     __m512 one = _mm512_set1_ps(1.0f);
     __m512 zero = _mm512_setzero_ps();
-    for (; i+15 < n; i += 16) {
+    for (; i+15 < numel; i += 16) {
         __m512 xx = _mm512_loadu_ps(x+i);
         __m512 neg_x = _mm512_sub_ps(zero, xx);
         __m512 exp_neg_x = mag_simd_expf(neg_x);
@@ -778,7 +778,7 @@ static void MAG_HOTPROC mag_vsigmoid_f32( /* σ : ℝ -> (0, 1), x |-> 1/(1 + e^
 #elif MAG_APPROXMATH && defined(__AVX2__) && defined(__FMA__)
     __m256 one = _mm256_set1_ps(1.0f);
     __m256 zero = _mm256_setzero_ps();
-    for (; i+7 < n; i += 8) {
+    for (; i+7 < numel; i += 8) {
         __m256 xx = _mm256_loadu_ps(x+i);
         __m256 neg_x = _mm256_sub_ps(zero, xx);
         __m256 exp_neg_x = mag_simd_expf(neg_x);
@@ -788,7 +788,7 @@ static void MAG_HOTPROC mag_vsigmoid_f32( /* σ : ℝ -> (0, 1), x |-> 1/(1 + e^
 #elif MAG_APPROXMATH && defined(__SSE2__)
     __m128 one = _mm_set1_ps(1.0f);
     __m128 zero = _mm_setzero_ps();
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         __m128 xx = _mm_loadu_ps(x+i);
         __m128 neg_x = _mm_sub_ps(zero, xx);
         __m128 exp_neg_x = mag_simd_expf(neg_x);
@@ -796,39 +796,39 @@ static void MAG_HOTPROC mag_vsigmoid_f32( /* σ : ℝ -> (0, 1), x |-> 1/(1 + e^
         _mm_storeu_ps(o+i, _mm_div_ps(one, one_plus_exp_neg_x));
     }
 #endif
-    for (; i < n; ++i) o[i] = 1.0f / (1.0f + expf(-x[i])); /* Process leftovers scalar-wise */
+    for (; i < numel; ++i) o[i] = 1.0f / (1.0f + expf(-x[i])); /* Process leftovers scalar-wise */
 }
 
 static void MAG_HOTPROC mag_vsigmoid_dv_f32( /* σ' : ℝ -> (0, 1), x |-> x * (1-x) */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = x[i] * (1.0f - x[i]);
     }
 }
 
 static void MAG_HOTPROC mag_vhard_sigmoid_f32( /* σ^ : ℝ -> (0, 1), x |-> min(1, max(0, (x + 3)/6)) */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = fminf(1.0f, fmaxf(0.0f, (x[i] + 3.0f) / 6.0f));
     }
 }
 
 static void MAG_HOTPROC mag_vsilu_f32( /* silu : ℝ -> ℝ, x |-> x/(1 + e^(-x)) */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
     int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
     float32x4_t one = vdupq_n_f32(1.0f);
     float32x4_t zero = vdupq_n_f32(0.0f);
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         float32x4_t xx = vld1q_f32(x+i);
         float32x4_t neg_x = vsubq_f32(zero, xx);
         float32x4_t exp_neg_x = mag_simd_expf(neg_x);
@@ -838,7 +838,7 @@ static void MAG_HOTPROC mag_vsilu_f32( /* silu : ℝ -> ℝ, x |-> x/(1 + e^(-x)
 #elif MAG_APPROXMATH && defined(__AVX512F__) && defined(__AVX512DQ__)
     __m512 one = _mm512_set1_ps(1);
     __m512 zero = _mm512_setzero_ps();
-    for (; i+15 < n; i += 16) {
+    for (; i+15 < numel; i += 16) {
         __m512 xx = _mm512_loadu_ps(x+i);
         __m512 neg_x = _mm512_sub_ps(zero, xx);
         __m512 exp_neg_x = mag_simd_expf(neg_x);
@@ -848,7 +848,7 @@ static void MAG_HOTPROC mag_vsilu_f32( /* silu : ℝ -> ℝ, x |-> x/(1 + e^(-x)
 #elif MAG_APPROXMATH && defined(__AVX2__) && defined(__FMA__)
     __m256 one = _mm256_set1_ps(1);
     __m256 zero = _mm256_setzero_ps();
-    for (; i+7 < n; i += 8) {
+    for (; i+7 < numel; i += 8) {
         const __m256 xx = _mm256_loadu_ps(x+i);
         __m256 neg_x = _mm256_sub_ps(zero, xx);
         __m256 exp_neg_x = mag_simd_expf(neg_x);
@@ -858,7 +858,7 @@ static void MAG_HOTPROC mag_vsilu_f32( /* silu : ℝ -> ℝ, x |-> x/(1 + e^(-x)
 #elif MAG_APPROXMATH && defined(__SSE2__)
     __m128 one = _mm_set1_ps(1);
     __m128 zero = _mm_setzero_ps();
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         __m128 xx = _mm_loadu_ps(x+i);
         __m128 neg_x = _mm_sub_ps(zero, xx);
         __m128 exp_neg_x = mag_simd_expf(neg_x);
@@ -866,84 +866,84 @@ static void MAG_HOTPROC mag_vsilu_f32( /* silu : ℝ -> ℝ, x |-> x/(1 + e^(-x)
         _mm_storeu_ps(o+i, _mm_div_ps(xx, one_plus_exp_neg_x));
     }
 #endif
-    for (; i < n; ++i) {
+    for (; i < numel; ++i) {
         o[i] = x[i] / (1.0f + expf(-x[i]));
     }
 }
 
 static void MAG_HOTPROC mag_vsilu_dv_f32( /* silu' : ℝ -> TODO */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         mag_panic("NYI!");
     }
 }
 
 static void MAG_HOTPROC mag_vtanh_f32( /* tanh : ℝ -> (-1, 1), x |-> tanh x */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
     int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         vst1q_f32(o+i, mag_simd_tanh(vld1q_f32(x+i)));
     }
 #elif MAG_APPROXMATH && defined(__AVX512F__) && defined(__AVX512DQ__)
-    for (; i+15 < n; i += 16) {
+    for (; i+15 < numel; i += 16) {
         _mm512_storeu_ps(o+i, mag_simd_tanh(_mm512_loadu_ps(x+i)));
     }
 #elif MAG_APPROXMATH && defined(__AVX2__) && defined(__FMA__)
-    for (; i+7 < n; i += 8) {
+    for (; i+7 < numel; i += 8) {
         _mm256_storeu_ps(o+i, mag_simd_tanh(_mm256_loadu_ps(x+i)));
     }
 #elif MAG_APPROXMATH && defined(__SSE2__)
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         _mm_storeu_ps(o+i, mag_simd_tanh(_mm_loadu_ps(x+i)));
     }
 #endif
-    for (; i < n; ++i) {
+    for (; i < numel; ++i) {
         o[i] = tanhf(x[i]);
     }
 }
 
 static void MAG_HOTPROC mag_vtanh_dv_f32( /* tanh' : ℝ -> (-1, 1), x |-> 1 / ((cosh x)^2) */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         const mag_f32_t cx = coshf(x[i]);
         o[i] = 1.0f / (cx*cx);
     }
 }
 
 static void MAG_HOTPROC mag_vrelu_f32( /* relu : ℝ -> ℝ^+, x |-> max {x, 0} */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = mag_xmax(x[i], 0.0f);
     }
 }
 
 static void MAG_HOTPROC mag_vrelu_dv_f32( /* relu' : ℝ -> ℝ^+, x |-> { 0 if x < 0, UB if x = 0, else 1 */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         o[i] = x[i] <= 0.0f ? 0.0f : 1.0f; /* relu' is mathematically undefined for x = 0, but we return 0 in this case. */
     }
 }
 
 static void MAG_HOTPROC mag_vgelu_f32( /* gelu : ℝ -> ℝ, x |-> TODO */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
     int64_t i=0;
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
@@ -951,7 +951,7 @@ static void MAG_HOTPROC mag_vgelu_f32( /* gelu : ℝ -> ℝ, x |-> TODO */
     float32x4_t one = vdupq_n_f32(1.0f);
     float32x4_t coeff1 = vdupq_n_f32(0.79788456080286535587989211986876f);
     float32x4_t coeff2 = vdupq_n_f32(MAG_GELU_COEFF);
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         float32x4_t xx = vld1q_f32(x+i);
         float32x4_t a = vaddq_f32(one, vmulq_f32(coeff2, vmulq_f32(xx, xx)));
         float32x4_t b = vaddq_f32(one, mag_simd_tanh(vmulq_f32(coeff1, vmulq_f32(xx, a))));
@@ -963,7 +963,7 @@ static void MAG_HOTPROC mag_vgelu_f32( /* gelu : ℝ -> ℝ, x |-> TODO */
     __m512 one = _mm512_set1_ps(1.0f);
     __m512 coeff1 = _mm512_set1_ps(0.79788456080286535587989211986876f);
     __m512 coeff2 = _mm512_set1_ps(MAG_GELU_COEFF);
-    for (; i+15 < n; i += 16) {
+    for (; i+15 < numel; i += 16) {
         __m512 xx = _mm512_loadu_ps(x+i);
         __m512 a = _mm512_fmadd_ps(coeff2, _mm512_mul_ps(xx, xx), one);
         __m512 b = _mm512_add_ps(one, mag_simd_tanh(_mm512_mul_ps(coeff1, _mm512_mul_ps(xx, a))));
@@ -975,7 +975,7 @@ static void MAG_HOTPROC mag_vgelu_f32( /* gelu : ℝ -> ℝ, x |-> TODO */
     __m256 one = _mm256_set1_ps(1.0f);
     __m256 coeff1 = _mm256_set1_ps(0.79788456080286535587989211986876f);
     __m256 coeff2 = _mm256_set1_ps(MAG_GELU_COEFF);
-    for (; i+7 < n; i += 8) {
+    for (; i+7 < numel; i += 8) {
         __m256 xx = _mm256_loadu_ps(x+i);
         __m256 a = _mm256_fmadd_ps(coeff2, _mm256_mul_ps(xx, xx), one);
         __m256 b = _mm256_add_ps(one, mag_simd_tanh(_mm256_mul_ps(coeff1, _mm256_mul_ps(xx, a))));
@@ -987,7 +987,7 @@ static void MAG_HOTPROC mag_vgelu_f32( /* gelu : ℝ -> ℝ, x |-> TODO */
     __m128 one = _mm_set1_ps(1.0f);
     __m128 coeff1 = _mm_set1_ps(0.79788456080286535587989211986876f);
     __m128 coeff2 = _mm_set1_ps(MAG_GELU_COEFF);
-    for (; i+3 < n; i += 4) {
+    for (; i+3 < numel; i += 4) {
         __m128 xx = _mm_loadu_ps(x+i);
         __m128 a = _mm_add_ps(one, _mm_mul_ps(coeff2, _mm_mul_ps(xx, xx)));
         __m128 b = _mm_add_ps(one, mag_simd_tanh(_mm_mul_ps(coeff1, _mm_mul_ps(xx, a))));
@@ -995,17 +995,17 @@ static void MAG_HOTPROC mag_vgelu_f32( /* gelu : ℝ -> ℝ, x |-> TODO */
         _mm_storeu_ps(o+i, c);
     }
 #endif
-    for (; i < n; ++i) {
+    for (; i < numel; ++i) {
         o[i] = 0.5f*x[i]*(1.0f + tanhf(0.79788456080286535587989211986876f*x[i]*(1.0f + MAG_GELU_COEFF*x[i]*x[i])));
     }
 }
 
 static void MAG_HOTPROC mag_vgelu_dv_f32( /* gelu' : ℝ -> ℝ, x |-> TODO */
-    const int64_t n,
-    mag_f32_t* const o,
-    const mag_f32_t* const x
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
 ) {
-    for (int64_t i=0; i < n; ++i) {
+    for (int64_t i=0; i < numel; ++i) {
         mag_panic("NYI"); /* TODO */
     }
 }
@@ -1138,7 +1138,7 @@ static void MAG_HOTPROC mag_blas_sum_f32(const mag_compute_payload_t* payload) {
         int64_t numel = r->numel; \
         int64_t chunk = (numel + tc - 1)/tc; \
         int64_t ra = ti*chunk; \
-        int64_t vmel = (ra < numel) ? mag_xmin(ra + chunk, numel) - ra : 0; \
+        int64_t vmel = mag_xmin(ra + chunk, numel) - ra; \
         if (mag_unlikely(vmel <= 0)) return; \
         mag_##T##_t* pr = br + ra; \
         const mag_##T##_t* px = bx + ra; \
@@ -1185,7 +1185,7 @@ mag_cpu_blas_impl_unary(f32, gelu_dv)
         int64_t numel = r->numel; \
         int64_t chunk = (numel + tc - 1)/tc; \
         int64_t ra = ti*chunk; \
-        int64_t vmel = (ra < numel) ? mag_xmin(ra + chunk, numel) - ra : 0; \
+        int64_t vmel = mag_xmin(ra + chunk, numel) - ra; \
         if (mag_unlikely(vmel <= 0)) return; \
         mag_##T##_t* pr = br + ra; \
         const mag_##T##_t* px = bx + ra; \
@@ -1217,8 +1217,23 @@ mag_cpu_blas_impl_unary_scalar(f32, div)
         mag_load_local_storage_group(y, ys, strides); \
         int64_t tc = payload->thread_num; \
         int64_t ti = payload->thread_idx; \
+        if (xd0==yd0 && xd1==yd1 && xd2==yd2 && xd3==yd3 && xd4==yd4 && xd5==yd5) { \
+            int64_t numel = r->numel; \
+            int64_t chunk = (numel + tc - 1)/tc; \
+            int64_t ra = ti*chunk; \
+            int64_t vmel = mag_xmin(ra + chunk, numel) - ra; \
+            if (mag_unlikely(vmel <= 0)) return; \
+            mag_##T##_t* pr = br + ra; \
+            const mag_##T##_t* px = bx + ra; \
+            const mag_##T##_t* py = by + ra; \
+            mag_bnd_chk(pr, br, mag_tensor_data_size(r)); \
+            mag_bnd_chk(px, bx, mag_tensor_data_size(x)); \
+            mag_bnd_chk(py, by, mag_tensor_data_size(y)); \
+            mag_v##name##_##T(vmel, pr, px, py); \
+            return; \
+        } \
         int64_t numel = xd5*xd4*xd3*xd2*xd1; \
-        int64_t chunk = (numel + tc - 1)/tc;\
+        int64_t chunk = (numel + tc - 1)/tc; \
         int64_t ra = chunk*ti; \
         int64_t rb = mag_xmin(ra+chunk, numel); \
         if (ys0 == 1) { \
@@ -1305,13 +1320,18 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
     int64_t rb = mag_xmin(ra+rpt, nr);
     for (int64_t i = ra; i < rb; ++i) {
         for (int64_t j = 0; j < y_d1; ++j) {
-            b_r[r_d1 * i + j] = 0.0f;
+            float* xo = b_r + r_d1*i + j;
+            mag_bnd_chk(xo, b_r, mag_tensor_data_size(r));
+            *xo = 0.0f;
         }
         for (int64_t k = 0; k < x_d1; ++k) {
             const mag_f32_t* p_x = b_x + x_d1*i + k;
+            mag_bnd_chk(p_x, b_x, mag_tensor_data_size(x));
             for (int64_t j = 0; j < y_d1; ++j) {
                 mag_f32_t* p_r = b_r + r_d1*i + j;
                 const mag_f32_t* p_y = b_y + y_d1*k + j;
+                mag_bnd_chk(p_r, b_r, mag_tensor_data_size(r));
+                mag_bnd_chk(p_y, b_y, mag_tensor_data_size(y));
                 *p_r += (*p_x) * (*p_y);
             }
         }
