@@ -1,6 +1,9 @@
 # (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
-from bench_tool import benchmark, BenchParticipant, generate_matmul_shapes, generate_elementwise_shapes
+from bench_tool import (
+    benchmark, BenchParticipant,
+    generate_matmul_shapes, generate_elementwise_shapes, generate_square_shapes
+)
 
 import magnetron as mag
 import numpy as np
@@ -51,28 +54,39 @@ matmul_ops = [
     ('Matrix Multiplication', lambda x, y: x @ y),
 ]
 
-max_dim = 40
-step = 8
+max_dim = 256
+square_step = 8
+all_step = max_dim // 4
 
 print('Running performance benchmark...')
 print('Magnetron VS')
 for participant in participants:
     if not isinstance(participant, MagnetronBenchmark):
         print(f'    {participant.name}')
-print(f'The benchmark profiles shapes up to {max_dim}x{max_dim}')
-print('The benchmark might take a while')
 
-elementwise_shapes = generate_elementwise_shapes(max_dim, step)
-matmul_shapes = generate_matmul_shapes(max_dim, step)
-
+print('\nSquare Matrix Benchmarks (NxN):')
+square_shapes = generate_square_shapes(max_dim, square_step)
 for op in elementwise_ops:
     name, fn = op
     print(f'Benchmarking {name} Operator')
-    result = benchmark(name, participants, fn, elementwise_shapes)
-    result.plot()
+    benchmark(name, participants, fn, square_shapes, plot_style='lines')
 
 for op in matmul_ops:
     name, fn = op
     print(f'Benchmarking {name} Operator')
-    result = benchmark(name, participants, fn, matmul_shapes)
-    result.plot()
+    benchmark(name, participants, fn, square_shapes, plot_style='lines')
+
+print('\nAll Shapes Benchmarks:')
+print('Elementwise Operations:')
+elementwise_shapes = generate_elementwise_shapes(max_dim, all_step)
+for op in elementwise_ops:
+    name, fn = op
+    print(f'Benchmarking {name} Operator')
+    benchmark(name, participants, fn, elementwise_shapes, plot_style='bars')
+
+print('\nMatrix Multiplication:')
+matmul_shapes = generate_matmul_shapes(max_dim, all_step)
+for op in matmul_ops:
+    name, fn = op
+    print(f'Benchmarking {name} Operator')
+    benchmark(name, participants, fn, matmul_shapes, plot_style='bars')
