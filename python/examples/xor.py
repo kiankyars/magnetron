@@ -1,46 +1,42 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
-import magnetron as mag
+from magnetron import Tensor
 from magnetron.models import SequentialModel, DenseLayer
 import matplotlib.pyplot as plt
 
-mag.GlobalConfig.compute_device = mag.ComputeDevice.CPU(1)
-
 EPOCHS: int = 10000
-LEARNING_RATE: float = 0.8
+RATE: float = 0.01
 
-# Inputs
-inputs = [
-    mag.Tensor.const([0.0, 0.0]),
-    mag.Tensor.const([0.0, 1.0]),
-    mag.Tensor.const([1.0, 0.0]),
-    mag.Tensor.const([1.0, 1.0])
-]
+# Inputs: shape (4, 2)
+inputs = Tensor.const([
+    [0.0, 0.0],
+    [0.0, 1.0],
+    [1.0, 0.0],
+    [1.0, 1.0]
+])
 
-# Targets
-targets = [
-    mag.Tensor.const([0.0]),
-    mag.Tensor.const([1.0]),
-    mag.Tensor.const([1.0]),
-    mag.Tensor.const([0.0])
-]
+# Targets: shape (4, 1)
+targets = Tensor.const([
+    [0.0],
+    [1.0],
+    [1.0],
+    [0.0]
+])
 
 mlp = SequentialModel([
     DenseLayer(2, 4),
     DenseLayer(4, 1)
 ])
 
-# Train model
-losses = mlp.train(inputs, targets, EPOCHS, LEARNING_RATE)
+# Train
+losses = mlp.train(inputs, targets, epochs=EPOCHS, rate=RATE)
 
 # Inference
-for input_tensor in inputs:
-    input_data = input_tensor.to_list()
-    output: float = mlp.forward(input_tensor)[0]
-    print(f'{input_data[0]} ^ {input_data[1]} = {output}')
+outputs = mlp.forward(inputs.transpose().clone())  # if your layer expects (features, batch)
+outputs.print()
 
 # Plot MSE loss
-plt.plot(list(range(0, EPOCHS - 1)), losses)
+plt.plot(list(range(0, EPOCHS)), losses)
 plt.xlabel('Epochs')
 plt.ylabel('MSE Loss')
 plt.title('XOR Problem')

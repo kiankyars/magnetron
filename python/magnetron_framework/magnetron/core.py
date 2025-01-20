@@ -506,7 +506,8 @@ class Tensor:
         assert all(0 < dim <= DIM_MAX for dim in shape), 'Invalid dimension size'
         self._ctx = weakref.ref(ctx)
         self._ptr = self._DISPATCH[len(shape)](ctx._ptr, dtype.value, *shape)
-        self.name = f'Tensor {self.shape}' if name is None else name
+        if name:
+            self.name = name
 
     @classmethod
     def empty(cls, shape: tuple[int, ...], *, dtype: DType = DType.F32, name: str | None = None) -> 'Tensor':

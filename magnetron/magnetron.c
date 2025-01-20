@@ -1112,7 +1112,7 @@ static mag_tensor_t* mag_result_constructor_routine_isomorph(mag_tensor_t** inpu
 static mag_tensor_t* mag_result_constructor_routine_view(mag_tensor_t** inputs,  const mag_op_param_t* params) {
     (void)params;
     mag_tensor_t* base = *inputs;
-    return mag_tensor_create(base->ctx, base->dtype, base->shape, MAG_MAX_DIMS, base, 0);
+    return mag_tensor_create(base->ctx, base->dtype, base->shape, base->rank, base, 0);
 }
 
 static mag_tensor_t* mag_result_constructor_routine_scalar(mag_tensor_t** inputs,  const mag_op_param_t* params) {
