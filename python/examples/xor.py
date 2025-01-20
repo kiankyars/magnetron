@@ -5,7 +5,7 @@ from magnetron.models import SequentialModel, DenseLayer
 import matplotlib.pyplot as plt
 
 EPOCHS: int = 10000
-RATE: float = 0.01
+RATE: float = 0.1
 
 # Inputs: shape (4, 2)
 inputs = Tensor.const([
@@ -24,16 +24,24 @@ targets = Tensor.const([
 ])
 
 mlp = SequentialModel([
-    DenseLayer(2, 4),
-    DenseLayer(4, 1)
+    DenseLayer(2, 8),
+    DenseLayer(8, 1)
 ])
 
 # Train
 losses = mlp.train(inputs, targets, epochs=EPOCHS, rate=RATE)
 
 # Inference
-outputs = mlp.forward(inputs.transpose().clone())  # if your layer expects (features, batch)
-outputs.print()
+test_points = [
+    (0.0, 0.0),
+    (0.0, 1.0),
+    (1.0, 0.0),
+    (1.0, 1.0),
+]
+
+for (x_val, y_val) in test_points:
+    result = mlp.forward(Tensor.const([[x_val], [y_val]]))[0]
+    print(f"{x_val} XOR {y_val} => {result:.4f}")
 
 # Plot MSE loss
 plt.plot(list(range(0, EPOCHS)), losses)

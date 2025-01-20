@@ -84,9 +84,7 @@ class DenseLayer(Layer):
         batch_size = delta.shape[1]
         ones_vec = Tensor.const([[1.0] for _ in range(batch_size)])
         row_sums = delta @ ones_vec  # shape (out_features, 1)
-        row_means = row_sums * (1.0 / batch_size)  # shape (out_features, 1)
-
-        # Then apply it to the bias update:
+        row_means = row_sums * (1.0 / batch_size)
         self.bias -= row_means * rate
 
         # For the next layer’s delta = (W^T @ delta) * sigmoid'(z)
