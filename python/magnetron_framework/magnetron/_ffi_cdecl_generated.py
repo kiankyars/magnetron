@@ -1,64 +1,88 @@
-# Autogenered by /home/mario/Documents/projects/magnetron/python/magnetron_framework/bing_gen.py 2025-01-08 22:53:50.660079, do NOT edit!
+# Autogenered by /Users/mariosieg/Documents/projects/magnetron/python/magnetron_framework/bing_gen.py 2025-01-20 11:24:33.732169, do NOT edit!
 
 __MAG_CDECLS: str = '''
-
-typedef struct mag_ctx_t mag_ctx_t;
-typedef struct mag_tensor_t mag_tensor_t;
-typedef struct mag_dtype_meta_t mag_dtype_meta_t;
-typedef struct mag_op_param_t mag_op_param_t;
-typedef struct mag_op_meta_t mag_op_meta_t;
-
-typedef int mag_compute_device_type_t;
-typedef int mag_exec_mode_t;
-typedef int mag_prng_algorithm_t;
-typedef int mag_thread_sched_prio_t;
-typedef int mag_color_channels_t;
-typedef int mag_dtype_t;
-typedef int mag_op_t;
-typedef int mag_op_param_type_t;
-typedef int mag_graph_eval_order_t;
-
-typedef struct mag_device_descriptor_t {
-    mag_compute_device_type_t type;
-    uint32_t thread_count;
-    uint32_t cuda_device_id;
-} mag_device_descriptor_t;
-
+typedef enum mag_compute_device_type_t {
+MAG_COMPUTE_DEVICE_TYPE_CPU = 0,
+MAG_COMPUTE_DEVICE_TYPE_GPU_CUDA = 1,
+MAG_COMPUTE_DEVICE_TYPE__NUM
+} mag_compute_device_type_t;
 extern   const char* mag_device_type_get_name(mag_compute_device_type_t op);
+typedef enum mag_exec_mode_t {
+MAG_EXEC_MODE_EAGER = 0,
+MAG_EXEC_MODE_DEFERRED = 1,
+MAG_EXEC_MODE__NUM
+} mag_exec_mode_t;
+typedef enum mag_prng_algorithm_t {
+MAG_PRNG_MERSENNE_TWISTER = 0,
+MAG_PRNG_PCG = 1,
+MAG_PRNG__NUM
+} mag_prng_algorithm_t;
+typedef enum mag_thread_sched_prio_t {
+MAG_THREAD_SCHED_PRIO_NORMAL = 0,
+MAG_THREAD_SCHED_PRIO_MEDIUM = 1,
+MAG_THREAD_SCHED_PRIO_HIGH = 2,
+MAG_THREAD_SCHED_PRIO_REALTIME = 3,
+} mag_thread_sched_prio_t;
+typedef enum mag_color_channels_t {
+MAG_COLOR_CHANNELS_AUTO,
+MAG_COLOR_CHANNELS_GRAY,
+MAG_COLOR_CHANNELS_GRAY_A,
+MAG_COLOR_CHANNELS_RGB,
+MAG_COLOR_CHANNELS_RGBA,
+MAG_COLOR_CHANNELS__NUM
+} mag_color_channels_t;
 extern   void* (*mag_get_alloc_fn(void))(void* blk, size_t size);
 extern   void mag_set_alloc_fn(void* (*alloc)(void* blk, size_t size));
 extern   void mag_set_log_mode(bool enabled);
 typedef uint32_t mag_char32_t;
+typedef struct mag_ctx_t mag_ctx_t;
+typedef struct mag_device_descriptor_t {
+mag_compute_device_type_t type;
+uint32_t thread_count;
+uint32_t cuda_device_id;
+} mag_device_descriptor_t;
 extern   mag_ctx_t* mag_ctx_create(mag_compute_device_type_t device);
 extern   mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info);
-extern   mag_exec_mode_t mag_ctx_get_exec_mode(const mag_ctx_t* ctx);
-extern   void mag_ctx_set_exec_mode(mag_ctx_t* ctx, mag_exec_mode_t mode);
-extern   mag_prng_algorithm_t mag_ctx_get_prng_algorithm(const mag_ctx_t* ctx);
-extern   void mag_ctx_set_prng_algorithm(mag_ctx_t* ctx, mag_prng_algorithm_t algorithm, uint64_t seed);
-extern   mag_compute_device_type_t mag_ctx_get_compute_device_type(const mag_ctx_t* ctx);
-extern   const char* mag_ctx_get_compute_device_name(const mag_ctx_t* ctx);
-extern   const char* mag_ctx_get_os_name(const mag_ctx_t* ctx);
-extern   const char* mag_ctx_get_cpu_name(const mag_ctx_t* ctx);
-extern   uint32_t mag_ctx_get_cpu_virtual_cores(const mag_ctx_t* ctx);
-extern   uint32_t mag_ctx_get_cpu_physical_cores(const mag_ctx_t* ctx);
-extern   uint32_t mag_ctx_get_cpu_sockets(const mag_ctx_t* ctx);
-extern   uint64_t mag_ctx_get_physical_memory_total(const mag_ctx_t* ctx);
-extern   uint64_t mag_ctx_get_physical_memory_free(const mag_ctx_t* ctx);
-extern   bool mag_ctx_is_numa_system(const mag_ctx_t* ctx);
-extern   size_t mag_ctx_get_total_tensors_created(const mag_ctx_t* ctx);
-extern   void mag_ctx_profile_start_recording(mag_ctx_t* ctx);
-extern   void mag_ctx_profile_stop_recording(mag_ctx_t* ctx, const char* export_csv_file);
-extern   void mag_ctx_destroy(mag_ctx_t* ctx);
+extern   mag_exec_mode_t mag_ctx_get_exec_mode(const mag_ctx_t* _ptr);
+extern   void mag_ctx_set_exec_mode(mag_ctx_t* _ptr, mag_exec_mode_t mode);
+extern   mag_prng_algorithm_t mag_ctx_get_prng_algorithm(const mag_ctx_t* _ptr);
+extern   void mag_ctx_set_prng_algorithm(mag_ctx_t* _ptr, mag_prng_algorithm_t algorithm, uint64_t seed);
+extern   mag_compute_device_type_t mag_ctx_get_compute_device_type(const mag_ctx_t* _ptr);
+extern   const char* mag_ctx_get_compute_device_name(const mag_ctx_t* _ptr);
+extern   const char* mag_ctx_get_os_name(const mag_ctx_t* _ptr);
+extern   const char* mag_ctx_get_cpu_name(const mag_ctx_t* _ptr);
+extern   uint32_t mag_ctx_get_cpu_virtual_cores(const mag_ctx_t* _ptr);
+extern   uint32_t mag_ctx_get_cpu_physical_cores(const mag_ctx_t* _ptr);
+extern   uint32_t mag_ctx_get_cpu_sockets(const mag_ctx_t* _ptr);
+extern   uint64_t mag_ctx_get_physical_memory_total(const mag_ctx_t* _ptr);
+extern   uint64_t mag_ctx_get_physical_memory_free(const mag_ctx_t* _ptr);
+extern   bool mag_ctx_is_numa_system(const mag_ctx_t* _ptr);
+extern   size_t mag_ctx_get_total_tensors_created(const mag_ctx_t* _ptr);
+extern   void mag_ctx_profile_start_recording(mag_ctx_t* _ptr);
+extern   void mag_ctx_profile_stop_recording(mag_ctx_t* _ptr, const char* export_csv_file);
+extern   void mag_ctx_destroy(mag_ctx_t* _ptr);
+typedef struct mag_tensor_t mag_tensor_t;
+typedef enum mag_dtype_t {
+MAG_DTYPE_F32,
+MAG_DTYPE__NUM
+} mag_dtype_t;
+typedef struct mag_dtype_meta_t {
+int64_t size;
+const char* name;
+} mag_dtype_meta_t;
 extern   const mag_dtype_meta_t* mag_dtype_meta_of(mag_dtype_t type);
-extern   const mag_op_meta_t* mag_op_meta_of(mag_op_t type);
 extern   uint32_t mag_pack_color_u8(uint8_t r, uint8_t g, uint8_t b);
 extern   uint32_t mag_pack_color_f32(float r, float g, float b);
-extern   mag_tensor_t* mag_tensor_create_1d(mag_ctx_t* ctx, mag_dtype_t type, int64_t d1);
-extern   mag_tensor_t* mag_tensor_create_2d(mag_ctx_t* ctx, mag_dtype_t type, int64_t d1, int64_t d2);
-extern   mag_tensor_t* mag_tensor_create_3d(mag_ctx_t* ctx, mag_dtype_t type, int64_t d1, int64_t d2, int64_t d3);
-extern   mag_tensor_t* mag_tensor_create_4d(mag_ctx_t* ctx, mag_dtype_t type, int64_t d1, int64_t d2, int64_t d3, int64_t d4);
-extern   mag_tensor_t* mag_tensor_create_5d(mag_ctx_t* ctx, mag_dtype_t type, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5);
-extern   mag_tensor_t* mag_tensor_create_6d(mag_ctx_t* ctx, mag_dtype_t type, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5, int64_t d6);
+typedef enum mag_graph_eval_order_t {
+MAG_GRAPH_EVAL_ORDER_FORWARD = 0,
+MAG_GRAPH_EVAL_ORDER_REVERSE = 1
+} mag_graph_eval_order_t;
+extern   mag_tensor_t* mag_tensor_create_1d(mag_ctx_t* _ptr, mag_dtype_t type, int64_t d1);
+extern   mag_tensor_t* mag_tensor_create_2d(mag_ctx_t* _ptr, mag_dtype_t type, int64_t d1, int64_t d2);
+extern   mag_tensor_t* mag_tensor_create_3d(mag_ctx_t* _ptr, mag_dtype_t type, int64_t d1, int64_t d2, int64_t d3);
+extern   mag_tensor_t* mag_tensor_create_4d(mag_ctx_t* _ptr, mag_dtype_t type, int64_t d1, int64_t d2, int64_t d3, int64_t d4);
+extern   mag_tensor_t* mag_tensor_create_5d(mag_ctx_t* _ptr, mag_dtype_t type, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5);
+extern   mag_tensor_t* mag_tensor_create_6d(mag_ctx_t* _ptr, mag_dtype_t type, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5, int64_t d6);
 extern   mag_tensor_t* mag_clone(mag_tensor_t* x);
 extern   mag_tensor_t* mag_view(mag_tensor_t* x);
 extern   mag_tensor_t* mag_transpose(mag_tensor_t* x);
@@ -170,8 +194,7 @@ extern   mag_ctx_t* mag_tensor_get_ctx(const mag_tensor_t* t);
 extern   void* mag_tensor_get_user_data(const mag_tensor_t* t);
 extern   void mag_tensor_set_user_data(mag_tensor_t* t, void* ud);
 extern   void mag_tensor_save(const mag_tensor_t* t, const char* file);
-extern   mag_tensor_t* mag_tensor_load(mag_ctx_t* ctx, const char* file);
-extern   mag_tensor_t* mag_tensor_load_image(mag_ctx_t* ctx, const char* file, mag_color_channels_t channels, uint32_t resize_w, uint32_t resize_h);
+extern   mag_tensor_t* mag_tensor_load(mag_ctx_t* _ptr, const char* file);
+extern   mag_tensor_t* mag_tensor_load_image(mag_ctx_t* _ptr, const char* file, mag_color_channels_t channels, uint32_t resize_w, uint32_t resize_h);
 extern   void mag_tensor_save_image(const mag_tensor_t* t, const char* file);
 '''
-

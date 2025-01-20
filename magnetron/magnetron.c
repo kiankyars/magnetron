@@ -1,4 +1,4 @@
-/* (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
+/* (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
 
 /*
 **
@@ -56,6 +56,10 @@
 #ifdef __linux__
 #include <linux/prctl.h>
 #include <sys/prctl.h>
+#ifdef __aarch64__
+#include <libc/sysv/consts/hwcap.h>
+#include <sys/auxv.h
+#endif
 #endif
 #endif
 
@@ -136,93 +140,23 @@ void mag_free_aligned(void* blk) {
 #include <stb_image_write.h>
 
 #if defined(__x86_64__) || defined(_M_X64)
-#define MAG_X86_64_CPUID_0H 0
-#define MAG_X86_64_CPUID_1H 1
-#define MAG_X86_64_CPUID_2H 2
-#define MAG_X86_64_CPUID_7H 3
-#define MAG_X86_64_CPUID_80000001H 4
-#define MAG_X86_64_CPUID_80000007H 5
-#define MAG_X86_64_CPUID_16H 6
-#define MAG_X86_64_CPUID_7H_1H 7
-#define MAG_X86_64_CPUID_EAX 0
-#define MAG_X86_64_CPUID_EBX 1
-#define MAG_X86_64_CPUID_ECX 2
-#define MAG_X86_64_CPUID_EDX 3
-
-#define mag_x86_64_feature_def(_, __) /* Enumerator | CPUDID Leaf | Register | Bit Index */\
-    _(AVX                  ,    1H,        ECX,     28)__\
-    _(AVX2                 ,    7H,        EBX,      5)__\
-    _(AVXVNNI              ,    7H_1H,     EAX,      4)__\
-    _(AVXVNNIINT8          ,    7H_1H,     EDX,      4)__\
-    _(AVXVNNIINT16         ,    7H_1H,     EDX,     10)__\
-    _(AVX512BW             ,    7H,        EBX,     30)__\
-    _(AVX512CD             ,    7H,        EBX,     28)__\
-    _(AVX512DQ             ,    7H,        EBX,     17)__\
-    _(AVX512ER             ,    7H,        EBX,     27)__\
-    _(AVX512F              ,    7H,        EBX,     16)__\
-    _(AVX512IFMA           ,    7H,        EBX,     21)__\
-    _(AVX512PF             ,    7H,        EBX,     26)__\
-    _(AVX512VBMI           ,    7H,        ECX,      1)__\
-    _(AVX512VL             ,    7H,        EBX,     31)__\
-    _(AVX512_4FMAPS        ,    7H,        EDX,      3)__\
-    _(AVX512_4VNNIW        ,    7H,        EDX,      2)__\
-    _(AVX512_FP16          ,    7H,        EDX,     23)__\
-    _(AVX512_BF16          ,    7H_1H,     EAX,      5)__\
-    _(AVX512_BITALG        ,    7H,        ECX,     12)__\
-    _(AVX512_VBMI2         ,    7H,        ECX,      6)__\
-    _(AVX512_VNNI          ,    7H,        ECX,     11)__\
-    _(AVX512_VP2INTERSECT  ,    7H,        EDX,      8)__\
-    _(AVX512_VPOPCNTDQ     ,    7H,        ECX,     14)__\
-    _(BMI                  ,    7H,        EBX,      3)__\
-    _(BMI2                 ,    7H,        EBX,      8)__\
-    _(F16C                 ,    1H,        ECX,     29)__\
-    _(FMA                  ,    1H,        ECX,     12)__\
-    _(FPU                  ,    1H,        EDX,      0)__\
-    _(GFNI                 ,    7H,        ECX,      8)__\
-    _(IA64                 ,    1H,        EDX,     30)__\
-    _(MMX                  ,    1H,        EDX,     23)__\
-    _(OSXSAVE              ,    1H,        ECX,     27)__\
-    _(PCLMUL               ,    1H,        ECX,      1)__\
-    _(RDRND                ,    1H,        ECX,     30)__\
-    _(RDSEED               ,    7H,        EBX,     18)__\
-    _(RDTSCP               ,    80000001H, EDX,     27)__\
-    _(SHA                  ,    7H,        EBX,     29)__\
-    _(SSE                  ,    1H,        EDX,     25)__\
-    _(SSE2                 ,    1H,        EDX,     26)__\
-    _(SSE3                 ,    1H,        ECX,      0)__\
-    _(SSE4_1               ,    1H,        ECX,     19)__\
-    _(SSE4_2               ,    1H,        ECX,     20)__\
-    _(SSSE3                ,    1H,        ECX,      9)__\
-    _(VAES                 ,    7H,        ECX,      9)__\
-    _(VME                  ,    1H,        EDX,      1)__\
-    _(VMX                  ,    1H,        ECX,      5)__\
-    _(VPCLMULQDQ           ,    7H,        ECX,     10)__\
-    _(XSAVE                ,    1H,        ECX,     26)__\
-    _(HYBRID_CPU           ,    7H,        EDX,     15)__
-
-#define _(enumerator, leaf, reg, bit) MAG_X86_64_FEATURE_##enumerator
-typedef enum mag_x86_64_feature_t {
-    mag_x86_64_feature_def(_, MAG_SEP)
-    MAG_X86_64_FEATURE__COUNT
-} mag_x86_64_feature_t;
-#undef _
 #define _(enumerator, leaf, reg, bit) #enumerator
-static const char* const mag_x86_64_feature_names[MAG_X86_64_FEATURE__COUNT] = {
+const char* const mag_x86_64_feature_names[MAG_X86_64_FEATURE__NUM] = {
     mag_x86_64_feature_def(_, MAG_SEP)
 };
 #undef _
 #define _(enumerator, leaf, reg, bit) (0xff&MAG_X86_64_CPUID_##leaf)
-static const uint8_t mag_x86_64_feature_leaves[MAG_X86_64_FEATURE__COUNT] = {
+const uint8_t mag_x86_64_feature_leaves[MAG_X86_64_FEATURE__NUM] = {
     mag_x86_64_feature_def(_, MAG_SEP)
 };
 #undef _
 #define _(enumerator, leaf, reg, bit) (0xff&MAG_X86_64_CPUID_##reg)
-static const uint8_t mag_x86_64_feature_regs[MAG_X86_64_FEATURE__COUNT] = {
+const uint8_t mag_x86_64_feature_regs[MAG_X86_64_FEATURE__NUM] = {
     mag_x86_64_feature_def(_, MAG_SEP)
 };
 #undef _
 #define _(enumerator, leaf, reg, bit) (1u<<(bit))
-static const uint32_t msml__x86_64_feature_masks[MAG_X86_64_FEATURE__COUNT] = {
+const uint32_t mag_x86_64_feature_masks[MAG_X86_64_FEATURE__NUM] = {
     mag_x86_64_feature_def(_, MAG_SEP)
 };
 #undef _
@@ -448,196 +382,6 @@ static double* mag_chebyshev_setup(double (*f)(double), double a, double b, uint
     return r;
 }
 
-#if defined(__aarch64__) && defined(__ARM_FEATURE_CRC32) && defined(__ARM_FEATURE_CRYPTO)
-static uint64x2_t MAG_AINLINE mag_clmul_lo_e(uint64x2_t a, uint64x2_t b, uint64x2_t c) {
-    register uint64x2_t r;
-    __asm__ __volatile__(
-        "pmull %0.1q, %2.1d, %3.1d\n"
-        "eor %0.16b, %0.16b, %1.16b\n"
-        : "=w"(r), "+w"(c) : "w"(a), "w"(b)
-    );
-    return r;
-}
-static uint64x2_t MAG_AINLINE mag_clmul_hi_e(uint64x2_t a, uint64x2_t b, uint64x2_t c) {
-    register uint64x2_t r;
-    __asm__ __volatile__(
-        "pmull2 %0.1q, %2.2d, %3.2d\n"
-        "eor %0.16b, %0.16b, %1.16b\n"
-        : "=w"(r), "+w"(c) : "w"(a), "w"(b)
-    );
-    return r;
-}
-#elif defined(__x86_64__) || defined(_M_X64)
-static uint32_t mag_xnmodp(uint64_t n) {
-    uint64_t stack = ~(uint64_t)1;
-    uint32_t low;
-    for (; n > 191; n = (n>>1) - 16) stack = (stack<<1) + (n & 1);
-    stack = ~stack;
-    uint32_t acc = 0x80000000 >> (n & 31);
-    for (n >>= 5; n; --n) acc = _mm_crc32_u32(acc, 0);
-    while (low = stack & 1, stack >>= 1) {
-        __m128i x = _mm_cvtsi32_si128(acc);
-        uint64_t y = _mm_cvtsi128_si64(_mm_clmulepi64_si128(x, x, 0));
-        acc = _mm_crc32_u64(0, y << low);
-    }
-    return acc;
-}
-static __m128i MAG_AINLINE mag_clmul_scalar(uint32_t a, uint32_t b) {
-    return _mm_clmulepi64_si128(_mm_cvtsi32_si128(a), _mm_cvtsi32_si128(b), 0);
-}
-static __m128i MAG_AINLINE mag_crc_shift(uint32_t crc, size_t sz) {
-    return mag_clmul_scalar(crc, mag_xnmodp((sz<<3) - 33));
-}
-#endif
-
-static uint32_t mag_crc32c(const void* buffer, size_t size) { /* Compute CRC32 checksum with CRC32c polynomial. */
-    if (mag_unlikely(!buffer || !size)) return 0;
-    const uint8_t* buf = (const uint8_t*)buffer;
-    #if defined(__aarch64__) && defined(__ARM_FEATURE_CRC32) && defined(__ARM_FEATURE_CRYPTO)
-        uint32_t crc = ~0;
-        for (; size && ((uintptr_t)buf & 7); --size) crc = __crc32cb(crc, *buf++);
-        if (((uintptr_t)buf & 8) && size >= 8) {
-            crc = __crc32cd(crc, *(const uint64_t*)buf);
-            buf += 8;
-            size -= 8;
-        }
-        if (size >= 192) { /* First vector chunk. */
-            uint64x2_t x0 = vld1q_u64((const uint64_t*)buf), y0;
-            uint64x2_t x1 = vld1q_u64((const uint64_t*)(buf+16)), y1;
-            uint64x2_t x2 = vld1q_u64((const uint64_t*)(buf+32)), y2;
-            uint64x2_t x3 = vld1q_u64((const uint64_t*)(buf+48)), y3;
-            uint64x2_t x4 = vld1q_u64((const uint64_t*)(buf+64)), y4;
-            uint64x2_t x5 = vld1q_u64((const uint64_t*)(buf+80)), y5;
-            uint64x2_t x6 = vld1q_u64((const uint64_t*)(buf+96)), y6;
-            uint64x2_t x7 = vld1q_u64((const uint64_t*)(buf+112)), y7;
-            uint64x2_t x8 = vld1q_u64((const uint64_t*)(buf+128)), y8;
-            uint64x2_t x9 = vld1q_u64((const uint64_t*)(buf+144)), y9;
-            uint64x2_t x10 = vld1q_u64((const uint64_t*)(buf+160)), y10;
-            uint64x2_t x11 = vld1q_u64((const uint64_t*)(buf+176)), y11;
-            uint64x2_t k;
-            { static const uint64_t mag_alignas(16) k_[] = {0xa87ab8a8, 0xab7aff2a}; k = vld1q_u64(k_); }
-            x0 = veorq_u64((uint64x2_t){crc, 0}, x0);
-            buf += 192;
-            size -= 192;
-            while (size >= 192) { /* Work loop. */
-                y0 = mag_clmul_lo_e(x0, k, vld1q_u64((const uint64_t*)buf)), x0 = mag_clmul_hi_e(x0, k, y0);
-                y1 = mag_clmul_lo_e(x1, k, vld1q_u64((const uint64_t*)(buf+16))), x1 = mag_clmul_hi_e(x1, k, y1);
-                y2 = mag_clmul_lo_e(x2, k, vld1q_u64((const uint64_t*)(buf+32))), x2 = mag_clmul_hi_e(x2, k, y2);
-                y3 = mag_clmul_lo_e(x3, k, vld1q_u64((const uint64_t*)(buf+48))), x3 = mag_clmul_hi_e(x3, k, y3);
-                y4 = mag_clmul_lo_e(x4, k, vld1q_u64((const uint64_t*)(buf+64))), x4 = mag_clmul_hi_e(x4, k, y4);
-                y5 = mag_clmul_lo_e(x5, k, vld1q_u64((const uint64_t*)(buf+80))), x5 = mag_clmul_hi_e(x5, k, y5);
-                y6 = mag_clmul_lo_e(x6, k, vld1q_u64((const uint64_t*)(buf+96))), x6 = mag_clmul_hi_e(x6, k, y6);
-                y7 = mag_clmul_lo_e(x7, k, vld1q_u64((const uint64_t*)(buf+112))), x7 = mag_clmul_hi_e(x7, k, y7);
-                y8 = mag_clmul_lo_e(x8, k, vld1q_u64((const uint64_t*)(buf+128))), x8 = mag_clmul_hi_e(x8, k, y8);
-                y9 = mag_clmul_lo_e(x9, k, vld1q_u64((const uint64_t*)(buf+144))), x9 = mag_clmul_hi_e(x9, k, y9);
-                y10 = mag_clmul_lo_e(x10, k, vld1q_u64((const uint64_t*)(buf+160))), x10 = mag_clmul_hi_e(x10, k, y10);
-                y11 = mag_clmul_lo_e(x11, k, vld1q_u64((const uint64_t*)(buf+176))), x11 = mag_clmul_hi_e(x11, k, y11);
-                buf += 192;
-                size -= 192;
-            }
-            /* Reduce x0 ... x11 to just x0. */
-            { static const uint64_t mag_alignas(16) k_[] = {0xf20c0dfe, 0x493c7d27}; k = vld1q_u64(k_); }
-            y0 = mag_clmul_lo_e(x0, k, x1), x0 = mag_clmul_hi_e(x0, k, y0);
-            y2 = mag_clmul_lo_e(x2, k, x3), x2 = mag_clmul_hi_e(x2, k, y2);
-            y4 = mag_clmul_lo_e(x4, k, x5), x4 = mag_clmul_hi_e(x4, k, y4);
-            y6 = mag_clmul_lo_e(x6, k, x7), x6 = mag_clmul_hi_e(x6, k, y6);
-            y8 = mag_clmul_lo_e(x8, k, x9), x8 = mag_clmul_hi_e(x8, k, y8);
-            y10 = mag_clmul_lo_e(x10, k, x11), x10 = mag_clmul_hi_e(x10, k, y10);
-            { static const uint64_t mag_alignas(16) k_[] = {0x3da6d0cb, 0xba4fc28e}; k = vld1q_u64(k_); }
-            y0 = mag_clmul_lo_e(x0, k, x2), x0 = mag_clmul_hi_e(x0, k, y0);
-            y4 = mag_clmul_lo_e(x4, k, x6), x4 = mag_clmul_hi_e(x4, k, y4);
-            y8 = mag_clmul_lo_e(x8, k, x10), x8 = mag_clmul_hi_e(x8, k, y8);
-            { static const uint64_t mag_alignas(16) k_[] = {0x740eef02, 0x9e4addf8}; k = vld1q_u64(k_); }
-            y0 = mag_clmul_lo_e(x0, k, x4), x0 = mag_clmul_hi_e(x0, k, y0);
-            x4 = x8;
-            y0 = mag_clmul_lo_e(x0, k, x4), x0 = mag_clmul_hi_e(x0, k, y0);
-            /* Reduce 128 bits to 32 bits, and multiply by x^32. */
-            crc = __crc32cd(0, vgetq_lane_u64(x0, 0));
-            crc = __crc32cd(crc, vgetq_lane_u64(x0, 1));
-        }
-        for (; size >= 8; buf += 8, size -= 8) crc = __crc32cd(crc, *(const uint64_t*)buf);
-        for (; size; --size) crc = __crc32cb(crc, *buf++);
-        return ~crc;
-    #elif defined(__x86_64__) || defined(_M_X64)
-        uint32_t crc = ~0;
-        for (; size && ((uintptr_t)buf & 7); --size) crc = _mm_crc32_u8(crc, *buf++);
-        if (size >= 32) {
-            size_t klen = ((size - 8) / 24)<<3;
-            uint32_t crc1 = 0;
-            uint32_t crc2 = 0;
-            /* Main loop. */
-            do {
-                crc = _mm_crc32_u64(crc, *(const uint64_t*)buf);
-                crc1 = _mm_crc32_u64(crc1, *(const uint64_t*)(buf + klen));
-                crc2 = _mm_crc32_u64(crc2, *(const uint64_t*)(buf + (klen<<1)));
-                buf += 8;
-                size -= 24;
-            } while (size >= 32);
-            __m128i vc0 = mag_crc_shift(crc, (klen << 1) + 8);
-            __m128i vc1 = mag_crc_shift(crc1, klen + 8);
-            uint64_t vc = _mm_extract_epi64(_mm_xor_si128(vc0, vc1), 0);
-            /* Final 8 bytes. */
-            buf += klen<<1;
-            crc = crc2;
-            crc = _mm_crc32_u64(crc, *(const uint64_t*)buf ^ vc), buf += 8;
-            size -= 8;
-        }
-        for (; size >= 8; buf += 8, size -= 8) crc = _mm_crc32_u64(crc, *(const uint64_t*)buf);
-        for (; size; --size) crc = _mm_crc32_u8(crc, *buf++);
-        return ~crc;
-    #else
-        static const uint32_t crc_lut[256] = {
-            0x00000000, 0xf26b8303, 0xe13b70f7, 0x1350f3f4, 0xc79a971f, 0x35f1141c,
-            0x26a1e7e8, 0xd4ca64eb, 0x8ad958cf, 0x78b2dbcc, 0x6be22838, 0x9989ab3b,
-            0x4d43cfd0, 0xbf284cd3, 0xac78bf27, 0x5e133c24, 0x105ec76f, 0xe235446c,
-            0xf165b798, 0x030e349b, 0xd7c45070, 0x25afd373, 0x36ff2087, 0xc494a384,
-            0x9a879fa0, 0x68ec1ca3, 0x7bbcef57, 0x89d76c54, 0x5d1d08bf, 0xaf768bbc,
-            0xbc267848, 0x4e4dfb4b, 0x20bd8ede, 0xd2d60ddd, 0xc186fe29, 0x33ed7d2a,
-            0xe72719c1, 0x154c9ac2, 0x061c6936, 0xf477ea35, 0xaa64d611, 0x580f5512,
-            0x4b5fa6e6, 0xb93425e5, 0x6dfe410e, 0x9f95c20d, 0x8cc531f9, 0x7eaeb2fa,
-            0x30e349b1, 0xc288cab2, 0xd1d83946, 0x23b3ba45, 0xf779deae, 0x05125dad,
-            0x1642ae59, 0xe4292d5a, 0xba3a117e, 0x4851927d, 0x5b016189, 0xa96ae28a,
-            0x7da08661, 0x8fcb0562, 0x9c9bf696, 0x6ef07595, 0x417b1dbc, 0xb3109ebf,
-            0xa0406d4b, 0x522bee48, 0x86e18aa3, 0x748a09a0, 0x67dafa54, 0x95b17957,
-            0xcba24573, 0x39c9c670, 0x2a993584, 0xd8f2b687, 0x0c38d26c, 0xfe53516f,
-            0xed03a29b, 0x1f682198, 0x5125dad3, 0xa34e59d0, 0xb01eaa24, 0x42752927,
-            0x96bf4dcc, 0x64d4cecf, 0x77843d3b, 0x85efbe38, 0xdbfc821c, 0x2997011f,
-            0x3ac7f2eb, 0xc8ac71e8, 0x1c661503, 0xee0d9600, 0xfd5d65f4, 0x0f36e6f7,
-            0x61c69362, 0x93ad1061, 0x80fde395, 0x72966096, 0xa65c047d, 0x5437877e,
-            0x4767748a, 0xb50cf789, 0xeb1fcbad, 0x197448ae, 0x0a24bb5a, 0xf84f3859,
-            0x2c855cb2, 0xdeeedfb1, 0xcdbe2c45, 0x3fd5af46, 0x7198540d, 0x83f3d70e,
-            0x90a324fa, 0x62c8a7f9, 0xb602c312, 0x44694011, 0x5739b3e5, 0xa55230e6,
-            0xfb410cc2, 0x092a8fc1, 0x1a7a7c35, 0xe811ff36, 0x3cdb9bdd, 0xceb018de,
-            0xdde0eb2a, 0x2f8b6829, 0x82f63b78, 0x709db87b, 0x63cd4b8f, 0x91a6c88c,
-            0x456cac67, 0xb7072f64, 0xa457dc90, 0x563c5f93, 0x082f63b7, 0xfa44e0b4,
-            0xe9141340, 0x1b7f9043, 0xcfb5f4a8, 0x3dde77ab, 0x2e8e845f, 0xdce5075c,
-            0x92a8fc17, 0x60c37f14, 0x73938ce0, 0x81f80fe3, 0x55326b08, 0xa759e80b,
-            0xb4091bff, 0x466298fc, 0x1871a4d8, 0xea1a27db, 0xf94ad42f, 0x0b21572c,
-            0xdfeb33c7, 0x2d80b0c4, 0x3ed04330, 0xccbbc033, 0xa24bb5a6, 0x502036a5,
-            0x4370c551, 0xb11b4652, 0x65d122b9, 0x97baa1ba, 0x84ea524e, 0x7681d14d,
-            0x2892ed69, 0xdaf96e6a, 0xc9a99d9e, 0x3bc21e9d, 0xef087a76, 0x1d63f975,
-            0x0e330a81, 0xfc588982, 0xb21572c9, 0x407ef1ca, 0x532e023e, 0xa145813d,
-            0x758fe5d6, 0x87e466d5, 0x94b49521, 0x66df1622, 0x38cc2a06, 0xcaa7a905,
-            0xd9f75af1, 0x2b9cd9f2, 0xff56bd19, 0x0d3d3e1a, 0x1e6dcdee, 0xec064eed,
-            0xc38d26c4, 0x31e6a5c7, 0x22b65633, 0xd0ddd530, 0x0417b1db, 0xf67c32d8,
-            0xe52cc12c, 0x1747422f, 0x49547e0b, 0xbb3ffd08, 0xa86f0efc, 0x5a048dff,
-            0x8ecee914, 0x7ca56a17, 0x6ff599e3, 0x9d9e1ae0, 0xd3d3e1ab, 0x21b862a8,
-            0x32e8915c, 0xc083125f, 0x144976b4, 0xe622f5b7, 0xf5720643, 0x07198540,
-            0x590ab964, 0xab613a67, 0xb831c993, 0x4a5a4a90, 0x9e902e7b, 0x6cfbad78,
-            0x7fab5e8c, 0x8dc0dd8f, 0xe330a81a, 0x115b2b19, 0x020bd8ed, 0xf0605bee,
-            0x24aa3f05, 0xd6c1bc06, 0xc5914ff2, 0x37faccf1, 0x69e9f0d5, 0x9b8273d6,
-            0x88d28022, 0x7ab90321, 0xae7367ca, 0x5c18e4c9, 0x4f48173d, 0xbd23943e,
-            0xf36e6f75, 0x0105ec76, 0x12551f82, 0xe03e9c81, 0x34f4f86a, 0xc69f7b69,
-            0xd5cf889d, 0x27a40b9e, 0x79b737ba, 0x8bdcb4b9, 0x988c474d, 0x6ae7c44e,
-            0xbe2da0a5, 0x4c4623a6, 0x5f16d052, 0xad7d5351
-        };
-        uint32_t crc = ~0u;
-        for (size_t i=0; i < size; ++i)
-            crc = (crc >> 8) ^ crc_lut[buf[i] ^ (crc & 0xff)];
-        return ~crc;
-    #endif
-}
-
 static bool MAG_AINLINE mag_imull64_ov(int64_t a, int64_t b, int64_t* out) { /* Performs c = a*b with overflow checking. Returns true on overflow, else false. */
     #ifdef _MSC_VER
     #ifdef _M_ARM64
@@ -729,16 +473,6 @@ static void mag_prng_init(mag_ctx_t* ctx, uint64_t seed) {
     }
 }
 
-#if defined(__x86_64__) || defined(_M_X64)
-static bool mag_ctx_x86_64_cpu_has_feature(const mag_ctx_t* ctx, mag_x86_64_feature_t feature) {
-    const uint8_t (*leafs)[49] = &mag_x86_64_feature_leaves;
-    const uint8_t (*regs)[49] = &mag_x86_64_feature_regs;
-    const uint32_t (*features)[8][4] = &ctx->sys.x86_64_cpu_features;
-    const uint32_t (*masks)[49] = &msml__x86_64_feature_masks;
-    return (*features)[(*leafs)[feature]][(*regs)[feature]] & (*masks)[feature];
-}
-#endif
-
 static void mag_system_host_info_query(mag_ctx_t* ctx); /* Query host system information. */
 static void mag_system_host_info_dump(mag_ctx_t* ctx) {
     mag_log_info("OS/Kernel: %s", ctx->sys.os_name);
@@ -754,7 +488,7 @@ static void mag_system_host_info_dump(mag_ctx_t* ctx) {
     #if defined(__x86_64__) || defined(_M_X64) /* Print CPU features for x86-64 platforms. */
         if (mag_log_enabled) {
             printf("CPU Features:");
-            for (uint32_t i=0, k=0; i < MAG_X86_64_FEATURE__COUNT; ++i) {
+            for (uint32_t i=0, k=0; i < MAG_X86_64_FEATURE__NUM; ++i) {
                 if (mag_ctx_x86_64_cpu_has_feature(ctx, i)) {
                     if ((k++ & 7) == 0) printf("\n\t");
                     printf("%s ", mag_x86_64_feature_names[i]);
@@ -808,7 +542,7 @@ mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
     mag_ctx_dump_compiler_info(); /* Dump compiler info. */
 
     /* Initialize context with default values or from context info. */
-    mag_ctx_t* ctx = (mag_ctx_t*)(*mag_alloc)(NULL, sizeof(*ctx)); /* Allocate context. */
+    mag_ctx_t* ctx = (*mag_alloc)(NULL, sizeof(*ctx)); /* Allocate context. */
     memset(ctx, 0, sizeof(*ctx));
 
     /* Init allocators */
@@ -1066,7 +800,7 @@ void mag_ctx_profile_stop_recording(mag_ctx_t* ctx, const char* export_csv_file)
         printf("CPU: %s, Virtual Cores: %u, Physical Cores: %u, Sockets: %u\n", ctx->sys.cpu_name, ctx->sys.cpu_virtual_cores, ctx->sys.cpu_physical_cores, ctx->sys.cpu_sockets);
         #if defined(__x86_64__) || defined(_M_X64) /* Print CPU features for x86-64 platforms. */
         printf("CPU Features:");
-        for (unsigned i=0, k=0; i < MAG_X86_64_FEATURE__COUNT; ++i) {
+        for (unsigned i=0, k=0; i < MAG_X86_64_FEATURE__NUM; ++i) {
             if (mag_ctx_x86_64_cpu_has_feature(ctx, i)) {
                 if (k++ % 8 == 0) printf("\n\t");
                 printf("%s ", mag_x86_64_feature_names[i]);
@@ -1154,19 +888,7 @@ const mag_dtype_meta_t* mag_dtype_meta_of(mag_dtype_t type) {
     return &infos[type];
 }
 
-/*
-**  validation error print template
-**
-**
-printf("SHORT ERROR DESCRIPTION"
-        "ERROR: Failed to execute operation: %s.\n"
-        "    - Input Tensor 1 '%s': MISMATCHES\n"
-        "    - Input Tensor 2 '%s': MISMATCHES\n"
-        "    Hint: ANY HINT FOR USR."
-);
-*/
-
-static bool mag_validate_inputs(mag_op_t op, mag_tensor_t** inputs, uint32_t numin) {
+static bool mag_check_are_inputs_valid(mag_op_t op, mag_tensor_t** inputs, uint32_t numin) {
     const mag_op_meta_t* meta = mag_op_meta_of(op);
     if (mag_unlikely(meta->argcount != numin || numin > MAG_MAX_INPUT_TENSORS)) {
         mag_print_separator(stderr);
@@ -1199,7 +921,7 @@ static bool mag_validate_inputs(mag_op_t op, mag_tensor_t** inputs, uint32_t num
     return true;
 }
 
-static bool mag_validate_op_params(mag_op_t op, const mag_op_param_t* params, uint32_t numparams) {
+static bool mag_check_are_op_params_valid(mag_op_t op, const mag_op_param_t* params, uint32_t numparams) {
     const mag_op_meta_t* meta = mag_op_meta_of(op);
     if (!meta->paramcount) return true; /* No parameters to validate. */
     if (mag_unlikely(meta->paramcount != numparams || numparams > MAG_MAX_OP_PARAMS)) {
@@ -1244,7 +966,7 @@ static bool mag_validate_op_params(mag_op_t op, const mag_op_param_t* params, ui
     return true;
 }
 
-static bool mag_validate_shape_eq(mag_op_t op, const mag_tensor_t* a, const mag_tensor_t* b) {
+static bool mag_check_is_shape_eq(mag_op_t op, const mag_tensor_t* a, const mag_tensor_t* b) {
     const mag_op_meta_t* meta = mag_op_meta_of(op);
     if (mag_likely(mag_tensor_is_shape_eq(a, b))) return true;
     mag_print_separator(stderr);
@@ -1254,10 +976,10 @@ static bool mag_validate_shape_eq(mag_op_t op, const mag_tensor_t* a, const mag_
     mag_fmt_dims(&shape_2, &b->shape, b->rank);
     fprintf(stderr,
         "Failed to execute operation: %s.\n"
-        "ERROR: Input tensor shapes must be equal.\n"
-        "    - Input Tensor 1 '%s' Shape: %s\n"
-        "    - Input Tensor 2 '%s' Shape: %s\n"
-        "    Hint: Adjust tensor shapes using transposition or permutation.\n",
+        "ERROR: Tensor shapes must be equal.\n"
+        "    - Tensor 1 '%s' Shape: %s\n"
+        "    - Tensor 2 '%s' Shape: %s\n"
+        "    Hint: Adjust tensor shapes using transpose() or permute().\n",
         meta->mnemonic,
         a->name, shape_1,
         b->name, shape_2
@@ -1268,7 +990,7 @@ static bool mag_validate_shape_eq(mag_op_t op, const mag_tensor_t* a, const mag_
     return false;
 }
 
-static bool mag_validate_shape_broadcastable(mag_op_t op, const mag_tensor_t* a, const mag_tensor_t* b) { /* Check if tensor shapes are broadcast-able. (b into a) */
+static bool mag_check_is_shape_broadcastable(mag_op_t op, const mag_tensor_t* a, const mag_tensor_t* b) { /* Check if tensor shapes are broadcast-able. (b into a) */
     const mag_op_meta_t* meta = mag_op_meta_of(op);
     if (mag_likely(mag_tensor_can_broadcast(b, a))) return true;
     mag_print_separator(stderr);
@@ -1290,7 +1012,7 @@ static bool mag_validate_shape_broadcastable(mag_op_t op, const mag_tensor_t* a,
         "    - Input Tensor 1 '%s' Shape: %s\n"
         "    - Input Tensor 2 '%s' Shape: %s\n"
         "    Broadcast-able: %s\n"
-        "    Hint: Adjust tensor shapes using transposition or permutation.\n",
+        "    Hint: Adjust tensor shapes using transpose() or permute().\n",
         meta->mnemonic,
         a->name, shape_1,
         b->name, shape_2,
@@ -1302,25 +1024,65 @@ static bool mag_validate_shape_broadcastable(mag_op_t op, const mag_tensor_t* a,
     return false;
 }
 
-#define mag_validate_expr_gen(expr, message, ...) \
-    if (mag_unlikely(!(expr))) { \
-        if (1) { \
-           mag_log_error(message, ## __VA_ARGS__); \
-        } \
-        return false; \
-    }
+static bool mag_check_is_shape_matmulable(mag_op_t op, const mag_tensor_t* a, const mag_tensor_t* b) { /* Check if tensor shapes are broadcast-able. (b into a) */
+    const mag_op_meta_t* meta = mag_op_meta_of(op);
+    if (mag_likely(a->shape[1] == b->shape[0])) return true;
+    bool valid_dims = true;
+    for (uint32_t i=2; i < MAG_MAX_DIMS; ++i)
+        valid_dims &= a->shape[i] == 1 && b->shape[i] == 1;
+    if (mag_likely(valid_dims)) return true;
+
+    mag_print_separator(stderr);
+    char shape_1[MAG_FMT_DIM_BUF_SIZE];
+    char shape_2[MAG_FMT_DIM_BUF_SIZE];
+    mag_fmt_dims(&shape_1, &a->shape, a->rank);
+    mag_fmt_dims(&shape_2, &b->shape, b->rank);
+    fprintf(stderr,
+        "Failed to execute operation: %s.\n"
+        "ERROR: Input tensor shapes are not compatible for matrix multiplication. The rows of the first tensor must match the columns of the second tensor.\n"
+        "    - Input Tensor 1 '%s' Shape: %s\n"
+        "    - Input Tensor 2 '%s' Shape: %s\n"
+        "    Hint: Adjust tensor shapes using transpose() or permute().\n",
+        meta->mnemonic,
+        a->name, shape_1,
+        b->name, shape_2
+    );
+    mag_print_separator(stderr);
+    fputc('\n', stderr);
+    fflush(stderr);
+    return false;
+}
+
+static bool mag_check_is_contiguous(mag_op_t op, const mag_tensor_t* a) {
+    const mag_op_meta_t* meta = mag_op_meta_of(op);
+    if (mag_likely(mag_tensor_is_contiguous(a))) return true;
+    mag_print_separator(stderr);
+    char shape[MAG_FMT_DIM_BUF_SIZE];
+    mag_fmt_dims(&shape, &a->shape, a->rank);
+    fprintf(stderr,
+        "Failed to execute operation: %s.\n"
+        "ERROR: Tensor '%s' must be contiguous. Shape: %s\n"
+        "    Hint: Make tensor contiguous using clone().\n",
+        meta->mnemonic,
+        a->name,
+        shape
+    );
+    mag_print_separator(stderr);
+    fputc('\n', stderr);
+    fflush(stderr);
+    return false;
+}
 
 static bool mag_validate_op_unary(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
-    if (mag_unlikely(!mag_validate_shape_eq(op, result, inputs[0]))) return false;
-    return true;
+   return mag_check_is_shape_eq(op, result, inputs[0]);
 }
 
 static bool mag_validate_op_binary(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
-    if (mag_unlikely(!mag_validate_shape_eq(op, result, inputs[0]))) return false;
-    if (mag_unlikely(!mag_validate_shape_broadcastable(op, inputs[0], inputs[1]))) return false;
-    mag_validate_expr_gen(mag_tensor_is_contiguous(result), "Result must be contiguous.");
-    mag_validate_expr_gen(mag_tensor_is_contiguous(inputs[0]), "First tensor must be contiguous.");
-    return true;
+    bool valid = true;
+    valid = valid && mag_check_is_shape_eq(op, result, inputs[0]);
+    valid = valid && mag_check_is_shape_broadcastable(op, inputs[0], inputs[1]);
+    valid = valid && mag_check_is_contiguous(op, result);
+    return valid;
 }
 
 static bool mag_validate_op_transpose(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
@@ -1328,42 +1090,35 @@ static bool mag_validate_op_transpose(mag_op_t op, mag_tensor_t* result, mag_ten
 }
 
 static bool mag_validate_op_scalar(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
-    mag_validate_expr_gen(mag_tensor_is_contiguous(inputs[0]), "Mean"); /* TODO */
-    mag_validate_expr_gen(result->shape[0] == 1, "Mean");
-    mag_validate_expr_gen(result->shape[1] == inputs[0]->shape[1], "Mean");
-    mag_validate_expr_gen(result->shape[2] == inputs[0]->shape[2], "Mean");
-    mag_validate_expr_gen(result->shape[3] == inputs[0]->shape[3], "Mean");
-    return true;
+    return mag_check_is_contiguous(op, inputs[0]);
 }
 
 static bool mag_validate_op_matmul(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
-    mag_validate_expr_gen(inputs[0]->shape[1] == inputs[1]->shape[0], "Input tensor shapes must be compatible for matrix multiplication.");
-    mag_validate_expr_gen(mag_tensor_is_contiguous(inputs[0]), "First tensor must be contiguous.");
-    mag_validate_expr_gen(mag_tensor_is_contiguous(inputs[1]), "Second tensor must be contiguous.");
-    mag_validate_expr_gen(inputs[1]->shape[2] % inputs[0]->shape[2] == 0, "Result tensor shape mismatch.");
-    mag_validate_expr_gen(inputs[1]->shape[3] % inputs[0]->shape[3] == 0, "Result tensor shape mismatch.");
-    return true;
+    bool valid = true;
+    valid = valid && mag_check_is_shape_matmulable(op, inputs[0], inputs[1]);
+    valid = valid && mag_check_is_contiguous(op, inputs[0]);
+    valid = valid && mag_check_is_contiguous(op, inputs[1]);
+    return valid;
 }
 
 static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const int64_t* dims, int64_t rank, mag_tensor_t* view, size_t view_offs);
 
 static mag_tensor_t* mag_result_constructor_routine_isomorph(mag_tensor_t** inputs, const mag_op_param_t* params) {
     (void)params;
-    return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, inputs[0]->shape, inputs[0]->rank, NULL, 0);
+    mag_tensor_t* base = *inputs;
+    return mag_tensor_create(base->ctx, base->dtype, base->shape, base->rank, NULL, 0);
 }
 
 static mag_tensor_t* mag_result_constructor_routine_view(mag_tensor_t** inputs,  const mag_op_param_t* params) {
     (void)params;
-    return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, inputs[0]->shape, MAG_MAX_DIMS, inputs[0], 0);
+    mag_tensor_t* base = *inputs;
+    return mag_tensor_create(base->ctx, base->dtype, base->shape, base->rank, base, 0);
 }
 
 static mag_tensor_t* mag_result_constructor_routine_scalar(mag_tensor_t** inputs,  const mag_op_param_t* params) {
-    int64_t shape[MAG_MAX_DIMS];
-    *shape = 1;
-    #pragma GCC unroll 5
-    for (uint32_t i=1; i < MAG_MAX_DIMS; ++i)
-        shape[i] = inputs[0]->shape[i];
-    return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, shape, MAG_MAX_DIMS, NULL, 0);
+    mag_tensor_t* base = *inputs;
+    int64_t shape = 1;
+    return mag_tensor_create(base->ctx, base->dtype, &shape, shape, NULL, 0);
 }
 
 static mag_tensor_t* mag_result_constructor_routine_transposed(mag_tensor_t** inputs,  const mag_op_param_t* params) {
@@ -1379,12 +1134,11 @@ static mag_tensor_t* mag_result_constructor_routine_permuted(mag_tensor_t** inpu
     uint32_t axes[MAG_MAX_DIMS];
     for (uint32_t i = 0; i < MAG_MAX_DIMS; ++i) /* Unpack axes */
         axes[i] = params[i].x.u32;
-    for (uint32_t i = 0; i < MAG_MAX_DIMS; ++i) { /* Check that all axes are unique */
+    for (uint32_t i = 0; i < MAG_MAX_DIMS; ++i) /* Check that all axes are unique */
         for (uint32_t j = i+1; j < MAG_MAX_DIMS; ++j)
             mag_assert(axes[i] != axes[j], "Axes must be unique: %zu != %zu", axes[i], axes[j]);
-    }
     for (uint32_t i=0; i < MAG_MAX_DIMS; ++i) { /* Permute shape and strides */
-        mag_assert2(axes[i] >= 0 && axes[i] < MAG_MAX_DIMS);
+        mag_assert2(axes[i] < MAG_MAX_DIMS);
         permuted->shape[axes[i]] = inputs[0]->shape[i];
         permuted->strides[axes[i]] = inputs[0]->strides[i];
     }
@@ -1948,8 +1702,8 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
 ) {
     /* Validate inputs and params first */
     mag_assert2(op != MAG_OP_NOP);
-    mag_assert(inputs && mag_validate_inputs(op, inputs, numin), "Invalid input tensors for operation %s.", mag_op_meta_of(op)->mnemonic);
-    mag_assert(mag_validate_op_params(op, params, numparams), "Invalid parameters for operation %s.", mag_op_meta_of(op)->mnemonic);
+    mag_assert(inputs && mag_check_are_inputs_valid(op, inputs, numin), "Invalid input tensors for operation %s.", mag_op_meta_of(op)->mnemonic);
+    mag_assert(mag_check_are_op_params_valid(op, params, numparams), "Invalid parameters for operation %s.", mag_op_meta_of(op)->mnemonic);
 
     const mag_op_meta_t* meta = mag_op_meta_of(op);
     mag_graph_eval_order_t gra = MAG_GRA_FWD; /* TODO */
@@ -2981,6 +2735,11 @@ static void MAG_COLDPROC mag_system_host_info_query_memory(uint64_t* out_phys_me
         }
     }
     #undef mag_cpy_regs
+
+#elif defined(__aarch64__) && defined(__linux__)
+static void MAG_COLDPROC mag_system_info_query_arm64_cpu_features(long* hwcap) {
+    *hwcap = getauxval(AT_HWCAP);
+}
 #endif
 
 static void MAG_COLDPROC mag_system_host_info_query(mag_ctx_t* ctx) {
@@ -2990,6 +2749,8 @@ static void MAG_COLDPROC mag_system_host_info_query(mag_ctx_t* ctx) {
     mag_system_host_info_query_memory(&ctx->sys.phys_mem_total, &ctx->sys.phys_mem_free);
     #if defined(__x86_64__) || defined(_M_X64)
         mag_system_info_query_x86_64_cpu_features(&ctx->sys.x86_64_cpu_features);
+    #elif defined(__aarch64__) && defined(__linux__)
+        mag_system_info_query_arm64_cpu_features(&ctx->sys.cpu_arm64_hwcap);
     #endif
     if (mag_unlikely(!*ctx->sys.os_name)) snprintf(ctx->sys.os_name, sizeof(ctx->sys.os_name), "Unknown");
     if (mag_unlikely(!*ctx->sys.cpu_name)) snprintf(ctx->sys.cpu_name, sizeof(ctx->sys.cpu_name), "Unknown");

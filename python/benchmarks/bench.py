@@ -1,40 +1,92 @@
-# (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+# (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
-import time
+from bench_tool import (
+    benchmark, BenchParticipant,
+    generate_matmul_shapes, generate_elementwise_shapes, generate_square_shapes
+)
 
-class BenchInfo:
-    def __init__(self, flops: list[float]):
-        self.flops = flops
+import magnetron as mag
+import numpy as np
+import torch
 
-    def avg_flops(self) -> float:
-        return sum(self.flops) / len(self.flops)
+class NumpyBenchmark(BenchParticipant):
+    def __init__(self):
+        super().__init__('Numpy')
 
-    def avg_tflops(self) -> float:
-        return self.avg_flops() * 1e-12
+    def allocate_args(self, shape_a: tuple[int, int], shape_b: tuple[int, int]):
+        x = np.full(shape_a, fill_value=1.0, dtype=np.float32)
+        y = np.full(shape_b, fill_value=2.0, dtype=np.float32)
+        return x, y
 
-    def min_flops(self) -> float:
-        return min(self.flops)
+class PyTorchBenchmark(BenchParticipant):
+    def __init__(self):
+        super().__init__('PyTorch')
+        self.device = torch.device('cpu')
 
-    def min_tflops(self) -> float:
-        return min(self.flops) * 1e-12
+    def allocate_args(self, shape_a: tuple[int, int], shape_b: tuple[int, int]):
+        x = torch.full(shape_a, fill_value=1.0, dtype=torch.float32).to(self.device)
+        y = torch.full(shape_b, fill_value=2.0, dtype=torch.float32).to(self.device)
+        return x, y
 
-    def max_flops(self) -> float:
-        return max(self.flops)
+class MagnetronBenchmark(BenchParticipant):
+    def __init__(self):
+        super().__init__('Magnetron')
 
-    def max_tflops(self) -> float:
-        return max(self.flops) * 1e-12
+    def allocate_args(self, shape_a: tuple[int, int], shape_b: tuple[int, int]):
+        x = mag.Tensor.full(shape_a, fill_value=1.0, dtype=mag.DType.F32)
+        y = mag.Tensor.full(shape_b, fill_value=2.0, dtype=mag.DType.F32)
+        return x, y
 
-    def __str__(self) -> str:
-        return f'Average: {self.avg_tflops()} TFLOP/s\nMin: {self.min_tflops()} TFLOP/s\nMax: {self.max_tflops()} TFLOP/s'
+participants = [
+    MagnetronBenchmark(),
+    NumpyBenchmark(),
+    PyTorchBenchmark(),
+]
 
-def bench(dim: int, iters: int, a, b, func: callable) -> BenchInfo:
-    flop: int = 2*dim**3
-    flops: list[float] = []
-    for _ in range(iters):
-        st: float = time.monotonic()
-        _r = func(a, b)
-        et: float = time.monotonic()
-        s: float = et - st
-        flops.append(flop/s)
+elementwise_ops = [
+    ('Addition', lambda x, y: x + y),
+    ('Subtraction', lambda x, y: x - y),
+    ('Hadamard Product', lambda x, y: x * y),
+    ('Division', lambda x, y: x / y),
+]
 
-    return BenchInfo(flops)
+matmul_ops = [
+    ('Matrix Multiplication', lambda x, y: x @ y),
+]
+
+max_dim = 256
+square_step = 8
+all_step = max_dim // 4
+
+print('Running performance benchmark...')
+print('Magnetron VS')
+for participant in participants:
+    if not isinstance(participant, MagnetronBenchmark):
+        print(f'    {participant.name}')
+
+print('\nSquare Matrix Benchmarks (NxN):')
+square_shapes = generate_square_shapes(max_dim, square_step)
+for op in elementwise_ops:
+    name, fn = op
+    print(f'Benchmarking {name} Operator')
+    benchmark(name, participants, fn, square_shapes, plot_style='lines')
+
+for op in matmul_ops:
+    name, fn = op
+    print(f'Benchmarking {name} Operator')
+    benchmark(name, participants, fn, square_shapes, plot_style='lines')
+
+print('\nAll Shapes Benchmarks:')
+print('Elementwise Operations:')
+elementwise_shapes = generate_elementwise_shapes(max_dim, all_step)
+for op in elementwise_ops:
+    name, fn = op
+    print(f'Benchmarking {name} Operator')
+    benchmark(name, participants, fn, elementwise_shapes, plot_style='bars')
+
+print('\nMatrix Multiplication:')
+matmul_shapes = generate_matmul_shapes(max_dim, all_step)
+for op in matmul_ops:
+    name, fn = op
+    print(f'Benchmarking {name} Operator')
+    benchmark(name, participants, fn, matmul_shapes, plot_style='bars')

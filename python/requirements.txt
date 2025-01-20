@@ -4,3 +4,4 @@ setuptools
 pytest
 numpy
 matplotlib
+cycler

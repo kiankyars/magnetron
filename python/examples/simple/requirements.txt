@@ -1,4 +1,0 @@
-cffi
-matplotlib
-numpy
-opencv-python

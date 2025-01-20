@@ -1,4 +1,4 @@
-/* (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
+/* (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
 
 #ifndef MAGNETRON_INTERNAL_H
 #define MAGNETRON_INTERNAL_H
@@ -7,6 +7,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -253,10 +254,10 @@ defined(__WIN32__) || defined(__TOS_WIN__) || defined(__WINDOWS__)
 
 #ifdef __cpp_lib_hardware_interference_size
 /* Hardware destructive interference size. */
-#define MAG_HDI hardware_destructive_interference_size
+#define MAG_CACHE_LINE_SIZE hardware_destructive_interference_size
 #else
 /* Hardware destructive interference size. */
-#define MAG_HDI 64
+#define MAG_CACHE_LINE_SIZE 64
 #endif
 
 static uint32_t MAG_AINLINE mag_bswap32(uint32_t x) { /* Swap bytes for endianess switch. Should be optimized to a (bswap/rev) instruction on modern compilers. */
@@ -327,7 +328,7 @@ extern MAG_EXPORT uintptr_t mag_thread_id(void);
     }
 #define mag_assert2(expr) mag_assert(expr, "")
 
-#ifdef MAG_DEBUG
+#if defined(MAG_DEBUG) || (!defined(NDEBUG) && !NDEBUG)
 #define mag_bnd_chk(ptr, base, n) \
     mag_assert((uintptr_t)(ptr) >= (uintptr_t)(base) && (uintptr_t)(ptr) < (uintptr_t)(base) + (n), \
         "\nBound check failed: %p not in [%p, %p), base+0x%x, end+0x%x", \
@@ -337,8 +338,12 @@ extern MAG_EXPORT uintptr_t mag_thread_id(void);
         (int)llabs((long long)((int64_t)(ptr)-(int64_t)(base))), \
         (int)llabs((long long)(((int64_t)(base)+(n))-(int64_t)(ptr))) \
     )
+#define mag_dassert mag_assert
+#define mag_dassert2 mag_assert2
 #else
 #define mag_bnd_chk(ptr, base, n)
+#define mag_dassert(...)
+#define mag_dassert2(...)
 #endif
 
 /* Increment pointer or size with correct type alignment. */
@@ -355,17 +360,16 @@ typedef DWORD mag_thread_ret_t;
 
 typedef HANDLE mag_thread_t;
 
-static int mag_thread_create(mag_thread_t* out, void* unused, mag_thread_ret_t (*f)(void*), void* arg) { /* WIN32 -> pthread style wrapper. */
+static void mag_thread_create(mag_thread_t* out, mag_thread_ret_t (*f)(void*), void* arg) { /* WIN32 -> pthread style wrapper. */
     HANDLE handle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)f, arg, 0, NULL);
-    if (mag_unlikely(!handle)) return EAGAIN;
+    mag_assert2(handle != 0);
     *out = handle;
-    return 0;
 }
 
-static int mag_thread_join(mag_thread_t th, void* unused) { /* WIN32 -> pthread style wrapper. */
+static void mag_thread_join(mag_thread_t th) { /* WIN32 -> pthread style wrapper. */
     int ret = (int)WaitForSingleObject(th, INFINITE);
     CloseHandle(th);
-    return ret;
+    mag_assert2(ret == 0);
 }
 
 typedef SRWLOCK mag_mutex_t;
@@ -387,21 +391,21 @@ typedef void* mag_thread_ret_t;
 #define MAG_THREAD_RET_NONE NULL
 
 typedef pthread_t mag_thread_t;
-#define mag_thread_create pthread_create
-#define mag_thread_join pthread_join
+#define mag_thread_create(out, fn, arg) mag_assert2(pthread_create((out), NULL, (fn), (arg)) == 0)
+#define mag_thread_join(th) mag_assert2(pthread_join((th), NULL) == 0)
 
 typedef pthread_mutex_t mag_mutex_t;
-#define mag_mutex_create(mtx) pthread_mutex_init(mtx, NULL)
-#define mag_mutex_destroy(mtx) pthread_mutex_destroy(mtx)
-#define mag_mutex_lock(mtx) pthread_mutex_lock(mtx)
-#define mag_mutex_unlock(mtx) pthread_mutex_unlock(mtx)
+#define mag_mutex_create(mtx) mag_assert2(pthread_mutex_init(mtx, NULL) == 0)
+#define mag_mutex_destroy(mtx) mag_assert2(pthread_mutex_destroy(mtx) == 0)
+#define mag_mutex_lock(mtx) mag_assert2(pthread_mutex_lock(mtx) == 0)
+#define mag_mutex_unlock(mtx) mag_assert2(pthread_mutex_unlock(mtx) == 0)
 
 typedef pthread_cond_t mag_cond_var_t;
-#define mag_cv_create(cv) pthread_cond_init(cv, NULL)
-#define mag_cv_destroy(cv) pthread_cond_destroy(cv)
-#define mag_cv_wait(cv, mtx) pthread_cond_wait(cv, mtx)
-#define mag_cv_signal(cv) pthread_cond_signal(cv)
-#define mag_cv_broadcast(cv) pthread_cond_broadcast(cv)
+#define mag_cv_create(cv) mag_assert2(pthread_cond_init(cv, NULL) == 0)
+#define mag_cv_destroy(cv) mag_assert2(pthread_cond_destroy(cv) == 0)
+#define mag_cv_wait(cv, mtx) mag_assert2(pthread_cond_wait(cv, mtx) == 0)
+#define mag_cv_signal(cv) mag_assert2(pthread_cond_signal(cv) == 0)
+#define mag_cv_broadcast(cv) mag_assert2(pthread_cond_broadcast(cv) == 0)
 
 #endif
 
@@ -585,6 +589,8 @@ struct mag_ctx_t {
         uint64_t phys_mem_free;                     /* Free physical memory in bytes. */
 #if defined(__x86_64__) || defined(_M_X64)
         uint32_t x86_64_cpu_features[8][4];         /* x86-64 CPU features. */
+#elif defined (__aarch64__)
+        long cpu_arm64_hwcap;                           /* ARM 64 hardware capabilities */
 #endif
     } sys;
 #ifdef MAG_DEBUG
@@ -672,7 +678,103 @@ struct mag_tensor_t {
     (void)prefix##4; \
     (void)prefix##5
 
+typedef struct mag_compute_payload_t {
+    int64_t thread_num;
+    int64_t thread_idx;
+    mag_tensor_t* node;
+} mag_compute_payload_t;
+
+typedef struct mag_kernel_registry_t {
+    void (*fwd[MAG_OP__NUM])(const mag_compute_payload_t*);
+    void (*bwd[MAG_OP__NUM])(const mag_compute_payload_t*);
+} mag_kernel_registry_t;
+
 #define mag_load_local_storage_group(xk, prefix, var) mag_load_local_storage_group_arr((xk)->var, prefix)
+
+#if defined(__x86_64__) || defined(_M_X64)
+#define MAG_X86_64_CPUID_0H 0
+#define MAG_X86_64_CPUID_1H 1
+#define MAG_X86_64_CPUID_2H 2
+#define MAG_X86_64_CPUID_7H 3
+#define MAG_X86_64_CPUID_80000001H 4
+#define MAG_X86_64_CPUID_80000007H 5
+#define MAG_X86_64_CPUID_16H 6
+#define MAG_X86_64_CPUID_7H_1H 7
+#define MAG_X86_64_CPUID_EAX 0
+#define MAG_X86_64_CPUID_EBX 1
+#define MAG_X86_64_CPUID_ECX 2
+#define MAG_X86_64_CPUID_EDX 3
+
+#define mag_x86_64_feature_def(_, __) /* Enumerator | CPUDID Leaf | Register | Bit Index */\
+    _(AVX                  ,    1H,        ECX,     28)__\
+    _(AVX2                 ,    7H,        EBX,      5)__\
+    _(AVXVNNI              ,    7H_1H,     EAX,      4)__\
+    _(AVXVNNIINT8          ,    7H_1H,     EDX,      4)__\
+    _(AVXVNNIINT16         ,    7H_1H,     EDX,     10)__\
+    _(AVX512BW             ,    7H,        EBX,     30)__\
+    _(AVX512CD             ,    7H,        EBX,     28)__\
+    _(AVX512DQ             ,    7H,        EBX,     17)__\
+    _(AVX512ER             ,    7H,        EBX,     27)__\
+    _(AVX512F              ,    7H,        EBX,     16)__\
+    _(AVX512IFMA           ,    7H,        EBX,     21)__\
+    _(AVX512PF             ,    7H,        EBX,     26)__\
+    _(AVX512VBMI           ,    7H,        ECX,      1)__\
+    _(AVX512VL             ,    7H,        EBX,     31)__\
+    _(AVX512_4FMAPS        ,    7H,        EDX,      3)__\
+    _(AVX512_4VNNIW        ,    7H,        EDX,      2)__\
+    _(AVX512_FP16          ,    7H,        EDX,     23)__\
+    _(AVX512_BF16          ,    7H_1H,     EAX,      5)__\
+    _(AVX512_BITALG        ,    7H,        ECX,     12)__\
+    _(AVX512_VBMI2         ,    7H,        ECX,      6)__\
+    _(AVX512_VNNI          ,    7H,        ECX,     11)__\
+    _(AVX512_VP2INTERSECT  ,    7H,        EDX,      8)__\
+    _(AVX512_VPOPCNTDQ     ,    7H,        ECX,     14)__\
+    _(BMI                  ,    7H,        EBX,      3)__\
+    _(BMI2                 ,    7H,        EBX,      8)__\
+    _(F16C                 ,    1H,        ECX,     29)__\
+    _(FMA                  ,    1H,        ECX,     12)__\
+    _(FPU                  ,    1H,        EDX,      0)__\
+    _(GFNI                 ,    7H,        ECX,      8)__\
+    _(IA64                 ,    1H,        EDX,     30)__\
+    _(MMX                  ,    1H,        EDX,     23)__\
+    _(OSXSAVE              ,    1H,        ECX,     27)__\
+    _(PCLMUL               ,    1H,        ECX,      1)__\
+    _(RDRND                ,    1H,        ECX,     30)__\
+    _(RDSEED               ,    7H,        EBX,     18)__\
+    _(RDTSCP               ,    80000001H, EDX,     27)__\
+    _(SHA                  ,    7H,        EBX,     29)__\
+    _(SSE                  ,    1H,        EDX,     25)__\
+    _(SSE2                 ,    1H,        EDX,     26)__\
+    _(SSE3                 ,    1H,        ECX,      0)__\
+    _(SSE4_1               ,    1H,        ECX,     19)__\
+    _(SSE4_2               ,    1H,        ECX,     20)__\
+    _(SSSE3                ,    1H,        ECX,      9)__\
+    _(VAES                 ,    7H,        ECX,      9)__\
+    _(VME                  ,    1H,        EDX,      1)__\
+    _(VMX                  ,    1H,        ECX,      5)__\
+    _(VPCLMULQDQ           ,    7H,        ECX,     10)__\
+    _(XSAVE                ,    1H,        ECX,     26)__\
+    _(HYBRID_CPU           ,    7H,        EDX,     15)__
+
+#define _(enumerator, leaf, reg, bit) MAG_X86_64_FEATURE_##enumerator
+typedef enum mag_x86_64_feature_t {
+    mag_x86_64_feature_def(_, MAG_SEP)
+    MAG_X86_64_FEATURE__NUM
+} mag_x86_64_feature_t;
+#undef _
+extern const char* const mag_x86_64_feature_names[MAG_X86_64_FEATURE__NUM];
+extern const uint8_t mag_x86_64_feature_leaves[MAG_X86_64_FEATURE__NUM];
+extern const uint8_t mag_x86_64_feature_regs[MAG_X86_64_FEATURE__NUM];
+extern const uint32_t mag_x86_64_feature_masks[MAG_X86_64_FEATURE__NUM];
+
+static inline bool mag_ctx_x86_64_cpu_has_feature(const mag_ctx_t* ctx, mag_x86_64_feature_t feature) {
+    const uint8_t (*leafs)[49] = &mag_x86_64_feature_leaves;
+    const uint8_t (*regs)[49] = &mag_x86_64_feature_regs;
+    const uint32_t (*masks)[49] = &mag_x86_64_feature_masks;
+    const uint32_t (*features)[8][4] = &ctx->sys.x86_64_cpu_features;
+    return (*features)[(*leafs)[feature]][(*regs)[feature]] & (*masks)[feature];
+}
+#endif
 
 #ifdef __cplusplus
 }
