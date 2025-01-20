@@ -991,7 +991,7 @@ static bool mag_validate_shape_eq(mag_op_t op, const mag_tensor_t* a, const mag_
         "ERROR: Input tensor shapes must be equal.\n"
         "    - Input Tensor 1 '%s' Shape: %s\n"
         "    - Input Tensor 2 '%s' Shape: %s\n"
-        "    Hint: Adjust tensor shapes using transposition or permutation.\n",
+        "    Hint:Adjust tensor shapes using transpose() or permute().\n",
         meta->mnemonic,
         a->name, shape_1,
         b->name, shape_2
@@ -1024,7 +1024,7 @@ static bool mag_validate_shape_broadcastable(mag_op_t op, const mag_tensor_t* a,
         "    - Input Tensor 1 '%s' Shape: %s\n"
         "    - Input Tensor 2 '%s' Shape: %s\n"
         "    Broadcast-able: %s\n"
-        "    Hint: Adjust tensor shapes using transposition or permutation.\n",
+        "    Hint: Adjust tensor shapes using transpose() or permute().\n",
         meta->mnemonic,
         a->name, shape_1,
         b->name, shape_2,
@@ -1083,21 +1083,24 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
 
 static mag_tensor_t* mag_result_constructor_routine_isomorph(mag_tensor_t** inputs, const mag_op_param_t* params) {
     (void)params;
-    return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, inputs[0]->shape, inputs[0]->rank, NULL, 0);
+    mag_tensor_t* base = *inputs;
+    return mag_tensor_create(base->ctx, base->dtype, base->shape, base->rank, NULL, 0);
 }
 
 static mag_tensor_t* mag_result_constructor_routine_view(mag_tensor_t** inputs,  const mag_op_param_t* params) {
     (void)params;
-    return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, inputs[0]->shape, MAG_MAX_DIMS, inputs[0], 0);
+    mag_tensor_t* base = *inputs;
+    return mag_tensor_create(base->ctx, base->dtype, base->shape, base->rank, base, 0);
 }
 
 static mag_tensor_t* mag_result_constructor_routine_scalar(mag_tensor_t** inputs,  const mag_op_param_t* params) {
     int64_t shape[MAG_MAX_DIMS];
     *shape = 1;
+    mag_tensor_t* base = *inputs;
     #pragma GCC unroll 5
     for (uint32_t i=1; i < MAG_MAX_DIMS; ++i)
-        shape[i] = inputs[0]->shape[i];
-    return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, shape, MAG_MAX_DIMS, NULL, 0);
+        shape[i] = base->shape[i];
+    return mag_tensor_create(base->ctx, base->dtype, shape, MAG_MAX_DIMS, NULL, 0);
 }
 
 static mag_tensor_t* mag_result_constructor_routine_transposed(mag_tensor_t** inputs,  const mag_op_param_t* params) {
@@ -1113,12 +1116,11 @@ static mag_tensor_t* mag_result_constructor_routine_permuted(mag_tensor_t** inpu
     uint32_t axes[MAG_MAX_DIMS];
     for (uint32_t i = 0; i < MAG_MAX_DIMS; ++i) /* Unpack axes */
         axes[i] = params[i].x.u32;
-    for (uint32_t i = 0; i < MAG_MAX_DIMS; ++i) { /* Check that all axes are unique */
+    for (uint32_t i = 0; i < MAG_MAX_DIMS; ++i) /* Check that all axes are unique */
         for (uint32_t j = i+1; j < MAG_MAX_DIMS; ++j)
             mag_assert(axes[i] != axes[j], "Axes must be unique: %zu != %zu", axes[i], axes[j]);
-    }
     for (uint32_t i=0; i < MAG_MAX_DIMS; ++i) { /* Permute shape and strides */
-        mag_assert2(axes[i] >= 0 && axes[i] < MAG_MAX_DIMS);
+        mag_assert2(axes[i] < MAG_MAX_DIMS);
         permuted->shape[axes[i]] = inputs[0]->shape[i];
         permuted->strides[axes[i]] = inputs[0]->strides[i];
     }

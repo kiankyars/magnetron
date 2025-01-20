@@ -223,12 +223,11 @@ extern MAG_EXPORT mag_tensor_t* mag_tensor_create_5d(mag_ctx_t* ctx, mag_dtype_t
  */
 extern MAG_EXPORT mag_tensor_t* mag_tensor_create_6d(mag_ctx_t* ctx, mag_dtype_t type, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5, int64_t d6);
 
-/* Tensor operation functions.  */
-
 extern MAG_EXPORT mag_tensor_t* mag_clone(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_view(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_transpose(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_permute(mag_tensor_t* x, uint32_t d0, uint32_t d1, uint32_t d2, uint32_t d3, uint32_t d4, uint32_t d5);
+
 extern MAG_EXPORT mag_tensor_t* mag_mean(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_min(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_max(mag_tensor_t* x);
