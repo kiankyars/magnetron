@@ -1,4 +1,4 @@
-// (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+// (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
 // For some tests, we use a larger absolute error than machine epsilon,
 // because the BLAS uses SIMD for certain functions which have higher accuracy than the scalar high-precision lambdas.

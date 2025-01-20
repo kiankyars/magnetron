@@ -1,4 +1,4 @@
-# (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+# (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
 function(set_blas_spec_arch filename posix_arch msvc_arch)
     message(STATUS "BLAS CPU permutation ${filename} ${posix_arch} / ${msvc_arch}")

@@ -1,4 +1,4 @@
-/* (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
+/* (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
 
 #ifndef __SSE4_2__
 #error "BLAS specialization requires matching compile flags"

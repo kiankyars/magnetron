@@ -1,4 +1,4 @@
-// (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+// (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
 // ON LINUX: Before running the benchmark, execute: prepare_system.sh to setup the system for performance measurements.
 

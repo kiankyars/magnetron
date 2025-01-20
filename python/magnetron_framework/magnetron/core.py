@@ -1,4 +1,4 @@
-# (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+# (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
 # Implements core functionality: Context, Tensors and Operations.
 
@@ -132,7 +132,7 @@ class ColorChannels(Enum):
 
     @property
     def argument_count(self) -> int:
-        """Returns the number of tensor arguments required by this operator."""
+        """Returns the number of _ptr arguments required by this operator."""
         return C.mag_op_get_argcount(self.value)
 
     @property
@@ -176,7 +176,7 @@ class GlobalConfig:
 
 class Context:
     """
-    Manages the magnetron context and tensor lifecycles, including device selection,
+    Manages the magnetron context and _ptr lifecycles, including device selection,
     memory allocation, and execution mode.
 
     A global active context is created automatically when needed.
@@ -217,7 +217,7 @@ class Context:
         elif isinstance(device, ComputeDevice.CUDA):
             descriptor.type = 1
             descriptor.cuda_device_id = abs(device.device_id)
-        self.ctx = C.mag_ctx_create2(descriptor)
+        self._ptr = C.mag_ctx_create2(descriptor)
         self.execution_mode = execution_mode
 
     @property
@@ -230,7 +230,7 @@ class Context:
         str
             Name of the device, e.g. "CPU" or "NVIDIA GPU".
         """
-        return ffi.string(C.mag_ctx_get_compute_device_name(self.ctx)).decode('utf-8')
+        return ffi.string(C.mag_ctx_get_compute_device_name(self._ptr)).decode('utf-8')
 
     @property
     def execution_mode(self) -> ExecutionMode:
@@ -242,7 +242,7 @@ class Context:
         ExecutionMode
             The current execution mode (EAGER or DEFERRED).
         """
-        return ExecutionMode(C.mag_ctx_get_exec_mode(self.ctx))
+        return ExecutionMode(C.mag_ctx_get_exec_mode(self._ptr))
 
     @execution_mode.setter
     def execution_mode(self, mode: ExecutionMode):
@@ -254,7 +254,7 @@ class Context:
         mode : ExecutionMode
             Desired mode (EAGER or DEFERRED).
         """
-        C.mag_ctx_set_exec_mode(self.ctx, mode.value)
+        C.mag_ctx_set_exec_mode(self._ptr, mode.value)
 
     @property
     def prng_algorithm(self) -> PRNGAlgorithm:
@@ -266,7 +266,7 @@ class Context:
         PRNGAlgorithm
             The PRNG algorithm in use.
         """
-        return PRNGAlgorithm(C.mag_ctx_get_prng_algorithm(self.ctx))
+        return PRNGAlgorithm(C.mag_ctx_get_prng_algorithm(self._ptr))
 
     @prng_algorithm.setter
     def prng_algorithm(self, algorithm: PRNGAlgorithm):
@@ -278,7 +278,7 @@ class Context:
         algorithm : PRNGAlgorithm
             The desired PRNG algorithm.
         """
-        C.mag_ctx_set_prng_algorithm(self.ctx, algorithm.value, 0)
+        C.mag_ctx_set_prng_algorithm(self._ptr, algorithm.value, 0)
 
     @property
     def os_name(self) -> str:
@@ -290,7 +290,7 @@ class Context:
         str
             The OS name (e.g., "Linux").
         """
-        return ffi.string(C.mag_ctx_get_os_name(self.ctx)).decode('utf-8')
+        return ffi.string(C.mag_ctx_get_os_name(self._ptr)).decode('utf-8')
 
     @property
     def cpu_name(self) -> str:
@@ -302,7 +302,7 @@ class Context:
         str
             The CPU name.
         """
-        return ffi.string(C.mag_ctx_get_cpu_name(self.ctx)).decode('utf-8')
+        return ffi.string(C.mag_ctx_get_cpu_name(self._ptr)).decode('utf-8')
 
     @property
     def cpu_virtual_cores(self) -> int:
@@ -314,7 +314,7 @@ class Context:
         int
             Count of virtual CPU cores.
         """
-        return C.mag_ctx_get_cpu_virtual_cores(self.ctx)
+        return C.mag_ctx_get_cpu_virtual_cores(self._ptr)
 
     @property
     def cpu_physical_cores(self) -> int:
@@ -326,7 +326,7 @@ class Context:
         int
             Count of physical CPU cores.
         """
-        return C.mag_ctx_get_cpu_physical_cores(self.ctx)
+        return C.mag_ctx_get_cpu_physical_cores(self._ptr)
 
     @property
     def cpu_sockets(self) -> int:
@@ -338,7 +338,7 @@ class Context:
         int
             CPU socket count.
         """
-        return C.mag_ctx_get_cpu_sockets(self.ctx)
+        return C.mag_ctx_get_cpu_sockets(self._ptr)
 
     @property
     def physical_memory_total(self) -> int:
@@ -350,7 +350,7 @@ class Context:
         int
             Total system memory in bytes.
         """
-        return C.mag_ctx_get_physical_memory_total(self.ctx)
+        return C.mag_ctx_get_physical_memory_total(self._ptr)
 
     @property
     def physical_memory_free(self) -> int:
@@ -362,7 +362,7 @@ class Context:
         int
             Free memory in bytes.
         """
-        return C.mag_ctx_get_physical_memory_free(self.ctx)
+        return C.mag_ctx_get_physical_memory_free(self._ptr)
 
     @property
     def physical_memory_used(self) -> int:
@@ -386,7 +386,7 @@ class Context:
         bool
             True if NUMA is supported, False otherwise.
         """
-        return C.mag_ctx_is_numa_system(self.ctx)
+        return C.mag_ctx_is_numa_system(self._ptr)
 
     @property
     def total_allocated_pool_memory(self) -> int:
@@ -398,7 +398,7 @@ class Context:
         int
             Total allocated memory in bytes.
         """
-        return C.mag_ctx_total_allocated_pool_memory(self.ctx)
+        return C.mag_ctx_total_allocated_pool_memory(self._ptr)
 
     @property
     def total_tensors_created(self) -> int:
@@ -410,7 +410,7 @@ class Context:
         int
             Count of all tensors created.
         """
-        return C.mag_ctx_get_total_tensors_created(self.ctx)
+        return C.mag_ctx_get_total_tensors_created(self._ptr)
 
     @property
     def total_tensors_allocated(self) -> int:
@@ -422,14 +422,14 @@ class Context:
         int
             Count of allocated tensors.
         """
-        return C.mag_ctx_get_total_tensors_allocated(self.ctx)
+        return C.mag_ctx_get_total_tensors_allocated(self._ptr)
 
     def start_profiler(self) -> None:
         """
         Starts recording profiling information for operations.
         Profiling must be stopped to produce a report. Slightly reduces performance.
         """
-        C.mag_ctx_profile_start_recording(self.ctx)
+        C.mag_ctx_profile_start_recording(self._ptr)
 
     def stop_profiler(self, export_csv_file: str | None = None) -> None:
         """
@@ -441,38 +441,38 @@ class Context:
             Path to export a CSV profiling report. If None, only an internal report is generated.
         """
         csv_file = ffi.NULL if export_csv_file is None else bytes(export_csv_file, 'utf-8')
-        C.mag_ctx_profile_stop_recording(self.ctx, csv_file)
+        C.mag_ctx_profile_stop_recording(self._ptr, csv_file)
 
     def __del__(self):
         """
         Destructor that releases context resources.
         """
-        C.mag_ctx_destroy(self.ctx)
-        self.ctx = ffi.NULL
+        C.mag_ctx_destroy(self._ptr)
+        self._ptr = ffi.NULL
 
 
 class Tensor:
     """
-    Represents a tensor in the magnetron library. Supports various operations and transformations.
+    Represents a _ptr in the magnetron library. Supports various operations and transformations.
     """
 
-    def __init__(self, internal_instance: ffi.CData | None = None) -> None:
+    def __init__(self, ptr: ffi.CData | None = None) -> None:
         """
         Internal constructor. Do not call directly. Use static methods or operators.
 
         Parameters
         ----------
-        internal_instance : ffi.CData or None
+        ptr : ffi.CData or None
             Internal tensor instance (C data pointer).
         """
-        self.context_ref = None
-        self.tensor = internal_instance
+        self._ctx = None
+        self._ptr = ptr
 
     def __del__(self) -> None:
-        """Releases tensor resources upon object destruction."""
-        if isinstance(self.tensor, ffi.CData) and self.tensor != ffi.NULL:
-            C.mag_tensor_decref(self.tensor)
-        self.tensor = ffi.NULL
+        """Releases _ptr resources upon object destruction."""
+        if isinstance(self._ptr, ffi.CData) and self._ptr != ffi.NULL:
+            C.mag_tensor_decref(self._ptr)
+        self._ptr = ffi.NULL
 
     _DISPATCH = {
         1: C.mag_tensor_create_1d,
@@ -487,43 +487,43 @@ class Tensor:
     def _new(self, ctx: Context, *, shape: tuple[int, ...], dtype: DType = DType.F32,
              name: str | None = None) -> None:
         """
-        Internal helper to create a new tensor instance.
+        Internal helper to create a new _ptr instance.
 
         Parameters
         ----------
         ctx : Context
-            The magnetron context where this tensor belongs.
+            The magnetron context where this _ptr belongs.
         shape : tuple[int, ...]
-            Dimensions of the tensor.
+            Dimensions of the _ptr.
         dtype : DType, optional
-            Data type of the tensor, by default DType.F32.
+            Data type of the _ptr, by default DType.F32.
         name : str or None, optional
-            A friendly name for the tensor, by default None.
+            A friendly name for the _ptr, by default None.
         """
         assert 0 < len(shape) <= MAX_DIMS, f'Invalid number of dimensions: {len(shape)}'
         assert all(0 < dim <= DIM_MAX for dim in shape), 'Invalid dimension size'
-        self.context_ref = weakref.ref(ctx)
-        self.tensor = self._DISPATCH[len(shape)](ctx.ctx, dtype.value, *shape)
+        self._ctx = weakref.ref(ctx)
+        self._ptr = self._DISPATCH[len(shape)](ctx._ptr, dtype.value, *shape)
         self.name = f'Tensor {self.shape}' if name is None else name
 
     @classmethod
     def empty(cls, shape: tuple[int, ...], *, dtype: DType = DType.F32, name: str | None = None) -> 'Tensor':
         """
-        Creates an empty tensor with uninitialized data.
+        Creates an empty _ptr with uninitialized data.
 
         Parameters
         ----------
         shape : tuple[int, ...]
-            The shape of the tensor.
+            The shape of the _ptr.
         dtype : DType, optional
-            Data type of the tensor, by default F32.
+            Data type of the _ptr, by default F32.
         name : str or None, optional
-            A friendly name for the tensor, by default None.
+            A friendly name for the _ptr, by default None.
 
         Returns
         -------
         Tensor
-            The newly created empty tensor.
+            The newly created empty _ptr.
         """
         tensor = cls(None)
         tensor._new(Context.active(), shape=shape, dtype=dtype, name=name)
@@ -533,48 +533,48 @@ class Tensor:
     def full(cls, shape: tuple[int, ...], *, fill_value: float, dtype: DType = DType.F32,
              name: str | None = None) -> 'Tensor':
         """
-        Creates a tensor filled with a given constant value.
+        Creates a _ptr filled with a given constant value.
 
         Parameters
         ----------
         shape : tuple[int, ...]
-            The shape of the tensor.
+            The shape of the _ptr.
         fill_value : float
             The constant value to fill.
         dtype : DType, optional
             Data type, by default F32.
         name : str or None, optional
-            A friendly name for the tensor, by default None.
+            A friendly name for the _ptr, by default None.
 
         Returns
         -------
         Tensor
-            The filled tensor.
+            The filled _ptr.
         """
         tensor = cls(None)
         tensor._new(Context.active(), shape=shape, dtype=dtype, name=name)
-        C.mag_tensor_fill(tensor.tensor, fill_value)
+        C.mag_tensor_fill(tensor._ptr, fill_value)
         return tensor
 
     @classmethod
     def const(cls, data, *, dtype: DType = DType.F32,
               name: str | None = None) -> 'Tensor':
         """
-        Creates a tensor from a nested Python list or a single scalar.
+        Creates a _ptr from a nested Python list or a single scalar.
 
         Parameters
         ----------
         data : scalar or nested list
-            Data to create the tensor from.
+            Data to create the _ptr from.
         dtype : DType, optional
             Data type, by default F32.
         name : str or None, optional
-            A friendly name for the tensor, by default None.
+            A friendly name for the _ptr, by default None.
 
         Returns
         -------
         Tensor
-            The constructed tensor.
+            The constructed _ptr.
         """
 
         def flatten_nested_lists(nested):
@@ -598,28 +598,28 @@ class Tensor:
         tensor = cls(None)
         tensor._new(Context.active(), shape=tuple(shape), dtype=dtype, name=name)
         size: int = len(flattened_data) * ffi.sizeof('float')
-        C.mag_tensor_copy_buffer_from(tensor.tensor, ffi.new(f'float[{len(flattened_data)}]', flattened_data), size)
+        C.mag_tensor_copy_buffer_from(tensor._ptr, ffi.new(f'float[{len(flattened_data)}]', flattened_data), size)
         return tensor
 
     @classmethod
     def zeros(cls, shape: tuple[int, ...], *, dtype: DType = DType.F32,
               name: str | None = None) -> 'Tensor':
         """
-        Creates a tensor filled with zeros.
+        Creates a _ptr filled with zeros.
 
         Parameters
         ----------
         shape : tuple[int, ...]
-            The shape of the tensor.
+            The shape of the _ptr.
         dtype : DType, optional
             Data type, by default F32.
         name : str or None, optional
-            A friendly name for the tensor, by default None.
+            A friendly name for the _ptr, by default None.
 
         Returns
         -------
         Tensor
-            The zero-filled tensor.
+            The zero-filled _ptr.
         """
         return cls.full(shape, fill_value=0.0, dtype=dtype, name=name)
 
@@ -627,40 +627,40 @@ class Tensor:
     def uniform(cls, shape: tuple[int, ...], *, interval: (float, float) = (-1.0, 1.0), dtype: DType = DType.F32,
                 name: str | None = None) -> 'Tensor':
         """
-        Creates a tensor filled with random uniform values within a given interval.
+        Creates a _ptr filled with random uniform values within a given interval.
 
         Parameters
         ----------
         shape : tuple[int, ...]
-            The shape of the tensor.
+            The shape of the _ptr.
         interval : (float, float), optional
             Min and max values for uniform distribution, by default (-1.0, 1.0).
         dtype : DType, optional
             Data type, by default F32.
         name : str or None, optional
-            A friendly name for the tensor, by default None.
+            A friendly name for the _ptr, by default None.
 
         Returns
         -------
         Tensor
-            The tensor filled with random values.
+            The _ptr filled with random values.
         """
         tensor = cls(None)
         tensor._new(Context.active(), shape=shape, dtype=dtype, name=name)
         if interval[1] < interval[0]:
             interval = (interval[1], interval[0])
-        C.mag_tensor_fill_random_uniform(tensor.tensor, interval[0], interval[1])
+        C.mag_tensor_fill_random_uniform(tensor._ptr, interval[0], interval[1])
         return tensor
 
     @classmethod
     def normal(cls, shape: tuple[int, ...], *, mean: float, stddev: float) -> 'Tensor':
         """
-        Creates a tensor filled with random values from a normal distribution.
+        Creates a _ptr filled with random values from a normal distribution.
 
         Parameters
         ----------
         shape : tuple[int, ...]
-            The shape of the tensor.
+            The shape of the _ptr.
         mean : float
             Mean of the normal distribution.
         stddev : float
@@ -669,17 +669,17 @@ class Tensor:
         Returns
         -------
         Tensor
-            The tensor filled with normally distributed values.
+            The _ptr filled with normally distributed values.
         """
         tensor = cls(None)
         tensor._new(Context.active(), shape=shape, dtype=DType.F32)
-        C.mag_tensor_fill_random_normal(tensor.tensor, mean, stddev)
+        C.mag_tensor_fill_random_normal(tensor._ptr, mean, stddev)
         return tensor
 
     @classmethod
     def load(cls, file_path: str) -> 'Tensor':
         """
-        Loads a tensor from a binary magnetron file.
+        Loads a _ptr from a binary magnetron file.
 
         Parameters
         ----------
@@ -689,11 +689,11 @@ class Tensor:
         Returns
         -------
         Tensor
-            The loaded tensor.
+            The loaded _ptr.
         """
         assert file_path.endswith('.magnetron'), 'File must be a magnetron file'
-        instance = C.mag_tensor_load(Context.active().ctx, bytes(file_path, 'utf-8'))
-        return cls(internal_instance=instance)
+        instance = C.mag_tensor_load(Context.active()._ptr, bytes(file_path, 'utf-8'))
+        return cls(ptr=instance)
 
     @classmethod
     def load_image(cls, file_path: str, *,
@@ -701,14 +701,14 @@ class Tensor:
                    channels=ColorChannels.AUTO,
                    resize_to: (int, int) = (0, 0)) -> 'Tensor':
         """
-        Loads an image from a file and creates a tensor.
+        Loads an image from a file and creates a _ptr.
 
         Parameters
         ----------
         file_path : str
             Path to the image file.
         name : str or None, optional
-            A friendly name for the tensor, by default None.
+            A friendly name for the _ptr, by default None.
         channels : ColorChannels, optional
             Desired color channels to load, by default AUTO.
         resize_to : (int, int), optional
@@ -717,10 +717,10 @@ class Tensor:
         Returns
         -------
         Tensor
-            The created image tensor.
+            The created image _ptr.
         """
         assert isfile(file_path), f'File not found: {file_path}'
-        instance = C.mag_tensor_load_image(Context.active().ctx, bytes(file_path, 'utf-8'), channels.value,
+        instance = C.mag_tensor_load_image(Context.active()._ptr, bytes(file_path, 'utf-8'), channels.value,
                                            resize_to[0], resize_to[1])
         tensor = cls(instance)
         if name is not None:
@@ -729,116 +729,116 @@ class Tensor:
 
     def print(self, print_header: bool = False, print_data: bool = True) -> None:
         """
-        Prints the tensor metadata and optionally its data.
+        Prints the _ptr metadata and optionally its data.
 
         Parameters
         ----------
         print_header : bool, optional
             If True, prints a header line, by default False.
         print_data : bool, optional
-            If True, prints the tensor data, by default True.
+            If True, prints the _ptr data, by default True.
         """
-        C.mag_tensor_print(self.tensor, print_header, print_data)
+        C.mag_tensor_print(self._ptr, print_header, print_data)
 
     @property
     def name(self) -> str:
         """
-        Returns the name of the tensor.
+        Returns the name of the _ptr.
 
         Returns
         -------
         str
-            The tensor's name.
+            The _ptr's name.
         """
-        return ffi.string(C.mag_tensor_get_name(self.tensor)).decode('utf-8')
+        return ffi.string(C.mag_tensor_get_name(self._ptr)).decode('utf-8')
 
     @name.setter
     def name(self, name: str) -> None:
         """
-        Sets a name for the tensor.
+        Sets a name for the _ptr.
 
         Parameters
         ----------
         name : str
-            The new name for the tensor.
+            The new name for the _ptr.
         """
-        C.mag_tensor_set_name(self.tensor, bytes(name, 'utf-8'))
+        C.mag_tensor_set_name(self._ptr, bytes(name, 'utf-8'))
 
     @property
     def rank(self) -> int:
         """
-        Returns the rank (number of dimensions) of the tensor.
+        Returns the rank (number of dimensions) of the _ptr.
 
         Returns
         -------
         int
             Number of dimensions.
         """
-        return C.mag_tensor_rank(self.tensor)
+        return C.mag_tensor_rank(self._ptr)
 
     @property
     def shape(self) -> tuple[int, ...]:
         """
-        Returns the shape (dimensions) of the tensor.
+        Returns the shape (dimensions) of the _ptr.
 
         Returns
         -------
         tuple[int, ...]
-            The dimensions of the tensor.
+            The dimensions of the _ptr.
         """
-        return tuple(ffi.unpack(C.mag_tensor_shape(self.tensor), self.rank))
+        return tuple(ffi.unpack(C.mag_tensor_shape(self._ptr), self.rank))
 
     @property
     def strides(self) -> tuple[int, ...]:
         """
-        Returns the strides of the tensor.
+        Returns the strides of the _ptr.
 
         Returns
         -------
         tuple[int, ...]
             The strides for each dimension.
         """
-        return tuple(ffi.unpack(C.mag_tensor_strides(self.tensor), self.rank))
+        return tuple(ffi.unpack(C.mag_tensor_strides(self._ptr), self.rank))
 
     @property
     def dtype(self) -> DType:
         """
-        Returns the data type of the tensor.
+        Returns the data type of the _ptr.
 
         Returns
         -------
         DType
             The data type, e.g. DType.F32.
         """
-        return DType(C.mag_tensor_dtype(self.tensor))
+        return DType(C.mag_tensor_dtype(self._ptr))
 
     @property
     def data_ptr(self) -> int:
         """
-        Returns the pointer to the tensor's data buffer.
+        Returns the pointer to the _ptr's data buffer.
 
         Returns
         -------
         int
-            Memory address of the tensor data.
+            Memory address of the _ptr data.
         """
-        return int(ffi.cast('uintptr_t', C.mag_tensor_data_ptr(self.tensor)))
+        return int(ffi.cast('uintptr_t', C.mag_tensor_data_ptr(self._ptr)))
 
     def to_list(self) -> list[float]:
         """
-        Returns the tensor data as a Python list of floats.
+        Returns the _ptr data as a Python list of floats.
 
         Returns
         -------
         list[float]
-            A flat list containing all tensor elements.
+            A flat list containing all _ptr elements.
         """
         assert self.dtype == DType.F32, 'Invalid data type'
-        return ffi.unpack(ffi.cast('float*', C.mag_tensor_data_ptr(self.tensor)), self.numel)
+        return ffi.unpack(ffi.cast('float*', C.mag_tensor_data_ptr(self._ptr)), self.numel)
 
     def scalar(self) -> float:
         """
-        Returns the scalar value of a 0D tensor.
+        Returns the scalar value of a 0D _ptr.
 
         Returns
         -------
@@ -846,127 +846,127 @@ class Tensor:
             The single scalar value.
         """
         assert self.dtype == DType.F32, 'Invalid data type'
-        return ffi.unpack(ffi.cast('float*', C.mag_tensor_data_ptr(self.tensor)), 1)[0]
+        return ffi.unpack(ffi.cast('float*', C.mag_tensor_data_ptr(self._ptr)), 1)[0]
 
     @property
     def data_size(self) -> int:
         """
-        Returns the size of the tensor buffer in bytes.
+        Returns the size of the _ptr buffer in bytes.
 
         Returns
         -------
         int
             Data size in bytes.
         """
-        return C.mag_tensor_data_size(self.tensor)
+        return C.mag_tensor_data_size(self._ptr)
 
     @property
     def numel(self) -> int:
         """
-        Returns the number of elements in the tensor.
+        Returns the number of elements in the _ptr.
 
         Returns
         -------
         int
             Number of elements.
         """
-        return C.mag_tensor_numel(self.tensor)
+        return C.mag_tensor_numel(self._ptr)
 
     @property
     def num_rows(self) -> int:
         """
-        Returns the number of rows in a 2D tensor (matrix).
+        Returns the number of rows in a 2D _ptr (matrix).
 
         Returns
         -------
         int
             Number of rows.
         """
-        return C.mag_tensor_num_rows(self.tensor)
+        return C.mag_tensor_num_rows(self._ptr)
 
     @property
     def num_cols(self) -> int:
         """
-        Returns the number of columns in a 2D tensor (matrix).
+        Returns the number of columns in a 2D _ptr (matrix).
 
         Returns
         -------
         int
             Number of columns.
         """
-        return C.mag_tensor_num_cols(self.tensor)
+        return C.mag_tensor_num_cols(self._ptr)
 
     @property
     def is_scalar(self) -> bool:
         """
-        Checks if the tensor is a scalar (0D).
+        Checks if the _ptr is a scalar (0D).
 
         Returns
         -------
         bool
             True if scalar, otherwise False.
         """
-        return C.mag_tensor_is_scalar(self.tensor)
+        return C.mag_tensor_is_scalar(self._ptr)
 
     @property
     def is_vector(self) -> bool:
         """
-        Checks if the tensor is a vector (1D).
+        Checks if the _ptr is a vector (1D).
 
         Returns
         -------
         bool
             True if vector, otherwise False.
         """
-        return C.mag_tensor_is_vector(self.tensor)
+        return C.mag_tensor_is_vector(self._ptr)
 
     @property
     def is_matrix(self) -> bool:
         """
-        Checks if the tensor is a matrix (2D).
+        Checks if the _ptr is a matrix (2D).
 
         Returns
         -------
         bool
             True if matrix, otherwise False.
         """
-        return C.mag_tensor_is_matrix(self.tensor)
+        return C.mag_tensor_is_matrix(self._ptr)
 
     @property
     def is_volume(self) -> bool:
         """
-        Checks if the tensor is a volume (3D or higher).
+        Checks if the _ptr is a volume (3D or higher).
 
         Returns
         -------
         bool
             True if volume, otherwise False.
         """
-        return C.mag_tensor_is_volume(self.tensor)
+        return C.mag_tensor_is_volume(self._ptr)
 
     @property
     def is_transposed(self) -> bool:
         """
-        Checks if the tensor is transposed.
+        Checks if the _ptr is transposed.
 
         Returns
         -------
         bool
             True if transposed, otherwise False.
         """
-        return C.mag_tensor_is_transposed(self.tensor)
+        return C.mag_tensor_is_transposed(self._ptr)
 
     @property
     def is_permuted(self) -> bool:
         """
-        Checks if the tensor is permuted.
+        Checks if the _ptr is permuted.
 
         Returns
         -------
         bool
             True if permuted, otherwise False.
         """
-        return C.mag_tensor_is_permuted(self.tensor)
+        return C.mag_tensor_is_permuted(self._ptr)
 
     def is_shape_eq(self, other: 'Tensor') -> bool:
         """
@@ -975,14 +975,14 @@ class Tensor:
         Parameters
         ----------
         other : Tensor
-            Another tensor to compare shape.
+            Another _ptr to compare shape.
 
         Returns
         -------
         bool
             True if shapes match, otherwise False.
         """
-        return C.mag_tensor_is_shape_eq(self.tensor, other.tensor)
+        return C.mag_tensor_is_shape_eq(self._ptr, other._ptr)
 
     def are_strides_eq(self, other: 'Tensor') -> bool:
         """
@@ -991,35 +991,35 @@ class Tensor:
         Parameters
         ----------
         other : Tensor
-            Another tensor to compare strides.
+            Another _ptr to compare strides.
 
         Returns
         -------
         bool
             True if strides match, otherwise False.
         """
-        return C.mag_tensor_are_strides_eq(self.tensor, other.tensor)
+        return C.mag_tensor_are_strides_eq(self._ptr, other._ptr)
 
     def can_broadcast(self, other: 'Tensor') -> bool:
         """
-        Checks if `other` tensor can be broadcasted to the shape of this tensor.
+        Checks if `other` _ptr can be broadcasted to the shape of this _ptr.
 
         Parameters
         ----------
         other : Tensor
-            Another tensor.
+            Another _ptr.
 
         Returns
         -------
         bool
             True if broadcastable, otherwise False.
         """
-        return C.mag_tensor_can_broadcast(self.tensor, other.tensor)
+        return C.mag_tensor_can_broadcast(self._ptr, other._ptr)
 
     @property
     def width(self) -> int:
         """
-        Returns the width of an image tensor (assumes layout: CxHxW).
+        Returns the width of an image _ptr (assumes layout: CxHxW).
 
         Returns
         -------
@@ -1031,7 +1031,7 @@ class Tensor:
     @property
     def height(self) -> int:
         """
-        Returns the height of an image tensor (assumes layout: CxHxW).
+        Returns the height of an image _ptr (assumes layout: CxHxW).
 
         Returns
         -------
@@ -1043,7 +1043,7 @@ class Tensor:
     @property
     def channels(self) -> int:
         """
-        Returns the number of channels in an image tensor (assumes layout: CxHxW).
+        Returns the number of channels in an image _ptr (assumes layout: CxHxW).
 
         Returns
         -------
@@ -1055,23 +1055,23 @@ class Tensor:
     @property
     def is_contiguous(self) -> bool:
         """
-        Checks if the tensor is contiguous in memory.
+        Checks if the _ptr is contiguous in memory.
 
         Returns
         -------
         bool
             True if contiguous, otherwise False.
         """
-        return C.mag_tensor_is_contiguous(self.tensor)
+        return C.mag_tensor_is_contiguous(self._ptr)
 
     def is_close(self, other: 'Tensor', eps: float = -1.0, print_eq_percent: bool = False) -> (bool, float):
         """
-        Checks if the tensor is close to another tensor within a given epsilon.
+        Checks if the _ptr is close to another _ptr within a given epsilon.
 
         Parameters
         ----------
         other : Tensor
-            Another tensor to compare to.
+            Another _ptr to compare to.
         eps : float, optional
             Epsilon tolerance. If -1.0, uses a default internal value.
         print_eq_percent : bool, optional
@@ -1085,14 +1085,14 @@ class Tensor:
             eq_percent is the percentage of approximately equal elements.
         """
         percent_eq = ffi.new('double[1]')
-        is_eq = C.mag_tensor_is_close(self.tensor, other.tensor, eps, percent_eq)
+        is_eq = C.mag_tensor_is_close(self._ptr, other._ptr, eps, percent_eq)
         if print_eq_percent:
             print(f'Tensors are close: {is_eq}, Percent equal: {percent_eq[0]:.2f}%')
         return is_eq, percent_eq[0]
 
     def draw_box(self, p1: (int, int), p2: (int, int), width: int = 2, rgb: int = 0xffffff):
         """
-        Draws a rectangular box on an image tensor.
+        Draws a rectangular box on an image _ptr.
 
         Parameters
         ----------
@@ -1106,11 +1106,11 @@ class Tensor:
             24-bit RGB color (e.g. 0xFFFFFF for white), by default 0xffffff.
         """
         assert p2[0] > p1[0] and p2[1] > p1[1] and width > 0
-        C.mag_tensor_img_draw_box(self.tensor, p1[0], p1[1], p2[0], p2[1], width, rgb & 0xffffff)
+        C.mag_tensor_img_draw_box(self._ptr, p1[0], p1[1], p2[0], p2[1], width, rgb & 0xffffff)
 
     def draw_text(self, p: (int, int), size: int, txt: str, rgb: int = 0xffffff):
         """
-        Draws text on an image tensor.
+        Draws text on an image _ptr.
 
         Parameters
         ----------
@@ -1123,24 +1123,24 @@ class Tensor:
         rgb : int, optional
             24-bit RGB color, by default white (0xffffff).
         """
-        C.mag_tensor_img_draw_text(self.tensor, p[0], p[1], size, rgb & 0xffffff, bytes(txt, 'utf-8'))
+        C.mag_tensor_img_draw_text(self._ptr, p[0], p[1], size, rgb & 0xffffff, bytes(txt, 'utf-8'))
 
     def save(self, file_path: str) -> None:
         """
-        Saves the tensor to a binary magnetron file.
+        Saves the _ptr to a binary magnetron file.
 
         Parameters
         ----------
         file_path : str
-            File path to save the tensor. Appends '.magnetron' if not present.
+            File path to save the _ptr. Appends '.magnetron' if not present.
         """
         if not file_path.endswith('.magnetron'):
             file_path += '.magnetron'
-        C.mag_tensor_save(self.tensor, bytes(file_path, 'utf-8'))
+        C.mag_tensor_save(self._ptr, bytes(file_path, 'utf-8'))
 
     def save_image(self, file_path: str) -> None:
         """
-        Saves a 3D image tensor as a JPG image file.
+        Saves a 3D image _ptr as a JPG image file.
 
         Parameters
         ----------
@@ -1150,48 +1150,48 @@ class Tensor:
         Raises
         ------
         AssertionError
-            If tensor is not 3D or channel count is not supported.
+            If _ptr is not 3D or channel count is not supported.
         """
-        assert self.rank == 3, 'Tensor must be a 3D image tensor'
+        assert self.rank == 3, 'Tensor must be a 3D image _ptr'
         assert self.channels in (1, 3, 4), 'Invalid number of color channels'
-        C.mag_tensor_save_image(self.tensor, bytes(file_path, 'utf-8'))
+        C.mag_tensor_save_image(self._ptr, bytes(file_path, 'utf-8'))
 
     def clone(self) -> 'Tensor':
         """
-        Creates a new tensor with the same data as this one (deep copy).
+        Creates a new _ptr with the same data as this one (deep copy).
 
         Returns
         -------
         Tensor
-            A cloned tensor.
+            A cloned _ptr.
         """
-        return Tensor(C.mag_clone(self.tensor))
+        return Tensor(C.mag_clone(self._ptr))
 
     def view(self) -> 'Tensor':
         """
-        Creates a view of the tensor that shares underlying data (shallow copy).
+        Creates a view of the _ptr that shares underlying data (shallow copy).
 
         Returns
         -------
         Tensor
-            A view tensor.
+            A view _ptr.
         """
-        return Tensor(C.mag_view(self.tensor))
+        return Tensor(C.mag_view(self._ptr))
 
     def transpose(self) -> 'Tensor':
         """
-        Transposes the tensor (swaps the last two dimensions).
+        Transposes the _ptr (swaps the last two dimensions).
 
         Returns
         -------
         Tensor
-            A transposed tensor.
+            A transposed _ptr.
         """
-        return Tensor(C.mag_transpose(self.tensor))
+        return Tensor(C.mag_transpose(self._ptr))
 
     def permute(self, axes: tuple[int, ...]) -> 'Tensor':
         """
-        Permutes the dimensions of the tensor.
+        Permutes the dimensions of the _ptr.
 
         Parameters
         ----------
@@ -1201,46 +1201,46 @@ class Tensor:
         Returns
         -------
         Tensor
-            A tensor with permuted dimensions.
+            A _ptr with permuted dimensions.
         """
         assert len(axes) == MAX_DIMS, f'Invalid number of axes: {axes}'
         for i in range(MAX_DIMS):
             assert 0 <= axes[i] < MAX_DIMS
             for j in range(i + 1, MAX_DIMS):
                 assert axes[i] != axes[j], f'Duplicate axis: {axes[i]}'
-        return Tensor(C.mag_permute(self.tensor, *axes))
+        return Tensor(C.mag_permute(self._ptr, *axes))
 
     def mean(self) -> 'Tensor':
-        """Computes the mean of all elements in the tensor."""
-        return Tensor(C.mag_mean(self.tensor))
+        """Computes the mean of all elements in the _ptr."""
+        return Tensor(C.mag_mean(self._ptr))
 
     def min(self) -> 'Tensor':
-        """Computes the minimum value in the tensor."""
-        return Tensor(C.mag_min(self.tensor))
+        """Computes the minimum value in the _ptr."""
+        return Tensor(C.mag_min(self._ptr))
 
     def max(self) -> 'Tensor':
-        """Computes the maximum value in the tensor."""
-        return Tensor(C.mag_max(self.tensor))
+        """Computes the maximum value in the _ptr."""
+        return Tensor(C.mag_max(self._ptr))
 
     def sum(self) -> 'Tensor':
-        """Computes the sum of all elements in the tensor."""
-        return Tensor(C.mag_sum(self.tensor))
+        """Computes the sum of all elements in the _ptr."""
+        return Tensor(C.mag_sum(self._ptr))
 
     def abs(self) -> 'Tensor':
         """Computes element-wise absolute value."""
-        return Tensor(C.mag_abs(self.tensor))
+        return Tensor(C.mag_abs(self._ptr))
 
     def abs_(self) -> 'Tensor':
         """In-place element-wise absolute value."""
-        return Tensor(C.mag_abs_(self.tensor))
+        return Tensor(C.mag_abs_(self._ptr))
 
     def neg(self) -> 'Tensor':
         """Computes element-wise negation."""
-        return Tensor(C.mag_neg(self.tensor))
+        return Tensor(C.mag_neg(self._ptr))
 
     def neg_(self) -> 'Tensor':
         """In-place element-wise negation."""
-        return Tensor(C.mag_neg_(self.tensor))
+        return Tensor(C.mag_neg_(self._ptr))
 
     def __neg__(self) -> 'Tensor':
         """Overloads unary negation: -X."""
@@ -1248,55 +1248,55 @@ class Tensor:
 
     def log(self) -> 'Tensor':
         """Computes element-wise natural logarithm."""
-        return Tensor(C.mag_log(self.tensor))
+        return Tensor(C.mag_log(self._ptr))
 
     def log_(self) -> 'Tensor':
         """In-place element-wise natural logarithm."""
-        return Tensor(C.mag_log_(self.tensor))
+        return Tensor(C.mag_log_(self._ptr))
 
     def sqr(self) -> 'Tensor':
         """Computes element-wise square of values."""
-        return Tensor(C.mag_sqr(self.tensor))
+        return Tensor(C.mag_sqr(self._ptr))
 
     def sqr_(self) -> 'Tensor':
         """In-place element-wise square of values."""
-        return Tensor(C.mag_sqr_(self.tensor))
+        return Tensor(C.mag_sqr_(self._ptr))
 
     def sqrt(self) -> 'Tensor':
         """Computes element-wise square root."""
-        return Tensor(C.mag_sqrt(self.tensor))
+        return Tensor(C.mag_sqrt(self._ptr))
 
     def sqrt_(self) -> 'Tensor':
         """In-place element-wise square root."""
-        return Tensor(C.mag_sqrt_(self.tensor))
+        return Tensor(C.mag_sqrt_(self._ptr))
 
     def sin(self) -> 'Tensor':
         """Computes element-wise sine."""
-        return Tensor(C.mag_sin(self.tensor))
+        return Tensor(C.mag_sin(self._ptr))
 
     def sin_(self) -> 'Tensor':
         """In-place element-wise sine."""
-        return Tensor(C.mag_sin_(self.tensor))
+        return Tensor(C.mag_sin_(self._ptr))
 
     def cos(self) -> 'Tensor':
         """Computes element-wise cosine."""
-        return Tensor(C.mag_cos(self.tensor))
+        return Tensor(C.mag_cos(self._ptr))
 
     def cos_(self) -> 'Tensor':
         """In-place element-wise cosine."""
-        return Tensor(C.mag_cos_(self.tensor))
+        return Tensor(C.mag_cos_(self._ptr))
 
     def heaviside_step(self) -> 'Tensor':
         """Computes element-wise Heaviside step function."""
-        return Tensor(C.mag_step(self.tensor))
+        return Tensor(C.mag_step(self._ptr))
 
     def heaviside_step_(self) -> 'Tensor':
         """In-place element-wise Heaviside step function."""
-        return Tensor(C.mag_step_(self.tensor))
+        return Tensor(C.mag_step_(self._ptr))
 
     def softmax(self, derivative: bool = False) -> 'Tensor':
         """
-        Applies softmax or its derivative on the tensor.
+        Applies softmax or its derivative on the _ptr.
 
         Parameters
         ----------
@@ -1306,17 +1306,17 @@ class Tensor:
         Returns
         -------
         Tensor
-            The transformed tensor.
+            The transformed _ptr.
         """
-        return Tensor(C.mag_softmax_dv(self.tensor) if derivative else C.mag_softmax(self.tensor))
+        return Tensor(C.mag_softmax_dv(self._ptr) if derivative else C.mag_softmax(self._ptr))
 
     def softmax_(self, derivative: bool = False) -> 'Tensor':
         """In-place softmax or softmax derivative."""
-        return Tensor(C.mag_softmax_dv_(self.tensor) if derivative else C.mag_softmax_(self.tensor))
+        return Tensor(C.mag_softmax_dv_(self._ptr) if derivative else C.mag_softmax_(self._ptr))
 
     def sigmoid(self, derivative: bool = False) -> 'Tensor':
         """
-        Applies sigmoid or its derivative on the tensor.
+        Applies sigmoid or its derivative on the _ptr.
 
         Parameters
         ----------
@@ -1326,21 +1326,21 @@ class Tensor:
         Returns
         -------
         Tensor
-            The transformed tensor.
+            The transformed _ptr.
         """
-        return Tensor(C.mag_sigmoid_dv(self.tensor) if derivative else C.mag_sigmoid(self.tensor))
+        return Tensor(C.mag_sigmoid_dv(self._ptr) if derivative else C.mag_sigmoid(self._ptr))
 
     def sigmoid_(self, derivative: bool = False) -> 'Tensor':
         """In-place sigmoid or sigmoid derivative."""
-        return Tensor(C.mag_sigmoid_dv_(self.tensor) if derivative else C.mag_sigmoid_(self.tensor))
+        return Tensor(C.mag_sigmoid_dv_(self._ptr) if derivative else C.mag_sigmoid_(self._ptr))
 
     def hard_sigmoid(self) -> 'Tensor':
-        """Applies hard sigmoid to the tensor."""
-        return Tensor(C.mag_hard_sigmoid(self.tensor))
+        """Applies hard sigmoid to the _ptr."""
+        return Tensor(C.mag_hard_sigmoid(self._ptr))
 
     def hard_sigmoid_(self) -> 'Tensor':
         """In-place hard sigmoid."""
-        return Tensor(C.mag_hard_sigmoid_(self.tensor))
+        return Tensor(C.mag_hard_sigmoid_(self._ptr))
 
     def silu(self, derivative: bool = False) -> 'Tensor':
         """
@@ -1354,13 +1354,13 @@ class Tensor:
         Returns
         -------
         Tensor
-            The transformed tensor.
+            The transformed _ptr.
         """
-        return C.mag_silu_dv(self.tensor) if derivative else C.mag_silu(self.tensor)
+        return C.mag_silu_dv(self._ptr) if derivative else C.mag_silu(self._ptr)
 
     def silu_(self, derivative: bool = False) -> 'Tensor':
         """In-place SiLU or SiLU derivative."""
-        return Tensor(C.mag_silu_dv_(self.tensor) if derivative else C.mag_silu_(self.tensor))
+        return Tensor(C.mag_silu_dv_(self._ptr) if derivative else C.mag_silu_(self._ptr))
 
     def tanh(self, derivative: bool = False) -> 'Tensor':
         """
@@ -1374,13 +1374,13 @@ class Tensor:
         Returns
         -------
         Tensor
-            The transformed tensor.
+            The transformed _ptr.
         """
-        return Tensor(C.mag_tanh_dv(self.tensor) if derivative else C.mag_tanh(self.tensor))
+        return Tensor(C.mag_tanh_dv(self._ptr) if derivative else C.mag_tanh(self._ptr))
 
     def tanh_(self, derivative: bool = False) -> 'Tensor':
         """In-place tanh or tanh derivative."""
-        return Tensor(C.mag_tanh_dv_(self.tensor) if derivative else C.mag_tanh_(self.tensor))
+        return Tensor(C.mag_tanh_dv_(self._ptr) if derivative else C.mag_tanh_(self._ptr))
 
     def relu(self, derivative: bool = False) -> 'Tensor':
         """
@@ -1394,13 +1394,13 @@ class Tensor:
         Returns
         -------
         Tensor
-            The transformed tensor.
+            The transformed _ptr.
         """
-        return Tensor(C.mag_relu_dv(self.tensor) if derivative else C.mag_relu(self.tensor))
+        return Tensor(C.mag_relu_dv(self._ptr) if derivative else C.mag_relu(self._ptr))
 
     def relu_(self, derivative: bool = False) -> 'Tensor':
         """In-place ReLU or ReLU derivative."""
-        return Tensor(C.mag_relu_dv_(self.tensor) if derivative else C.mag_relu_(self.tensor))
+        return Tensor(C.mag_relu_dv_(self._ptr) if derivative else C.mag_relu_(self._ptr))
 
     def gelu(self, derivative: bool = False) -> 'Tensor':
         """
@@ -1414,61 +1414,61 @@ class Tensor:
         Returns
         -------
         Tensor
-            The transformed tensor.
+            The transformed _ptr.
         """
-        return Tensor(C.mag_gelu_dv(self.tensor) if derivative else C.mag_gelu(self.tensor))
+        return Tensor(C.mag_gelu_dv(self._ptr) if derivative else C.mag_gelu(self._ptr))
 
     def gelu_(self, derivative: bool = False) -> 'Tensor':
         """In-place GELU or GELU derivative."""
-        return Tensor(C.mag_gelu_dv_(self.tensor) if derivative else C.mag_gelu_(self.tensor))
+        return Tensor(C.mag_gelu_dv_(self._ptr) if derivative else C.mag_gelu_(self._ptr))
 
     def __add__(self, other: object | int | float) -> 'Tensor':
-        """Element-wise addition with another tensor or scalar."""
-        return Tensor(C.mag_add(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_adds(self.tensor,
-                                                                                                        float(other)))
+        """Element-wise addition with another _ptr or scalar."""
+        return Tensor(C.mag_add(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_adds(self._ptr,
+                                                                                                    float(other)))
 
     def __iadd__(self, other: object | int | float) -> 'Tensor':
         """In-place element-wise addition."""
-        return Tensor(C.mag_add_(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_adds_(self.tensor,
-                                                                                                          float(other)))
+        return Tensor(C.mag_add_(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_adds_(self._ptr,
+                                                                                                      float(other)))
 
     def __sub__(self, other: object | int | float) -> 'Tensor':
-        """Element-wise subtraction with another tensor or scalar."""
-        return Tensor(C.mag_sub(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_subs(self.tensor,
-                                                                                                        float(other)))
+        """Element-wise subtraction with another _ptr or scalar."""
+        return Tensor(C.mag_sub(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_subs(self._ptr,
+                                                                                                    float(other)))
 
     def __isub__(self, other: object | int | float) -> 'Tensor':
         """In-place element-wise subtraction."""
-        return Tensor(C.mag_sub_(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_subs_(self.tensor,
-                                                                                                          float(other)))
+        return Tensor(C.mag_sub_(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_subs_(self._ptr,
+                                                                                                      float(other)))
 
     def __mul__(self, other: object | int | float) -> 'Tensor':
-        """Element-wise multiplication with another tensor or scalar."""
-        return Tensor(C.mag_mul(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_muls(self.tensor,
-                                                                                                        float(other)))
+        """Element-wise multiplication with another _ptr or scalar."""
+        return Tensor(C.mag_mul(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_muls(self._ptr,
+                                                                                                    float(other)))
 
     def __imul__(self, other: object | int | float) -> 'Tensor':
         """In-place element-wise multiplication."""
-        return Tensor(C.mag_mul_(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_muls_(self.tensor,
-                                                                                                          float(other)))
+        return Tensor(C.mag_mul_(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_muls_(self._ptr,
+                                                                                                      float(other)))
 
     def __truediv__(self, other: object | int | float) -> 'Tensor':
-        """Element-wise division with another tensor or scalar."""
-        return Tensor(C.mag_div(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_divs(self.tensor,
-                                                                                                        float(other)))
+        """Element-wise division with another _ptr or scalar."""
+        return Tensor(C.mag_div(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_divs(self._ptr,
+                                                                                                    float(other)))
 
     def __itruediv__(self, other: object | int | float) -> 'Tensor':
         """In-place element-wise division."""
-        return Tensor(C.mag_div_(self.tensor, other.tensor) if isinstance(other, Tensor) else C.mag_divs_(self.tensor,
-                                                                                                          float(other)))
+        return Tensor(C.mag_div_(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_divs_(self._ptr,
+                                                                                                      float(other)))
 
     def __matmul__(self, other: 'Tensor') -> 'Tensor':
-        """Matrix multiplication with another tensor: A @ B."""
-        return Tensor(C.mag_matmul(self.tensor, other.tensor))
+        """Matrix multiplication with another _ptr: A @ B."""
+        return Tensor(C.mag_matmul(self._ptr, other._ptr))
 
     def __imatmul__(self, other: 'Tensor') -> 'Tensor':
         """In-place matrix multiplication: A @= B."""
-        return Tensor(C.mag_matmul_(self.tensor, other.tensor))
+        return Tensor(C.mag_matmul_(self._ptr, other._ptr))
 
     def __eq__(self, other: 'Tensor') -> bool:
         """
@@ -1477,16 +1477,53 @@ class Tensor:
         Parameters
         ----------
         other : Tensor
-            Another tensor to compare.
+            Another _ptr to compare.
 
         Returns
         -------
         bool
             True if equal, otherwise False.
         """
-        return C.mag_tensor_eq(self.tensor, other.tensor)
+        return C.mag_tensor_eq(self._ptr, other._ptr)
 
     def __str__(self) -> str:
-        """String representation prints the tensor header and data."""
+        """String representation prints the _ptr header and data."""
         self.print(True, True)
         return ''
+
+    def __getitem__(self, indices: int | tuple[int, ...]) -> float:
+        """Retrieve a value via virtual or physical indexing."""
+        if isinstance(indices, int):
+            return C.mag_tensor_get_scalar_virtual_index(self._ptr, indices)
+        elif isinstance(indices, tuple):
+            idx = indices + (0,) * (6 - len(indices))
+            return C.mag_tensor_get_scalar_physical_index(
+                self._ptr,
+                idx[0],
+                idx[1],
+                idx[2],
+                idx[3],
+                idx[4],
+                idx[5],
+            )
+        else:
+            raise TypeError("Indices must be an int or a tuple of ints.")
+
+    def __setitem__(self, indices: int | tuple[int, ...], value: float) -> None:
+        """Set a value via virtual or physical indexing."""
+        if isinstance(indices, int):
+            C.mag_tensor_set_scalar_virtual_index(self._ptr, indices, float(value))
+        elif isinstance(indices, tuple):
+            idx = indices + (0,) * (6 - len(indices))
+            C.mag_tensor_set_scalar_physical_index(
+                self._ptr,
+                idx[0],
+                idx[1],
+                idx[2],
+                idx[3],
+                idx[4],
+                idx[5],
+                float(value),
+            )
+        else:
+            raise TypeError("Indices must be an int or a tuple of ints.")

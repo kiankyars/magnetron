@@ -1,4 +1,4 @@
-/* (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
+/* (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
 
 #if !defined(__ARM_FEATURE_FP16_SCALAR_ARITHMETIC) \
     || !defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)

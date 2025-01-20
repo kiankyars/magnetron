@@ -1,4 +1,4 @@
-# (c) 2024 Mario 'Neo' Sieg. <mario.sieg.64@gmail.com>
+# (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
 import time
 import sys
@@ -21,7 +21,7 @@ class MAGNETRONViewer(QMainWindow):
     def __init__(self):
         super().__init__()
         self.window_icon = QIcon('logo.png')
-        self.tensor_icon = QIcon('icons/tensor.png')
+        self.tensor_icon = QIcon('icons/_ptr.png')
         self.folder_icon = QIcon('icons/folder.png')
         self.metadata_icon = QIcon('icons/metadata.png')
         self.setWindowTitle('magnetron File Viewer')

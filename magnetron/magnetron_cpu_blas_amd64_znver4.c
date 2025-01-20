@@ -1,4 +1,4 @@
-/* (c) 2024 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
+/* (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
 
 #if !defined(__AVX512F__) || !defined(__AVX512VL__)  || !defined(__AVX512VNNI__)
     || !defined(__AVX512BF16__)  || !defined(__AVX512BW__)  || !defined(__AVX512DQ__)

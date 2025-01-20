@@ -1,4 +1,4 @@
-# (c) 2024 Mario 'Neo' Sieg. <mario.sieg.64@gmail.com>
+# (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 # Implements utility functions for magnetron. Requires matplotlib and numpy.
 
 from magnetron.core import Tensor
