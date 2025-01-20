@@ -976,9 +976,9 @@ static bool mag_check_is_shape_eq(mag_op_t op, const mag_tensor_t* a, const mag_
     mag_fmt_dims(&shape_2, &b->shape, b->rank);
     fprintf(stderr,
         "Failed to execute operation: %s.\n"
-        "ERROR: Input tensor shapes must be equal.\n"
-        "    - Input Tensor 1 '%s' Shape: %s\n"
-        "    - Input Tensor 2 '%s' Shape: %s\n"
+        "ERROR: Tensor shapes must be equal.\n"
+        "    - Tensor 1 '%s' Shape: %s\n"
+        "    - Tensor 2 '%s' Shape: %s\n"
         "    Hint: Adjust tensor shapes using transpose() or permute().\n",
         meta->mnemonic,
         a->name, shape_1,
@@ -1112,17 +1112,13 @@ static mag_tensor_t* mag_result_constructor_routine_isomorph(mag_tensor_t** inpu
 static mag_tensor_t* mag_result_constructor_routine_view(mag_tensor_t** inputs,  const mag_op_param_t* params) {
     (void)params;
     mag_tensor_t* base = *inputs;
-    return mag_tensor_create(base->ctx, base->dtype, base->shape, base->rank, base, 0);
+    return mag_tensor_create(base->ctx, base->dtype, base->shape, MAG_MAX_DIMS, base, 0);
 }
 
 static mag_tensor_t* mag_result_constructor_routine_scalar(mag_tensor_t** inputs,  const mag_op_param_t* params) {
-    int64_t shape[MAG_MAX_DIMS];
-    *shape = 1;
     mag_tensor_t* base = *inputs;
-    #pragma GCC unroll 5
-    for (uint32_t i=1; i < MAG_MAX_DIMS; ++i)
-        shape[i] = base->shape[i];
-    return mag_tensor_create(base->ctx, base->dtype, shape, MAG_MAX_DIMS, NULL, 0);
+    int64_t shape = 1;
+    return mag_tensor_create(base->ctx, base->dtype, &shape, shape, NULL, 0);
 }
 
 static mag_tensor_t* mag_result_constructor_routine_transposed(mag_tensor_t** inputs,  const mag_op_param_t* params) {

@@ -472,7 +472,7 @@ class Tensor:
 
     def __del__(self) -> None:
         """Releases _ptr resources upon object destruction."""
-        if isinstance(self._ptr, ffi.CData) and self._ptr != ffi.NULL:
+        if hasattr(self, '_ptr') and isinstance(self._ptr, ffi.CData) and self._ptr != ffi.NULL:
             C.mag_tensor_decref(self._ptr)
         self._ptr = ffi.NULL
 
