@@ -23,24 +23,14 @@ macro_substitutions: dict[str, str] = {
     'MAG_MAX_OP_PARAMS': str(6)  # SYNC with magnetron.h
 }
 
-enums_names: list[str] = []
-struct_names: list[str] = []
-
-
 def keep_line(line: str) -> bool:
     if line == '' or line.startswith('#'):
         return False
-    if line.startswith('extern') and not line.startswith('extern "C"'):
-        return True
-    if line.startswith('typedef enum'):
-        enums_names.append(line.split()[2])
+    if line.startswith('extern "C"'):
         return False
-    if line.startswith('typedef struct'):
-        struct_names.append(line.split()[2])
+    if line.startswith('mag_static_assert'):
         return False
-    if line.startswith('typedef'):
-        return True
-    return False
+    return True
 
 
 c_input: list[str] = []
@@ -57,16 +47,13 @@ with open(C_HDR_FILE, 'rt') as f:
     c_input = [line for line in c_input if keep_line(line)]  # remove empty lines
 
 out = f'# Autogenered by {__file__} {datetime.datetime.now()}, do NOT edit!\n\n'
-out += "__MAG_CDECLS: str = '''\n\n"
-for struct in struct_names:
-    out += f'typedef struct {struct} {struct};\n'
-out += '\n'
-for enum in enums_names:
-    out += f'typedef int {enum};\n'
-out += '\n'
+out += "__MAG_CDECLS: str = '''\n"
 for line in c_input:
     out += f'{line}\n'
-out += "'''\n\n"
+out = out.rstrip()
+if out.endswith('}'):
+    out = out[:-1]
+out += "'''\n"
 
 with open(OUTPUT_FILE, 'wt') as f:
     f.write(out)

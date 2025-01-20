@@ -470,7 +470,8 @@ class Tensor:
 
     def __del__(self) -> None:
         """Releases tensor resources upon object destruction."""
-        C.mag_tensor_decref(self.tensor)
+        if isinstance(self.tensor, ffi.CData) and self.tensor != ffi.NULL:
+            C.mag_tensor_decref(self.tensor)
         self.tensor = ffi.NULL
 
     _DISPATCH = {
