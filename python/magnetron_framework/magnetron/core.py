@@ -465,6 +465,8 @@ class Tensor:
         ptr : ffi.CData or None
             Internal tensor instance (C data pointer).
         """
+        if isinstance(ptr, ffi.CData):
+            assert ptr != ffi.NULL, 'Invalid tensor pointer'
         self._ctx = None
         self._ptr = ptr
 

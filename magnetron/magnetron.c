@@ -888,19 +888,7 @@ const mag_dtype_meta_t* mag_dtype_meta_of(mag_dtype_t type) {
     return &infos[type];
 }
 
-/*
-**  validation error print template
-**
-**
-printf("SHORT ERROR DESCRIPTION"
-        "ERROR: Failed to execute operation: %s.\n"
-        "    - Input Tensor 1 '%s': MISMATCHES\n"
-        "    - Input Tensor 2 '%s': MISMATCHES\n"
-        "    Hint: ANY HINT FOR USR."
-);
-*/
-
-static bool mag_validate_inputs(mag_op_t op, mag_tensor_t** inputs, uint32_t numin) {
+static bool mag_check_are_inputs_valid(mag_op_t op, mag_tensor_t** inputs, uint32_t numin) {
     const mag_op_meta_t* meta = mag_op_meta_of(op);
     if (mag_unlikely(meta->argcount != numin || numin > MAG_MAX_INPUT_TENSORS)) {
         mag_print_separator(stderr);
@@ -933,7 +921,7 @@ static bool mag_validate_inputs(mag_op_t op, mag_tensor_t** inputs, uint32_t num
     return true;
 }
 
-static bool mag_validate_op_params(mag_op_t op, const mag_op_param_t* params, uint32_t numparams) {
+static bool mag_check_are_op_params_valid(mag_op_t op, const mag_op_param_t* params, uint32_t numparams) {
     const mag_op_meta_t* meta = mag_op_meta_of(op);
     if (!meta->paramcount) return true; /* No parameters to validate. */
     if (mag_unlikely(meta->paramcount != numparams || numparams > MAG_MAX_OP_PARAMS)) {
@@ -978,7 +966,7 @@ static bool mag_validate_op_params(mag_op_t op, const mag_op_param_t* params, ui
     return true;
 }
 
-static bool mag_validate_shape_eq(mag_op_t op, const mag_tensor_t* a, const mag_tensor_t* b) {
+static bool mag_check_is_shape_eq(mag_op_t op, const mag_tensor_t* a, const mag_tensor_t* b) {
     const mag_op_meta_t* meta = mag_op_meta_of(op);
     if (mag_likely(mag_tensor_is_shape_eq(a, b))) return true;
     mag_print_separator(stderr);
@@ -991,7 +979,7 @@ static bool mag_validate_shape_eq(mag_op_t op, const mag_tensor_t* a, const mag_
         "ERROR: Input tensor shapes must be equal.\n"
         "    - Input Tensor 1 '%s' Shape: %s\n"
         "    - Input Tensor 2 '%s' Shape: %s\n"
-        "    Hint:Adjust tensor shapes using transpose() or permute().\n",
+        "    Hint: Adjust tensor shapes using transpose() or permute().\n",
         meta->mnemonic,
         a->name, shape_1,
         b->name, shape_2
@@ -1002,7 +990,7 @@ static bool mag_validate_shape_eq(mag_op_t op, const mag_tensor_t* a, const mag_
     return false;
 }
 
-static bool mag_validate_shape_broadcastable(mag_op_t op, const mag_tensor_t* a, const mag_tensor_t* b) { /* Check if tensor shapes are broadcast-able. (b into a) */
+static bool mag_check_is_shape_broadcastable(mag_op_t op, const mag_tensor_t* a, const mag_tensor_t* b) { /* Check if tensor shapes are broadcast-able. (b into a) */
     const mag_op_meta_t* meta = mag_op_meta_of(op);
     if (mag_likely(mag_tensor_can_broadcast(b, a))) return true;
     mag_print_separator(stderr);
@@ -1036,25 +1024,65 @@ static bool mag_validate_shape_broadcastable(mag_op_t op, const mag_tensor_t* a,
     return false;
 }
 
-#define mag_validate_expr_gen(expr, message, ...) \
-    if (mag_unlikely(!(expr))) { \
-        if (1) { \
-           mag_log_error(message, ## __VA_ARGS__); \
-        } \
-        return false; \
-    }
+static bool mag_check_is_shape_matmulable(mag_op_t op, const mag_tensor_t* a, const mag_tensor_t* b) { /* Check if tensor shapes are broadcast-able. (b into a) */
+    const mag_op_meta_t* meta = mag_op_meta_of(op);
+    if (mag_likely(a->shape[1] == b->shape[0])) return true;
+    bool valid_dims = true;
+    for (uint32_t i=2; i < MAG_MAX_DIMS; ++i)
+        valid_dims &= a->shape[i] == 1 && b->shape[i] == 1;
+    if (mag_likely(valid_dims)) return true;
+
+    mag_print_separator(stderr);
+    char shape_1[MAG_FMT_DIM_BUF_SIZE];
+    char shape_2[MAG_FMT_DIM_BUF_SIZE];
+    mag_fmt_dims(&shape_1, &a->shape, a->rank);
+    mag_fmt_dims(&shape_2, &b->shape, b->rank);
+    fprintf(stderr,
+        "Failed to execute operation: %s.\n"
+        "ERROR: Input tensor shapes are not compatible for matrix multiplication. The rows of the first tensor must match the columns of the second tensor.\n"
+        "    - Input Tensor 1 '%s' Shape: %s\n"
+        "    - Input Tensor 2 '%s' Shape: %s\n"
+        "    Hint: Adjust tensor shapes using transpose() or permute().\n",
+        meta->mnemonic,
+        a->name, shape_1,
+        b->name, shape_2
+    );
+    mag_print_separator(stderr);
+    fputc('\n', stderr);
+    fflush(stderr);
+    return false;
+}
+
+static bool mag_check_is_contiguous(mag_op_t op, const mag_tensor_t* a) {
+    const mag_op_meta_t* meta = mag_op_meta_of(op);
+    if (mag_likely(mag_tensor_is_contiguous(a))) return true;
+    mag_print_separator(stderr);
+    char shape[MAG_FMT_DIM_BUF_SIZE];
+    mag_fmt_dims(&shape, &a->shape, a->rank);
+    fprintf(stderr,
+        "Failed to execute operation: %s.\n"
+        "ERROR: Tensor '%s' must be contiguous. Shape: %s\n"
+        "    Hint: Make tensor contiguous using clone().\n",
+        meta->mnemonic,
+        a->name,
+        shape
+    );
+    mag_print_separator(stderr);
+    fputc('\n', stderr);
+    fflush(stderr);
+    return false;
+}
 
 static bool mag_validate_op_unary(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
-    if (mag_unlikely(!mag_validate_shape_eq(op, result, inputs[0]))) return false;
-    return true;
+   return mag_check_is_shape_eq(op, result, inputs[0]);
 }
 
 static bool mag_validate_op_binary(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
-    if (mag_unlikely(!mag_validate_shape_eq(op, result, inputs[0]))) return false;
-    if (mag_unlikely(!mag_validate_shape_broadcastable(op, inputs[0], inputs[1]))) return false;
-    mag_validate_expr_gen(mag_tensor_is_contiguous(result), "Result must be contiguous.");
-    mag_validate_expr_gen(mag_tensor_is_contiguous(inputs[0]), "First tensor must be contiguous.");
-    return true;
+    bool valid = true;
+    valid = valid && mag_check_is_shape_eq(op, result, inputs[0]);
+    valid = valid && mag_check_is_shape_broadcastable(op, inputs[0], inputs[1]);
+    valid = valid && mag_check_is_contiguous(op, result);
+    return valid;
 }
 
 static bool mag_validate_op_transpose(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
@@ -1062,21 +1090,15 @@ static bool mag_validate_op_transpose(mag_op_t op, mag_tensor_t* result, mag_ten
 }
 
 static bool mag_validate_op_scalar(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
-    mag_validate_expr_gen(mag_tensor_is_contiguous(inputs[0]), "Mean"); /* TODO */
-    mag_validate_expr_gen(result->shape[0] == 1, "Mean");
-    mag_validate_expr_gen(result->shape[1] == inputs[0]->shape[1], "Mean");
-    mag_validate_expr_gen(result->shape[2] == inputs[0]->shape[2], "Mean");
-    mag_validate_expr_gen(result->shape[3] == inputs[0]->shape[3], "Mean");
-    return true;
+    return mag_check_is_contiguous(op, inputs[0]);
 }
 
 static bool mag_validate_op_matmul(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
-    mag_validate_expr_gen(inputs[0]->shape[1] == inputs[1]->shape[0], "Input tensor shapes must be compatible for matrix multiplication.");
-    mag_validate_expr_gen(mag_tensor_is_contiguous(inputs[0]), "First tensor must be contiguous.");
-    mag_validate_expr_gen(mag_tensor_is_contiguous(inputs[1]), "Second tensor must be contiguous.");
-    mag_validate_expr_gen(inputs[1]->shape[2] % inputs[0]->shape[2] == 0, "Result tensor shape mismatch.");
-    mag_validate_expr_gen(inputs[1]->shape[3] % inputs[0]->shape[3] == 0, "Result tensor shape mismatch.");
-    return true;
+    bool valid = true;
+    valid = valid && mag_check_is_shape_matmulable(op, inputs[0], inputs[1]);
+    valid = valid && mag_check_is_contiguous(op, inputs[0]);
+    valid = valid && mag_check_is_contiguous(op, inputs[1]);
+    return valid;
 }
 
 static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const int64_t* dims, int64_t rank, mag_tensor_t* view, size_t view_offs);
@@ -1684,8 +1706,8 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
 ) {
     /* Validate inputs and params first */
     mag_assert2(op != MAG_OP_NOP);
-    mag_assert(inputs && mag_validate_inputs(op, inputs, numin), "Invalid input tensors for operation %s.", mag_op_meta_of(op)->mnemonic);
-    mag_assert(mag_validate_op_params(op, params, numparams), "Invalid parameters for operation %s.", mag_op_meta_of(op)->mnemonic);
+    mag_assert(inputs && mag_check_are_inputs_valid(op, inputs, numin), "Invalid input tensors for operation %s.", mag_op_meta_of(op)->mnemonic);
+    mag_assert(mag_check_are_op_params_valid(op, params, numparams), "Invalid parameters for operation %s.", mag_op_meta_of(op)->mnemonic);
 
     const mag_op_meta_t* meta = mag_op_meta_of(op);
     mag_graph_eval_order_t gra = MAG_GRA_FWD; /* TODO */

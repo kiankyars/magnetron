@@ -1310,8 +1310,8 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
     mag_load_local_storage_group(x, xs, strides);
     mag_load_local_storage_group(y, yd, shape);
     mag_load_local_storage_group(y, ys, strides);
-    mag_assert2(xd2 == 1 && xd3 == 1);
-    mag_assert2(yd2 == 1 && yd3 == 1);
+    mag_assert2(xd2 == 1 && xd3 == 1 && xd4 == 1&& xd5 == 1);
+    mag_assert2(yd2 == 1 && yd3 == 1 && yd4 == 1&& yd5 == 1);
     int64_t tc = payload->thread_num;
     int64_t ti = payload->thread_idx;
     int64_t numel = xd0;
