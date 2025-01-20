@@ -32,3 +32,11 @@ def test_tensor_scalar_get_set_virtual():
     assert tensor[0] == 128
     tensor[15] = 3.14
     assert abs(tensor[15] - 3.14) < 1e-6
+
+def test_tensor_to_list():
+    tensor = Tensor.zeros((2, 2))
+    tensor[0] = 128
+    tensor[1] = 255
+    tensor[2] = -22333
+    tensor[3] = 22
+    assert tensor.to_list() == [128, 255, -22333, 22]

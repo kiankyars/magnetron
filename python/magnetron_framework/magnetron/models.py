@@ -33,12 +33,12 @@ class Optim:
     @staticmethod
     def mse(y: mag.Tensor, y_hat: mag.Tensor) -> float:
         """Mean Squared Error"""
-        return (y - y_hat).sqr_().mean().scalar()
+        return (y - y_hat).sqr_().mean()[0]
 
     @staticmethod
     def cross_entropy(y: mag.Tensor, y_hat: mag.Tensor) -> float:
         """Cross Entropy Loss"""
-        return -(y * y_hat.log_()).sum().scalar()
+        return -(y * y_hat.log_()).sum()[0]
 
 
 class DenseLayer(Layer):

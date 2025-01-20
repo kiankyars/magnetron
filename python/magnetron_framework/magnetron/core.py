@@ -836,18 +836,6 @@ class Tensor:
         assert self.dtype == DType.F32, 'Invalid data type'
         return ffi.unpack(ffi.cast('float*', C.mag_tensor_data_ptr(self._ptr)), self.numel)
 
-    def scalar(self) -> float:
-        """
-        Returns the scalar value of a 0D _ptr.
-
-        Returns
-        -------
-        float
-            The single scalar value.
-        """
-        assert self.dtype == DType.F32, 'Invalid data type'
-        return ffi.unpack(ffi.cast('float*', C.mag_tensor_data_ptr(self._ptr)), 1)[0]
-
     @property
     def data_size(self) -> int:
         """
