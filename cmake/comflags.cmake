@@ -27,6 +27,7 @@ set(MAG_CLANG_COMPILE_FLAGS
 set(MAG_CLANG_RELEASE_COMPILE_FLAGS
     -O3
     -flto
+    -fomit-frame-pointer
 )
 set(MAG_CLANG_LINK_OPTIONS "")
 set(MAG_CLANG_RELEASE_LINK_OPTIONS -flto)
