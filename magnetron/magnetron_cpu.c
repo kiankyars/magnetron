@@ -50,7 +50,7 @@ static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_re
             has_all_features &= mag_ctx_x86_64_cpu_has_feature(ctx, features[j]);
         if (has_all_features) { /* Since specializations are sorted by score, we found the perfect spec. */
             (*spec->inject_kernels)(kernels);
-            mag_log_info("Using BLAS specialization: %s", spec->name);
+            mag_log_info("Using tuned BLAS specialization: %s", spec->name);
             return true;
         }
     }
@@ -70,16 +70,12 @@ static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_re
 mag_cpu_blas_spec_decl(82);
 
 static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_registry_t* kernels) {
-#ifdef __linux__
-    long hwcap = ctx->sys.cpu_arm64_hwcap;
-    if (hwcap & HWCAP_FPHP) && (hwcap & HWCAP_ASIMDHP) && (hwcap && HWCAP_ASIMDDP)) { /* ARM v.8.2 f16 scalar + f16 vec + dotprod */
+    mag_arm64_cap_t feat = ctx->sys.arm64_cpu_features;
+    if (feat & (1u<<MAG_ARM64_CAP_NEON) && feat & (1<<MAG_ARM64_CAP_DOTPROD)) {
         mag_cpu_blas_spec_name(82)(kernels);
+        mag_log_info("Using tuned BLAS specialization: ARM64 v.8.2");
         return true;
     }
-#elif defined(__APPLE__)
-    /* TODO - currently using ARM v8 baseline but Apple M2/M3 have newer arm versions we could target */
-    /* mag_cpu_blas_spec_name(82)(kernels); */
-#endif
     /* No matching specialization found, use generic */
     mag_cpu_blas_specialization_fallback(kernels);
     return false; /* No spec used, fallback is active */

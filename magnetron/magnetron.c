@@ -161,6 +161,12 @@ const uint32_t mag_x86_64_feature_masks[MAG_X86_64_FEATURE__NUM] = {
 };
 #undef _
 #undef mag_x86_64_feature_def
+#elif defined(__aarch64__)
+#define _(ident) #ident
+const char* const mag_arm64_cap_names[MAG_ARM64_CAP__NUM] = {
+    mag_arm64_feature_def(_, MAG_SEP)
+};
+#undef _
 #endif
 
 void* (*mag_get_alloc_fn(void))(void* blk, size_t size) {
@@ -484,14 +490,24 @@ static void mag_system_host_info_dump(mag_ctx_t* ctx) {
     #else
     #error "Unknwon CPU arch"
     #endif
-    mag_log_info("CPU (%s): %s, Virtual Cores: %u, Physical Cores: %u, Sockets: %u", cpu_arch, ctx->sys.cpu_name, ctx->sys.cpu_virtual_cores, ctx->sys.cpu_physical_cores, ctx->sys.cpu_sockets);
+    mag_log_info("CPU: %s, Virtual Cores: %u, Physical Cores: %u, Sockets: %u", ctx->sys.cpu_name, ctx->sys.cpu_virtual_cores, ctx->sys.cpu_physical_cores, ctx->sys.cpu_sockets);
     #if defined(__x86_64__) || defined(_M_X64) /* Print CPU features for x86-64 platforms. */
         if (mag_log_enabled) {
-            printf("CPU Features:");
+            mag_log_info("%s caps:", cpu_arch);
             for (uint32_t i=0, k=0; i < MAG_X86_64_FEATURE__NUM; ++i) {
                 if (mag_ctx_x86_64_cpu_has_feature(ctx, i)) {
                     if ((k++ & 7) == 0) printf("\n\t");
                     printf("%s ", mag_x86_64_feature_names[i]);
+                }
+            }
+            putchar('\n');
+        }
+    #elif defined(__aarch64__)
+        if (mag_log_enabled) {
+            printf(MAG_CC_CYAN "[magnetron] " MAG_CC_RESET "%s caps: ", cpu_arch);
+            for (uint32_t i=0; i < MAG_ARM64_CAP__NUM; ++i) {
+                if (ctx->sys.arm64_cpu_features & (1u<<i)) {
+                    printf("%s ", mag_arm64_cap_names[i]);
                 }
             }
             putchar('\n');
@@ -2736,9 +2752,38 @@ static void MAG_COLDPROC mag_system_host_info_query_memory(uint64_t* out_phys_me
     }
     #undef mag_cpy_regs
 
-#elif defined(__aarch64__) && defined(__linux__)
-static void MAG_COLDPROC mag_system_info_query_arm64_cpu_features(long* hwcap) {
-    *hwcap = getauxval(AT_HWCAP);
+#elif defined(__aarch64__)
+static void MAG_COLDPROC mag_system_info_query_arm64_cpu_features(mag_arm64_cap_t* feat, int64_t* sve_width) {
+    *feat = MAG_ARM64_CAP_NONE;
+    #ifdef __linux__
+        #ifndef HWCAP2_I8MM
+        #define HWCAP2_I8MM 0x2000u
+        #endif
+        uint32_t hwcap = getauxval(AT_HWCAP);
+        uint32_t hwcap2 = getauxval(AT_HWCAP2);
+        if (hwcap & HWCAP_ASIMD) *feat |= 1u<<MAG_ARM64_CAP_NEON;
+        if (hwcap & HWCAP_ASIMDDP) *feat |= 1u<<MAG_ARM64_CAP_DOTPROD;
+        if (hwcap2 & HWCAP2_I8MM) *feat |= 1u<<MAG_ARM64_CAP_I8MM;
+        if (hwcap & HWCAP_SVE) *feat |= 1u<<MAG_ARM64_CAP_SVE;
+    #elif defined(__APPLE__)
+        int sx = 0;
+        size_t size = sizeof(sx);
+        if (sysctlbyname("hw.optional.AdvSIMD", &sx, &size, NULL, 0) != 0) sx = 0;
+        if (sx) *feat |= 1u<<MAG_ARM64_CAP_NEON;
+        if (sysctlbyname("hw.optional.arm.FEAT_DotProd", &sx, &size, NULL, 0) != 0) sx = 0;
+        if (sx) *feat |= 1u<<MAG_ARM64_CAP_DOTPROD;
+        if (sysctlbyname("hw.optional.arm.FEAT_I8MM", &sx, &size, NULL, 0) != 0) sx = 0;
+        if (sx) *feat |= 1u<<MAG_ARM64_CAP_I8MM;
+        if (sysctlbyname("hw.optional.arm.FEAT_FP16", &sx, &size, NULL, 0) != 0) sx = 0;
+        if (sx) *feat |= 1u<<MAG_ARM64_CAP_F16SCA;
+        if (sysctlbyname("hw.optional.AdvSIMD_HPFPCvt", &sx, &size, NULL, 0) != 0) sx = 0;
+        if (sx) *feat |= 1u<<MAG_ARM64_CAP_F16VEC;
+        if (sysctlbyname("hw.optional.arm.FEAT_BF16", &sx, &size, NULL, 0) != 0) sx = 0;
+        if (sx) *feat |= 1u<<MAG_ARM64_CAP_BF16;
+        if (sysctlbyname("hw.optional.arm.FEAT_SVE", &sx, &size, NULL, 0) != 0) sx = 0;
+        if (sx) *feat |= 1u<<MAG_ARM64_CAP_SVE;
+        *sve_width = 0; /* NYI */
+    #endif
 }
 #endif
 
@@ -2749,8 +2794,8 @@ static void MAG_COLDPROC mag_system_host_info_query(mag_ctx_t* ctx) {
     mag_system_host_info_query_memory(&ctx->sys.phys_mem_total, &ctx->sys.phys_mem_free);
     #if defined(__x86_64__) || defined(_M_X64)
         mag_system_info_query_x86_64_cpu_features(&ctx->sys.x86_64_cpu_features);
-    #elif defined(__aarch64__) && defined(__linux__)
-        mag_system_info_query_arm64_cpu_features(&ctx->sys.cpu_arm64_hwcap);
+    #elif defined(__aarch64__)
+        mag_system_info_query_arm64_cpu_features(&ctx->sys.arm64_cpu_features, &ctx->sys.arm64_cpu_sve_width);
     #endif
     if (mag_unlikely(!*ctx->sys.os_name)) snprintf(ctx->sys.os_name, sizeof(ctx->sys.os_name), "Unknown");
     if (mag_unlikely(!*ctx->sys.cpu_name)) snprintf(ctx->sys.cpu_name, sizeof(ctx->sys.cpu_name), "Unknown");
