@@ -139,36 +139,6 @@ void mag_free_aligned(void* blk) {
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
-#if defined(__x86_64__) || defined(_M_X64)
-#define _(enumerator, leaf, reg, bit) #enumerator
-const char* const mag_x86_64_feature_names[MAG_X86_64_FEATURE__NUM] = {
-    mag_x86_64_feature_def(_, MAG_SEP)
-};
-#undef _
-#define _(enumerator, leaf, reg, bit) (0xff&MAG_X86_64_CPUID_##leaf)
-const uint8_t mag_x86_64_feature_leaves[MAG_X86_64_FEATURE__NUM] = {
-    mag_x86_64_feature_def(_, MAG_SEP)
-};
-#undef _
-#define _(enumerator, leaf, reg, bit) (0xff&MAG_X86_64_CPUID_##reg)
-const uint8_t mag_x86_64_feature_regs[MAG_X86_64_FEATURE__NUM] = {
-    mag_x86_64_feature_def(_, MAG_SEP)
-};
-#undef _
-#define _(enumerator, leaf, reg, bit) (1u<<(bit))
-const uint32_t mag_x86_64_feature_masks[MAG_X86_64_FEATURE__NUM] = {
-    mag_x86_64_feature_def(_, MAG_SEP)
-};
-#undef _
-#undef mag_x86_64_feature_def
-#elif defined(__aarch64__)
-#define _(ident) #ident
-const char* const mag_arm64_cap_names[MAG_ARM64_CAP__NUM] = {
-    mag_arm64_feature_def(_, MAG_SEP)
-};
-#undef _
-#endif
-
 void* (*mag_get_alloc_fn(void))(void* blk, size_t size) {
     return mag_alloc;
 }
@@ -313,6 +283,19 @@ uintptr_t mag_thread_id(void) {
     #endif
     return tid;
 }
+
+#if defined(__x86_64__) || defined(_M_X64)
+#define _(enumerator, leaf, reg, bit) #enumerator
+const char* const mag_amd64_cap_names[MAG_AMD64_CAP__NUM] = {
+    mag_x86_64_feature_def(_, MAG_SEP)
+};
+#undef _
+#elif defined(__aarch64__)
+#define _(ident) #ident
+const char* const mag_arm64_cap_names[MAG_ARM64_CAP__NUM] = {
+    mag_arm64_feature_def(_, MAG_SEP)
+};
+#endif
 
 static uint64_t mag_hpc_clock_ns(void) { /* High precision clock in nanoseconds. */
     #ifdef _WIN32
@@ -481,7 +464,7 @@ static void mag_prng_init(mag_ctx_t* ctx, uint64_t seed) {
 
 static void mag_system_host_info_query(mag_ctx_t* ctx); /* Query host system information. */
 static void mag_system_host_info_dump(mag_ctx_t* ctx) {
-    mag_log_info("OS/Kernel: %s", ctx->sys.os_name);
+    mag_log_info("OS/Kernel: %s", ctx->machine.os_name);
     const char* cpu_arch = "?";
     #if defined(__x86_64__) || defined(_M_X64)
         cpu_arch = "x86-64";
@@ -490,14 +473,13 @@ static void mag_system_host_info_dump(mag_ctx_t* ctx) {
     #else
     #error "Unknwon CPU arch"
     #endif
-    mag_log_info("CPU: %s, Virtual Cores: %u, Physical Cores: %u, Sockets: %u", ctx->sys.cpu_name, ctx->sys.cpu_virtual_cores, ctx->sys.cpu_physical_cores, ctx->sys.cpu_sockets);
+    mag_log_info("CPU: %s, Virtual Cores: %u, Physical Cores: %u, Sockets: %u", ctx->machine.cpu_name, ctx->machine.cpu_virtual_cores, ctx->machine.cpu_physical_cores, ctx->machine.cpu_sockets);
     #if defined(__x86_64__) || defined(_M_X64) /* Print CPU features for x86-64 platforms. */
         if (mag_log_enabled) {
-            mag_log_info("%s caps:", cpu_arch);
-            for (uint32_t i=0, k=0; i < MAG_X86_64_FEATURE__NUM; ++i) {
-                if (mag_ctx_x86_64_cpu_has_feature(ctx, i)) {
-                    if ((k++ & 7) == 0) printf("\n\t");
-                    printf("%s ", mag_x86_64_feature_names[i]);
+            printf(MAG_CC_CYAN "[magnetron] " MAG_CC_RESET "%s caps: ", cpu_arch);
+            for (uint64_t i=0; i < MAG_AMD64_CAP__NUM; ++i) {
+                if (ctx->machine.amd64_cpu_caps & (1ull<<i)) {
+                    printf("%s ", mag_amd64_cap_names[i]);
                 }
             }
             putchar('\n');
@@ -506,7 +488,7 @@ static void mag_system_host_info_dump(mag_ctx_t* ctx) {
         if (mag_log_enabled) {
             printf(MAG_CC_CYAN "[magnetron] " MAG_CC_RESET "%s caps: ", cpu_arch);
             for (uint32_t i=0; i < MAG_ARM64_CAP__NUM; ++i) {
-                if (ctx->sys.arm64_cpu_features & (1u<<i)) {
+                if (ctx->machine.arm64_cpu_features & (1u<<i)) {
                     printf("%s ", mag_arm64_cap_names[i]);
                 }
             }
@@ -515,10 +497,10 @@ static void mag_system_host_info_dump(mag_ctx_t* ctx) {
     #endif
     double mem_total, mem_free, mem_used;
     const char* mem_unit_total, *mem_unit_free, *mem_unit_used;
-    mag_humanize_memory_size(ctx->sys.phys_mem_total, &mem_total, &mem_unit_total);
-    mag_humanize_memory_size(ctx->sys.phys_mem_free, &mem_free, &mem_unit_free);
-    mag_humanize_memory_size((size_t)llabs((int64_t)ctx->sys.phys_mem_total-(int64_t)ctx->sys.phys_mem_free), &mem_used, &mem_unit_used);
-    double mem_used_percent = fabs((double)(ctx->sys.phys_mem_total-ctx->sys.phys_mem_free))/(double)ctx->sys.phys_mem_total*100.0;
+    mag_humanize_memory_size(ctx->machine.phys_mem_total, &mem_total, &mem_unit_total);
+    mag_humanize_memory_size(ctx->machine.phys_mem_free, &mem_free, &mem_unit_free);
+    mag_humanize_memory_size((size_t)llabs((int64_t)ctx->machine.phys_mem_total-(int64_t)ctx->machine.phys_mem_free), &mem_used, &mem_unit_used);
+    double mem_used_percent = fabs((double)(ctx->machine.phys_mem_total-ctx->machine.phys_mem_free))/(double)ctx->machine.phys_mem_total*100.0;
     mag_log_info("Physical Machine Memory: %.03f %s, Free: %.03f %s, Used: %.03f %s (%.02f%%)", mem_total, mem_unit_total, mem_free, mem_unit_free, mem_used, mem_unit_used, mem_used_percent);
 }
 
@@ -638,13 +620,13 @@ void mag_ctx_set_prng_algorithm(mag_ctx_t* ctx, mag_prng_algorithm_t algorithm, 
 
 mag_compute_device_type_t mag_ctx_get_compute_device_type(const mag_ctx_t* ctx) { return ctx->device_type; }
 const char* mag_ctx_get_compute_device_name(const mag_ctx_t* ctx) { return ctx->device->name; }
-const char* mag_ctx_get_os_name(const mag_ctx_t* ctx) { return ctx->sys.os_name; }
-const char* mag_ctx_get_cpu_name(const mag_ctx_t* ctx) { return ctx->sys.cpu_name; }
-uint32_t mag_ctx_get_cpu_virtual_cores(const mag_ctx_t* ctx) { return ctx->sys.cpu_virtual_cores; }
-uint32_t mag_ctx_get_cpu_physical_cores(const mag_ctx_t* ctx) { return ctx->sys.cpu_physical_cores; }
-uint32_t mag_ctx_get_cpu_sockets(const mag_ctx_t* ctx) { return ctx->sys.cpu_sockets; }
-uint64_t mag_ctx_get_physical_memory_total(const mag_ctx_t* ctx) { return ctx->sys.phys_mem_total; }
-uint64_t mag_ctx_get_physical_memory_free(const mag_ctx_t* ctx) { return ctx->sys.phys_mem_free; }
+const char* mag_ctx_get_os_name(const mag_ctx_t* ctx) { return ctx->machine.os_name; }
+const char* mag_ctx_get_cpu_name(const mag_ctx_t* ctx) { return ctx->machine.cpu_name; }
+uint32_t mag_ctx_get_cpu_virtual_cores(const mag_ctx_t* ctx) { return ctx->machine.cpu_virtual_cores; }
+uint32_t mag_ctx_get_cpu_physical_cores(const mag_ctx_t* ctx) { return ctx->machine.cpu_physical_cores; }
+uint32_t mag_ctx_get_cpu_sockets(const mag_ctx_t* ctx) { return ctx->machine.cpu_sockets; }
+uint64_t mag_ctx_get_physical_memory_total(const mag_ctx_t* ctx) { return ctx->machine.phys_mem_total; }
+uint64_t mag_ctx_get_physical_memory_free(const mag_ctx_t* ctx) { return ctx->machine.phys_mem_free; }
 bool mag_ctx_is_numa_system(const mag_ctx_t* ctx) { return false; /* TODO */ }
 size_t mag_ctx_get_total_tensors_created(const mag_ctx_t* ctx) { return 0; /* TODO */ }
 
@@ -812,24 +794,14 @@ void mag_ctx_profile_stop_recording(mag_ctx_t* ctx, const char* export_csv_file)
     bool csv = export_csv_file && *export_csv_file;
     if (!csv) {
         mag_print_separator(stdout);
-        printf("OS/Kernel: %s\n", ctx->sys.os_name);
-        printf("CPU: %s, Virtual Cores: %u, Physical Cores: %u, Sockets: %u\n", ctx->sys.cpu_name, ctx->sys.cpu_virtual_cores, ctx->sys.cpu_physical_cores, ctx->sys.cpu_sockets);
-        #if defined(__x86_64__) || defined(_M_X64) /* Print CPU features for x86-64 platforms. */
-        printf("CPU Features:");
-        for (unsigned i=0, k=0; i < MAG_X86_64_FEATURE__NUM; ++i) {
-            if (mag_ctx_x86_64_cpu_has_feature(ctx, i)) {
-                if (k++ % 8 == 0) printf("\n\t");
-                printf("%s ", mag_x86_64_feature_names[i]);
-            }
-        }
-        putchar('\n');
-        #endif
+        printf("OS/Kernel: %s\n", ctx->machine.os_name);
+        printf("CPU: %s, Virtual Cores: %u, Physical Cores: %u, Sockets: %u\n", ctx->machine.cpu_name, ctx->machine.cpu_virtual_cores, ctx->machine.cpu_physical_cores, ctx->machine.cpu_sockets);
         double mem_total, mem_free, mem_used;
         const char* mem_unit_total, *mem_unit_free, *mem_unit_used;
-        mag_humanize_memory_size(ctx->sys.phys_mem_total, &mem_total, &mem_unit_total);
-        mag_humanize_memory_size(ctx->sys.phys_mem_free, &mem_free, &mem_unit_free);
-        mag_humanize_memory_size((size_t)llabs((int64_t)ctx->sys.phys_mem_total-(int64_t)ctx->sys.phys_mem_free), &mem_used, &mem_unit_used);
-        double mem_used_percent = fabs((double)(ctx->sys.phys_mem_total-ctx->sys.phys_mem_free))/(double)ctx->sys.phys_mem_total*100.0;
+        mag_humanize_memory_size(ctx->machine.phys_mem_total, &mem_total, &mem_unit_total);
+        mag_humanize_memory_size(ctx->machine.phys_mem_free, &mem_free, &mem_unit_free);
+        mag_humanize_memory_size((size_t)llabs((int64_t)ctx->machine.phys_mem_total-(int64_t)ctx->machine.phys_mem_free), &mem_used, &mem_unit_used);
+        double mem_used_percent = fabs((double)(ctx->machine.phys_mem_total-ctx->machine.phys_mem_free))/(double)ctx->machine.phys_mem_total*100.0;
         printf("Physical memory: %.03f %s, Free: %.03f %s, Used: %.03f %s (%.02f%%)\n", mem_total, mem_unit_total, mem_free, mem_unit_free, mem_used, mem_unit_used, mem_used_percent);
         mag_print_separator(stdout);
         printf("%16s %16s %16s %16s %16s\n", "Operation", "Executions", "Usage (%)", "AVG Time (μs)", "Total Time (μs)");
@@ -2686,74 +2658,126 @@ static void MAG_COLDPROC mag_system_host_info_query_memory(uint64_t* out_phys_me
             return (uint64_t)lo | ((uint64_t)hi << 32);
         #endif
     }
-    #define mag_cpy_regs(id) \
-        (*features)[MAG_X86_64_CPUID_##id][MAG_X86_64_CPUID_EAX] = eax; \
-        (*features)[MAG_X86_64_CPUID_##id][MAG_X86_64_CPUID_EBX] = ebx; \
-        (*features)[MAG_X86_64_CPUID_##id][MAG_X86_64_CPUID_ECX] = ecx; \
-        (*features)[MAG_X86_64_CPUID_##id][MAG_X86_64_CPUID_EDX] = edx
-    static void MAG_COLDPROC mag_system_info_query_x86_64_cpu_features(uint32_t (*features)[8][4]) {
+    static void MAG_COLDPROC mag_system_info_query_amd64_cpu_caps(uint64_t* caps) {
+        *caps = 0;
+        uint32_t regs[8][4] = {0};
+
+        #define H0 0
+        #define H1 1
+        #define H2 2
+        #define H7 3
+        #define H80000001 4
+        #define H80000007 5
+        #define H16 6
+        #define H7_1H 7
+        #define EAX 0
+        #define EBX 1
+        #define ECX 2
+        #define EDX 3
+
+        #define mag_cpy_regs(id) \
+        regs[id][EAX] = eax; \
+        regs[id][EBX] = ebx; \
+        regs[id][ECX] = ecx; \
+        regs[id][EDX] = edx
+
+        #define _(enumerator, leaf, reg, shift) (0xff&leaf)
+            static const uint8_t feature_leaves[MAG_AMD64_CAP__NUM] = {
+                mag_x86_64_feature_def(_, MAG_SEP)
+            };
+        #undef _
+        #define _(enumerator, leaf, reg, shift) (0xff&reg)
+            static const uint8_t feature_regs[MAG_AMD64_CAP__NUM] = {
+                mag_x86_64_feature_def(_, MAG_SEP)
+            };
+        #undef _
+        #define _(enumerator, leaf, reg, shift) (1u<<(shift))
+            static const uint32_t feature_masks[MAG_AMD64_CAP__NUM] = {
+                mag_x86_64_feature_def(_, MAG_SEP)
+            };
+        #undef _
+        #undef mag_x86_64_feature_def
+        #undef _
+
         uint32_t eax=0, ebx=0, ecx=0, edx=0;
         uint32_t max_basic_leaf, max_extended_leaf;
         mag_cpuid(0, -1, &eax, &ebx, &ecx, &edx);
-        mag_cpy_regs(0H);
+        mag_cpy_regs(H0);
         max_basic_leaf = eax;
         mag_cpuid(0x80000000u, -1, &eax, &ebx, &ecx, &edx);
         max_extended_leaf = eax;
         if (max_basic_leaf >= 1u) {
             mag_cpuid(1, -1, &eax, &ebx, &ecx, &edx);
-            mag_cpy_regs(1H);
+            mag_cpy_regs(H1);
         }
         if (max_basic_leaf >= 2u) {
             mag_cpuid(2u, -1, &eax, &ebx, &ecx, &edx);
-            mag_cpy_regs(2H);
+            mag_cpy_regs(H2);
         }
         if (max_basic_leaf >= 7u) {
             mag_cpuid(7u, 0, &eax, &ebx, &ecx, &edx);
-            mag_cpy_regs(7H);
+            mag_cpy_regs(H7);
         }
         if (max_basic_leaf >= 7u) {
             mag_cpuid(7u, 1, &eax, &ebx, &ecx, &edx);
-            mag_cpy_regs(7H_1H);
+            mag_cpy_regs(H7_1H);
         }
         if (max_basic_leaf >= 0x16u) {
             mag_cpuid(0x16u, -1, &eax, &ebx, &ecx, &edx);
-            mag_cpy_regs(16H);
+            mag_cpy_regs(H16);
         }
         if (max_extended_leaf >= 0x80000001u) {
             mag_cpuid(0x80000001u, -1, &eax, &ebx, &ecx, &edx);
-            mag_cpy_regs(80000001H);
+            mag_cpy_regs(H80000001);
         }
         if (max_extended_leaf >= 0x80000007u) {
             mag_cpuid(0x80000007u, -1, &eax, &ebx, &ecx, &edx);
-            mag_cpy_regs(80000007H);
+            mag_cpy_regs(H80000007);
         }
-        bool cpu_avx_support = ((*features)[MAG_X86_64_CPUID_1H][MAG_X86_64_CPUID_ECX] & 0x10000000u) != 0;
-        bool cpu_osxsave_support = ((*features)[MAG_X86_64_CPUID_1H][MAG_X86_64_CPUID_ECX] & 0x8000000u) != 0;
+        bool cpu_avx_support = !!(regs[H1][ECX] & 0x10000000u);
+        bool cpu_osxsave_support = !!(regs[H1][ECX] & 0x8000000u);
         if (cpu_avx_support && cpu_osxsave_support) {
             uint64_t xcr0 = mag_xgetbv();
             if ((xcr0 & 0x6) != 0x6u) {
-                (*features)[MAG_X86_64_CPUID_1H][MAG_X86_64_CPUID_ECX] &= ~0x10000000u; /* Clear AVX */
-                (*features)[MAG_X86_64_CPUID_7H][MAG_X86_64_CPUID_EBX] &= ~0x20u; /* Clear AVX2 */
+                regs[H1][ECX] &= ~0x10000000u; /* Clear AVX */
+                regs[H7][EBX] &= ~0x20u; /* Clear AVX2 */
             }
             if ((xcr0 & 0xe0) != 0xe0u) { /* OS does not support AVX-512, clear AVX512 */
-                (*features)[MAG_X86_64_CPUID_7H][MAG_X86_64_CPUID_EBX] &= ~0xdc230000u;
-                (*features)[MAG_X86_64_CPUID_7H][MAG_X86_64_CPUID_ECX] &= ~0x5842u;
-                (*features)[MAG_X86_64_CPUID_7H][MAG_X86_64_CPUID_EDX] &= ~0x10cu;
-                (*features)[MAG_X86_64_CPUID_7H_1H][MAG_X86_64_CPUID_EAX] &= ~0x20u;
+                regs[H7][EBX] &= ~0xdc230000u;
+                regs[H7][ECX] &= ~0x5842u;
+                regs[H7][EDX] &= ~0x10cu;
+                regs[H7_1H][EAX] &= ~0x20u;
             }
         } else {
-            (*features)[MAG_X86_64_CPUID_1H][MAG_X86_64_CPUID_ECX] &= ~0x10000000u; /* Clear AVX */
-            (*features)[MAG_X86_64_CPUID_7H][MAG_X86_64_CPUID_EBX] &= ~0x20u; /* Clear AVX2 */
-            (*features)[MAG_X86_64_CPUID_7H][MAG_X86_64_CPUID_EBX] &= ~0xdc230000u; /* Clear AVX512 */
-            (*features)[MAG_X86_64_CPUID_7H][MAG_X86_64_CPUID_ECX] &= ~0x5842u; /* Clear AVX512 */
-            (*features)[MAG_X86_64_CPUID_7H][MAG_X86_64_CPUID_EDX] &= ~0x10cu; /* Clear AVX512 */
-            (*features)[MAG_X86_64_CPUID_7H_1H][MAG_X86_64_CPUID_EAX] &= ~0x20u; /* Clear AVX512 */
+            regs[H1][ECX] &= ~0x10000000u;  /* Clear AVX */
+            regs[H7][EBX] &= ~0x20u;        /* Clear AVX2 */
+            regs[H7][EBX] &= ~0xdc230000u;  /* Clear AVX512 */
+            regs[H7][ECX] &= ~0x5842u;      /* Clear AVX512 */
+            regs[H7][EDX] &= ~0x10cu;       /* Clear AVX512 */
+            regs[H7_1H][EAX] &= ~0x20u;     /* Clear AVX512 */
         }
+
+        for (uint64_t i=1; i < MAG_AMD64_CAP__NUM; ++i) /* Create bitset of features */
+            if (regs[feature_leaves[i]][feature_regs[i]] & feature_masks[i])
+                *caps |= 1ull<<i;
+
+        #undef H0
+        #undef H1
+        #undef H2
+        #undef H7
+        #undef H80000001
+        #undef H80000007
+        #undef H16
+        #undef H7_1H
+        #undef EAX
+        #undef EBX
+        #undef ECX
+        #undef EDX
+        #undef mag_cpy_regs
     }
-    #undef mag_cpy_regs
 
 #elif defined(__aarch64__)
-static void MAG_COLDPROC mag_system_info_query_arm64_cpu_features(mag_arm64_cap_t* feat, int64_t* sve_width) {
+static void MAG_COLDPROC mag_system_info_query_arm64_cpu_caps(mag_arm64_cap_t* feat, int64_t* sve_width) {
     *feat = MAG_ARM64_CAP_NONE;
     #ifdef __linux__
         #ifndef HWCAP2_I8MM
@@ -2788,17 +2812,17 @@ static void MAG_COLDPROC mag_system_info_query_arm64_cpu_features(mag_arm64_cap_
 #endif
 
 static void MAG_COLDPROC mag_system_host_info_query(mag_ctx_t* ctx) {
-    mag_system_host_info_query_os_name(&ctx->sys.os_name);
-    mag_system_host_info_query_cpu_name(&ctx->sys.cpu_name);
-    mag_system_host_info_query_cpu_cores(&ctx->sys.cpu_virtual_cores, &ctx->sys.cpu_physical_cores, &ctx->sys.cpu_sockets);
-    mag_system_host_info_query_memory(&ctx->sys.phys_mem_total, &ctx->sys.phys_mem_free);
+    mag_system_host_info_query_os_name(&ctx->machine.os_name);
+    mag_system_host_info_query_cpu_name(&ctx->machine.cpu_name);
+    mag_system_host_info_query_cpu_cores(&ctx->machine.cpu_virtual_cores, &ctx->machine.cpu_physical_cores, &ctx->machine.cpu_sockets);
+    mag_system_host_info_query_memory(&ctx->machine.phys_mem_total, &ctx->machine.phys_mem_free);
     #if defined(__x86_64__) || defined(_M_X64)
-        mag_system_info_query_x86_64_cpu_features(&ctx->sys.x86_64_cpu_features);
+        mag_system_info_query_amd64_cpu_caps(&ctx->machine.amd64_cpu_caps);
     #elif defined(__aarch64__)
-        mag_system_info_query_arm64_cpu_features(&ctx->sys.arm64_cpu_features, &ctx->sys.arm64_cpu_sve_width);
+        mag_system_info_query_arm64_cpu_caps(&ctx->sys.arm64_cpu_features, &ctx->sys.arm64_cpu_sve_width);
     #endif
-    if (mag_unlikely(!*ctx->sys.os_name)) snprintf(ctx->sys.os_name, sizeof(ctx->sys.os_name), "Unknown");
-    if (mag_unlikely(!*ctx->sys.cpu_name)) snprintf(ctx->sys.cpu_name, sizeof(ctx->sys.cpu_name), "Unknown");
+    if (mag_unlikely(!*ctx->machine.os_name)) snprintf(ctx->machine.os_name, sizeof(ctx->machine.os_name), "Unknown");
+    if (mag_unlikely(!*ctx->machine.cpu_name)) snprintf(ctx->machine.cpu_name, sizeof(ctx->machine.cpu_name), "Unknown");
 }
 
 static MAG_AINLINE void mag_sto_write_u32_le(uint8_t** p, uint32_t x) {

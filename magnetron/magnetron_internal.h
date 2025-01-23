@@ -574,78 +574,69 @@ struct mag_tensor_node_t {
 #endif
 
 #if defined(__x86_64__) || defined(_M_X64)
-#define MAG_X86_64_CPUID_0H 0
-#define MAG_X86_64_CPUID_1H 1
-#define MAG_X86_64_CPUID_2H 2
-#define MAG_X86_64_CPUID_7H 3
-#define MAG_X86_64_CPUID_80000001H 4
-#define MAG_X86_64_CPUID_80000007H 5
-#define MAG_X86_64_CPUID_16H 6
-#define MAG_X86_64_CPUID_7H_1H 7
-#define MAG_X86_64_CPUID_EAX 0
-#define MAG_X86_64_CPUID_EBX 1
-#define MAG_X86_64_CPUID_ECX 2
-#define MAG_X86_64_CPUID_EDX 3
+#define mag_x86_64_feature_def(_, __) /* Enumerator | CPUDID Leaf | Register | Shift */\
+    _(NONE                 , 0,         EAX,   0)__\
+    _(AVX                  , H1,        ECX,  28)__\
+    _(AVX2                 , H7,        EBX,   5)__\
+    _(AVXVNNI              , H7_1H,     EAX,   4)__\
+    _(AVXVNNIINT8          , H7_1H,     EDX,   4)__\
+    _(AVXVNNIINT16         , H7_1H,     EDX,  10)__\
+    _(AVX512BW             , H7,        EBX,  30)__\
+    _(AVX512CD             , H7,        EBX,  28)__\
+    _(AVX512DQ             , H7,        EBX,  17)__\
+    _(AVX512ER             , H7,        EBX,  27)__\
+    _(AVX512F              , H7,        EBX,  16)__\
+    _(AVX512IFMA           , H7,        EBX,  21)__\
+    _(AVX512PF             , H7,        EBX,  26)__\
+    _(AVX512VBMI           , H7,        ECX,   1)__\
+    _(AVX512VL             , H7,        EBX,  31)__\
+    _(AVX512_4FMAPS        , H7,        EDX,   3)__\
+    _(AVX512_4VNNIW        , H7,        EDX,   2)__\
+    _(AVX512_FP16          , H7,        EDX,  23)__\
+    _(AVX512_BF16          , H7_1H,     EAX,   5)__\
+    _(AVX512_BITALG        , H7,        ECX,  12)__\
+    _(AVX512_VBMI2         , H7,        ECX,   6)__\
+    _(AVX512_VNNI          , H7,        ECX,  11)__\
+    _(AVX512_VP2INTERSECT  , H7,        EDX,   8)__\
+    _(AVX512_VPOPCNTDQ     , H7,        ECX,  14)__\
+    _(BMI                  , H7,        EBX,   3)__\
+    _(BMI2                 , H7,        EBX,   8)__\
+    _(F16C                 , H1,        ECX,  29)__\
+    _(FMA                  , H1,        ECX,  12)__\
+    _(FPU                  , H1,        EDX,   0)__\
+    _(GFNI                 , H7,        ECX,   8)__\
+    _(IA64                 , H1,        EDX,  30)__\
+    _(MMX                  , H1,        EDX,  23)__\
+    _(OSXSAVE              , H1,        ECX,  27)__\
+    _(PCLMUL               , H1,        ECX,   1)__\
+    _(RDRND                , H1,        ECX,  30)__\
+    _(RDSEED               , H7,        EBX,  18)__\
+    _(RDTSCP               , H80000001, EDX,  27)__\
+    _(SHA                  , H7,        EBX,  29)__\
+    _(SSE                  , H1,        EDX,  25)__\
+    _(SSE2                 , H1,        EDX,  26)__\
+    _(SSE3                 , H1,        ECX,   0)__\
+    _(SSE4_1               , H1,        ECX,  19)__\
+    _(SSE4_2               , H1,        ECX,  20)__\
+    _(SSSE3                , H1,        ECX,   9)__\
+    _(VAES                 , H7,        ECX,   9)__\
+    _(VME                  , H1,        EDX,   1)__\
+    _(VMX                  , H1,        ECX,   5)__\
+    _(VPCLMULQDQ           , H7,        ECX,  10)__\
+    _(XSAVE                , H1,        ECX,  26)__\
+    _(HYBRID_CPU           , H7,        EDX,  15)__
 
-#define mag_x86_64_feature_def(_, __) /* Enumerator | CPUDID Leaf | Register | Bit Index */\
-    _(AVX                  ,    1H,        ECX,     28)__\
-    _(AVX2                 ,    7H,        EBX,      5)__\
-    _(AVXVNNI              ,    7H_1H,     EAX,      4)__\
-    _(AVXVNNIINT8          ,    7H_1H,     EDX,      4)__\
-    _(AVXVNNIINT16         ,    7H_1H,     EDX,     10)__\
-    _(AVX512BW             ,    7H,        EBX,     30)__\
-    _(AVX512CD             ,    7H,        EBX,     28)__\
-    _(AVX512DQ             ,    7H,        EBX,     17)__\
-    _(AVX512ER             ,    7H,        EBX,     27)__\
-    _(AVX512F              ,    7H,        EBX,     16)__\
-    _(AVX512IFMA           ,    7H,        EBX,     21)__\
-    _(AVX512PF             ,    7H,        EBX,     26)__\
-    _(AVX512VBMI           ,    7H,        ECX,      1)__\
-    _(AVX512VL             ,    7H,        EBX,     31)__\
-    _(AVX512_4FMAPS        ,    7H,        EDX,      3)__\
-    _(AVX512_4VNNIW        ,    7H,        EDX,      2)__\
-    _(AVX512_FP16          ,    7H,        EDX,     23)__\
-    _(AVX512_BF16          ,    7H_1H,     EAX,      5)__\
-    _(AVX512_BITALG        ,    7H,        ECX,     12)__\
-    _(AVX512_VBMI2         ,    7H,        ECX,      6)__\
-    _(AVX512_VNNI          ,    7H,        ECX,     11)__\
-    _(AVX512_VP2INTERSECT  ,    7H,        EDX,      8)__\
-    _(AVX512_VPOPCNTDQ     ,    7H,        ECX,     14)__\
-    _(BMI                  ,    7H,        EBX,      3)__\
-    _(BMI2                 ,    7H,        EBX,      8)__\
-    _(F16C                 ,    1H,        ECX,     29)__\
-    _(FMA                  ,    1H,        ECX,     12)__\
-    _(FPU                  ,    1H,        EDX,      0)__\
-    _(GFNI                 ,    7H,        ECX,      8)__\
-    _(IA64                 ,    1H,        EDX,     30)__\
-    _(MMX                  ,    1H,        EDX,     23)__\
-    _(OSXSAVE              ,    1H,        ECX,     27)__\
-    _(PCLMUL               ,    1H,        ECX,      1)__\
-    _(RDRND                ,    1H,        ECX,     30)__\
-    _(RDSEED               ,    7H,        EBX,     18)__\
-    _(RDTSCP               ,    80000001H, EDX,     27)__\
-    _(SHA                  ,    7H,        EBX,     29)__\
-    _(SSE                  ,    1H,        EDX,     25)__\
-    _(SSE2                 ,    1H,        EDX,     26)__\
-    _(SSE3                 ,    1H,        ECX,      0)__\
-    _(SSE4_1               ,    1H,        ECX,     19)__\
-    _(SSE4_2               ,    1H,        ECX,     20)__\
-    _(SSSE3                ,    1H,        ECX,      9)__\
-    _(VAES                 ,    7H,        ECX,      9)__\
-    _(VME                  ,    1H,        EDX,      1)__\
-    _(VMX                  ,    1H,        ECX,      5)__\
-    _(VPCLMULQDQ           ,    7H,        ECX,     10)__\
-    _(XSAVE                ,    1H,        ECX,     26)__\
-    _(HYBRID_CPU           ,    7H,        EDX,     15)__
-
-#define _(ident, leaf, reg, bit) MAG_X86_64_FEATURE_##ident
-typedef enum mag_x86_64_feature_t {
+#define _(ident, leaf, reg, bit) MAG_AMD64_CAP_##ident
+typedef enum mag_amd64_cap_t {
     mag_x86_64_feature_def(_, MAG_SEP)
-    MAG_X86_64_FEATURE__NUM
-} mag_x86_64_feature_t;
+    MAG_AMD64_CAP__NUM
+} mag_amd64_cap_t;
 #undef _
-extern const char* const mag_x86_64_feature_names[MAG_X86_64_FEATURE__NUM];
+#define mag_amd64_cap(cap) (1ull<<(MAG_AMD64_CAP_##cap))
+extern const char* const mag_amd64_cap_names[MAG_AMD64_CAP__NUM];
+
 #elif defined(__aarch64__)
+
 #define mag_arm64_feature_def(_, __) /* Enumerator | Shift */\
     _(NONE)__\
     _(NEON)__\
@@ -682,12 +673,12 @@ struct mag_ctx_t {
         uint64_t phys_mem_total;                    /* Total physical memory in bytes. */
         uint64_t phys_mem_free;                     /* Free physical memory in bytes. */
 #if defined(__x86_64__) || defined(_M_X64)
-        uint32_t x86_64_cpu_features[8][4];         /* x86-64 CPU features. */
+        uint64_t amd64_cpu_caps;                    /* x86-64 CPU features. Bitset of 1ull<<MAG_AMD64_CAP_* */
 #elif defined (__aarch64__)
         mag_arm64_cap_t arm64_cpu_features;        /* ARM64 CPU features. */
         int64_t arm64_cpu_sve_width;                /* ARM64 SVE vector register width. */
 #endif
-    } sys;
+    } machine;
 #ifdef MAG_DEBUG
     mag_tensor_node_t* rc_tracked;                  /* Linked list of RC tensors for sanitize. */
 #endif
@@ -785,20 +776,6 @@ typedef struct mag_kernel_registry_t {
 } mag_kernel_registry_t;
 
 #define mag_load_local_storage_group(xk, prefix, var) mag_load_local_storage_group_arr((xk)->var, prefix)
-
-#if defined(__x86_64__) || defined(_M_X64)
-extern const uint8_t mag_x86_64_feature_leaves[MAG_X86_64_FEATURE__NUM];
-extern const uint8_t mag_x86_64_feature_regs[MAG_X86_64_FEATURE__NUM];
-extern const uint32_t mag_x86_64_feature_masks[MAG_X86_64_FEATURE__NUM];
-
-static inline bool mag_ctx_x86_64_cpu_has_feature(const mag_ctx_t* ctx, mag_x86_64_feature_t feature) {
-    const uint8_t (*leafs)[49] = &mag_x86_64_feature_leaves;
-    const uint8_t (*regs)[49] = &mag_x86_64_feature_regs;
-    const uint32_t (*masks)[49] = &mag_x86_64_feature_masks;
-    const uint32_t (*features)[8][4] = &ctx->sys.x86_64_cpu_features;
-    return (*features)[(*leafs)[feature]][(*regs)[feature]] & (*masks)[feature];
-}
-#endif
 
 #ifdef __cplusplus
 }

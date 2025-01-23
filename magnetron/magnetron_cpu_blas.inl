@@ -1411,132 +1411,129 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
 #endif
 
 #if defined(__x86_64__) || defined(_M_X64)
-const mag_x86_64_feature_t* MAG_BLAS_SPECIALIZATION_FEAT_REQUEST(size_t* out_num) {
-    static const mag_x86_64_feature_t required_features[] = {
-        #ifdef __AVX512F__
-            MAG_X86_64_FEATURE_AVX512F,
-        #endif
-        #ifdef __AVX512BW__
-            MAG_X86_64_FEATURE_AVX512BW,
-        #endif
-        #ifdef __AVX512CD__
-            MAG_X86_64_FEATURE_AVX512CD,
-        #endif
-        #ifdef __AVX512DQ__
-            MAG_X86_64_FEATURE_AVX512DQ,
-        #endif
-        #ifdef __AVX512ER__
-            MAG_X86_64_FEATURE_AVX512ER,
-        #endif
-        #ifdef __AVX512IFMA__
-            MAG_X86_64_FEATURE_AVX512IFMA,
-        #endif
-        #ifdef __AVX512PF__
-            MAG_X86_64_FEATURE_AVX512PF,
-        #endif
-        #ifdef __AVX512VBMI__
-            MAG_X86_64_FEATURE_AVX512VBMI,
-        #endif
-        #ifdef __AVX512VL__
-            MAG_X86_64_FEATURE_AVX512VL,
-        #endif
-        #ifdef __AVX512_4FMAPS__
-            MAG_X86_64_FEATURE_AVX512_4FMAPS,
-        #endif
-        #ifdef __AVX512_4VNNIW__
-            MAG_X86_64_FEATURE_AVX512_4VNNIW,
-        #endif
-        #ifdef __AVX512_FP16__
-            MAG_X86_64_FEATURE_AVX512_FP16,
-        #endif
-        #ifdef __AVX512_BF16__
-            MAG_X86_64_FEATURE_AVX512_BF16,
-        #endif
-        #ifdef __AVX512_BITALG__
-            MAG_X86_64_FEATURE_AVX512_BITALG,
-        #endif
-        #ifdef __AVX512_VBMI2__
-            MAG_X86_64_FEATURE_AVX512_VBMI2,
-        #endif
-        #ifdef __AVX512_VNNI__
-            MAG_X86_64_FEATURE_AVX512_VNNI,
-        #endif
-        #ifdef __AVX512_VP2INTERSECT__
-            MAG_X86_64_FEATURE_AVX512_VP2INTERSECT,
-        #endif
-        #ifdef __AVX512_VPOPCNTDQ__
-            MAG_X86_64_FEATURE_AVX512_VPOPCNTDQ,
-        #endif
-        #ifdef __AVX__
-            MAG_X86_64_FEATURE_AVX,
-        #endif
-        #ifdef __AVX2__
-            MAG_X86_64_FEATURE_AVX2,
-        #endif
-        #ifdef __AVXVNNI__
-            MAG_X86_64_FEATURE_AVXVNNI,
-        #endif
-        #ifdef __AVXVNNIINT8__
-            MAG_X86_64_FEATURE_AVXVNNIINT8,
-        #endif
-        #ifdef __AVXVNNIINT16__
-            MAG_X86_64_FEATURE_AVXVNNIINT16,
-        #endif
-        #ifdef __BMI__
-            MAG_X86_64_FEATURE_BMI,
-        #endif
-        #ifdef __BMI2__
-            MAG_X86_64_FEATURE_BMI2,
-        #endif
-        #ifdef __F16C__
-            MAG_X86_64_FEATURE_F16C,
-        #endif
-        #ifdef __FMA__
-            MAG_X86_64_FEATURE_FMA,
-        #endif
-        #ifdef __GFNI__
-            MAG_X86_64_FEATURE_GFNI,
-        #endif
-        #ifdef __PCLMUL__
-            MAG_X86_64_FEATURE_PCLMUL,
-        #endif
-        #ifdef __RDRND__
-            MAG_X86_64_FEATURE_RDRND,
-        #endif
-        #ifdef __RDSEED__
-            MAG_X86_64_FEATURE_RDSEED,
-        #endif
-        #ifdef __RDTSCP__
-            MAG_X86_64_FEATURE_RDTSCP,
-        #endif
-        #ifdef __SHA__
-            MAG_X86_64_FEATURE_SHA,
-        #endif
-        #ifdef __SSE3__
-            MAG_X86_64_FEATURE_SSE3,
-        #endif
-        #ifdef __SSE4_1__
-            MAG_X86_64_FEATURE_SSE4_1,
-        #endif
-        #ifdef __SSE4_2__
-            MAG_X86_64_FEATURE_SSE4_2,
-        #endif
-        #ifdef __SSSE3__
-            MAG_X86_64_FEATURE_SSSE3,
-        #endif
-        #ifdef __VAES__
-            MAG_X86_64_FEATURE_VAES,
-        #endif
-        #ifdef __VPCLMULQDQ__
-            MAG_X86_64_FEATURE_VPCLMULQDQ,
-        #endif
-        #ifdef __XSAVE__
-            MAG_X86_64_FEATURE_XSAVE,
-        #endif
-        MAG_X86_64_FEATURE_SSE2, /* always required */
-    };
-    *out_num = sizeof(required_features)/sizeof(*required_features);
-    return required_features;
+uint64_t MAG_BLAS_SPECIALIZATION_FEAT_REQUEST() {
+    uint64_t caps = 1ull<<MAG_AMD64_CAP_SSE2; /* always required */
+    #ifdef __AVX512F__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512F;
+    #endif
+    #ifdef __AVX512BW__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512BW;
+    #endif
+    #ifdef __AVX512CD__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512CD;
+    #endif
+    #ifdef __AVX512DQ__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512DQ;
+    #endif
+    #ifdef __AVX512ER__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512ER;
+    #endif
+    #ifdef __AVX512IFMA__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512IFMA;
+    #endif
+    #ifdef __AVX512PF__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512PF;
+    #endif
+    #ifdef __AVX512VBMI__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512VBMI;
+    #endif
+    #ifdef __AVX512VL__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512VL;
+    #endif
+    #ifdef __AVX512_4FMAPS__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512_4FMAPS;
+    #endif
+    #ifdef __AVX512_4VNNIW__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512_4VNNIW;
+    #endif
+    #ifdef __AVX512_FP16__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512_FP16;
+    #endif
+    #ifdef __AVX512_BF16__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512_BF16;
+    #endif
+    #ifdef __AVX512_BITALG__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512_BITALG;
+    #endif
+    #ifdef __AVX512_VBMI2__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512_VBMI2;
+    #endif
+    #ifdef __AVX512_VNNI__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512_VNNI;
+    #endif
+    #ifdef __AVX512_VP2INTERSECT__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512_VP2INTERSECT;
+    #endif
+    #ifdef __AVX512_VPOPCNTDQ__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX512_VPOPCNTDQ;
+    #endif
+    #ifdef __AVX__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX;
+    #endif
+    #ifdef __AVX2__
+        caps |= 1ull<<MAG_AMD64_CAP_AVX2;
+    #endif
+    #ifdef __AVXVNNI__
+       caps |= 1ull<<MAG_AMD64_CAP_AVXVNNI;
+    #endif
+    #ifdef __AVXVNNIINT8__
+        caps |= 1ull<<MAG_AMD64_CAP_AVXVNNIINT8;
+    #endif
+    #ifdef __AVXVNNIINT16__
+        caps |= 1ull<<MAG_AMD64_CAP_AVXVNNIINT16;
+    #endif
+    #ifdef __BMI__
+        caps |= 1ull<<MAG_AMD64_CAP_BMI;
+    #endif
+    #ifdef __BMI2__
+        caps |= 1ull<<MAG_AMD64_CAP_BMI2;
+    #endif
+    #ifdef __F16C__
+        caps |= 1ull<<MAG_AMD64_CAP_F16C;
+    #endif
+    #ifdef __FMA__
+        caps |= 1ull<<MAG_AMD64_CAP_FMA;
+    #endif
+    #ifdef __GFNI__
+        caps |= 1ull<<MAG_AMD64_CAP_GFNI;
+    #endif
+    #ifdef __PCLMUL__
+        caps |= 1ull<<MAG_AMD64_CAP_PCLMUL;
+    #endif
+    #ifdef __RDRND__
+        caps |= 1ull<<MAG_AMD64_CAP_RDRND;
+    #endif
+    #ifdef __RDSEED__
+        caps |= 1ull<<MAG_AMD64_CAP_RDSEED;
+    #endif
+    #ifdef __RDTSCP__
+        caps |= 1ull<<MAG_AMD64_CAP_RDTSCP;
+    #endif
+    #ifdef __SHA__
+        caps |= 1ull<<MAG_AMD64_CAP_SHA;
+    #endif
+    #ifdef __SSE3__
+        caps |= 1ull<<MAG_AMD64_CAP_SSE3;
+    #endif
+    #ifdef __SSE4_1__
+        caps |= 1ull<<MAG_AMD64_CAP_SSE4_1;
+    #endif
+    #ifdef __SSE4_2__
+        caps |= 1ull<<MAG_AMD64_CAP_SSE4_2;
+    #endif
+    #ifdef __SSSE3__
+        caps |= 1ull<<MAG_AMD64_CAP_SSSE3;
+    #endif
+    #ifdef __VAES__
+        caps |= 1ull<<MAG_AMD64_CAP_VAES;
+    #endif
+    #ifdef __VPCLMULQDQ__
+        caps |= 1ull<<MAG_AMD64_CAP_VPCLMULQDQ;
+    #endif
+    #ifdef __XSAVE__
+        caps |= 1ull<<MAG_AMD64_CAP_XSAVE;
+    #endif
+    return caps;
 }
 
 #elif defined(__aarch64__)

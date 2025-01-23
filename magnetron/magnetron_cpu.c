@@ -10,12 +10,12 @@ extern void mag_cpu_blas_specialization_fallback(mag_kernel_registry_t* kernels)
 
 typedef struct mag_amd64_blas_specialization {
     const char* name;
-    const mag_x86_64_feature_t* (*get_feature_permutation)(size_t* out_num);
+    uint64_t (*get_feature_permutation)(void);
     void (*inject_kernels)(mag_kernel_registry_t* kernels);
 } mag_amd64_blas_specialization;
 
 #define mag_amd64_blas_spec_decl(feat) \
-    const mag_x86_64_feature_t* mag_cpu_blas_specialization_amd64_##feat##_features(size_t* out_num); \
+    uint64_t mag_cpu_blas_specialization_amd64_##feat##_features(void); \
     extern void mag_cpu_blas_specialization_amd64_##feat(mag_kernel_registry_t* kernels)
 
 #define mag_amd64_blas_spec_permute(feat) \
@@ -40,15 +40,11 @@ static const mag_amd64_blas_specialization mag_amd64_blas_specializations[] = { 
 };
 
 static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_registry_t* kernels) {
+    uint64_t cap_avail = ctx->machine.amd64_cpu_caps;
     for (size_t i=0; i < sizeof(mag_amd64_blas_specializations)/sizeof(*mag_amd64_blas_specializations); ++i) { /* Find best blas spec for the host CPU */
         const mag_amd64_blas_specialization* spec = mag_amd64_blas_specializations+i;
-        size_t num_features = 0;
-        const mag_x86_64_feature_t* features = (*spec->get_feature_permutation)(&num_features); /* Get requires features */
-        if (mag_unlikely(!num_features || !features)) continue;
-        bool has_all_features = true;
-        for (size_t j=0; j < num_features; ++j) /* For each requested feature, check if host CPU supports it */
-            has_all_features &= mag_ctx_x86_64_cpu_has_feature(ctx, features[j]);
-        if (has_all_features) { /* Since specializations are sorted by score, we found the perfect spec. */
+        uint64_t cap_required = (*spec->get_feature_permutation)(); /* Get requires features */
+        if ((cap_avail & cap_required) == cap_required) { /* Since specializations are sorted by score, we found the perfect spec. */
             (*spec->inject_kernels)(kernels);
             mag_log_info("Using tuned BLAS specialization: %s", spec->name);
             return true;
@@ -444,7 +440,7 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num
         .alloc_storage = &mag_cpu_alloc_storage,
         .free_storage = &mag_cpu_free_storage
     };
-    snprintf(dvc->name, sizeof(dvc->name), "%s - %s - Using %u Compute Threads", mag_device_type_get_name(dvc->type), ctx->sys.cpu_name, num_threads);
+    snprintf(dvc->name, sizeof(dvc->name), "%s", ctx->machine.cpu_name);
     return dvc;
 }
 
@@ -455,7 +451,7 @@ static void mag_cpu_release_interface(mag_compute_device_t* ctx) {
 }
 
 mag_compute_device_t* mag_init_device_cpu(mag_ctx_t* ctx, const mag_device_descriptor_t* desc) {
-    uint32_t hw_concurrency = mag_xmax(1, ctx->sys.cpu_virtual_cores);
+    uint32_t hw_concurrency = mag_xmax(1, ctx->machine.cpu_virtual_cores);
     uint32_t num_threads = desc->thread_count;
     num_threads = num_threads ? num_threads : hw_concurrency;
     mag_compute_device_t* dvc = mag_cpu_init_interface(ctx, num_threads);
