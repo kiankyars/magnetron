@@ -15,28 +15,28 @@ typedef struct mag_amd64_blas_specialization {
 } mag_amd64_blas_specialization;
 
 #define mag_amd64_blas_spec_decl(feat) \
-    uint64_t mag_cpu_blas_specialization_amd64_##feat##_features(void); \
-    extern void mag_cpu_blas_specialization_amd64_##feat(mag_kernel_registry_t* kernels)
+    uint64_t mag_cpu_blas_specialization_amd64_v##feat##_features(void); \
+    extern void mag_cpu_blas_specialization_amd64_v##feat(mag_kernel_registry_t* kernels)
 
 #define mag_amd64_blas_spec_permute(feat) \
     (mag_amd64_blas_specialization) { \
-        .name = "amd64_"#feat, \
-        .get_feature_permutation = &mag_cpu_blas_specialization_amd64_##feat##_features, \
-        .inject_kernels = &mag_cpu_blas_specialization_amd64_##feat \
+        .name = "amd64-v"#feat, \
+        .get_feature_permutation = &mag_cpu_blas_specialization_amd64_v##feat##_features, \
+        .inject_kernels = &mag_cpu_blas_specialization_amd64_v##feat \
     }
 
-mag_amd64_blas_spec_decl(znver4);
-mag_amd64_blas_spec_decl(avx512f);
-mag_amd64_blas_spec_decl(avx2);
-mag_amd64_blas_spec_decl(avx);
-mag_amd64_blas_spec_decl(sse41);
+mag_amd64_blas_spec_decl(4_5);
+mag_amd64_blas_spec_decl(4);
+mag_amd64_blas_spec_decl(3);
+mag_amd64_blas_spec_decl(2_5);
+mag_amd64_blas_spec_decl(2);
 
 static const mag_amd64_blas_specialization mag_amd64_blas_specializations[] = { /* Dynamic selectable BLAS permutations, sorted from best to worst score. */
-    mag_amd64_blas_spec_permute(znver4),
-    mag_amd64_blas_spec_permute(avx512f),
-    mag_amd64_blas_spec_permute(avx2),
-    mag_amd64_blas_spec_permute(avx),
-    mag_amd64_blas_spec_permute(sse41),
+    mag_amd64_blas_spec_permute(4_5),
+    mag_amd64_blas_spec_permute(4),
+    mag_amd64_blas_spec_permute(3),
+    mag_amd64_blas_spec_permute(2_5),
+    mag_amd64_blas_spec_permute(2),
 };
 
 static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_registry_t* kernels) {
@@ -73,7 +73,7 @@ typedef struct mag_arm64_blas_specialization {
 
 #define mag_arm64_blas_spec_permute(feat) \
     (mag_arm64_blas_specialization) { \
-        .name = "arm64_"#feat, \
+        .name = "arm64-"#feat, \
         .get_cap_permutation = &mag_cpu_blas_specialization_arm64_v_##feat##_features, \
         .inject_kernels = &mag_cpu_blas_specialization_arm64_v_##feat \
 }
