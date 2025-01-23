@@ -474,7 +474,7 @@ class Tensor:
         """Releases _ptr resources upon object destruction."""
         if hasattr(self, '_ptr') and isinstance(self._ptr, ffi.CData) and self._ptr != ffi.NULL:
             C.mag_tensor_decref(self._ptr)
-        self._ptr = ffi.NULL
+            self._ptr = ffi.NULL
 
     _DISPATCH = {
         1: C.mag_tensor_create_1d,
@@ -827,7 +827,7 @@ class Tensor:
         """
         return int(ffi.cast('uintptr_t', C.mag_tensor_data_ptr(self._ptr)))
 
-    def to_list(self) -> list[float]:
+    def tolist(self) -> list[float]:
         """
         Returns the tensor data as a Python list of floats.
 
