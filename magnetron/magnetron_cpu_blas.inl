@@ -1,3 +1,28 @@
+/* (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
+
+/*
+**
+** + ARM 64 Versions and Features
+** +==============+=============+==============+======================================================+
+** | armv8-a      |  Armv8-A    |              |  +fp, +simd
+** | armv8.1-a    |  Armv8.1-A  |  armv8-a,    |  +crc, +lse, +rdma
+** | armv8.2-a    |  Armv8.2-A  |  armv8.1-a   |
+** | armv8.3-a    |  Armv8.3-A  |  armv8.2-a,  |  +pauth, +fcma, +jscvt
+** | armv8.4-a    |  Armv8.4-A  |  armv8.3-a,  |  +flagm, +fp16fml, +dotprod, +rcpc2
+** | armv8.5-a    |  Armv8.5-A  |  armv8.4-a,  |  +sb, +ssbs, +predres, +frintts, +flagm2
+** | armv8.6-a    |  Armv8.6-A  |  armv8.5-a,  |  +bf16, +i8mm
+** | armv8.7-a    |  Armv8.7-A  |  armv8.6-a,  |  +wfxt, +xs
+** | armv8.8-a    |  Armv8.8-a  |  armv8.7-a,  |  +mops
+** | armv8.9-a    |  Armv8.9-a  |  armv8.8-a   |
+** | armv9-a      |  Armv9-A    |  armv8.5-a,  |  +sve, +sve2
+** | armv9.1-a    |  Armv9.1-A  |  armv9-a,    |  +bf16, +i8mm
+** | armv9.2-a    |  Armv9.2-A  |  armv9.1-a   |
+** | armv9.3-a    |  Armv9.3-A  |  armv9.2-a,  |  +mops
+** | armv9.4-a    |  Armv9.4-A  |  armv9.3-a   |
+** | armv8-r      |  Armv8-R    |  armv8-r     |
+** +==============+=============+==============+======================================================+
+*/
+
 #include "magnetron_internal.h"
 
 #include <math.h>
@@ -1381,12 +1406,11 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
 #ifndef MAG_BLAS_SPECIALIZATION
 #error "BLAS specialization undefined"
 #endif
-
-#if defined(__x86_64__) || defined(_M_X64)
 #ifndef MAG_BLAS_SPECIALIZATION_FEAT_REQUEST
 #error "Feature request routine undefined"
 #endif
 
+#if defined(__x86_64__) || defined(_M_X64)
 const mag_x86_64_feature_t* MAG_BLAS_SPECIALIZATION_FEAT_REQUEST(size_t* out_num) {
     static const mag_x86_64_feature_t required_features[] = {
         #ifdef __AVX512F__
@@ -1514,6 +1538,35 @@ const mag_x86_64_feature_t* MAG_BLAS_SPECIALIZATION_FEAT_REQUEST(size_t* out_num
     *out_num = sizeof(required_features)/sizeof(*required_features);
     return required_features;
 }
+
+#elif defined(__aarch64__)
+
+mag_arm64_cap_t MAG_BLAS_SPECIALIZATION_FEAT_REQUEST(void) {
+    mag_arm64_cap_t caps = 1u<<MAG_ARM64_CAP_NEON; /* Always required on arm64. */
+    #ifdef __ARM_FEATURE_DOTPROD
+        caps |= 1u<<MAG_ARM64_CAP_DOTPROD;
+    #endif
+    #ifdef __ARM_FEATURE_MATMUL_INT8
+        caps |= 1u<<MAG_ARM64_CAP_I8MM;
+    #endif
+    #ifdef __ARM_FEATURE_FP16_SCALAR_ARITHMETIC
+        caps |= 1u<<MAG_ARM64_CAP_F16SCA;
+    #endif
+    #ifdef __ARM_FEATURE_FP16_VECTOR_ARITHMETIC
+        caps |= 1u<<MAG_ARM64_CAP_F16VEC;
+    #endif
+    #ifdef __ARM_FEATURE_BF16
+        caps |= 1u<<MAG_ARM64_CAP_BF16;
+    #endif
+    #ifdef __ARM_FEATURE_SVE
+        caps |= 1u<<MAG_ARM64_CAP_SVE;
+    #endif
+    #ifdef __ARM_FEATURE_SVE2
+        caps |= 1u<<MAG_ARM64_CAP_SVE2;
+    #endif
+    return caps;
+}
+
 #endif
 
 static void (*const forward_kernels[MAG_OP__NUM])(const mag_compute_payload_t*) = {

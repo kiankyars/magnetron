@@ -35,7 +35,7 @@ endif()
 
 include(cmake/arch.cmake)
 include(cmake/lib.cmake)
-include(cmake/comflags.cmake)
+include(cmake/compiler_config.cmake)
 
 if (${MAGNETRON_ENABLE_CUDA})
     include(cmake/cuda.cmake)
