@@ -656,7 +656,7 @@ class Tensor:
         return tensor
 
     @classmethod
-    def normal(cls, shape: tuple[int, ...], *, mean: float, stddev: float) -> 'Tensor':
+    def normal(cls, shape: tuple[int, ...], *, mean: float=0.0, stddev: float=1.0) -> 'Tensor':
         """
         Creates a _ptr filled with random values from a normal distribution.
 
@@ -827,7 +827,7 @@ class Tensor:
         """
         return int(ffi.cast('uintptr_t', C.mag_tensor_data_ptr(self._ptr)))
 
-    def to_list(self) -> list[float]:
+    def tolist(self) -> list[float]:
         """
         Returns the tensor data as a Python list of floats.
 
@@ -1171,13 +1171,25 @@ class Tensor:
 
     def transpose(self) -> 'Tensor':
         """
-        Transposes the tensor (swaps the last two dimensions).
+        Transposes the tensor (swaps the last two dimensions). Same as tensor.T.
 
         Returns
         -------
         Tensor
             A transposed tensor.
         """
+        return Tensor(C.mag_transpose(self._ptr))
+
+    @property
+    def T(self) -> 'Tensor':
+        """
+           Transposes the tensor (swaps the last two dimensions). Same as tensor.transpose().
+
+           Returns
+           -------
+           Tensor
+               A transposed tensor.
+           """
         return Tensor(C.mag_transpose(self._ptr))
 
     def permute(self, axes: tuple[int, ...]) -> 'Tensor':

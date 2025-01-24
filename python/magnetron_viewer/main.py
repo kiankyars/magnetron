@@ -119,7 +119,7 @@ class MAGNETRONViewer(QMainWindow):
         if tensor_name not in self.tensors:
             return
         tensor = self.tensors[tensor_name]
-        tensor_data = tensor.to_list()
+        tensor_data = tensor.tolist()
 
         rows = []
         elements_per_row = 16

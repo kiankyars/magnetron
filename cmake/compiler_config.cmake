@@ -27,6 +27,7 @@ set(MAG_CLANG_COMPILE_FLAGS
 set(MAG_CLANG_RELEASE_COMPILE_FLAGS
     -O3
     -flto
+    -fomit-frame-pointer
 )
 set(MAG_CLANG_LINK_OPTIONS "")
 set(MAG_CLANG_RELEASE_LINK_OPTIONS -flto)
@@ -49,6 +50,14 @@ set(MAG_GCC_RELEASE_COMPILE_FLAGS
 )
 set(MAG_GCC_LINK_OPTIONS "")
 set(MAG_GCC_RELEASE_LINK_OPTIONS -flto)
+
+if (${IS_ARM64})
+    set(MAG_CLANG_COMPILE_FLAGS ${MAG_CLANG_COMPILE_FLAGS} -march=armv8-a)
+    set(MAG_GCC_COMPILE_FLAGS ${MAG_CLANG_COMPILE_FLAGS} -march=armv8-a)
+elseif (${IS_AMD64})
+    set(MAG_CLANG_COMPILE_FLAGS ${MAG_CLANG_COMPILE_FLAGS} -msse -msse2)
+    set(MAG_GCC_COMPILE_FLAGS ${MAG_CLANG_COMPILE_FLAGS} -msse -msse2)
+endif()
 
 if (WIN32) # Windows (MSVC) specific config
     target_compile_options(magnetron PRIVATE ${MAG_MSVC_COMPILE_FLAGS})

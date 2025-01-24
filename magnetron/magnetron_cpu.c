@@ -10,52 +10,49 @@ extern void mag_cpu_blas_specialization_fallback(mag_kernel_registry_t* kernels)
 
 typedef struct mag_amd64_blas_specialization {
     const char* name;
-    const mag_x86_64_feature_t* (*get_feature_permutation)(size_t* out_num);
+    uint64_t (*get_feature_permutation)(void);
     void (*inject_kernels)(mag_kernel_registry_t* kernels);
 } mag_amd64_blas_specialization;
 
-#define mag_cpu_blas_spec_decl(feat) \
-    const mag_x86_64_feature_t* mag_cpu_blas_specialization_amd64_##feat##_features(size_t* out_num); \
-    extern void mag_cpu_blas_specialization_amd64_##feat(mag_kernel_registry_t* kernels)
+#define mag_amd64_blas_spec_decl(feat) \
+    uint64_t mag_cpu_blas_specialization_amd64_v##feat##_features(void); \
+    extern void mag_cpu_blas_specialization_amd64_v##feat(mag_kernel_registry_t* kernels)
 
 #define mag_amd64_blas_spec_permute(feat) \
     (mag_amd64_blas_specialization) { \
-        .name = "amd64_"#feat, \
-        .get_feature_permutation = &mag_cpu_blas_specialization_amd64_##feat##_features, \
-        .inject_kernels = &mag_cpu_blas_specialization_amd64_##feat \
+        .name = "amd64-v."#feat, \
+        .get_feature_permutation = &mag_cpu_blas_specialization_amd64_v##feat##_features, \
+        .inject_kernels = &mag_cpu_blas_specialization_amd64_v##feat \
     }
 
-mag_cpu_blas_spec_decl(znver4);
-mag_cpu_blas_spec_decl(avx512f);
-mag_cpu_blas_spec_decl(avx2);
-mag_cpu_blas_spec_decl(avx);
-mag_cpu_blas_spec_decl(sse41);
-
-static const mag_amd64_blas_specialization mag_amd64_blas_specializations[] = { /* Dynamic selectable BLAS permutations, sorted from best to worst score. */
-    mag_amd64_blas_spec_permute(znver4),
-    mag_amd64_blas_spec_permute(avx512f),
-    mag_amd64_blas_spec_permute(avx2),
-    mag_amd64_blas_spec_permute(avx),
-    mag_amd64_blas_spec_permute(sse41),
-};
+mag_amd64_blas_spec_decl(4_5);
+mag_amd64_blas_spec_decl(4);
+mag_amd64_blas_spec_decl(3);
+mag_amd64_blas_spec_decl(2_5);
+mag_amd64_blas_spec_decl(2);
 
 static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_registry_t* kernels) {
+    const mag_amd64_blas_specialization mag_amd64_blas_specializations[] = { /* Dynamic selectable BLAS permutations, sorted from best to worst score. */
+        mag_amd64_blas_spec_permute(4_5),
+        mag_amd64_blas_spec_permute(4),
+        mag_amd64_blas_spec_permute(3),
+        mag_amd64_blas_spec_permute(2_5),
+        mag_amd64_blas_spec_permute(2),
+    };
+
+    uint64_t cap_avail = ctx->machine.amd64_cpu_caps;
     for (size_t i=0; i < sizeof(mag_amd64_blas_specializations)/sizeof(*mag_amd64_blas_specializations); ++i) { /* Find best blas spec for the host CPU */
         const mag_amd64_blas_specialization* spec = mag_amd64_blas_specializations+i;
-        size_t num_features = 0;
-        const mag_x86_64_feature_t* features = (*spec->get_feature_permutation)(&num_features); /* Get requires features */
-        if (mag_unlikely(!num_features || !features)) continue;
-        bool has_all_features = true;
-        for (size_t j=0; j < num_features; ++j) /* For each requested feature, check if host CPU supports it */
-            has_all_features &= mag_ctx_x86_64_cpu_has_feature(ctx, features[j]);
-        if (has_all_features) { /* Since specializations are sorted by score, we found the perfect spec. */
+        uint64_t cap_required = (*spec->get_feature_permutation)(); /* Get requires features */
+        if ((cap_avail & cap_required) == cap_required) { /* Since specializations are sorted by score, we found the perfect spec. */
             (*spec->inject_kernels)(kernels);
-            mag_log_info("Using BLAS specialization: %s", spec->name);
+            mag_log_info("Using tuned BLAS specialization: %s", spec->name);
             return true;
         }
     }
     /* No matching specialization found, use generic */
     mag_cpu_blas_specialization_fallback(kernels);
+    mag_log_info("Using fallback BLAS specialization");
     return false; /* No spec used, fallback is active */
 }
 
@@ -64,24 +61,45 @@ static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_re
 
 #elif defined(__aarch64__) || defined(_M_ARM64)
 
-#define mag_cpu_blas_spec_name(feat) mag_cpu_blas_specialization_arm64_##feat
-#define mag_cpu_blas_spec_decl(feat) extern void mag_cpu_blas_spec_name(feat)(mag_kernel_registry_t* kernels)
+typedef struct mag_arm64_blas_specialization {
+    const char* name;
+    uint64_t (*get_cap_permutation)(void);
+    void (*inject_kernels)(mag_kernel_registry_t* kernels);
+} mag_arm64_blas_specialization;
 
-mag_cpu_blas_spec_decl(82);
+#define mag_arm64_blas_spec_decl(feat) \
+    uint64_t mag_cpu_blas_specialization_arm64_v_##feat##_features(void); \
+    extern void mag_cpu_blas_specialization_arm64_v_##feat(mag_kernel_registry_t* kernels)
+
+#define mag_arm64_blas_spec_permute(feat) \
+    (mag_arm64_blas_specialization) { \
+        .name = "arm64-v."#feat, \
+        .get_cap_permutation = &mag_cpu_blas_specialization_arm64_v_##feat##_features, \
+        .inject_kernels = &mag_cpu_blas_specialization_arm64_v_##feat \
+}
+
+mag_arm64_blas_spec_decl(9);
+mag_arm64_blas_spec_decl(8_2);
 
 static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_registry_t* kernels) {
-#ifdef __linux__
-    long hwcap = ctx->sys.cpu_arm64_hwcap;
-    if (hwcap & HWCAP_FPHP) && (hwcap & HWCAP_ASIMDHP) && (hwcap && HWCAP_ASIMDDP)) { /* ARM v.8.2 f16 scalar + f16 vec + dotprod */
-        mag_cpu_blas_spec_name(82)(kernels);
-        return true;
+    const mag_arm64_blas_specialization mag_arm64_blas_specializations[] = { /* Dynamic selectable BLAS permutations, sorted from best to worst score. */
+        mag_arm64_blas_spec_permute(9),
+        mag_arm64_blas_spec_permute(8_2),
+    };
+
+    uint64_t cap_avail = ctx->machine.arm64_cpu_caps;
+    for (size_t i=0; i < sizeof(mag_arm64_blas_specializations)/sizeof(*mag_arm64_blas_specializations); ++i) { /* Find best blas spec for the host CPU */
+        const mag_arm64_blas_specialization* spec = mag_arm64_blas_specializations+i;
+        uint64_t cap_required = (*spec->get_cap_permutation)(); /* Get requires features */
+        if ((cap_avail & cap_required) == cap_required) { /* Since specializations are sorted by score, we found the perfect spec. */
+            (*spec->inject_kernels)(kernels);
+            mag_log_info("Using tuned BLAS specialization: %s", spec->name);
+            return true;
+        }
     }
-#elif defined(__APPLE__)
-    /* TODO - currently using ARM v8 baseline but Apple M2/M3 have newer arm versions we could target */
-    /* mag_cpu_blas_spec_name(82)(kernels); */
-#endif
     /* No matching specialization found, use generic */
     mag_cpu_blas_specialization_fallback(kernels);
+    mag_log_info("Using fallback BLAS specialization");
     return false; /* No spec used, fallback is active */
 }
 
@@ -422,7 +440,7 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num
         .alloc_storage = &mag_cpu_alloc_storage,
         .free_storage = &mag_cpu_free_storage
     };
-    snprintf(dvc->name, sizeof(dvc->name), "%s - %s - Using %u Compute Threads", mag_device_type_get_name(dvc->type), ctx->sys.cpu_name, num_threads);
+    snprintf(dvc->name, sizeof(dvc->name), "%s", ctx->machine.cpu_name);
     return dvc;
 }
 
@@ -433,7 +451,7 @@ static void mag_cpu_release_interface(mag_compute_device_t* ctx) {
 }
 
 mag_compute_device_t* mag_init_device_cpu(mag_ctx_t* ctx, const mag_device_descriptor_t* desc) {
-    uint32_t hw_concurrency = mag_xmax(1, ctx->sys.cpu_virtual_cores);
+    uint32_t hw_concurrency = mag_xmax(1, ctx->machine.cpu_virtual_cores);
     uint32_t num_threads = desc->thread_count;
     num_threads = num_threads ? num_threads : hw_concurrency;
     mag_compute_device_t* dvc = mag_cpu_init_interface(ctx, num_threads);

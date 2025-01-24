@@ -1,7 +1,7 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
 from magnetron import Tensor
-from magnetron.models import SequentialModel, DenseLayer
+from magnetron.model import SequentialModel, DenseLayer
 import matplotlib.pyplot as plt
 
 EPOCHS: int = 10000
