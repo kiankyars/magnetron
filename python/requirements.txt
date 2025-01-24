@@ -5,3 +5,6 @@ pytest
 numpy
 matplotlib
 cycler
+sphinx
+sphinx-autoapi
+sphinx-rtd-theme
