@@ -1,5 +1,7 @@
 /* (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
 
+
+#ifndef _MSC_VER
 #if !defined(__SSE__) \
     || !defined(__SSE2__) \
     || !defined(__SSE3__) \
@@ -8,8 +10,6 @@
     || !defined(__SSE4_2__) \
     || !defined(__AVX__) \
     || !defined(__AVX2__) \
-    || !defined(__BMI__) \
-    || !defined(__BMI2__) \
     || !defined(__F16C__) \
     || !defined(__FMA__) \
     || !defined(__AVX512F__) \
@@ -17,6 +17,7 @@
     || !defined(__AVX512DQ__) \
     || !defined(__AVX512VL__)
 #error "BLAS specialization requires matching compile flags"
+#endif
 #endif
 #ifdef __AVX512VNNI__
 #error "BLAS specialization feature too high"

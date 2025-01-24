@@ -590,7 +590,6 @@ void mag_ctx_destroy(mag_ctx_t* ctx) {
     }
     *head = NULL;
 #endif
-    mag_fixed_intrusive_pool_print_info(&ctx->tensor_pool, "Tensor Hull Pool");
     mag_fixed_intrusive_pool_destroy(&ctx->tensor_pool);
     mag_destroy_dynamic_device(ctx->device); ctx->device = NULL;
     memset(ctx, 0, sizeof(*ctx));

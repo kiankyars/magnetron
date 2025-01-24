@@ -31,15 +31,15 @@ mag_amd64_blas_spec_decl(3);
 mag_amd64_blas_spec_decl(2_5);
 mag_amd64_blas_spec_decl(2);
 
-static const mag_amd64_blas_specialization mag_amd64_blas_specializations[] = { /* Dynamic selectable BLAS permutations, sorted from best to worst score. */
-    mag_amd64_blas_spec_permute(4_5),
-    mag_amd64_blas_spec_permute(4),
-    mag_amd64_blas_spec_permute(3),
-    mag_amd64_blas_spec_permute(2_5),
-    mag_amd64_blas_spec_permute(2),
-};
-
 static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_registry_t* kernels) {
+    const mag_amd64_blas_specialization mag_amd64_blas_specializations[] = { /* Dynamic selectable BLAS permutations, sorted from best to worst score. */
+        mag_amd64_blas_spec_permute(4_5),
+        mag_amd64_blas_spec_permute(4),
+        mag_amd64_blas_spec_permute(3),
+        mag_amd64_blas_spec_permute(2_5),
+        mag_amd64_blas_spec_permute(2),
+    };
+
     uint64_t cap_avail = ctx->machine.amd64_cpu_caps;
     for (size_t i=0; i < sizeof(mag_amd64_blas_specializations)/sizeof(*mag_amd64_blas_specializations); ++i) { /* Find best blas spec for the host CPU */
         const mag_amd64_blas_specialization* spec = mag_amd64_blas_specializations+i;
@@ -81,12 +81,12 @@ typedef struct mag_arm64_blas_specialization {
 mag_arm64_blas_spec_decl(9);
 mag_arm64_blas_spec_decl(8_2);
 
-static const mag_arm64_blas_specialization mag_arm64_blas_specializations[] = { /* Dynamic selectable BLAS permutations, sorted from best to worst score. */
-    mag_arm64_blas_spec_permute(9),
-    mag_arm64_blas_spec_permute(8_2),
-};
-
 static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_registry_t* kernels) {
+    const mag_arm64_blas_specialization mag_arm64_blas_specializations[] = { /* Dynamic selectable BLAS permutations, sorted from best to worst score. */
+        mag_arm64_blas_spec_permute(9),
+        mag_arm64_blas_spec_permute(8_2),
+    };
+
     uint64_t cap_avail = ctx->machine.arm64_cpu_caps;
     for (size_t i=0; i < sizeof(mag_arm64_blas_specializations)/sizeof(*mag_arm64_blas_specializations); ++i) { /* Find best blas spec for the host CPU */
         const mag_arm64_blas_specialization* spec = mag_arm64_blas_specializations+i;
