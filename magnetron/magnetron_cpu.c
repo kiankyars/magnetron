@@ -88,7 +88,7 @@ static const mag_arm64_blas_specialization mag_arm64_blas_specializations[] = { 
 
 static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_registry_t* kernels) {
     uint64_t cap_avail = ctx->machine.arm64_cpu_caps;
-    for (size_t i=1; i < sizeof(mag_arm64_blas_specializations)/sizeof(*mag_arm64_blas_specializations); ++i) { /* Find best blas spec for the host CPU */
+    for (size_t i=0; i < sizeof(mag_arm64_blas_specializations)/sizeof(*mag_arm64_blas_specializations); ++i) { /* Find best blas spec for the host CPU */
         const mag_arm64_blas_specialization* spec = mag_arm64_blas_specializations+i;
         uint64_t cap_required = (*spec->get_cap_permutation)(); /* Get requires features */
         if ((cap_avail & cap_required) == cap_required) { /* Since specializations are sorted by score, we found the perfect spec. */

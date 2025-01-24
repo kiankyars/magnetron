@@ -1559,8 +1559,8 @@ uint64_t MAG_BLAS_SPECIALIZATION_FEAT_REQUEST() {
 
 #elif defined(__aarch64__)
 
-mag_arm64_cap_t MAG_BLAS_SPECIALIZATION_FEAT_REQUEST(void) {
-    mag_arm64_cap_t caps = 1u<<MAG_ARM64_CAP_NEON; /* Always required on arm64. */
+uint64_t MAG_BLAS_SPECIALIZATION_FEAT_REQUEST(void) {
+    uint64_t caps = 1u<<MAG_ARM64_CAP_NEON; /* Always required on arm64. */
     #ifdef __ARM_FEATURE_DOTPROD
         caps |= 1u<<MAG_ARM64_CAP_DOTPROD;
     #endif
