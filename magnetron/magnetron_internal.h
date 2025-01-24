@@ -632,7 +632,7 @@ typedef enum mag_amd64_cap_t {
     MAG_AMD64_CAP__NUM
 } mag_amd64_cap_t;
 #undef _
-#define mag_amd64_cap(cap) (1ull<<(MAG_AMD64_CAP_##cap))
+
 extern const char* const mag_amd64_cap_names[MAG_AMD64_CAP__NUM];
 
 #elif defined(__aarch64__)
@@ -675,7 +675,7 @@ struct mag_ctx_t {
 #if defined(__x86_64__) || defined(_M_X64)
         uint64_t amd64_cpu_caps;                    /* x86-64 CPU features. Bitset of 1ull<<MAG_AMD64_CAP_* */
 #elif defined (__aarch64__)
-        mag_arm64_cap_t arm64_cpu_features;        /* ARM64 CPU features. */
+        uint64_t arm64_cpu_caps;                    /* ARM64 CPU features. */
         int64_t arm64_cpu_sve_width;                /* ARM64 SVE vector register width. */
 #endif
     } machine;

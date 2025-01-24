@@ -52,7 +52,7 @@ static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_re
     }
     /* No matching specialization found, use generic */
     mag_cpu_blas_specialization_fallback(kernels);
-    mag_log_warn("Using fallback BLAS specialization");
+    mag_log_info("Using fallback BLAS specialization");
     return false; /* No spec used, fallback is active */
 }
 
@@ -63,12 +63,12 @@ static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_re
 
 typedef struct mag_arm64_blas_specialization {
     const char* name;
-    mag_arm64_cap_t (*get_cap_permutation)(void);
+    uint64_t (*get_cap_permutation)(void);
     void (*inject_kernels)(mag_kernel_registry_t* kernels);
 } mag_arm64_blas_specialization;
 
 #define mag_arm64_blas_spec_decl(feat) \
-    mag_arm64_cap_t mag_cpu_blas_specialization_arm64_v_##feat##_features(void); \
+    uint64_t mag_cpu_blas_specialization_arm64_v_##feat##_features(void); \
     extern void mag_cpu_blas_specialization_arm64_v_##feat(mag_kernel_registry_t* kernels)
 
 #define mag_arm64_blas_spec_permute(feat) \
@@ -87,10 +87,10 @@ static const mag_arm64_blas_specialization mag_arm64_blas_specializations[] = { 
 };
 
 static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_registry_t* kernels) {
-    mag_arm64_cap_t cap_avail = ctx->sys.arm64_cpu_features;
-    for (size_t i=0; i < sizeof(mag_arm64_blas_specializations)/sizeof(*mag_arm64_blas_specializations); ++i) { /* Find best blas spec for the host CPU */
+    uint64_t cap_avail = ctx->machine.arm64_cpu_caps;
+    for (size_t i=1; i < sizeof(mag_arm64_blas_specializations)/sizeof(*mag_arm64_blas_specializations); ++i) { /* Find best blas spec for the host CPU */
         const mag_arm64_blas_specialization* spec = mag_arm64_blas_specializations+i;
-        mag_arm64_cap_t cap_required = (*spec->get_cap_permutation)(); /* Get requires features */
+        uint64_t cap_required = (*spec->get_cap_permutation)(); /* Get requires features */
         if ((cap_avail & cap_required) == cap_required) { /* Since specializations are sorted by score, we found the perfect spec. */
             (*spec->inject_kernels)(kernels);
             mag_log_info("Using tuned BLAS specialization: %s", spec->name);
@@ -99,7 +99,7 @@ static bool mag_blas_detect_gen_optimal_spec(const mag_ctx_t* ctx, mag_kernel_re
     }
     /* No matching specialization found, use generic */
     mag_cpu_blas_specialization_fallback(kernels);
-    mag_log_warn("Using fallback BLAS specialization");
+    mag_log_info("Using fallback BLAS specialization");
     return false; /* No spec used, fallback is active */
 }
 

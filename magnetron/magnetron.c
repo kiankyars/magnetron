@@ -57,8 +57,7 @@
 #include <linux/prctl.h>
 #include <sys/prctl.h>
 #ifdef __aarch64__
-#include <libc/sysv/consts/hwcap.h>
-#include <sys/auxv.h
+#include <sys/auxv.h>
 #endif
 #endif
 #endif
@@ -477,21 +476,17 @@ static void mag_system_host_info_dump(mag_ctx_t* ctx) {
     #if defined(__x86_64__) || defined(_M_X64) /* Print CPU features for x86-64 platforms. */
         if (mag_log_enabled) {
             printf(MAG_CC_CYAN "[magnetron] " MAG_CC_RESET "%s caps: ", cpu_arch);
-            for (uint64_t i=0; i < MAG_AMD64_CAP__NUM; ++i) {
-                if (ctx->machine.amd64_cpu_caps & (1ull<<i)) {
+            for (uint64_t i=0; i < MAG_AMD64_CAP__NUM; ++i)
+                if (ctx->machine.amd64_cpu_caps & (1ull<<i))
                     printf("%s ", mag_amd64_cap_names[i]);
-                }
-            }
             putchar('\n');
         }
     #elif defined(__aarch64__)
         if (mag_log_enabled) {
             printf(MAG_CC_CYAN "[magnetron] " MAG_CC_RESET "%s caps: ", cpu_arch);
-            for (uint32_t i=0; i < MAG_ARM64_CAP__NUM; ++i) {
-                if (ctx->machine.arm64_cpu_features & (1u<<i)) {
+            for (uint32_t i=0; i < MAG_ARM64_CAP__NUM; ++i)
+                if (ctx->machine.arm64_cpu_caps & (1ull<<i))
                     printf("%s ", mag_arm64_cap_names[i]);
-                }
-            }
             putchar('\n');
         }
     #endif
@@ -2777,35 +2772,37 @@ static void MAG_COLDPROC mag_system_host_info_query_memory(uint64_t* out_phys_me
     }
 
 #elif defined(__aarch64__)
-static void MAG_COLDPROC mag_system_info_query_arm64_cpu_caps(mag_arm64_cap_t* feat, int64_t* sve_width) {
-    *feat = MAG_ARM64_CAP_NONE;
+static void MAG_COLDPROC mag_system_info_query_arm64_cpu_caps(uint64_t* caps, int64_t* sve_width) {
+    *caps = MAG_ARM64_CAP_NONE;
     #ifdef __linux__
-        #ifndef HWCAP2_I8MM
-        #define HWCAP2_I8MM 0x2000u
-        #endif
-        uint32_t hwcap = getauxval(AT_HWCAP);
-        uint32_t hwcap2 = getauxval(AT_HWCAP2);
-        if (hwcap & HWCAP_ASIMD) *feat |= 1u<<MAG_ARM64_CAP_NEON;
-        if (hwcap & HWCAP_ASIMDDP) *feat |= 1u<<MAG_ARM64_CAP_DOTPROD;
-        if (hwcap2 & HWCAP2_I8MM) *feat |= 1u<<MAG_ARM64_CAP_I8MM;
-        if (hwcap & HWCAP_SVE) *feat |= 1u<<MAG_ARM64_CAP_SVE;
+        unsigned long hwcap = getauxval(AT_HWCAP);
+        unsigned long hwcap2 = getauxval(AT_HWCAP2);
+        if (hwcap & HWCAP_ASIMD) *caps |= 1ull<<MAG_ARM64_CAP_NEON;
+        if (hwcap & HWCAP_ASIMDDP) *caps |= 1ull<<MAG_ARM64_CAP_DOTPROD;
+        if (hwcap2 & HWCAP2_I8MM) *caps |= 1ull<<MAG_ARM64_CAP_I8MM;
+        if (hwcap & HWCAP_FPHP) *caps |= 1ull<<MAG_ARM64_CAP_F16SCA;
+        if (hwcap & HWCAP_ASIMDHP) *caps |= 1ull<<MAG_ARM64_CAP_F16VEC;
+        if (hwcap2 & HWCAP2_BF16) *caps |= 1ull<<MAG_ARM64_CAP_BF16;
+        if (hwcap & HWCAP_SVE) *caps |= 1ull<<MAG_ARM64_CAP_SVE;
+        if (hwcap2 & HWCAP2_SVE2) *caps |= 1ull<<MAG_ARM64_CAP_SVE2;
+        *sve_width = 0; /* NYI */
     #elif defined(__APPLE__)
         int sx = 0;
         size_t size = sizeof(sx);
         if (sysctlbyname("hw.optional.AdvSIMD", &sx, &size, NULL, 0) != 0) sx = 0;
-        if (sx) *feat |= 1u<<MAG_ARM64_CAP_NEON;
+        if (sx) *feat |= 1ull<<MAG_ARM64_CAP_NEON;
         if (sysctlbyname("hw.optional.arm.FEAT_DotProd", &sx, &size, NULL, 0) != 0) sx = 0;
-        if (sx) *feat |= 1u<<MAG_ARM64_CAP_DOTPROD;
+        if (sx) *feat |= 1ull<<MAG_ARM64_CAP_DOTPROD;
         if (sysctlbyname("hw.optional.arm.FEAT_I8MM", &sx, &size, NULL, 0) != 0) sx = 0;
-        if (sx) *feat |= 1u<<MAG_ARM64_CAP_I8MM;
+        if (sx) *feat |= 1ull<<MAG_ARM64_CAP_I8MM;
         if (sysctlbyname("hw.optional.arm.FEAT_FP16", &sx, &size, NULL, 0) != 0) sx = 0;
-        if (sx) *feat |= 1u<<MAG_ARM64_CAP_F16SCA;
+        if (sx) *feat |= 1ull<<MAG_ARM64_CAP_F16SCA;
         if (sysctlbyname("hw.optional.AdvSIMD_HPFPCvt", &sx, &size, NULL, 0) != 0) sx = 0;
-        if (sx) *feat |= 1u<<MAG_ARM64_CAP_F16VEC;
+        if (sx) *feat |= 1ull<<MAG_ARM64_CAP_F16VEC;
         if (sysctlbyname("hw.optional.arm.FEAT_BF16", &sx, &size, NULL, 0) != 0) sx = 0;
-        if (sx) *feat |= 1u<<MAG_ARM64_CAP_BF16;
+        if (sx) *feat |= 1ull<<MAG_ARM64_CAP_BF16;
         if (sysctlbyname("hw.optional.arm.FEAT_SVE", &sx, &size, NULL, 0) != 0) sx = 0;
-        if (sx) *feat |= 1u<<MAG_ARM64_CAP_SVE;
+        if (sx) *feat |= 1ull<<MAG_ARM64_CAP_SVE;
         *sve_width = 0; /* NYI */
     #endif
 }
@@ -2819,7 +2816,7 @@ static void MAG_COLDPROC mag_system_host_info_query(mag_ctx_t* ctx) {
     #if defined(__x86_64__) || defined(_M_X64)
         mag_system_info_query_amd64_cpu_caps(&ctx->machine.amd64_cpu_caps);
     #elif defined(__aarch64__)
-        mag_system_info_query_arm64_cpu_caps(&ctx->sys.arm64_cpu_features, &ctx->sys.arm64_cpu_sve_width);
+        mag_system_info_query_arm64_cpu_caps(&ctx->machine.arm64_cpu_caps, &ctx->machine.arm64_cpu_sve_width);
     #endif
     if (mag_unlikely(!*ctx->machine.os_name)) snprintf(ctx->machine.os_name, sizeof(ctx->machine.os_name), "Unknown");
     if (mag_unlikely(!*ctx->machine.cpu_name)) snprintf(ctx->machine.cpu_name, sizeof(ctx->machine.cpu_name), "Unknown");
@@ -3073,7 +3070,7 @@ MAG_EXPORT mag_tensor_t** mag_sto_read_buffered(mag_ctx_t* ctx, const uint8_t* b
     if (mag_unlikely(!mag_sto_read_file_header(&needle, end, out_version, &n_tensors, &ud))) return NULL;   /* Read file header */
     if (mag_unlikely(!*out_version || *out_version > MAG_VERSION)) return NULL;
     if (mag_unlikely(!n_tensors)) return NULL;
-    mag_tensor_t** tensors = (mag_tensor_t**)(*mag_alloc)(NULL, n_tensors*sizeof(*tensors));   /* Allocate return tensor array */
+    mag_tensor_t** tensors = (*mag_alloc)(NULL, n_tensors*sizeof(*tensors));   /* Allocate return tensor array */
     for (size_t i=0; i < n_tensors; ++i) {  /* Read tensor headers */
         char name[MAG_MAX_TENSOR_NAME_LEN] = {0};
         mag_tensor_flags_t flags = 0;
