@@ -2790,19 +2790,19 @@ static void MAG_COLDPROC mag_system_info_query_arm64_cpu_caps(uint64_t* caps, in
         int sx = 0;
         size_t size = sizeof(sx);
         if (sysctlbyname("hw.optional.AdvSIMD", &sx, &size, NULL, 0) != 0) sx = 0;
-        if (sx) *feat |= 1ull<<MAG_ARM64_CAP_NEON;
+        if (sx) *caps |= 1ull<<MAG_ARM64_CAP_NEON;
         if (sysctlbyname("hw.optional.arm.FEAT_DotProd", &sx, &size, NULL, 0) != 0) sx = 0;
-        if (sx) *feat |= 1ull<<MAG_ARM64_CAP_DOTPROD;
+        if (sx) *caps |= 1ull<<MAG_ARM64_CAP_DOTPROD;
         if (sysctlbyname("hw.optional.arm.FEAT_I8MM", &sx, &size, NULL, 0) != 0) sx = 0;
-        if (sx) *feat |= 1ull<<MAG_ARM64_CAP_I8MM;
+        if (sx) *caps |= 1ull<<MAG_ARM64_CAP_I8MM;
         if (sysctlbyname("hw.optional.arm.FEAT_FP16", &sx, &size, NULL, 0) != 0) sx = 0;
-        if (sx) *feat |= 1ull<<MAG_ARM64_CAP_F16SCA;
+        if (sx) *caps |= 1ull<<MAG_ARM64_CAP_F16SCA;
         if (sysctlbyname("hw.optional.AdvSIMD_HPFPCvt", &sx, &size, NULL, 0) != 0) sx = 0;
-        if (sx) *feat |= 1ull<<MAG_ARM64_CAP_F16VEC;
+        if (sx) *caps |= 1ull<<MAG_ARM64_CAP_F16VEC;
         if (sysctlbyname("hw.optional.arm.FEAT_BF16", &sx, &size, NULL, 0) != 0) sx = 0;
-        if (sx) *feat |= 1ull<<MAG_ARM64_CAP_BF16;
+        if (sx) *caps |= 1ull<<MAG_ARM64_CAP_BF16;
         if (sysctlbyname("hw.optional.arm.FEAT_SVE", &sx, &size, NULL, 0) != 0) sx = 0;
-        if (sx) *feat |= 1ull<<MAG_ARM64_CAP_SVE;
+        if (sx) *caps |= 1ull<<MAG_ARM64_CAP_SVE;
         *sve_width = 0; /* NYI */
     #endif
 }

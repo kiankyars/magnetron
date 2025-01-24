@@ -20,7 +20,7 @@ typedef struct mag_amd64_blas_specialization {
 
 #define mag_amd64_blas_spec_permute(feat) \
     (mag_amd64_blas_specialization) { \
-        .name = "amd64-v"#feat, \
+        .name = "amd64-v."#feat, \
         .get_feature_permutation = &mag_cpu_blas_specialization_amd64_v##feat##_features, \
         .inject_kernels = &mag_cpu_blas_specialization_amd64_v##feat \
     }
@@ -73,7 +73,7 @@ typedef struct mag_arm64_blas_specialization {
 
 #define mag_arm64_blas_spec_permute(feat) \
     (mag_arm64_blas_specialization) { \
-        .name = "arm64-"#feat, \
+        .name = "arm64-v."#feat, \
         .get_cap_permutation = &mag_cpu_blas_specialization_arm64_v_##feat##_features, \
         .inject_kernels = &mag_cpu_blas_specialization_arm64_v_##feat \
 }
