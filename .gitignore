@@ -33,3 +33,4 @@ out/
 .tmp
 CMakeSettings.json
 magnetron_chat/.idea
+/build/

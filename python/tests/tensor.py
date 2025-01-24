@@ -39,4 +39,4 @@ def test_tensor_to_list():
     tensor[1] = 255
     tensor[2] = -22333
     tensor[3] = 22
-    assert tensor.to_list() == [128, 255, -22333, 22]
+    assert tensor.tolist() == [128, 255, -22333, 22]
