@@ -1,6 +1,7 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
 import faulthandler
+import typing
 import weakref
 from dataclasses import dataclass
 from enum import Enum, auto, unique
@@ -13,8 +14,6 @@ faulthandler.enable()
 ffi, C = load_native_module()
 
 MAX_DIMS: int = 6
-MAX_ARG_TENSORS: int = 2
-MAG_MAX_OP_PARAMS: int = 6
 DIM_MAX: int = (1 << 63) - 1  # INT64_MAX
 
 
@@ -81,7 +80,7 @@ class GlobalConfig:
     verbose: bool = (getenv('MAG_VERBOSE', '0') == '1')
     compute_device: ComputeDevice.CPU | ComputeDevice.CUDA = ComputeDevice.CPU()
 
-
+@typing.final
 class Context:
     _active: 'Context' = None
 
@@ -183,7 +182,7 @@ class Context:
         C.mag_ctx_destroy(self._ptr)
         self._ptr = ffi.NULL
 
-
+@typing.final
 class Tensor:
     def __init__(self, ptr: ffi.CData | None = None) -> None:
         if isinstance(ptr, ffi.CData):
@@ -567,7 +566,7 @@ class Tensor:
             C.mag_sub(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_subs(self._ptr, float(other)))
 
     def __rsub__(self, other: int | float) -> 'Tensor':
-        return Tensor.full(self.shape, fill_value=other) - self
+        return Tensor.full(self.shape, fill_value=float(other)) - self
 
     def __isub__(self, other: object | int | float) -> 'Tensor':
         return Tensor(
@@ -590,7 +589,7 @@ class Tensor:
             C.mag_div(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_divs(self._ptr, float(other)))
 
     def __rtruediv__(self, other: int | float) -> 'Tensor':
-        return Tensor.full(self.shape, fill_value=other) / self
+        return Tensor.full(self.shape, fill_value=float(other)) / self
 
     def __itruediv__(self, other: object | int | float) -> 'Tensor':
         return Tensor(
@@ -606,7 +605,7 @@ class Tensor:
         return C.mag_tensor_eq(self._ptr, other._ptr)
 
     def __str__(self) -> str:
-        self.print(True, True)
+        self.print(False, True)
         return ''
 
     def __getitem__(self, indices: int | tuple[int, ...]) -> float:
@@ -614,15 +613,7 @@ class Tensor:
             return C.mag_tensor_get_scalar_virtual_index(self._ptr, indices)
         elif isinstance(indices, tuple):
             idx = indices + (0,) * (6 - len(indices))
-            return C.mag_tensor_get_scalar_physical_index(
-                self._ptr,
-                idx[0],
-                idx[1],
-                idx[2],
-                idx[3],
-                idx[4],
-                idx[5],
-            )
+            return C.mag_tensor_get_scalar_physical_index(self._ptr, *idx)
         else:
             raise TypeError("Indices must be an int or a tuple of ints.")
 
@@ -631,15 +622,6 @@ class Tensor:
             C.mag_tensor_set_scalar_virtual_index(self._ptr, indices, float(value))
         elif isinstance(indices, tuple):
             idx = indices + (0,) * (6 - len(indices))
-            C.mag_tensor_set_scalar_physical_index(
-                self._ptr,
-                idx[0],
-                idx[1],
-                idx[2],
-                idx[3],
-                idx[4],
-                idx[5],
-                float(value),
-            )
+            C.mag_tensor_set_scalar_physical_index(self._ptr, *idx, float(value))
         else:
             raise TypeError("Indices must be an int or a tuple of ints.")

@@ -1382,42 +1382,21 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
             xd1
         );
     #else
-        if (xd0==yd0 && xd1==yd1) { /* Square matrices */
-            for (int64_t i = ra; i < rb; ++i) { /* Rows */
-                for (int64_t j = 0; j < yd1; ++j) {
-                    float* xo = br + rd1*i + j;
-                    mag_bnd_chk(xo, br, mag_tensor_data_size(r));
-                    *xo = 0.0f;
-                }
-                for (int64_t k = 0; k < xd1; ++k) { /* Inner dim */
-                    const mag_f32_t* px = bx + xd1*i + k;
-                    mag_bnd_chk(px, bx, mag_tensor_data_size(x));
-                    for (int64_t j = 0; j < yd1; ++j) { /* Columns */
-                        mag_f32_t* pr = br + rd1*i + j;
-                        const mag_f32_t* py = by + yd1*k + j;
-                        mag_bnd_chk(pr, br, mag_tensor_data_size(r));
-                        mag_bnd_chk(py, by, mag_tensor_data_size(y));
-                        *pr += (*px) * (*py);
-                    }
-                }
+        for (int64_t i = ra; i < rb; ++i) { /* Rows */
+            for (int64_t j = 0; j < yd1; ++j) {
+                float* xo = br + rd1*i + j;
+                mag_bnd_chk(xo, br, mag_tensor_data_size(r));
+                *xo = 0.0f;
             }
-        } else {
-            for (int64_t i = ra; i < rb; ++i) { /* Rows */
-                for (int64_t j = 0; j < yd1; ++j) {
-                    float* xo = br + rd1*i + j;
-                    mag_bnd_chk(xo, br, mag_tensor_data_size(r));
-                    *xo = 0.0f;
-                }
-                for (int64_t k = 0; k < xd1; ++k) { /* Inner dim */
-                    const mag_f32_t* px = bx + xd1*i + k;
-                    mag_bnd_chk(px, bx, mag_tensor_data_size(x));
-                    for (int64_t j = 0; j < yd1; ++j) { /* Columns */
-                        mag_f32_t* pr = br + rd1*i + j;
-                        const mag_f32_t* py = by + yd1*k + j;
-                        mag_bnd_chk(pr, br, mag_tensor_data_size(r));
-                        mag_bnd_chk(py, by, mag_tensor_data_size(y));
-                        *pr += (*px) * (*py);
-                    }
+            for (int64_t k = 0; k < xd1; ++k) { /* Inner dim */
+                const mag_f32_t* px = bx + xd1*i + k;
+                mag_bnd_chk(px, bx, mag_tensor_data_size(x));
+                for (int64_t j = 0; j < yd1; ++j) { /* Columns */
+                    mag_f32_t* pr = br + rd1*i + j;
+                    const mag_f32_t* py = by + yd1*k + j;
+                    mag_bnd_chk(pr, br, mag_tensor_data_size(r));
+                    mag_bnd_chk(py, by, mag_tensor_data_size(y));
+                    *pr += (*px) * (*py);
                 }
             }
         }

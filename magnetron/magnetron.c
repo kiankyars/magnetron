@@ -1130,9 +1130,24 @@ static mag_tensor_t* mag_result_constructor_routine_permuted(mag_tensor_t** inpu
 static mag_tensor_t* mag_result_constructor_routine_matmul(mag_tensor_t** inputs,  const mag_op_param_t* params) { /* MxR = MxN * NxR */
     (void)params;
     int64_t shape[MAG_MAX_DIMS];
-    shape[0] = inputs[0]->shape[0]; /* M */
-    shape[1] = inputs[1]->shape[1]; /* R */
-    return mag_tensor_create(inputs[0]->ctx, MAG_DTYPE_F32, shape, 2, NULL, 0);
+    int64_t* rd0 = shape;
+    int64_t* rd1 = shape+1;
+    int64_t rank = 0;
+    if (inputs[0]->rank == 1 && inputs[1]->rank == 2) { /* (ℝⁿ)(ℝⁿˣʳ) → ℝʳ */
+        *rd0 = 1;
+        *rd1 = inputs[1]->shape[1];
+        rank = 2;
+    } else if (inputs[0]->rank == 2 && inputs[1]->rank == 1) { /* (ℝᵐˣⁿ)(ℝⁿ) → ℝᵐ */
+        *rd0 = inputs[0]->shape[0];
+        rank = 1;
+    } else if (inputs[0]->rank == 1 && inputs[1]->rank == 1) { /* (ℝⁿ)(ℝⁿ) → ℝ */
+        rank = 1;
+    } else { /* (ℝᵐˣⁿ)(ℝⁿˣʳ) → ℝᵐˣʳ */
+        *rd0 = inputs[0]->shape[0];
+        *rd1 = inputs[1]->shape[1];
+        rank = 2;
+    }
+    return mag_tensor_create(inputs[0]->ctx, MAG_DTYPE_F32, shape, rank, NULL, 0);
 }
 
 const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
