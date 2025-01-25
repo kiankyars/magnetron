@@ -18,6 +18,7 @@ set(MAG_CLANG_COMPILE_FLAGS
     -std=c99
     -std=gnu99
     -fvisibility=hidden
+    -fno-math-errno
     -Wall
     -Werror
     -Wno-gnu-zero-variadic-macro-arguments
@@ -36,6 +37,7 @@ set(MAG_GCC_COMPILE_FLAGS
     -std=c99
     -std=gnu99
     -fvisibility=hidden
+    -fno-math-errno
     -Wall
     -Werror
     -Wno-gnu-zero-variadic-macro-arguments

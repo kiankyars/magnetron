@@ -1,7 +1,8 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
 from magnetron import Tensor
-from magnetron.model import SequentialModel, DenseLayer
+from magnetron.layer import DenseLayer
+from magnetron.model import SequentialModel, HyperParams
 import matplotlib.pyplot as plt
 
 EPOCHS: int = 10000
@@ -23,13 +24,14 @@ targets = Tensor.const([
     [0.0]
 ])
 
-mlp = SequentialModel([
+params = HyperParams(lr=RATE, epochs=EPOCHS)
+mlp = SequentialModel(params, [
     DenseLayer(2, 8),
     DenseLayer(8, 1)
 ])
 
 # Train
-losses = mlp.train(inputs, targets, epochs=EPOCHS, rate=RATE)
+losses = mlp.train(inputs, targets)
 
 # Inference
 test_points = [
