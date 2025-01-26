@@ -1078,8 +1078,6 @@ static bool mag_validate_op_scalar(mag_op_t op, mag_tensor_t* result, mag_tensor
 static bool mag_validate_op_matmul(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
     bool valid = true;
     valid = valid && mag_check_is_shape_matmulable(op, inputs[0], inputs[1]);
-    valid = valid && mag_check_is_contiguous(op, inputs[0]);
-    valid = valid && mag_check_is_contiguous(op, inputs[1]);
     return valid;
 }
 
@@ -1129,7 +1127,7 @@ static mag_tensor_t* mag_result_constructor_routine_permuted(mag_tensor_t** inpu
 
 static mag_tensor_t* mag_result_constructor_routine_matmul(mag_tensor_t** inputs,  const mag_op_param_t* params) { /* MxR = MxN * NxR */
     (void)params;
-    int64_t shape[MAG_MAX_DIMS];
+    int64_t shape[MAG_MAX_DIMS] = {0};
     int64_t* rd0 = shape;
     int64_t* rd1 = shape+1;
     int64_t rank = 0;

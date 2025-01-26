@@ -42,7 +42,7 @@ test_points = [
 ]
 
 for (x_val, y_val) in test_points:
-    result = mlp.forward(Tensor.const([[x_val], [y_val]]))[0]
+    result = mlp.forward(Tensor.const([x_val, y_val]))[0]
     print(f"{x_val} XOR {y_val} => {result:.4f}")
 
 # Plot MSE loss

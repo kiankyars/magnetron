@@ -1,10 +1,13 @@
+# !! Requirements for full Magnetron development (Magnetron Core, Unit Tests, Benchmarks, Documentation)
+# !! Magnetron itself requires *only* cffi.
+# !! See magnetron_framework/requirements.txt for the production requirements.
+
 cffi
 wheel
 setuptools
 pytest
 numpy
 matplotlib
-cycler
 sphinx
 sphinx-autoapi
 sphinx-rtd-theme

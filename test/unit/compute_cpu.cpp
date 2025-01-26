@@ -172,6 +172,52 @@ impl_test_unary_op(gelu, 1e-3, gelu, [](float x) -> float {
 //    return x <= 0.0f ? 0.0f : 1.0f;
 //})
 
+TEST(compute_cpu, clone_same_shape) {
+    mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
+    for (std::int64_t i0=1; i0 <= k_lim_same_shape; ++i0)
+        for (std::int64_t i1=1; i1 <= k_lim_same_shape; ++i1)
+            for (std::int64_t i2=1; i2 <= k_lim_same_shape; ++i2)
+                for (std::int64_t i3=1; i3 <= k_lim_same_shape; ++i3)
+                    for (std::int64_t i4=1; i4 <= k_lim_same_shape; ++i4)
+                        for (std::int64_t i5=1; i5 <= k_lim_same_shape; ++i5) {
+                            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0, i1, i2, i3, i4, i5);
+                            mag_tensor_fill_random_uniform(x, 0.0f, 1.0f);
+                            mag_tensor_t* r = mag_clone(x);
+                            const auto* b_x = static_cast<const float*>(mag_tensor_data_ptr(x));
+                            const auto* b_r = static_cast<const float*>(mag_tensor_data_ptr(r));
+                            ASSERT_EQ(mag_tensor_numel(x), mag_tensor_numel(r));
+                            for (std::int64_t i=0; i < mag_tensor_numel(x); ++i) {
+                                ASSERT_EQ(b_r[i], b_x[i]);
+                            }
+                            mag_tensor_decref(x);
+                            mag_tensor_decref(r);
+                        }
+    mag_ctx_destroy(ctx);
+}
+
+TEST(compute_cpu, clone_transpose) {
+    mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
+    for (std::int64_t i0=1; i0 <= k_lim_same_shape; ++i0)
+        for (std::int64_t i1=1; i1 <= k_lim_same_shape; ++i1)
+            for (std::int64_t i2=1; i2 <= k_lim_same_shape; ++i2)
+                for (std::int64_t i3=1; i3 <= k_lim_same_shape; ++i3)
+                    for (std::int64_t i4=1; i4 <= k_lim_same_shape; ++i4)
+                        for (std::int64_t i5=1; i5 <= k_lim_same_shape; ++i5) {
+                            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0, i1, i2, i3, i4, i5);
+                            mag_tensor_fill_random_uniform(x, 0.0f, 1.0f);
+                            mag_tensor_t* r = mag_clone(mag_transpose(x));
+                            const auto* b_x = static_cast<const float*>(mag_tensor_data_ptr(x));
+                            const auto* b_r = static_cast<const float*>(mag_tensor_data_ptr(r));
+                            ASSERT_EQ(mag_tensor_numel(x), mag_tensor_numel(r));
+                            for (std::int64_t i=0; i < mag_tensor_numel(x); ++i) {
+                                ASSERT_EQ(b_r[i], b_x[i]);
+                            }
+                            mag_tensor_decref(x);
+                            mag_tensor_decref(r);
+                        }
+    mag_ctx_destroy(ctx);
+}
+
 #undef impl_test_unary_op
 
 #define impl_test_binary_op(name, op, scalar_op) \
