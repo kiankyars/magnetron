@@ -1,10 +1,19 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
 import numpy as np
-from magnetron import Tensor
+from magnetron import Tensor, Context
 
-learning_rate = 0.1
-epochs = 10000
+np.random.seed(932002)
+Context.active().seed(932002)
+
+LR: float = 0.1
+EPOCHS: int = 10000
+INPUT: list[list[float]] = [[0, 0],
+         [0, 1],
+         [1, 0],
+         [1, 1]]
+TARGET: list[list[float]] = [[0], [1], [1], [0]]
+HIDDEN_DIM: int = 4
 
 def xor_nn_np():
     def sigmoid(x):
@@ -13,133 +22,119 @@ def xor_nn_np():
     def sigmoid_derivative(x):
         return x * (1 - x)
 
-    X = np.array([[0, 0],
-                  [0, 1],
-                  [1, 0],
-                  [1, 1]])
+    x = np.array(INPUT, dtype=np.float32)
+    y = np.array(TARGET, dtype=np.float32)
 
-    Y = np.array([[0], [1], [1], [0]])
+    w1 = np.random.randn(2, HIDDEN_DIM).astype(np.float32)
+    b1 = np.zeros((1, HIDDEN_DIM), dtype=np.float32)
+    w2 = np.random.randn(HIDDEN_DIM, 1).astype(np.float32)
+    b2 = np.zeros((1, 1), dtype=np.float32)
 
-    W1 = np.random.randn(2, 4)
-    b1 = np.zeros((1, 4))
-    W2 = np.random.randn(4, 1)
-    b2 = np.zeros((1, 1))
-
-    for epoch in range(epochs):
-        z1 = np.matmul(X, W1) + b1
+    for epoch in range(EPOCHS):
+        z1 = np.matmul(x, w1) + b1
         a1 = sigmoid(z1)
-        z2 = np.matmul(a1, W2) + b2
+        z2 = np.matmul(a1, w2) + b2
         a2 = sigmoid(z2)
 
-        loss = np.mean((Y - a2) ** 2)
+        loss = np.mean((y - a2) ** 2)
 
         if epoch % 1000 == 0:
             print(f'Epoch: {epoch}, loss: {loss}')
 
-        d_a2 = -(Y - a2)
+        d_a2 = -(y - a2)
         d_z2 = d_a2 * sigmoid_derivative(a2)
-        d_W2 = np.matmul(a1.T, d_z2)
+        d_w2 = np.matmul(a1.T, d_z2)
         d_b2 = np.sum(d_z2)
 
-        d_a1 = np.matmul(d_z2, W2.T)
+        d_a1 = np.matmul(d_z2, w2.T)
         d_z1 = d_a1 * sigmoid_derivative(a1)
-        d_W1 = np.matmul(X.T, d_z1)
+        d_w1 = np.matmul(x.T, d_z1)
         d_b1 = np.sum(d_z1)
 
-        W2 -= learning_rate * d_W2
-        b2 -= learning_rate * d_b2
-        W1 -= learning_rate * d_W1
-        b1 -= learning_rate * d_b1
+        w2 -= LR * d_w2
+        b2 -= LR * d_b2
+        w1 -= LR * d_w1
+        b1 -= LR * d_b1
 
     def predict(x):
-        z1 = np.matmul(x, W1) + b1
+        z1 = np.matmul(x, w1) + b1
         a1 = sigmoid(z1)
-        z2 = np.matmul(a1, W2) + b2
+        z2 = np.matmul(a1, w2) + b2
         a2 = sigmoid(z2)
         return a2
 
-    for input_ in X:
-        output = predict(input_)
-        print(output[0][0])
+    return [float(predict(xr)[0][0]) for xr in x]
+
 
 def tonumpy(t: Tensor):
     return np.array(t.tolist(), dtype=np.float32).reshape(t.shape)
 
+
 def fromnumpy(a: np.ndarray):
     return Tensor.const(a.tolist())
 
+
 def xor_nn_mag():
-    def sigmoid(x):
-        return 1 / (1 + np.exp(-x))
+    x = Tensor.const(INPUT)
+    y = Tensor.const(TARGET)
 
-    def sigmoid_derivative(x):
-        return x * (1 - x)
+    w1 = Tensor.uniform((2, HIDDEN_DIM))
+    b1 = Tensor.zeros((1, HIDDEN_DIM))
+    w2 = Tensor.uniform((HIDDEN_DIM, 1))
+    b2 = Tensor.zeros((1, 1))
 
-    X = Tensor.const([[0, 0],
-                  [0, 1],
-                  [1, 0],
-                  [1, 1]])
+    for epoch in range(EPOCHS):
+        a1 = (x @ w1 + b1).sigmoid()
+        a2 = (a1 @ w2 + b2).sigmoid()
 
-    Y = Tensor.const([[0], [1], [1], [0]])
-
-    W1 = np.random.randn(2, 4)
-    b1 = np.zeros((1, 4))
-    W2 = np.random.randn(4, 1)
-    b2 = np.zeros((1, 1))
-
-    W1 = fromnumpy(W1)
-    b1 = fromnumpy(b1)
-    W2 = fromnumpy(W2)
-    b2 = fromnumpy(b2)
-
-    for epoch in range(epochs):
-        a1 = (X @ W1 + b1).sigmoid()
-        a2 = (a1 @ W2 + b2).sigmoid()
-
-        loss = (Y - a2).sqr_().mean()[0]
+        loss = (y - a2).sqr_().mean()[0]
 
         if epoch % 1000 == 0:
             print(f'Epoch: {epoch}, loss: {loss}')
 
-        d_a2 = -(Y - a2)
-        d_z2 = d_a2 * sigmoid_derivative(a2)
-        d_W2 = a1.T.clone() @ d_z2
+        d_a2 = -(y - a2)
+        d_z2 = d_a2 * a2.sigmoid(True)
+        d_w2 = a1.T.clone() @ d_z2
         d_b2 = d_z2.sum()
 
-        d_z1 = (d_z2 @ W2.T.clone()) * sigmoid_derivative(a1)
+        d_z1 = (d_z2 @ w2.T.clone()) * a1.sigmoid()
 
-        ld_W1 = X.T.clone() @ d_z1
-        print(f'{X.T.clone().shape} @ {d_z1.shape} = {ld_W1.shape}')
+        # d_w1 = x.T @ d_z1
+        # print(x.T.shape, d_z1.shape)
 
         d_z1 = tonumpy(d_z1)
-
-        d_W1 = tonumpy(X).T @ d_z1
-        print(f'{tonumpy(X).T.shape} @ {d_z1.shape} = {d_W1.shape}')
-
+        d_w1 = tonumpy(x).T @ d_z1
         d_z1 = fromnumpy(d_z1)
-        d_W1 = fromnumpy(d_W1)
-
+        d_w1 = fromnumpy(d_w1)
         d_b1 = d_z1.sum()
 
-        W2 -= learning_rate * d_W2
-        b2 -= learning_rate * d_b2
-        W1 -= learning_rate * d_W1
-        b1 -= learning_rate * d_b1
+        w2 -= LR * d_w2
+        b2 -= LR * d_b2
+        w1 -= LR * d_w1
+        b1 -= LR * d_b1
 
     def predict(x):
-        z1 = x @ W1 + b1
+        z1 = x @ w1 + b1
         a1 = z1.sigmoid()
-        z2 = a1 @ W2 + b2
+        z2 = a1 @ w2 + b2
         a2 = z2.sigmoid()
         return a2
 
-    XX = [[0, 0],
-                  [0, 1],
-                  [1, 0],
-                  [1, 1]]
-    for input_ in XX:
-        output = predict(Tensor.const([input_]))[0]
-        print(output)
+    return [predict(Tensor.const([xr]))[0] for xr in INPUT]
 
-xor_nn_np()
-xor_nn_mag()
+def test_xor_nn():
+    np_out = xor_nn_np()
+    mag_out = xor_nn_mag()
+    assert [round(x) for x in np_out] == [0, 1, 1, 0]
+    assert [round(x) for x in mag_out] == [0, 1, 1, 0]
+    assert np_out[0] < 0.08
+    assert mag_out[0] < 0.04
+    assert np_out[1] > 0.95
+    assert mag_out[1] > 0.95
+    assert np_out[2] > 0.95
+    assert mag_out[2] > 0.95
+    assert np_out[3] < 0.05
+    assert mag_out[3] < 0.04
+    print(np_out)
+    print(mag_out)
+    assert np.allclose(np_out, mag_out, atol=0.1)

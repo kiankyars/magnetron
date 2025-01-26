@@ -442,7 +442,7 @@ static void mag_prng_generate_n(mag_ctx_t* ctx, float* out_gen, int64_t out_n, f
 }
 
 static void mag_prng_init(mag_ctx_t* ctx, uint64_t seed) {
-    seed = seed ? seed : 0x853c49e6748fea9bull ^ (uintptr_t)ctx ^ (uintptr_t)&ctx; /* Default seed. */
+    seed = seed ? seed : 0x853c49e6748fea9bull^ctx->tr_id^(uintptr_t)ctx^(uintptr_t)&ctx;
     switch (ctx->prng_algorithm) {
         case MAG_PRNG_MERSENNE_TWISTER: {
             uint32_t* state = ctx->prng.mersenne.state;
@@ -554,7 +554,7 @@ mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
 
     /* Initialize PRNG state. */
     ctx->prng_algorithm = MAG_PRNG_MERSENNE_TWISTER;
-    mag_prng_init(ctx, ctx->tr_id^(uintptr_t)ctx^(uintptr_t)&ctx); /* Initialize PRNG state. */
+    mag_prng_init(ctx, 0); /* Initialize PRNG state. */
 
     /* Create selected compute device. */
     ctx->exec_mode = MAG_EXEC_MODE_EAGER;

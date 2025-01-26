@@ -123,6 +123,9 @@ class Context:
     def prng_algorithm(self, algorithm: PRNGAlgorithm):
         C.mag_ctx_set_prng_algorithm(self._ptr, algorithm.value, 0)
 
+    def seed(self, seed: int) -> None:
+        C.mag_ctx_set_prng_algorithm(self._ptr, self.prng_algorithm.value, seed)
+
     @property
     def os_name(self) -> str:
         return ffi.string(C.mag_ctx_get_os_name(self._ptr)).decode('utf-8')
