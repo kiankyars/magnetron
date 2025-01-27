@@ -13,7 +13,7 @@ from magnetron.optim import Optim
 class HyperParams:
     lr: float = 0.01
     epochs: int = 10000
-    epoch_step: int = 100
+    epoch_step: int = 1000
 
 
 class Model(ABC):
@@ -53,8 +53,7 @@ class SequentialModel(Model):
         return x
 
     def backward(self, outputs: Tensor, targets: Tensor, rate: float):
-        error = outputs - targets
-        delta = error * outputs.sigmoid(derivative=True)
+        delta = (outputs - targets) * outputs.sigmoid(derivative=True)
         for i in reversed(range(len(self.layers))):
             is_hidden = (i > 0)
             delta = self.layers[i].backward(is_hidden, delta, rate)
@@ -65,8 +64,6 @@ class SequentialModel(Model):
 
         print(f'Training started for {epochs} epochs with learning rate {rate}')
         start_time = time.time_ns()
-        inputs = inputs.T.clone()
-        targets = targets.T.clone()
         losses = []
         for epoch in range(epochs):
             output = self.forward(inputs)

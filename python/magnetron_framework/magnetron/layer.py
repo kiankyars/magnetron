@@ -80,28 +80,26 @@ class DenseLayer(Layer):
     def __init__(self, in_features: int, out_features: int,
                  init: LayerInit = LayerInit(LayerInit.Method.RANDOM, LayerInit.Dist.UNIFORM)):
         super().__init__()
-        self.weight = init.apply((out_features, in_features))
-        self.bias = init.apply((out_features, 1))
+        self.weight = init.apply((in_features, out_features))
+        self.bias = init.apply((1, out_features))
         self._x = None
         self._z = None
         self._out = None
 
     def forward(self, x: Tensor) -> Tensor:
         self._x = x
-        self._z = self.weight @ x + self.bias
+        self._z = x @ self.weight + self.bias
         self._out = self._z.sigmoid()
         return self._out
 
     def backward(self, is_hidden_layer: bool, delta: Tensor, rate: float) -> Tensor:
-        self.weight -= (delta @ self._x.T.clone()) * rate
-        batch_size = delta.shape[1]
-        ones_vec = Tensor.const([[1.0] for _ in range(batch_size)])
-        row_sums = delta @ ones_vec
-        row_means = row_sums * (1.0 / batch_size)
-        self.bias -= row_means * rate
+        dW = self._x.T.clone() @ delta
+        ones_batch = Tensor.full((delta.shape[0], 1), fill_value=1.0)
+        dB = (delta.T.clone() @ ones_batch).T.clone()
+        self.weight -= dW * rate
+        self.bias -= dB * rate
+
+        next_delta = delta @ self.weight.T.clone()
         if is_hidden_layer:
-            d_in = self.weight.T.clone() @ delta
-            d_in *= self._z.sigmoid(derivative=True)
-            return d_in
-        else:
-            return delta
+            next_delta *= self._z.sigmoid(derivative=True)
+        return next_delta
