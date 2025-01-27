@@ -65,15 +65,6 @@ def xor_nn_np():
 
     return [float(predict(xr)[0][0]) for xr in x]
 
-
-def tonumpy(t: Tensor):
-    return np.array(t.tolist(), dtype=np.float32).reshape(t.shape)
-
-
-def fromnumpy(a: np.ndarray):
-    return Tensor.const(a.tolist())
-
-
 def xor_nn_mag():
     x = Tensor.const(INPUT)
     y = Tensor.const(TARGET)
@@ -96,16 +87,8 @@ def xor_nn_mag():
         d_z2 = d_a2 * a2.sigmoid(True)
         d_w2 = a1.T.clone() @ d_z2
         d_b2 = d_z2.sum()
-
         d_z1 = (d_z2 @ w2.T.clone()) * a1.sigmoid()
-
-        # d_w1 = x.T @ d_z1
-        # print(x.T.shape, d_z1.shape)
-
-        d_z1 = tonumpy(d_z1)
-        d_w1 = tonumpy(x).T @ d_z1
-        d_z1 = fromnumpy(d_z1)
-        d_w1 = fromnumpy(d_w1)
+        d_w1 = x.T @ d_z1
         d_b1 = d_z1.sum()
 
         w2 -= LR * d_w2

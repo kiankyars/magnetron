@@ -1364,43 +1364,25 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
     int64_t chunk = (numel + tc - 1)/tc;
     int64_t ra = chunk*ti;
     int64_t rb = mag_xmin(ra+chunk, numel);
-    #ifdef MAG_ACCELERATE
-        int64_t vmel = rb - ra;
-        if (mag_unlikely(vmel <= 0)) return;
-        const mag_f32_t* px = bx + ra*xd1;
-        mag_f32_t* pr = br + ra*yd1;
-        memset(pr, 0, vmel*yd1*sizeof(float));
-        vDSP_mmul(
-            px,
-            1,
-            by,
-            1,
-            pr,
-            1,
-            vmel,
-            yd1,
-            xd1
-        );
-    #else
-        for (int64_t i = ra; i < rb; ++i) { /* Rows */
-            for (int64_t j = 0; j < yd1; ++j) {
-                float* xo = br + rd1*i + j;
-                mag_bnd_chk(xo, br, mag_tensor_data_size(r));
-                *xo = 0.0f;
-            }
-            for (int64_t k = 0; k < xd1; ++k) { /* Inner dim */
-                const mag_f32_t* px = bx + xd1*i + k;
-                mag_bnd_chk(px, bx, mag_tensor_data_size(x));
-                for (int64_t j = 0; j < yd1; ++j) { /* Columns */
-                    mag_f32_t* pr = br + rd1*i + j;
-                    const mag_f32_t* py = by + yd1*k + j;
-                    mag_bnd_chk(pr, br, mag_tensor_data_size(r));
-                    mag_bnd_chk(py, by, mag_tensor_data_size(y));
-                    *pr += (*px) * (*py);
-                }
+    bool tx = mag_tensor_is_transposed(x);
+    for (int64_t i = ra; i < rb; ++i) { /* Rows */
+        for (int64_t j = 0; j < yd1; ++j) {
+            float* xo = br + rd1*i + j;
+            mag_bnd_chk(xo, br, mag_tensor_data_size(r));
+            *xo = 0.0f;
+        }
+        for (int64_t k = 0; k < xd1; ++k) { /* Inner dim */
+            const mag_f32_t* px = bx + (tx ? k*xd0 + i : xd1*i + k);
+            mag_bnd_chk(px, bx, mag_tensor_data_size(x));
+            for (int64_t j = 0; j < yd1; ++j) { /* Columns */
+                mag_f32_t* pr = br + rd1*i + j;
+                const mag_f32_t* py = by + yd1*k + j;
+                mag_bnd_chk(pr, br, mag_tensor_data_size(r));
+                mag_bnd_chk(py, by, mag_tensor_data_size(y));
+                *pr += (*px) * (*py);
             }
         }
-    #endif
+    }
 }
 
 #ifndef MAG_BLAS_SPECIALIZATION
