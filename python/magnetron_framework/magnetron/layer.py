@@ -77,18 +77,22 @@ class LayerInit:
 
 class DenseLayer(Layer):
     """Fully connected layer"""
-    def __init__(self, in_features: int, out_features: int,
+    def __init__(self, in_features: int, out_features: int, bias: bool,
                  init: LayerInit = LayerInit(LayerInit.Method.RANDOM, LayerInit.Dist.UNIFORM)):
         super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
         self.weight = init.apply((in_features, out_features))
-        self.bias = init.apply((1, out_features))
+        self.bias = init.apply((1, out_features)) if bias else None
         self._x = None
         self._z = None
         self._out = None
 
     def forward(self, x: Tensor) -> Tensor:
         self._x = x
-        self._z = x @ self.weight + self.bias
+        self._z = x @ self.weight
+        if self.bias is not None:
+            self._z += self.bias
         self._out = self._z.sigmoid()
         return self._out
 

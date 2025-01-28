@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from magnetron import Tensor
 from magnetron.layer import Layer
-from magnetron.optim import Optim
+from magnetron.optim import Optimizer
 
 
 @dataclass
@@ -18,6 +18,7 @@ class HyperParams:
 
 class Model(ABC):
     """Abstract base class for all models"""
+
     def __init__(self, hyper_params: HyperParams):
         self.hyper_params = hyper_params
 
@@ -44,7 +45,6 @@ class SequentialModel(Model):
     def __init__(self, hyper_params: HyperParams, layers: list[Layer]):
         super().__init__(hyper_params)
         self.layers = layers
-        self.optim = Optim(hyper_params.lr)
 
     def forward(self, inputs: Tensor) -> Tensor:
         x = inputs
@@ -68,7 +68,7 @@ class SequentialModel(Model):
         for epoch in range(epochs):
             output = self.forward(inputs)
             self.backward(output, targets, rate)
-            loss = self.optim.mse(output, targets)
+            loss = Optimizer.mse(output, targets)
             losses.append(loss)
             if epoch % self.hyper_params.epoch_step == 0:
                 print(f'Epoch: {epoch}, Loss: {loss:.6f}')

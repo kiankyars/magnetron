@@ -80,6 +80,7 @@ class GlobalConfig:
     verbose: bool = (getenv('MAG_VERBOSE', '0') == '1')
     compute_device: ComputeDevice.CPU | ComputeDevice.CUDA = ComputeDevice.CPU()
 
+
 @typing.final
 class Context:
     _active: 'Context' = None
@@ -102,6 +103,14 @@ class Context:
             descriptor.cuda_device_id = abs(device.device_id)
         self._ptr = C.mag_ctx_create2(descriptor)
         self.execution_mode = execution_mode
+
+    @property
+    def enable_grad_recorder(self) -> bool:
+        return C.mag_ctx_enable_grad_recorder(self._ptr)
+
+    @enable_grad_recorder.setter
+    def enable_grad_recorder(self, enable: bool):
+        C.mag_ctx_set_enable_grad_recorder(self._ptr, enable)
 
     @property
     def compute_device_name(self) -> str:
@@ -184,6 +193,27 @@ class Context:
     def __del__(self):
         C.mag_ctx_destroy(self._ptr)
         self._ptr = ffi.NULL
+
+
+def no_grad():
+    """Temporary disable gradient computation"""
+
+    class Scope:
+        def __call__(self, func):
+            def f(*args, **kwargs):
+                with Scope():
+                    return func(*args, **kwargs)
+
+            return f
+
+        def __enter__(self):
+            Context.active().enable_grad_recorder = False
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            Context.active().enable_grad_recorder = True
+
+    return Scope()
+
 
 @typing.final
 class Tensor:
@@ -398,6 +428,18 @@ class Tensor:
     @property
     def is_contiguous(self) -> bool:
         return C.mag_tensor_is_contiguous(self._ptr)
+
+    @property
+    def grad(self):
+        ptr: ffi.CData = C.mag_tensor_grad(self._ptr)
+        return Tensor(ptr) if ptr != ffi.NULL else None
+
+    @grad.setter
+    def grad(self, grad: 'Tensor') -> None:
+        C.mag_tensor_set_grad(self._ptr, grad._ptr)
+
+    def zero_grad(self) -> None:
+        C.mag_tensor_zero_grad(self._ptr)
 
     def is_close(self, other: 'Tensor', eps: float = -1.0, print_eq_percent: bool = False) -> (bool, float):
         percent_eq = ffi.new('double[1]')
