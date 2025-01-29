@@ -1,31 +1,5 @@
 /* (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
 
-/*
-**
-**
-** ### To add a new operation:
-** 1. Add the operation to the mag_op_def macro, which defines all operations, with all information needed.
-** 2. Write a validation routine, or use an existing one (e.g. 'mag_validate_op_binary').
-** 3. Add the validation routine to the 'routines' table in 'mag_op_get_validator_routine', at the op index.
-** 4. Write a result tensor constructor routine or use an existing one (e.g. 'mag_result_constructor_routine_isomorph').
-** 5. Add the result tensor constructor routine to the 'routines' table in 'mag_op_get_result_constructor_routine', at the op index.
-** 6. Write a BLAS computation routine.
-** 7. Add the BLAS computation routine to the 'dispatch_lut' table in 'mag_blas_compute_dispatch_table_default', at the op index.
-*/
-
-/*
-** Here ⊕ denotes a binary or unary operator.
-** Note that an operators can or cannot support any of those forms. This must be specified in mag_op_def.
-**
-** Operators can have two forms:
-**
-** 1. R = A ⊕ B
-**  Result is a new tensor of shape of A and contains element-wise result of A ⊕ B, where A and B are tensors.
-**
-** 2. R = A ⊕= B
-**  Result is a view tensor of shape of A and contains element-wise result of A ⊕= B, where A and B are tensors. (Safes 1 allocation)
-*/
-
 #include "magnetron.h"
 #include "magnetron_internal.h"
 
@@ -1310,6 +1284,15 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
+        [MAG_OP_EXP] = {
+            .mnemonic = "exp",
+            .argcount = 1,
+            .paramcount = 0,
+            .param_types = {MAG_OP_TPARAM_NONE},
+            .inplace = true,
+            .r_alloc = &mag_result_constructor_routine_isomorph,
+            .validator = &mag_validate_op_unary
+        },
         [MAG_OP_SOFTMAX] = {
             .mnemonic = "softmax",
             .argcount = 1,
@@ -1492,6 +1475,15 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_DIVS] = {
             .mnemonic = "divs",
+            .argcount = 1,
+            .paramcount = 1,
+            .param_types = {MAG_OP_TPARAM_F32},
+            .inplace = true,
+            .r_alloc = &mag_result_constructor_routine_isomorph,
+            .validator = &mag_validate_op_unary
+        },
+        [MAG_OP_POWS] = {
+            .mnemonic = "pows",
             .argcount = 1,
             .paramcount = 1,
             .param_types = {MAG_OP_TPARAM_F32},
@@ -1770,6 +1762,8 @@ mag_tensor_t* mag_cos(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_
 mag_tensor_t* mag_cos_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_COS, true, &x, 1, NULL, 0); }
 mag_tensor_t* mag_step(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_STEP, false, &x, 1, NULL, 0); }
 mag_tensor_t* mag_step_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_STEP, true, &x, 1, NULL, 0); }
+mag_tensor_t* mag_exp(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_EXP, false, &x, 1, NULL, 0); }
+mag_tensor_t* mag_exp_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_EXP, true, &x, 1, NULL, 0); }
 mag_tensor_t* mag_softmax(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX, false, &x, 1, NULL, 0); }
 mag_tensor_t* mag_softmax_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX, true, &x, 1, NULL, 0); }
 mag_tensor_t* mag_softmax_dv(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX_DV, false, &x, 1, NULL, 0); }
@@ -1843,6 +1837,16 @@ mag_tensor_t* mag_divs(mag_tensor_t* x, float xi) {
 mag_tensor_t* mag_divs_(mag_tensor_t* x, float xi) {
     mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.f32=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_DIVS, true, &x, 1, &param, 1);
+}
+
+mag_tensor_t* mag_pows(mag_tensor_t* x, float xi) {
+    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.f32=xi};
+    return mag_tensor_operator(x->ctx, MAG_OP_POWS, false, &x, 1, &param, 1);
+}
+
+mag_tensor_t* mag_pows_(mag_tensor_t* x, float xi) {
+    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.f32=xi};
+    return mag_tensor_operator(x->ctx, MAG_OP_POWS, true, &x, 1, &param, 1);
 }
 
 mag_tensor_t* mag_matmul(mag_tensor_t* x, mag_tensor_t* y) {

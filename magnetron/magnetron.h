@@ -249,6 +249,8 @@ extern MAG_EXPORT mag_tensor_t* mag_cos(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_cos_(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_step(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_step_(mag_tensor_t* x);
+extern MAG_EXPORT mag_tensor_t* mag_exp(mag_tensor_t* x);
+extern MAG_EXPORT mag_tensor_t* mag_exp_(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_softmax(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_softmax_(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_softmax_dv(mag_tensor_t* x);
@@ -275,7 +277,6 @@ extern MAG_EXPORT mag_tensor_t* mag_gelu(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_gelu_(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_gelu_dv(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_gelu_dv_(mag_tensor_t* x);
-
 extern MAG_EXPORT mag_tensor_t* mag_add(mag_tensor_t* x, mag_tensor_t* y);
 extern MAG_EXPORT mag_tensor_t* mag_add_(mag_tensor_t* x, mag_tensor_t* y);
 extern MAG_EXPORT mag_tensor_t* mag_sub( mag_tensor_t* x, mag_tensor_t* y);
@@ -292,6 +293,8 @@ extern MAG_EXPORT mag_tensor_t* mag_muls(mag_tensor_t* x, float xi);
 extern MAG_EXPORT mag_tensor_t* mag_muls_(mag_tensor_t* x, float xi);
 extern MAG_EXPORT mag_tensor_t* mag_divs(mag_tensor_t* x, float xi);
 extern MAG_EXPORT mag_tensor_t* mag_divs_(mag_tensor_t* x, float xi);
+extern MAG_EXPORT mag_tensor_t* mag_pows(mag_tensor_t* x, float xi);
+extern MAG_EXPORT mag_tensor_t* mag_pows_(mag_tensor_t* x, float xi);
 extern MAG_EXPORT mag_tensor_t* mag_matmul(mag_tensor_t* a, mag_tensor_t* b);
 
 /**

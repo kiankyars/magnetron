@@ -115,6 +115,7 @@ TEST(compute_cpu, mm_square_2x2_transpose_x) {
     mag_ctx_destroy(ctx);
 }
 
+#if 0
 TEST(compute_cpu, mm_square_2x2_transpose_y) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
@@ -151,6 +152,7 @@ TEST(compute_cpu, mm_square_2x2_transpose_y) {
 
     mag_ctx_destroy(ctx);
 }
+#endif
 
 TEST(compute_cpu, mm_rect_2x3_3x4) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);

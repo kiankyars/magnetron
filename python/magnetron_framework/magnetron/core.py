@@ -217,6 +217,8 @@ def no_grad():
 
 @typing.final
 class Tensor:
+    __slots__ = ('_ctx', '_ptr')
+
     def __init__(self, ptr: ffi.CData | None = None) -> None:
         if isinstance(ptr, ffi.CData):
             assert ptr != ffi.NULL, 'Invalid tensor pointer'
@@ -546,11 +548,17 @@ class Tensor:
     def cos_(self) -> 'Tensor':
         return Tensor(C.mag_cos_(self._ptr))
 
-    def heaviside_step(self) -> 'Tensor':
+    def step(self) -> 'Tensor':
         return Tensor(C.mag_step(self._ptr))
 
-    def heaviside_step_(self) -> 'Tensor':
+    def step_(self) -> 'Tensor':
         return Tensor(C.mag_step_(self._ptr))
+
+    def exp(self) -> 'Tensor':
+        return Tensor(C.mag_exp(self._ptr))
+
+    def exp_(self) -> 'Tensor':
+        return Tensor(C.mag_exp_(self._ptr))
 
     def softmax(self, derivative: bool = False) -> 'Tensor':
         return Tensor(C.mag_softmax_dv(self._ptr) if derivative else C.mag_softmax(self._ptr))
@@ -639,6 +647,14 @@ class Tensor:
     def __itruediv__(self, other: object | int | float) -> 'Tensor':
         return Tensor(
             C.mag_div_(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_divs_(self._ptr, float(other)))
+
+    def __pow__(self, exponent: int | float, modulo=None) -> 'Tensor':
+        assert modulo is None
+        return Tensor(C.mag_pows(self._ptr, float(exponent)))
+
+    def __ipow__(self, exponent: int | float, modulo=None) -> 'Tensor':
+        assert modulo is None
+        return Tensor(C.mag_pows_(self._ptr, float(exponent)))
 
     def __matmul__(self, other: 'Tensor') -> 'Tensor':
         return Tensor(C.mag_matmul(self._ptr, other._ptr))

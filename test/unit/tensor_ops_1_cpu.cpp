@@ -123,6 +123,10 @@ impl_test_unary_op(step, 1e-9, step, [](float x) -> float {
     return x >= 0.0f ? 1.0f : 0.0f;
 })
 
+impl_test_unary_op(exp, 1e-6, exp, [](float x) -> float {
+    return std::exp(x);
+})
+
 impl_test_unary_op(softmax, 1e-6, softmax, [](float x) -> float {
     return std::exp(x);
 })
@@ -391,6 +395,29 @@ impl_test_binary_op(mul_f32, mul, *)
 impl_test_binary_op(div_f32, div, /)
 
 #undef impl_test_binary_op
+
+TEST(compute_cpu, pows) {
+    mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
+    for (std::int64_t i0=1; i0 <= k_lim_same_shape; ++i0)
+    for (std::int64_t i1=1; i1 <= k_lim_same_shape; ++i1)
+    for (std::int64_t i2=1; i2 <= k_lim_same_shape; ++i2)
+    for (std::int64_t i3=1; i3 <= k_lim_same_shape; ++i3)
+    for (std::int64_t i4=1; i4 <= k_lim_same_shape; ++i4)
+    for (std::int64_t i5=1; i5 <= k_lim_same_shape; ++i5) {
+        mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0, i1, i2, i3, i4, i5);
+        mag_tensor_fill_random_uniform(x, 0.0f, 1.0f);
+        mag_tensor_t* r = mag_pows(x, static_cast<float>(i0+i1+i2+i3+i4+i5)*0.221f);
+        const auto* b_x = static_cast<const float*>(mag_tensor_data_ptr(x));
+        const auto* b_r = static_cast<const float*>(mag_tensor_data_ptr(r));
+        ASSERT_NE(mag_tensor_data_ptr(r), mag_tensor_data_ptr(x));
+        for (std::int64_t i=0; i < mag_tensor_numel(x); ++i) {
+            ASSERT_FLOAT_EQ(b_r[i], std::pow(b_x[i], (static_cast<float>(i0+i1+i2+i3+i4+i5)*0.221f)));
+        }
+        mag_tensor_decref(r);
+        mag_tensor_decref(x);
+    }
+    mag_ctx_destroy(ctx);
+}
 
 TEST(compute_cpu, arithmetic_mean) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);

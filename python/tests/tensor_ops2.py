@@ -1,133 +1,116 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+import random
 
-from magnetron import *
+from magnetron import Tensor
 import numpy as np
 
 def tonumpy(t: Tensor):
     return np.array(t.tolist(), dtype=np.float32).reshape(t.shape)
 
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
+def square_shape_permutations(f: callable, lim: int) -> None:
+    lim += 1
+    for i0 in range(1, lim):
+        for i1 in range(1, lim):
+            for i2 in range(1, lim):
+                for i3 in range(1, lim):
+                    for i4 in range(1, lim):
+                        for i5 in range(1, lim):
+                            f((i0, i1, i2, i3, i4, i5))
 
-def test_simple_ff():
-    truth_table = [
-        [0, 0],
-        [0, 1],
-        [1, 0],
-        [1, 1]
-    ]
+def binary_op_square(f: callable, lim: int = 4) -> None:
+    def compute(shape: tuple[int, ...]) -> None:
+        x = Tensor.uniform(shape)
+        y = Tensor.uniform(shape)
+        r = f(x, y)
+        np.testing.assert_allclose(tonumpy(r), f(tonumpy(x), tonumpy(y)))
+    square_shape_permutations(compute, lim)
 
-    W1 = Tensor.uniform((2, 4))
-    b1 = Tensor.uniform((1, 4))
-    W2 = Tensor.uniform((4, 1))
-    b2 = Tensor.uniform((1, 1))
+def unary_op(magf: callable, npf: callable, lim: int = 4) -> None:
+    def compute(shape: tuple[int, ...]) -> None:
+        x = Tensor.uniform(shape)
+        r = magf(x)
+        np.testing.assert_allclose(tonumpy(r), npf(tonumpy(x)), atol=1e-6)
 
-    nW1 = tonumpy(W1)
-    nb1 = tonumpy(b1)
-    nW2 = tonumpy(W2)
-    nb2 = tonumpy(b2)
+    square_shape_permutations(compute, lim)
 
-    np_data = []
-    for x in truth_table:
-        z1 = x @ nW1 + nb1
-        a1 = sigmoid(z1)
-        z2 = a1 @ nW2 + nb2
-        a2 = sigmoid(z2)
-        np_data.append(a2)
+def scalar_op(f: callable, rhs: bool = True, lim: int = 4) -> None:
+    def compute(shape: tuple[int, ...]) -> None: # x op scalar
+        xi: float = random.uniform(-10.0, 10.0)
+        x = Tensor.uniform(shape)
+        r = f(x, xi)
+        np.testing.assert_allclose(tonumpy(r), f(tonumpy(x), xi))
+    square_shape_permutations(compute, lim)
 
-    mag_data = []
-    for x in truth_table:
-        x = Tensor.const([x])
-        z1 = x @ W1 + b1
-        a1 = z1.sigmoid()
-        z2 = a1 @ W2 + b2
-        a2 = z2.sigmoid()
-        mag_data.append(a2)
+    if not rhs:
+        return
+    def compute(shape: tuple[int, ...]) -> None: # scalar op x
+        xi: float = random.uniform(-10.0, 10.0)
+        x = Tensor.uniform(shape)
+        r = f(xi, x)
+        np.testing.assert_allclose(tonumpy(r), f(xi, tonumpy(x)))
+    square_shape_permutations(compute, lim)
 
-    for mag, np_ in zip(mag_data, np_data):
-        np.testing.assert_allclose(tonumpy(mag), np_)
+def test_unary_op_abs() -> None:
+    unary_op(lambda x: x.abs(), lambda x: np.abs(x))
+    unary_op(lambda x: x.abs_(), lambda x: np.abs(x))
 
-def test_matmul_squared():
-    shapes = [4, 8, 16, 32, 64, 128, 256, 512, 1024]
-    for shape in shapes:
-        mag_a = Tensor.uniform((shape, shape))
-        mag_b = Tensor.uniform((shape, shape))
-        np_a = tonumpy(mag_a)
-        np_b = tonumpy(mag_b)
-        mag_result = mag_a @ mag_b
-        np_result = np.matmul(np_a, np_b)
-        assert mag_result.shape == np_result.shape
-        np.testing.assert_allclose(tonumpy(mag_result), np_result)
+def test_unary_op_neg() -> None:
+    unary_op(lambda x: -x, lambda x: -x)
 
-def test_matmul():
-    shapes = [(4, 8), (8, 16), (16, 32), (32, 64), (64, 128), (128, 256), (256, 512), (512, 1024)]
-    for shape in shapes:
-        mag_a = Tensor.uniform(shape)
-        mag_b = Tensor.uniform((shape[1], shape[0]))
-        np_a = tonumpy(mag_a)
-        np_b = tonumpy(mag_b)
-        mag_result = mag_a @ mag_b
-        np_result = np.matmul(np_a, np_b)
-        assert mag_result.shape == np_result.shape
-        np.testing.assert_allclose(tonumpy(mag_result), np_result)
+def test_unary_op_log() -> None:
+    unary_op(lambda x: x.log(), lambda x: np.log(x))
+    unary_op(lambda x: x.log_(), lambda x: np.log(x))
 
-def test_matmul_matrix_by_vector():
-    shapes = [(4, 8), (8, 16), (16, 32), (32, 64), (64, 128), (128, 256), (256, 512), (512, 1024)]
-    for shape in shapes:
-        mag_a = Tensor.uniform(shape)
-        mag_b = Tensor.uniform((shape[1], 1))
-        np_a = tonumpy(mag_a)
-        np_b = tonumpy(mag_b)
-        mag_result = mag_a @ mag_b
-        np_result = np.matmul(np_a, np_b)
-        assert mag_result.shape == np_result.shape
-        np.testing.assert_allclose(tonumpy(mag_result), np_result)
+def test_unary_op_sqr() -> None:
+    unary_op(lambda x: x.sqr(), lambda x: x * x)
+    unary_op(lambda x: x.sqr_(), lambda x: x * x)
 
-def test_matmul_vector_by_matrix():
-    shapes = [(4, 8), (8, 16), (16, 32), (32, 64), (64, 128), (128, 256), (256, 512), (512, 1024)]
-    for shape in shapes:
-        mag_a = Tensor.uniform((1, shape[0]))
-        mag_b = Tensor.uniform(shape)
-        np_a = tonumpy(mag_a)
-        np_b = tonumpy(mag_b)
-        mag_result = mag_a @ mag_b
-        np_result = np.matmul(np_a, np_b)
-        assert mag_result.shape == np_result.shape
-        np.testing.assert_allclose(tonumpy(mag_result), np_result)
+def test_unary_op_sqrt() -> None:
+    unary_op(lambda x: x.sqrt(), lambda x: np.sqrt(x))
+    unary_op(lambda x: x.sqrt_(), lambda x: np.sqrt(x))
 
-def test_matmul_scalar_by_matrix():
-    shapes = [(4, 8), (8, 16), (16, 32), (32, 64), (64, 128), (128, 256), (256, 512), (512, 1024)]
-    for shape in shapes:
-        scalar = np.random.rand()
-        mag_b = Tensor.uniform(shape)
-        np_b = tonumpy(mag_b)
-        mag_result = scalar * mag_b
-        np_result = scalar * np_b
-        assert mag_result.shape == np_result.shape
-        np.testing.assert_allclose(tonumpy(mag_result), np_result)
+def test_unary_op_sin() -> None:
+    unary_op(lambda x: x.sin(), lambda x: np.sin(x))
+    unary_op(lambda x: x.sin_(), lambda x: np.sin(x))
 
-def test_matmul_x_transposed():
-    shape_a = (4, 2)
-    shape_b = (4, 4)
-    mag_a = Tensor.uniform(shape_a)
-    mag_b = Tensor.uniform(shape_b)
-    np_a = tonumpy(mag_a)
-    np_b = tonumpy(mag_b)
-    mag_result = mag_a.T @ mag_b
-    np_result = np.matmul(np_a.T, np_b)
-    assert mag_result.shape == np_result.shape
-    assert mag_result.shape == (2, 4)
-    np.testing.assert_allclose(tonumpy(mag_result), np_result)
+def test_unary_op_cos() -> None:
+    unary_op(lambda x: x.cos(), lambda x: np.cos(x))
+    unary_op(lambda x: x.cos_(), lambda x: np.cos(x))
 
-def test_matmul_y_transposed():
-    shape_a = (4, 2)
-    shape_b = (4, 4)
-    mag_a = Tensor.uniform(shape_a)
-    mag_b = Tensor.uniform(shape_b)
-    np_a = tonumpy(mag_a)
-    np_b = tonumpy(mag_b)
-    mag_result = mag_a @ mag_b.T
-    np_result = np.matmul(np_a, np_b.T)
-    assert mag_result.shape == np_result.shape
-    assert mag_result.shape == (2, 4)
-    np.testing.assert_allclose(tonumpy(mag_result), np_result)
+"""
+def test_unary_op_step() -> None:
+    unary_op(lambda x: x.cos(), lambda x: np.cos(x))
+    unary_op(lambda x: x.cos_(), lambda x: np.cos(x))
+"""
+
+def test_unary_op_exp() -> None:
+    unary_op(lambda x: x.exp(), lambda x: np.exp(x))
+    unary_op(lambda x: x.exp_(), lambda x: np.exp(x))
+
+def test_binary_op_add() -> None:
+    binary_op_square(lambda x, y: x + y)
+
+def test_binary_op_sub() -> None:
+    binary_op_square(lambda x, y: x + y)
+
+def test_binary_op_mul() -> None:
+    binary_op_square(lambda x, y: x * y)
+
+def test_binary_op_div() -> None:
+    binary_op_square(lambda x, y: x / y)
+
+def test_scalar_op_add() -> None:
+    scalar_op(lambda x, xi: x + xi)
+
+def test_scalar_op_sub() -> None:
+    scalar_op(lambda x, xi: x + xi)
+
+def test_scalar_op_mul() -> None:
+    scalar_op(lambda x, xi: x * xi)
+
+def test_scalar_op_div() -> None:
+    scalar_op(lambda x, xi: x / xi)
+
+def test_scalar_op_pow() -> None:
+    scalar_op(lambda x, xi: x ** xi, rhs=False)
+

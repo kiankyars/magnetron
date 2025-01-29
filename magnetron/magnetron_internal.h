@@ -431,6 +431,7 @@ typedef enum mag_op_t {
     MAG_OP_SIN,
     MAG_OP_COS,
     MAG_OP_STEP,
+    MAG_OP_EXP,
     MAG_OP_SOFTMAX,
     MAG_OP_SOFTMAX_DV,
     MAG_OP_SIGMOID,
@@ -452,6 +453,7 @@ typedef enum mag_op_t {
     MAG_OP_SUBS,
     MAG_OP_MULS,
     MAG_OP_DIVS,
+    MAG_OP_POWS,
     MAG_OP_MATMUL,
     MAG_OP__NUM
 } mag_op_t;

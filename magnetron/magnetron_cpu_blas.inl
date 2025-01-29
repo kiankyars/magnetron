@@ -396,6 +396,17 @@ static void MAG_HOTPROC mag_vdivs_f32(
     }
 }
 
+static void MAG_HOTPROC mag_vpows_f32(
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x,
+    const mag_f32_t y
+) {
+    for (int64_t i=0; i < numel; ++i) {
+        o[i] = powf(x[i], y);
+    }
+}
+
 static mag_f32_t MAG_UNUSED MAG_HOTPROC mag_vdot_f32(
     int64_t numel,
     const mag_f32_t* x,
@@ -759,6 +770,32 @@ static void MAG_HOTPROC mag_vstep_f32( /* Heaviside step function. */
     for (int64_t i=0; i < numel; ++i) {
         o[i] = x[i] >= 0.0f ? 1.0f : 0.0f;
     }
+}
+
+static void MAG_HOTPROC mag_vexp_f32( /* e^x */
+    int64_t numel,
+    mag_f32_t* o,
+    const mag_f32_t* x
+) {
+    int64_t i=0;
+#if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
+    for (; i+3 < numel; i += 4) {
+        vst1q_f32(o+i, mag_simd_expf(vld1q_f32(x+i)));
+    }
+#elif MAG_APPROXMATH && defined(__AVX512F__) && defined(__AVX512DQ__)
+    for (; i+15 < numel; i += 16) {
+        _mm512_storeu_ps(o+i, mag_simd_expf(_mm512_loadu_ps(x+i)));
+    }
+#elif MAG_APPROXMATH && defined(__AVX2__) && defined(__FMA__)
+    for (; i+7 < numel; i += 8) {
+        _mm256_storeu_ps(o+i, mag_simd_expf(_mm256_loadu_ps(x+i)));
+    }
+#elif MAG_APPROXMATH && defined(__SSE2__)
+    for (; i+3 < numel; i += 4) {
+        _mm_storeu_ps(o+i, mag_simd_expf(_mm_loadu_ps(x+i)));
+    }
+#endif
+    for (; i < numel; ++i) o[i] = expf(x[i]); /* Process leftovers scalar-wise */
 }
 
 static void MAG_HOTPROC mag_vsoftmax_f32( /* softmax : ℝ -> (0, ∞), x |-> e^x */
@@ -1201,6 +1238,7 @@ mag_cpu_blas_impl_unary(f32, sqrt)
 mag_cpu_blas_impl_unary(f32, sin)
 mag_cpu_blas_impl_unary(f32, cos)
 mag_cpu_blas_impl_unary(f32, step)
+mag_cpu_blas_impl_unary(f32, exp)
 mag_cpu_blas_impl_unary(f32, softmax)
 mag_cpu_blas_impl_unary(f32, softmax_dv)
 mag_cpu_blas_impl_unary(f32, sigmoid)
@@ -1244,6 +1282,7 @@ mag_cpu_blas_impl_unary_scalar(f32, add)
 mag_cpu_blas_impl_unary_scalar(f32, sub)
 mag_cpu_blas_impl_unary_scalar(f32, mul)
 mag_cpu_blas_impl_unary_scalar(f32, div)
+mag_cpu_blas_impl_unary_scalar(f32, pow)
 
 #undef mag_cpu_blas_impl_unary_scalar
 
@@ -1566,6 +1605,7 @@ static void (*const forward_kernels[MAG_OP__NUM])(const mag_compute_payload_t*) 
     [MAG_OP_SIN] = &mag_blas_sin_f32,
     [MAG_OP_COS] = &mag_blas_cos_f32,
     [MAG_OP_STEP] = &mag_blas_step_f32,
+    [MAG_OP_EXP] = &mag_blas_exp_f32,
     [MAG_OP_SOFTMAX] = &mag_blas_softmax_f32,
     [MAG_OP_SOFTMAX_DV] = &mag_blas_softmax_dv_f32,
     [MAG_OP_SIGMOID] = &mag_blas_sigmoid_f32,
@@ -1587,6 +1627,7 @@ static void (*const forward_kernels[MAG_OP__NUM])(const mag_compute_payload_t*) 
     [MAG_OP_SUBS] = &mag_blas_subs_f32,
     [MAG_OP_MULS] = &mag_blas_muls_f32,
     [MAG_OP_DIVS] = &mag_blas_divs_f32,
+    [MAG_OP_POWS] = &mag_blas_pows_f32,
     [MAG_OP_MATMUL] = &mag_blas_matmul_f32,
 };
 
@@ -1608,6 +1649,7 @@ static void (*const backward_kernels[MAG_OP__NUM])(const mag_compute_payload_t*)
     [MAG_OP_SIN] = &mag_blas_sin_f32,
     [MAG_OP_COS] = &mag_blas_cos_f32,
     [MAG_OP_STEP] = &mag_blas_step_f32,
+    [MAG_OP_EXP] = &mag_blas_exp_f32,
     [MAG_OP_SOFTMAX] = &mag_blas_softmax_f32,
     [MAG_OP_SOFTMAX_DV] = &mag_blas_softmax_dv_f32,
     [MAG_OP_SIGMOID] = &mag_blas_sigmoid_f32,
@@ -1629,6 +1671,7 @@ static void (*const backward_kernels[MAG_OP__NUM])(const mag_compute_payload_t*)
     [MAG_OP_SUBS] = &mag_blas_subs_f32,
     [MAG_OP_MULS] = &mag_blas_muls_f32,
     [MAG_OP_DIVS] = &mag_blas_divs_f32,
+    [MAG_OP_POWS] = &mag_blas_pows_f32,
     [MAG_OP_MATMUL] = &mag_blas_matmul_f32,
 };
 
