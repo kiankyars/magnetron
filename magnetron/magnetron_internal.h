@@ -485,6 +485,7 @@ typedef struct mag_op_meta_t {
     uint8_t paramcount;                                     /* Number of parameters */
     mag_op_param_type_t param_types[MAG_MAX_OP_PARAMS];     /* Parameter types */
     bool inplace;                                           /* Supports inplace execution */
+    bool backward;                                          /* Supports backward execution */
     mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_op_param_t*);
     bool (*validator)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_op_param_t*);
 } mag_op_meta_t;
@@ -686,7 +687,8 @@ struct mag_ctx_t {
 #endif
     mag_fixed_intrusive_pool tensor_pool;           /* Fixed-size memory pool for tensors. */
     mag_exec_mode_t exec_mode;
-    bool profiler_enabled;
+    bool is_profiling;
+    bool is_grad_recording;
     mag_op_perf_info_t op_perf_mons_total[MAG_OP__NUM];
     union {
         struct {
@@ -715,8 +717,9 @@ typedef enum mag_tensor_flags_t {
     MAG_TFLAG_NONE = 0,
     MAG_TFLAG_OWNER = 1<<0,         /* Tensor is the owner of the buffer. */
     MAG_TFLAG_VIEW = 1<<1,          /* Tensor is a view. */
-    MAG_FLAG_GRAD = 1<<2,           /* Tensor is a gradient. */
+    MAG_TFLAG_IS_GRAD = 1<<2,       /* Tensor is a gradient. */
     MAG_TFLAG_EXEC_EAGER = 1<<3,    /* Tensor is executed eagerly. */
+    MAG_TFLAG_REQUIRES_GRAD = 1<<4, /* Tensor requires gradient. */
 
     MAG_TFLAG_LEN = 4
 } mag_tensor_flags_t;
@@ -770,6 +773,7 @@ typedef struct mag_compute_payload_t {
     int64_t thread_num;
     int64_t thread_idx;
     mag_tensor_t* node;
+    bool is_fwd;
 } mag_compute_payload_t;
 
 typedef struct mag_kernel_registry_t {

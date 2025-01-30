@@ -106,11 +106,11 @@ class Context:
 
     @property
     def enable_grad_recorder(self) -> bool:
-        return C.mag_ctx_enable_grad_recorder(self._ptr)
+        return C.mag_ctx_is_grad_recorder_enabled(self._ptr)
 
     @enable_grad_recorder.setter
     def enable_grad_recorder(self, enable: bool):
-        C.mag_ctx_set_enable_grad_recorder(self._ptr, enable)
+        C.mag_ctx_enable_grad_recorder(self._ptr, enable)
 
     @property
     def compute_device_name(self) -> str:

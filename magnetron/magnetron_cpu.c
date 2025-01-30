@@ -208,7 +208,9 @@ static bool mag_worker_await_work(mag_worker_t* worker, mag_threadpool_t* pool) 
 /* Execute the operation on the current thread */
 static void mag_worker_exec_thread_local(const mag_kernel_registry_t* kernels, mag_compute_payload_t* payload) {
     if (mag_likely(payload->node)) { /* Do the work 🦾 */
-        (*kernels->fwd[payload->node->op])(payload);
+        mag_op_t op = payload->node->op;
+        void (*kernel)(const mag_compute_payload_t*) = payload->is_fwd ? kernels->fwd[op] : kernels->bwd[op];
+        (*kernel)(payload);
         payload->node = NULL;
     }
 }
@@ -262,7 +264,7 @@ static mag_threadpool_t* mag_threadpool_create(uint32_t num_workers, const mag_k
     for (uint32_t ti=0; ti < num_workers; ++ti) { /* Initialize workers */
         workers[ti] = (mag_worker_t){
             .phase = 0,
-            .payload = (mag_compute_payload_t){.thread_num = num_workers, .thread_idx = ti, .node = NULL, },
+            .payload = (mag_compute_payload_t){.thread_num = num_workers, .thread_idx = ti, .node = NULL, .is_fwd = true },
             .pool = pool,
             .is_async = ti != 0 /* Main thread is worker but without thread */
         };
@@ -293,13 +295,14 @@ static void mag_threadpool_destroy(mag_threadpool_t* pool) {
 }
 
 /* Submits work payload and awakens all threads */
-static void mag_threadpool_kickoff(mag_threadpool_t* pool, mag_tensor_t* node, uint32_t num_active_workers) {
+static void mag_threadpool_kickoff(mag_threadpool_t* pool, mag_tensor_t* node, bool is_fwd, uint32_t num_active_workers) {
     mag_mutex_lock(&pool->mtx);
     pool->num_active_workers = num_active_workers;
     for (uint32_t i=0; i < pool->num_allocated_workers; ++i) { /* Set up payload */
         mag_compute_payload_t* payload = &pool->workers[i].payload;
-        payload->node = node;
         payload->thread_num = num_active_workers;
+        payload->node = node;
+        payload->is_fwd = is_fwd;
     }
     ++pool->phase;
     pool->num_completed = 0; /* Reset completion counter */
@@ -319,17 +322,17 @@ static void mag_threadpool_barrier(mag_threadpool_t* pool) {
 }
 
 /* Execute an operator tensor on the CPU */
-static MAG_HOTPROC void mag_threadpool_parallel_compute(mag_threadpool_t* pool, mag_tensor_t* node, uint32_t num_active_workers) {
+static MAG_HOTPROC void mag_threadpool_parallel_compute(mag_threadpool_t* pool, mag_tensor_t* node, bool is_fwd, uint32_t num_active_workers) {
     mag_assert2(pool != NULL);
-    mag_threadpool_kickoff(pool, node, num_active_workers);                         /* Kick off workers */
-    mag_cv_broadcast(&pool->cv);                                  /* Wake up all workers */
+    mag_threadpool_kickoff(pool, node, is_fwd, num_active_workers);                 /* Kick off workers */
+    mag_cv_broadcast(&pool->cv);                                                    /* Wake up all workers */
     mag_worker_exec_and_broadcast(pool, pool->kernels, &pool->workers->payload);    /* Main thread does work too */
     mag_threadpool_barrier(pool);                                                   /* Wait for all workers to finish */
 }
 
 static uint32_t mag_cpu_dynamic_work_scaling(mag_cpu_device_t* dvc, mag_op_t op, int64_t numel);
 
-static MAG_HOTPROC void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t* node) {
+static MAG_HOTPROC void mag_cpu_exec(mag_compute_device_t* dvc, bool is_fwd, mag_tensor_t* node) {
     mag_cpu_device_t* cpu_dvc = dvc->impl;
     uint32_t intraop_workers = mag_cpu_dynamic_work_scaling(cpu_dvc, node->op, node->numel);
     if (intraop_workers <= 1) { /* Main thread does the work (single threaded mode). */
@@ -341,12 +344,15 @@ static MAG_HOTPROC void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t
         mag_worker_exec_thread_local(&cpu_dvc->kernels, &payload);
         return; /* Done */
     }
-    mag_threadpool_parallel_compute(cpu_dvc->pool, node, intraop_workers); /* Multithreaded mode. */
+    mag_threadpool_parallel_compute(cpu_dvc->pool, node, is_fwd, intraop_workers); /* Multithreaded mode. */
 }
 
-static MAG_HOTPROC void mag_cpu_exec_bwd(mag_compute_device_t* dvc, mag_tensor_t* root) {
-    (void)dvc, (void)root;
-    mag_panic("NYI");
+static void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t* node) {
+    mag_cpu_exec(dvc, true, node);
+}
+
+static void mag_cpu_exec_bwd(mag_compute_device_t* dvc, mag_tensor_t* node) {
+    mag_cpu_exec(dvc, false, node);
 }
 
 static void mag_cpu_buf_set(mag_storage_buffer_t* sto, size_t offs, uint8_t x) {
