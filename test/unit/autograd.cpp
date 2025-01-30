@@ -24,6 +24,11 @@ TEST(autograd, bin_ops1) {
     auto* z = mag_div(mag_mul(mag_add(x, y), mag_sub(x, y)), k);
     mag_tensor_backward(z);
 
+    ASSERT_NE(x->grad, nullptr);
+    ASSERT_NE(y->grad, nullptr);
+    ASSERT_NE(k->grad, nullptr);
+    ASSERT_NE(z->grad, nullptr);
+
     // check forward pass
     float vx = mag_tensor_get_scalar_virtual_index(x, 0);
     float vy = mag_tensor_get_scalar_virtual_index(y, 0);

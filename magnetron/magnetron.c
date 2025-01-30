@@ -2166,62 +2166,173 @@ void mag_tensor_required_grad(mag_tensor_t* t, bool requires_grad) {
     else t->flags &= ~MAG_TFLAG_REQUIRES_GRAD;
 }
 
-void mag_tensor_backward(mag_tensor_t* t) {
-    if (!(t->flags & MAG_TFLAG_REQUIRES_GRAD)) return;
-    if (!t->grad) { /* Lazily allocate gradient and set ∂L/∂L = 1.0 */
-        mag_tensor_t* grad = mag_tensor_create(t->ctx, t->dtype, t->shape, t->rank, NULL, 0);
-        grad->flags |= MAG_TFLAG_IS_GRAD;
-        mag_tensor_fill(grad, 1.0f);
-        t->grad = grad;
-    }
-    if (mag_unlikely(t->op == MAG_OP_NOP)) return;
-    const mag_op_meta_t* meta = mag_op_meta_of(t->op);
+typedef struct mag_topo_stack_record_t {
+    mag_tensor_t* tensor;
+    uint32_t next_child_idx;
+} mag_topo_stack_record_t;
 
-    mag_tensor_t* x = t->op_inputs[0];
-    mag_tensor_t* y = t->op_inputs[1];
-    mag_tensor_t* gx = NULL;
-    mag_tensor_t* gy = NULL;
-    mag_tensor_t* gout = t->grad;
+typedef struct mag_tensor_array_t {
+    mag_tensor_t** data;
+    size_t size;
+    size_t capacity;
+} mag_tensor_array_t;
 
-    switch (t->op) {
-        case MAG_OP_RELU: {
-            mag_tensor_t* mask = mag_step(x);
-            gx = mag_mul(gout, mask);
-            mag_tensor_decref(mask);
-        } break;
-        case MAG_OP_ADD:
-            gx = mag_clone(gout);
-            gy = mag_clone(gout);
-        break;
-        case MAG_OP_SUB:
-            gx = mag_clone(gout);
-            gy = mag_neg(gout);
-        break;
-        case MAG_OP_MUL:
-            gx = mag_mul(gout, y);
-            gy = mag_mul(gout, x);
-        break;
-        case MAG_OP_DIV:
-            gx = mag_div(gout, y);
-            gy = mag_neg(mag_div(mag_mul(gout, x), mag_mul(y, y)));
-            break;
-        default: mag_panic("fuck");
+static void mag_tensor_array_init(mag_tensor_array_t* arr) {
+    arr->data = NULL;
+    arr->size = 0;
+    arr->capacity = 0;
+}
+
+static void mag_tensor_array_free(mag_tensor_array_t* arr) {
+    (*mag_alloc)(arr->data, 0);
+    arr->size = 0;
+    arr->capacity = 0;
+}
+
+static void mag_tensor_array_push(mag_tensor_array_t* arr, mag_tensor_t* t) {
+    if (arr->size == arr->capacity) {
+        size_t cap = !arr->capacity ? 16 : arr->capacity<<1;
+        arr->data = (*mag_alloc)(arr->data, cap*sizeof(*arr->data));
+        arr->capacity = cap;
     }
-    for (uint32_t i = 0; i < meta->argcount; ++i) {
-        mag_tensor_t* input = t->op_inputs[i];
-        if (!(input->flags & MAG_TFLAG_REQUIRES_GRAD)) continue;
-        mag_tensor_t* grad_input = !i ? gx : gy;
-        mag_assert2(grad_input);
-        if (!input->grad) {
-            input->grad = grad_input;
+    arr->data[arr->size++] = t;
+}
+
+static bool mag_was_visited(mag_tensor_t** visited, size_t len, mag_tensor_t* t) {
+    for (size_t i = 0; i < len; ++i) if (visited[i] == t) return 1;
+    return 0;
+}
+
+static void mag_mark_visited(mag_tensor_t*** visited, size_t* len, size_t* cap, mag_tensor_t* t) {
+    if (*len == *cap) {
+        size_t nc = !*cap ? 16 : (*cap<<=1);
+        *visited = (*mag_alloc)(*visited, nc*sizeof(**visited));
+        *cap = nc;
+    }
+    (*visited)[(*len)++] = t;
+}
+
+static void mag_collect_topo_iterative(mag_tensor_t* root, mag_tensor_array_t* out_array) {
+    size_t sta_len = 0, sta_cap = 0;
+    size_t vi_len = 0, vi_cap = 0;
+    mag_topo_stack_record_t* stack = NULL;
+    mag_tensor_t** visited = NULL;
+
+    #define mag_sta_push(_t) do { \
+        if (sta_len == sta_cap) { \
+            size_t nc = !sta_cap ? 16 : (sta_cap<<1); \
+            stack = (*mag_alloc)(stack, nc*sizeof(*stack)); \
+            sta_cap = nc; \
+        } \
+        stack[sta_len].tensor = (_t); \
+        stack[sta_len].next_child_idx = 0; \
+        sta_len++; \
+    } while(0)
+    #define mag_sta_pop() (stack[--sta_len])
+
+    if (!(root->flags & MAG_TFLAG_REQUIRES_GRAD)) return;
+    mag_mark_visited(&visited, &vi_len, &vi_cap, root);
+    mag_sta_push(root);
+    while (sta_len) { /* Iterative DFS */
+        mag_topo_stack_record_t* top = &stack[sta_len - 1];
+        mag_tensor_t* cur_tensor = top->tensor;
+        if (top->next_child_idx < mag_op_meta_of(cur_tensor->op)->argcount) {
+            mag_tensor_t* child = cur_tensor->op_inputs[top->next_child_idx++];
+            if (child && (child->flags & MAG_TFLAG_REQUIRES_GRAD)) {
+                if (!mag_was_visited(visited, vi_len, child)) {
+                    mag_mark_visited(&visited, &vi_len, &vi_cap, child);
+                    mag_sta_push(child);
+                }
+            }
         } else {
-            mag_tensor_t* acc = mag_add(input->grad, grad_input);
-            mag_tensor_decref(input->grad);
-            input->grad = acc;
-            mag_tensor_decref(grad_input);
+            (void)mag_sta_pop();
+            mag_tensor_array_push(out_array, cur_tensor);
         }
-        mag_tensor_backward(input);
     }
+
+    #undef mag_sta_push
+    #undef mag_sta_pop
+
+    (*mag_alloc)(stack, 0);
+    (*mag_alloc)(visited, 0);
+}
+
+void mag_tensor_backward(mag_tensor_t* t) {
+    mag_tensor_array_t post_order;
+    mag_tensor_array_init(&post_order);
+    mag_collect_topo_iterative(t, &post_order);
+    if (mag_unlikely(!post_order.size)) return;
+    for (size_t i = 0, j = post_order.size-1; i < j; ++i, --j)
+        mag_swap(mag_tensor_t*, post_order.data[i], post_order.data[j]);
+    for (size_t id = 0; id < post_order.size; ++id) {
+        t = post_order.data[id];
+        if (id == 0 && !t->grad) {
+            mag_tensor_t* grad = mag_tensor_create(t->ctx, t->dtype, t->shape, t->rank, NULL, 0);
+            grad->flags |= MAG_TFLAG_IS_GRAD;
+            mag_tensor_fill(grad, 1.0f);
+            t->grad = grad;
+        }
+        if (mag_unlikely(t->op == MAG_OP_NOP)) continue;
+        mag_tensor_t* grads[MAG_MAX_OP_PARAMS] = {0};
+        mag_tensor_t* gout = t->grad;
+        switch (t->op) {
+            case MAG_OP_RELU: {
+                mag_tensor_t* x = t->op_inputs[0];
+                mag_tensor_t* mask = mag_step(x);
+                grads[0] = mag_mul(gout, mask);
+                mag_tensor_decref(mask);
+                break;
+            }
+            case MAG_OP_ADD: {
+                grads[0] = mag_clone(gout);
+                grads[1] = mag_clone(gout);
+                break;
+            }
+            case MAG_OP_SUB: {
+                grads[0] = mag_clone(gout);
+                grads[1] = mag_neg(gout);
+                break;
+            }
+            case MAG_OP_MUL: {
+                mag_tensor_t* x = t->op_inputs[0];
+                mag_tensor_t* y = t->op_inputs[1];
+                grads[0] = mag_mul(gout, y);
+                grads[1] = mag_mul(gout, x);
+                break;
+            }
+            case MAG_OP_DIV: {
+                mag_tensor_t* x = t->op_inputs[0];
+                mag_tensor_t* y = t->op_inputs[1];
+                grads[0] = mag_div(gout, y);
+                mag_tensor_t* tmp = mag_mul(gout, x);
+                mag_tensor_t* y2  = mag_mul(y, y);
+                mag_tensor_t* tmp2= mag_div(tmp, y2);
+                grads[1] = mag_neg(tmp2);
+                mag_tensor_decref(tmp);
+                mag_tensor_decref(y2);
+                mag_tensor_decref(tmp2);
+                break;
+            }
+            default: mag_panic("Unsupported op in backward!");
+        }
+        uint32_t numin = mag_op_meta_of(t->op)->argcount;
+        for (uint32_t i = 0; i < numin; ++i) {
+            mag_tensor_t* input = t->op_inputs[i];
+            mag_assert2(input);
+            if (!(input->flags & MAG_TFLAG_REQUIRES_GRAD)) continue;
+            mag_tensor_t* gri = grads[i];
+            if (!gri) continue;
+            if (!input->grad) {
+                input->grad = gri;
+            } else {
+                mag_tensor_t* acc = mag_add(input->grad, gri);
+                mag_tensor_decref(input->grad);
+                input->grad = acc;
+                mag_tensor_decref(gri);
+            }
+        }
+    }
+    mag_tensor_array_free(&post_order);
 }
 
 float mag_tensor_get_scalar_physical_index(mag_tensor_t* t, int64_t d0, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5) {
