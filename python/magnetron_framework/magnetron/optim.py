@@ -54,8 +54,13 @@ class SGD(Optimizer):
 class Adam(Optimizer):
     """Adaptive Moment Estimation"""
 
-    def __init__(self, params: list[Tensor], lr: float = 0.001, betas: tuple[float, float] = (0.9, 0.999),
-                 eps: float = 1e-8):
+    def __init__(
+        self,
+        params: list[Tensor],
+        lr: float = 0.001,
+        betas: tuple[float, float] = (0.9, 0.999),
+        eps: float = 1e-8,
+    ) -> None:
         super().__init__(params, lr)
         self.betas = betas
         self.eps = eps

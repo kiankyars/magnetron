@@ -7,18 +7,23 @@ import multiprocessing
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 
-CMAKE_ROOT: str = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')) # Root directory of the CMake project
-NUM_JOBS: int = max(multiprocessing.cpu_count() - 1, 1) # Use all but one core
+CMAKE_ROOT: str = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..', '..')
+)  # Root directory of the CMake project
+NUM_JOBS: int = max(multiprocessing.cpu_count() - 1, 1)  # Use all but one core
+
 
 class BuildException(Exception):
     def __init__(self, message: str):
         self.message = message
         super().__init__(self.message)
 
+
 class CMakeBuildExtension(Extension):
-    def __init__(self, name, root_dir: str=''):
+    def __init__(self, name, root_dir: str = ''):
         super().__init__(name, sources=[])
         self.root_dir = os.path.abspath(root_dir)
+
 
 class CMakeBuildExecutor(build_ext):
     def initialize_options(self):
@@ -28,7 +33,9 @@ class CMakeBuildExecutor(build_ext):
         try:
             print(subprocess.check_output(['cmake', '--version']))
         except OSError:
-            raise BuildException('CMake must be installed to build the magnetron binaries from source. Please install CMake and try again.')
+            raise BuildException(
+                'CMake must be installed to build the magnetron binaries from source. Please install CMake and try again.'
+            )
         super().run()
         for ext in self.extensions:
             self.build_extension(ext)
@@ -37,17 +44,26 @@ class CMakeBuildExecutor(build_ext):
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
         cmake_args = [
-            '-DMAGNETRON_ENABLE_CUDA=OFF', # TODO: Fix cuda compilation
+            '-DMAGNETRON_ENABLE_CUDA=OFF',  # TODO: Fix cuda compilation
             f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={os.path.abspath(os.path.join(self.build_lib, "magnetron"))}',
             '-DCMAKE_BUILD_TYPE=Release',
         ]
         build_args = [
-            '--target magnetron', # Only build the magnetron library
+            '--target magnetron',  # Only build the magnetron library
             f'-j{NUM_JOBS}',
-            '-v'
+            '-v',
         ]
-        print(subprocess.check_call(['cmake', ext.root_dir] + cmake_args, cwd=self.build_temp))
-        print(subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp))
+        print(
+            subprocess.check_call(
+                ['cmake', ext.root_dir] + cmake_args, cwd=self.build_temp
+            )
+        )
+        print(
+            subprocess.check_call(
+                ['cmake', '--build', '.'] + build_args, cwd=self.build_temp
+            )
+        )
+
 
 # Setup dependencies from requirements.txt
 lib_folder = os.path.dirname(os.path.realpath(__file__))
@@ -75,5 +91,5 @@ setup(
         'build_ext': CMakeBuildExecutor,
     },
     zip_safe=False,
-    install_requires=install_requires
+    install_requires=install_requires,
 )

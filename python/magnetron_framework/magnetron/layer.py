@@ -10,6 +10,7 @@ from magnetron import Tensor
 
 class Layer(ABC):
     """Abstract base class for all layers"""
+
     @abstractmethod
     def forward(self, inputs: Tensor) -> Tensor:
         pass
@@ -24,7 +25,7 @@ class LayerInit:
     """Weight/bias initialization methods and parameters"""
 
     @unique
-    class Dist(Enum):
+    class Distribution(Enum):
         NORMAL = 0
         UNIFORM = 1
 
@@ -35,15 +36,17 @@ class LayerInit:
         HE = 2
 
     method: Method
-    distrib: Dist
+    dist: Distribution
     uniform_interval: (float, float) = (-1.0, 1.0)
     mean: float = 0.0
     stddev: float = 1.0
     gain: float = 1.0
 
-    def __init__(self, method: Method, distrib: Dist, **kwargs):
+    def __init__(
+        self, method: Method, dist: Distribution, **kwargs: dict[str, object]
+    ) -> None:
         self.method = method
-        self.distrib = distrib
+        self.dist = dist
         for key, value in kwargs.items():
             setattr(self, key, value)
 
@@ -51,9 +54,9 @@ class LayerInit:
         assert len(shape) >= 1
 
         if self.method == self.Method.RANDOM:
-            if self.distrib == self.Dist.NORMAL:
+            if self.dist == self.Distribution.NORMAL:
                 return Tensor.normal(shape, mean=self.mean, stddev=self.stddev)
-            elif self.distrib == self.Dist.UNIFORM:
+            elif self.dist == self.Distribution.UNIFORM:
                 return Tensor.uniform(shape, interval=self.uniform_interval)
 
         fan_in: int = shape[0]
@@ -68,17 +71,29 @@ class LayerInit:
             factor = 1.0 / fan_in
             bound = math.sqrt(3.0 / fan_in)
 
-        if self.distrib == self.Dist.NORMAL:
+        if self.dist == self.Distribution.NORMAL:
             stddev = self.gain * math.sqrt(factor)
             return Tensor.normal(shape, mean=0.0, stddev=stddev)
-        elif self.distrib == self.Dist.UNIFORM:
-            return Tensor.uniform(shape, interval=(-self.gain * bound, self.gain * bound))
+        elif self.dist == self.Distribution.UNIFORM:
+            return Tensor.uniform(
+                shape, interval=(-self.gain * bound, self.gain * bound)
+            )
+        else:
+            raise ValueError('Invalid weight/bias initialization method')
 
 
 class DenseLayer(Layer):
     """Fully connected layer"""
-    def __init__(self, in_features: int, out_features: int, bias: bool,
-                 init: LayerInit = LayerInit(LayerInit.Method.RANDOM, LayerInit.Dist.UNIFORM)):
+
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        bias: bool,
+        init: LayerInit = LayerInit(
+            LayerInit.Method.RANDOM, LayerInit.Distribution.UNIFORM
+        ),
+    ) -> None:
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features

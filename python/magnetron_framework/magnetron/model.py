@@ -19,7 +19,7 @@ class HyperParams:
 class Model(ABC):
     """Abstract base class for all models"""
 
-    def __init__(self, hyper_params: HyperParams):
+    def __init__(self, hyper_params: HyperParams) -> None:
         self.hyper_params = hyper_params
 
     @abstractmethod
@@ -27,22 +27,22 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def backward(self, outputs: Tensor, targets: Tensor, rate: float):
+    def backward(self, outputs: Tensor, targets: Tensor, rate: float) -> None:
         pass
 
     @abstractmethod
-    def train(self, inputs: Tensor, targets: Tensor):
+    def train(self, inputs: Tensor, targets: Tensor) -> None:
         pass
 
     @abstractmethod
-    def summary(self):
+    def summary(self) -> None:
         pass
 
 
 class SequentialModel(Model):
     """Feedforward neural network model (multi-layer perceptron)"""
 
-    def __init__(self, hyper_params: HyperParams, layers: list[Layer]):
+    def __init__(self, hyper_params: HyperParams, layers: list[Layer]) -> None:
         super().__init__(hyper_params)
         self.layers = layers
 
@@ -52,13 +52,13 @@ class SequentialModel(Model):
             x = layer.forward(x)
         return x
 
-    def backward(self, outputs: Tensor, targets: Tensor, rate: float):
+    def backward(self, outputs: Tensor, targets: Tensor, rate: float) -> None:
         delta = (outputs - targets) * outputs.sigmoid(derivative=True)
         for i in reversed(range(len(self.layers))):
-            is_hidden = (i > 0)
+            is_hidden = i > 0
             delta = self.layers[i].backward(is_hidden, delta, rate)
 
-    def train(self, inputs: Tensor, targets: Tensor):
+    def train(self, inputs: Tensor, targets: Tensor) -> None:
         epochs: int = self.hyper_params.epochs
         rate: float = self.hyper_params.lr
 
@@ -77,5 +77,5 @@ class SequentialModel(Model):
         print(f'Training finished in {duration:.2f} seconds')
         return losses
 
-    def summary(self):
+    def summary(self) -> None:
         pass

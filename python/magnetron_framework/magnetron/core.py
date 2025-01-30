@@ -19,11 +19,11 @@ DIM_MAX: int = (1 << 63) - 1  # INT64_MAX
 
 class ComputeDevice:
     class CPU:
-        def __init__(self, num_threads: int = 0):
+        def __init__(self, num_threads: int = 0) -> None:
             self.num_threads = num_threads
 
     class CUDA:
-        def __init__(self, device_id: int = 0):
+        def __init__(self, device_id: int = 0) -> None:
             self.device_id = device_id
 
 
@@ -77,7 +77,7 @@ class ExecutionMode(Enum):
 
 @dataclass
 class GlobalConfig:
-    verbose: bool = (getenv('MAG_VERBOSE', '0') == '1')
+    verbose: bool = getenv('MAG_VERBOSE', '0') == '1'
     compute_device: ComputeDevice.CPU | ComputeDevice.CUDA = ComputeDevice.CPU()
 
 
@@ -92,8 +92,12 @@ class Context:
             Context._active = Context(GlobalConfig.compute_device)
         return Context._active
 
-    def __init__(self, device: ComputeDevice.CPU | ComputeDevice.CUDA, *,
-                 execution_mode: ExecutionMode = ExecutionMode.EAGER):
+    def __init__(
+        self,
+        device: ComputeDevice.CPU | ComputeDevice.CUDA,
+        *,
+        execution_mode: ExecutionMode = ExecutionMode.EAGER,
+    ) -> None:
         descriptor: ffi.CData = ffi.new('mag_device_descriptor_t*')
         if isinstance(device, ComputeDevice.CPU):
             descriptor.type = 0
@@ -109,7 +113,7 @@ class Context:
         return C.mag_ctx_is_grad_recorder_enabled(self._ptr)
 
     @enable_grad_recorder.setter
-    def enable_grad_recorder(self, enable: bool):
+    def enable_grad_recorder(self, enable: bool) -> None:
         C.mag_ctx_enable_grad_recorder(self._ptr, enable)
 
     @property
@@ -121,7 +125,7 @@ class Context:
         return ExecutionMode(C.mag_ctx_get_exec_mode(self._ptr))
 
     @execution_mode.setter
-    def execution_mode(self, mode: ExecutionMode):
+    def execution_mode(self, mode: ExecutionMode) -> None:
         C.mag_ctx_set_exec_mode(self._ptr, mode.value)
 
     @property
@@ -129,7 +133,7 @@ class Context:
         return PRNGAlgorithm(C.mag_ctx_get_prng_algorithm(self._ptr))
 
     @prng_algorithm.setter
-    def prng_algorithm(self, algorithm: PRNGAlgorithm):
+    def prng_algorithm(self, algorithm: PRNGAlgorithm) -> None:
         C.mag_ctx_set_prng_algorithm(self._ptr, algorithm.value, 0)
 
     def seed(self, seed: int) -> None:
@@ -187,29 +191,33 @@ class Context:
         C.mag_ctx_profile_start_recording(self._ptr)
 
     def stop_profiler(self, export_csv_file: str | None = None) -> None:
-        csv_file = ffi.NULL if export_csv_file is None else bytes(export_csv_file, 'utf-8')
+        csv_file = (
+            ffi.NULL if export_csv_file is None else bytes(export_csv_file, 'utf-8')
+        )
         C.mag_ctx_profile_stop_recording(self._ptr, csv_file)
 
-    def __del__(self):
+    def __del__(self) -> None:
         C.mag_ctx_destroy(self._ptr)
         self._ptr = ffi.NULL
 
 
-def no_grad():
+def no_grad() -> 'no_grad.Scope':
     """Temporary disable gradient computation"""
 
     class Scope:
-        def __call__(self, func):
-            def f(*args, **kwargs):
+        def __call__(self, func: callable) -> None:
+            def f(*args: tuple[object, ...], **kwargs: dict[str, object]) -> None:
                 with Scope():
                     return func(*args, **kwargs)
 
             return f
 
-        def __enter__(self):
+        def __enter__(self) -> None:
             Context.active().enable_grad_recorder = False
 
-        def __exit__(self, exc_type, exc_value, traceback):
+        def __exit__(
+            self, exc_type: object, exc_value: object, traceback: object
+        ) -> None:
             Context.active().enable_grad_recorder = True
 
     return Scope()
@@ -226,22 +234,32 @@ class Tensor:
         self._ptr = ptr
 
     def __del__(self) -> None:
-        if hasattr(self, '_ptr') and isinstance(self._ptr, ffi.CData) and self._ptr != ffi.NULL:
+        if (
+            hasattr(self, '_ptr')
+            and isinstance(self._ptr, ffi.CData)
+            and self._ptr != ffi.NULL
+        ):
             C.mag_tensor_decref(self._ptr)
         self._ptr = ffi.NULL
 
-    _DISPATCH = {
+    _DISPATCH: list[int, ffi.CData] = {
         1: C.mag_tensor_create_1d,
         2: C.mag_tensor_create_2d,
         3: C.mag_tensor_create_3d,
         4: C.mag_tensor_create_4d,
         5: C.mag_tensor_create_5d,
-        6: C.mag_tensor_create_6d
+        6: C.mag_tensor_create_6d,
     }
     assert len(_DISPATCH) == MAX_DIMS
 
-    def _new(self, ctx: Context, *, shape: tuple[int, ...], dtype: DType = DType.F32,
-             name: str | None = None) -> None:
+    def _new(
+        self,
+        ctx: Context,
+        *,
+        shape: tuple[int, ...],
+        dtype: DType = DType.F32,
+        name: str | None = None,
+    ) -> None:
         assert 0 < len(shape) <= MAX_DIMS, f'Invalid number of dimensions: {len(shape)}'
         assert all(0 < dim <= DIM_MAX for dim in shape), 'Invalid dimension size'
         self._ctx = weakref.ref(ctx)
@@ -250,23 +268,40 @@ class Tensor:
             self.name = name
 
     @classmethod
-    def empty(cls, shape: tuple[int, ...], *, dtype: DType = DType.F32, name: str | None = None) -> 'Tensor':
+    def empty(
+        cls,
+        shape: tuple[int, ...],
+        *,
+        dtype: DType = DType.F32,
+        name: str | None = None,
+    ) -> 'Tensor':
         tensor = cls(None)
         tensor._new(Context.active(), shape=shape, dtype=dtype, name=name)
         return tensor
 
     @classmethod
-    def full(cls, shape: tuple[int, ...], *, fill_value: float, dtype: DType = DType.F32,
-             name: str | None = None) -> 'Tensor':
+    def full(
+        cls,
+        shape: tuple[int, ...],
+        *,
+        fill_value: float,
+        dtype: DType = DType.F32,
+        name: str | None = None,
+    ) -> 'Tensor':
         tensor = cls(None)
         tensor._new(Context.active(), shape=shape, dtype=dtype, name=name)
         C.mag_tensor_fill(tensor._ptr, fill_value)
         return tensor
 
     @classmethod
-    def const(cls, data, *, dtype: DType = DType.F32,
-              name: str | None = None) -> 'Tensor':
-        def flatten_nested_lists(nested):
+    def const(
+        cls,
+        data: list[float, ...],
+        *,
+        dtype: DType = DType.F32,
+        name: str | None = None,
+    ) -> 'Tensor':
+        def flatten_nested_lists(nested: object) -> tuple[tuple[int, ...], list[float]]:
             if not isinstance(nested, list):
                 return (), [nested]
             elif len(nested) == 0:
@@ -285,19 +320,32 @@ class Tensor:
 
         shape, flattened_data = flatten_nested_lists(data)
         tensor = cls(None)
-        tensor._new(Context.active(), shape=tuple(shape), dtype=dtype, name=name)
+        tensor._new(Context.active(), shape=shape, dtype=dtype, name=name)
         size: int = len(flattened_data) * ffi.sizeof('float')
-        C.mag_tensor_copy_buffer_from(tensor._ptr, ffi.new(f'float[{len(flattened_data)}]', flattened_data), size)
+        C.mag_tensor_copy_buffer_from(
+            tensor._ptr, ffi.new(f'float[{len(flattened_data)}]', flattened_data), size
+        )
         return tensor
 
     @classmethod
-    def zeros(cls, shape: tuple[int, ...], *, dtype: DType = DType.F32,
-              name: str | None = None) -> 'Tensor':
+    def zeros(
+        cls,
+        shape: tuple[int, ...],
+        *,
+        dtype: DType = DType.F32,
+        name: str | None = None,
+    ) -> 'Tensor':
         return cls.full(shape, fill_value=0.0, dtype=dtype, name=name)
 
     @classmethod
-    def uniform(cls, shape: tuple[int, ...], *, interval: (float, float) = (-1.0, 1.0), dtype: DType = DType.F32,
-                name: str | None = None) -> 'Tensor':
+    def uniform(
+        cls,
+        shape: tuple[int, ...],
+        *,
+        interval: (float, float) = (-1.0, 1.0),
+        dtype: DType = DType.F32,
+        name: str | None = None,
+    ) -> 'Tensor':
         tensor = cls(None)
         tensor._new(Context.active(), shape=shape, dtype=dtype, name=name)
         if interval[1] < interval[0]:
@@ -306,7 +354,9 @@ class Tensor:
         return tensor
 
     @classmethod
-    def normal(cls, shape: tuple[int, ...], *, mean: float = 0.0, stddev: float = 1.0) -> 'Tensor':
+    def normal(
+        cls, shape: tuple[int, ...], *, mean: float = 0.0, stddev: float = 1.0
+    ) -> 'Tensor':
         tensor = cls(None)
         tensor._new(Context.active(), shape=shape, dtype=DType.F32)
         C.mag_tensor_fill_random_normal(tensor._ptr, mean, stddev)
@@ -319,13 +369,22 @@ class Tensor:
         return cls(ptr=instance)
 
     @classmethod
-    def load_image(cls, file_path: str, *,
-                   name: str | None = None,
-                   channels=ColorChannels.AUTO,
-                   resize_to: (int, int) = (0, 0)) -> 'Tensor':
+    def load_image(
+        cls,
+        file_path: str,
+        *,
+        name: str | None = None,
+        channels: ColorChannels = ColorChannels.AUTO,
+        resize_to: (int, int) = (0, 0),
+    ) -> 'Tensor':
         assert isfile(file_path), f'File not found: {file_path}'
-        instance = C.mag_tensor_load_image(Context.active()._ptr, bytes(file_path, 'utf-8'), channels.value,
-                                           resize_to[0], resize_to[1])
+        instance = C.mag_tensor_load_image(
+            Context.active()._ptr,
+            bytes(file_path, 'utf-8'),
+            channels.value,
+            resize_to[0],
+            resize_to[1],
+        )
         tensor = cls(instance)
         if name is not None:
             tensor.name = name
@@ -364,7 +423,9 @@ class Tensor:
 
     def tolist(self) -> list[float]:
         assert self.dtype == DType.F32, 'Invalid data type'
-        return ffi.unpack(ffi.cast('float*', C.mag_tensor_data_ptr(self._ptr)), self.numel)
+        return ffi.unpack(
+            ffi.cast('float*', C.mag_tensor_data_ptr(self._ptr)), self.numel
+        )
 
     @property
     def data_size(self) -> int:
@@ -432,7 +493,7 @@ class Tensor:
         return C.mag_tensor_is_contiguous(self._ptr)
 
     @property
-    def grad(self):
+    def grad(self) -> object | None: # -> Tensor | None     - Forward Reference ('Tensor') + None is a bug in Python, will be fixed in Python 3.5.3, so long we use object.
         ptr: ffi.CData = C.mag_tensor_grad(self._ptr)
         return Tensor(ptr) if ptr != ffi.NULL else None
 
@@ -443,19 +504,29 @@ class Tensor:
     def zero_grad(self) -> None:
         C.mag_tensor_zero_grad(self._ptr)
 
-    def is_close(self, other: 'Tensor', eps: float = -1.0, print_eq_percent: bool = False) -> (bool, float):
+    def is_close(
+        self, other: 'Tensor', eps: float = -1.0, print_eq_percent: bool = False
+    ) -> (bool, float):
         percent_eq = ffi.new('double[1]')
         is_eq = C.mag_tensor_is_close(self._ptr, other._ptr, eps, percent_eq)
         if print_eq_percent:
             print(f'Tensors are close: {is_eq}, Percent equal: {percent_eq[0]:.2f}%')
         return is_eq, percent_eq[0]
 
-    def draw_box(self, p1: (int, int), p2: (int, int), width: int = 2, rgb: int = 0xffffff):
+    def draw_box(
+        self, p1: (int, int), p2: (int, int), width: int = 2, rgb: int = 0xFFFFFF
+    ) -> None:
         assert p2[0] > p1[0] and p2[1] > p1[1] and width > 0
-        C.mag_tensor_img_draw_box(self._ptr, p1[0], p1[1], p2[0], p2[1], width, rgb & 0xffffff)
+        C.mag_tensor_img_draw_box(
+            self._ptr, p1[0], p1[1], p2[0], p2[1], width, rgb & 0xFFFFFF
+        )
 
-    def draw_text(self, p: (int, int), size: int, txt: str, rgb: int = 0xffffff):
-        C.mag_tensor_img_draw_text(self._ptr, p[0], p[1], size, rgb & 0xffffff, bytes(txt, 'utf-8'))
+    def draw_text(
+        self, p: (int, int), size: int, txt: str, rgb: int = 0xFFFFFF
+    ) -> None:
+        C.mag_tensor_img_draw_text(
+            self._ptr, p[0], p[1], size, rgb & 0xFFFFFF, bytes(txt, 'utf-8')
+        )
 
     def save(self, file_path: str) -> None:
         if not file_path.endswith('.magnetron'):
@@ -481,7 +552,9 @@ class Tensor:
         return Tensor(C.mag_transpose(self._ptr))
 
     def permute(self, axes: tuple[int, ...]) -> 'Tensor':
-        assert len(axes) == self.rank, f'Invalid number of axes, require {self.rank}, got {len(axes)}'
+        assert len(axes) == self.rank, (
+            f'Invalid number of axes, require {self.rank}, got {len(axes)}'
+        )
         if len(axes) != MAX_DIMS:
             axes = axes + tuple(range(self.rank, MAX_DIMS))
         assert len(axes) == MAX_DIMS
@@ -561,16 +634,24 @@ class Tensor:
         return Tensor(C.mag_exp_(self._ptr))
 
     def softmax(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(C.mag_softmax_dv(self._ptr) if derivative else C.mag_softmax(self._ptr))
+        return Tensor(
+            C.mag_softmax_dv(self._ptr) if derivative else C.mag_softmax(self._ptr)
+        )
 
     def softmax_(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(C.mag_softmax_dv_(self._ptr) if derivative else C.mag_softmax_(self._ptr))
+        return Tensor(
+            C.mag_softmax_dv_(self._ptr) if derivative else C.mag_softmax_(self._ptr)
+        )
 
     def sigmoid(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(C.mag_sigmoid_dv(self._ptr) if derivative else C.mag_sigmoid(self._ptr))
+        return Tensor(
+            C.mag_sigmoid_dv(self._ptr) if derivative else C.mag_sigmoid(self._ptr)
+        )
 
     def sigmoid_(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(C.mag_sigmoid_dv_(self._ptr) if derivative else C.mag_sigmoid_(self._ptr))
+        return Tensor(
+            C.mag_sigmoid_dv_(self._ptr) if derivative else C.mag_sigmoid_(self._ptr)
+        )
 
     def hard_sigmoid(self) -> 'Tensor':
         return Tensor(C.mag_hard_sigmoid(self._ptr))
@@ -582,78 +663,114 @@ class Tensor:
         return C.mag_silu_dv(self._ptr) if derivative else C.mag_silu(self._ptr)
 
     def silu_(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(C.mag_silu_dv_(self._ptr) if derivative else C.mag_silu_(self._ptr))
+        return Tensor(
+            C.mag_silu_dv_(self._ptr) if derivative else C.mag_silu_(self._ptr)
+        )
 
     def tanh(self, derivative: bool = False) -> 'Tensor':
         return Tensor(C.mag_tanh_dv(self._ptr) if derivative else C.mag_tanh(self._ptr))
 
     def tanh_(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(C.mag_tanh_dv_(self._ptr) if derivative else C.mag_tanh_(self._ptr))
+        return Tensor(
+            C.mag_tanh_dv_(self._ptr) if derivative else C.mag_tanh_(self._ptr)
+        )
 
     def relu(self, derivative: bool = False) -> 'Tensor':
         return Tensor(C.mag_relu_dv(self._ptr) if derivative else C.mag_relu(self._ptr))
 
     def relu_(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(C.mag_relu_dv_(self._ptr) if derivative else C.mag_relu_(self._ptr))
+        return Tensor(
+            C.mag_relu_dv_(self._ptr) if derivative else C.mag_relu_(self._ptr)
+        )
 
     def gelu(self, derivative: bool = False) -> 'Tensor':
         return Tensor(C.mag_gelu_dv(self._ptr) if derivative else C.mag_gelu(self._ptr))
 
     def gelu_(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(C.mag_gelu_dv_(self._ptr) if derivative else C.mag_gelu_(self._ptr))
+        return Tensor(
+            C.mag_gelu_dv_(self._ptr) if derivative else C.mag_gelu_(self._ptr)
+        )
 
     def __add__(self, other: object | int | float) -> 'Tensor':
         return Tensor(
-            C.mag_add(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_adds(self._ptr, float(other)))
+            C.mag_add(self._ptr, other._ptr)
+            if isinstance(other, Tensor)
+            else C.mag_adds(self._ptr, float(other))
+        )
 
     def __radd__(self, other: int | float) -> 'Tensor':
         return Tensor(
-            C.mag_add(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_adds(self._ptr, float(other)))
+            C.mag_add(self._ptr, other._ptr)
+            if isinstance(other, Tensor)
+            else C.mag_adds(self._ptr, float(other))
+        )
 
     def __iadd__(self, other: object | int | float) -> 'Tensor':
         return Tensor(
-            C.mag_add_(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_adds_(self._ptr, float(other)))
+            C.mag_add_(self._ptr, other._ptr)
+            if isinstance(other, Tensor)
+            else C.mag_adds_(self._ptr, float(other))
+        )
 
     def __sub__(self, other: object | int | float) -> 'Tensor':
         return Tensor(
-            C.mag_sub(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_subs(self._ptr, float(other)))
+            C.mag_sub(self._ptr, other._ptr)
+            if isinstance(other, Tensor)
+            else C.mag_subs(self._ptr, float(other))
+        )
 
     def __rsub__(self, other: int | float) -> 'Tensor':
         return Tensor.full(self.shape, fill_value=float(other)) - self
 
     def __isub__(self, other: object | int | float) -> 'Tensor':
         return Tensor(
-            C.mag_sub_(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_subs_(self._ptr, float(other)))
+            C.mag_sub_(self._ptr, other._ptr)
+            if isinstance(other, Tensor)
+            else C.mag_subs_(self._ptr, float(other))
+        )
 
     def __mul__(self, other: object | int | float) -> 'Tensor':
         return Tensor(
-            C.mag_mul(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_muls(self._ptr, float(other)))
+            C.mag_mul(self._ptr, other._ptr)
+            if isinstance(other, Tensor)
+            else C.mag_muls(self._ptr, float(other))
+        )
 
     def __rmul__(self, other: int | float) -> 'Tensor':
         return Tensor(
-            C.mag_mul(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_muls(self._ptr, float(other)))
+            C.mag_mul(self._ptr, other._ptr)
+            if isinstance(other, Tensor)
+            else C.mag_muls(self._ptr, float(other))
+        )
 
     def __imul__(self, other: object | int | float) -> 'Tensor':
         return Tensor(
-            C.mag_mul_(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_muls_(self._ptr, float(other)))
+            C.mag_mul_(self._ptr, other._ptr)
+            if isinstance(other, Tensor)
+            else C.mag_muls_(self._ptr, float(other))
+        )
 
     def __truediv__(self, other: object | int | float) -> 'Tensor':
         return Tensor(
-            C.mag_div(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_divs(self._ptr, float(other)))
+            C.mag_div(self._ptr, other._ptr)
+            if isinstance(other, Tensor)
+            else C.mag_divs(self._ptr, float(other))
+        )
 
     def __rtruediv__(self, other: int | float) -> 'Tensor':
         return Tensor.full(self.shape, fill_value=float(other)) / self
 
     def __itruediv__(self, other: object | int | float) -> 'Tensor':
         return Tensor(
-            C.mag_div_(self._ptr, other._ptr) if isinstance(other, Tensor) else C.mag_divs_(self._ptr, float(other)))
+            C.mag_div_(self._ptr, other._ptr)
+            if isinstance(other, Tensor)
+            else C.mag_divs_(self._ptr, float(other))
+        )
 
-    def __pow__(self, exponent: int | float, modulo=None) -> 'Tensor':
-        assert modulo is None
+    def __pow__(self, exponent: int | float) -> 'Tensor':
         return Tensor(C.mag_pows(self._ptr, float(exponent)))
 
-    def __ipow__(self, exponent: int | float, modulo=None) -> 'Tensor':
-        assert modulo is None
+    def __ipow__(self, exponent: int | float) -> 'Tensor':
         return Tensor(C.mag_pows_(self._ptr, float(exponent)))
 
     def __matmul__(self, other: 'Tensor') -> 'Tensor':
@@ -673,16 +790,16 @@ class Tensor:
         if isinstance(indices, int):
             return C.mag_tensor_get_scalar_virtual_index(self._ptr, indices)
         elif isinstance(indices, tuple):
-            idx = indices + (0,) * (6 - len(indices))
+            idx = indices + (0,) * (MAX_DIMS - len(indices))
             return C.mag_tensor_get_scalar_physical_index(self._ptr, *idx)
         else:
-            raise TypeError("Indices must be an int or a tuple of ints.")
+            raise TypeError('Indices must be an int or a tuple of ints.')
 
     def __setitem__(self, indices: int | tuple[int, ...], value: float) -> None:
         if isinstance(indices, int):
             C.mag_tensor_set_scalar_virtual_index(self._ptr, indices, float(value))
         elif isinstance(indices, tuple):
-            idx = indices + (0,) * (6 - len(indices))
+            idx = indices + (0,) * (MAX_DIMS - len(indices))
             C.mag_tensor_set_scalar_physical_index(self._ptr, *idx, float(value))
         else:
-            raise TypeError("Indices must be an int or a tuple of ints.")
+            raise TypeError('Indices must be an int or a tuple of ints.')
