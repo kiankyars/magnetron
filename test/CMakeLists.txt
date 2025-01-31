@@ -5,3 +5,7 @@ add_subdirectory(unit)
 add_executable(magnetron_santity_test santiy_test.c)
 target_link_libraries(magnetron_santity_test magnetron)
 target_include_directories(magnetron_santity_test PRIVATE ../magnetron)
+
+add_executable(magnetron_invariant_proof invariant_proof.cpp)
+target_link_libraries(magnetron_invariant_proof magnetron)
+target_include_directories(magnetron_invariant_proof PRIVATE ../magnetron)
