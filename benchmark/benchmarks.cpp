@@ -50,6 +50,60 @@ static auto bench_cpu_compute(std::int64_t numel_per_dim) -> void {
 }
 
 auto main() -> int {
+    std::vector<uint32_t> data {};
+    std::uniform_int_distribution<uint32_t> dist(1, UINT32_MAX);
+    std::mt19937 gen(std::random_device{}());
+    int N = 10000;
+    data.reserve(N);
+    for (int i=0; i<N; ++i) {
+        data.emplace_back(dist(gen));
+    }
+    std::vector<uint64_t> setups {};
+    setups.reserve(N);
+    for (int i=0; i<N; ++i) {
+        setups.emplace_back(mag_ivdiv_mkdi(data[i]));
+    }
+
+
+    ankerl::nanobench::Bench b1 {};
+    b1.title("Div")
+        .unit("div")
+        .warmup(100)
+        .relative(true)
+        .performanceCounters(true);
+    b1.run("div naive", [&] {
+        for (uint32_t i=0; i<N; ++i) {
+            ankerl::nanobench::doNotOptimizeAway(i / data[i]);
+        }
+    });
+
+    b1.run("fdiv32", [&] {
+        for (uint32_t i=0; i<N; ++i) {
+            ankerl::nanobench::doNotOptimizeAway(mag_ivdiv32(i, data[i], setups[i]));
+        }
+    });
+
+
+    ankerl::nanobench::Bench b2 {};
+    b2.title("rem")
+        .unit("rem")
+        .warmup(100)
+        .relative(true)
+        .performanceCounters(true);
+    b2.run("rem naive", [&] {
+        for (uint32_t i=0; i<N; ++i) {
+            ankerl::nanobench::doNotOptimizeAway(i % data[i]);
+        }
+    });
+
+    b2.run("frem32", [&] {
+        for (uint32_t i=0; i<N; ++i) {
+            ankerl::nanobench::doNotOptimizeAway(mag_ivrem32(i, data[i], setups[i]));
+        }
+    });
+
+    return 0;
+
     //bench_cpu_compute(10000);
     bench_cpu_compute(1000);
     bench_cpu_compute(750);
