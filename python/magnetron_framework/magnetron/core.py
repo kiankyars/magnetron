@@ -109,14 +109,6 @@ class Context:
         self.execution_mode = execution_mode
 
     @property
-    def enable_grad_recorder(self) -> bool:
-        return C.mag_ctx_is_grad_recorder_enabled(self._ptr)
-
-    @enable_grad_recorder.setter
-    def enable_grad_recorder(self, enable: bool) -> None:
-        C.mag_ctx_enable_grad_recorder(self._ptr, enable)
-
-    @property
     def compute_device_name(self) -> str:
         return ffi.string(C.mag_ctx_get_compute_device_name(self._ptr)).decode('utf-8')
 
@@ -213,12 +205,12 @@ def no_grad() -> 'no_grad.Scope':
             return f
 
         def __enter__(self) -> None:
-            Context.active().enable_grad_recorder = False
+            pass
 
         def __exit__(
             self, exc_type: object, exc_value: object, traceback: object
         ) -> None:
-            Context.active().enable_grad_recorder = True
+            pass
 
     return Scope()
 
@@ -258,12 +250,14 @@ class Tensor:
         *,
         shape: tuple[int, ...],
         dtype: DType = DType.F32,
+        requires_grad: bool = False,
         name: str | None = None,
     ) -> None:
         assert 0 < len(shape) <= MAX_DIMS, f'Invalid number of dimensions: {len(shape)}'
         assert all(0 < dim <= DIM_MAX for dim in shape), 'Invalid dimension size'
         self._ctx = weakref.ref(ctx)
         self._ptr = self._DISPATCH[len(shape)](ctx._ptr, dtype.value, *shape)
+        self.requires_grad = requires_grad
         if name:
             self.name = name
 
@@ -273,10 +267,11 @@ class Tensor:
         shape: tuple[int, ...],
         *,
         dtype: DType = DType.F32,
-        name: str | None = None,
+        requires_grad: bool = False,
+        name: str | None = None
     ) -> 'Tensor':
         tensor = cls(None)
-        tensor._new(Context.active(), shape=shape, dtype=dtype, name=name)
+        tensor._new(Context.active(), shape=shape, dtype=dtype, requires_grad=requires_grad, name=name)
         return tensor
 
     @classmethod
@@ -286,10 +281,11 @@ class Tensor:
         *,
         fill_value: float,
         dtype: DType = DType.F32,
+        requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
         tensor = cls(None)
-        tensor._new(Context.active(), shape=shape, dtype=dtype, name=name)
+        tensor._new(Context.active(), shape=shape, dtype=dtype, requires_grad=requires_grad, name=name)
         C.mag_tensor_fill(tensor._ptr, fill_value)
         return tensor
 
@@ -299,6 +295,7 @@ class Tensor:
         data: list[float, ...],
         *,
         dtype: DType = DType.F32,
+        requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
         def flatten_nested_lists(nested: object) -> tuple[tuple[int, ...], list[float]]:
@@ -320,7 +317,7 @@ class Tensor:
 
         shape, flattened_data = flatten_nested_lists(data)
         tensor = cls(None)
-        tensor._new(Context.active(), shape=shape, dtype=dtype, name=name)
+        tensor._new(Context.active(), shape=shape, dtype=dtype, requires_grad=requires_grad, name=name)
         size: int = len(flattened_data) * ffi.sizeof('float')
         C.mag_tensor_copy_buffer_from(
             tensor._ptr, ffi.new(f'float[{len(flattened_data)}]', flattened_data), size
@@ -333,9 +330,10 @@ class Tensor:
         shape: tuple[int, ...],
         *,
         dtype: DType = DType.F32,
+        requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
-        return cls.full(shape, fill_value=0.0, dtype=dtype, name=name)
+        return cls.full(shape, fill_value=0.0, dtype=dtype, requires_grad=requires_grad, name=name)
 
     @classmethod
     def uniform(
@@ -344,10 +342,11 @@ class Tensor:
         *,
         interval: (float, float) = (-1.0, 1.0),
         dtype: DType = DType.F32,
+        requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
         tensor = cls(None)
-        tensor._new(Context.active(), shape=shape, dtype=dtype, name=name)
+        tensor._new(Context.active(), shape=shape, dtype=dtype, requires_grad=requires_grad, name=name)
         if interval[1] < interval[0]:
             interval = (interval[1], interval[0])
         C.mag_tensor_fill_random_uniform(tensor._ptr, interval[0], interval[1])
@@ -355,10 +354,16 @@ class Tensor:
 
     @classmethod
     def normal(
-        cls, shape: tuple[int, ...], *, mean: float = 0.0, stddev: float = 1.0
+        cls,
+        shape: tuple[int, ...],
+        *,
+        mean: float = 0.0,
+        stddev: float = 1.0,
+        requires_grad: bool = False,
+        name: str | None = None,
     ) -> 'Tensor':
         tensor = cls(None)
-        tensor._new(Context.active(), shape=shape, dtype=DType.F32)
+        tensor._new(Context.active(), shape=shape, dtype=DType.F32, requires_grad=requires_grad, name=name)
         C.mag_tensor_fill_random_normal(tensor._ptr, mean, stddev)
         return tensor
 
@@ -420,6 +425,10 @@ class Tensor:
     @property
     def data_ptr(self) -> int:
         return int(ffi.cast('uintptr_t', C.mag_tensor_data_ptr(self._ptr)))
+
+    def item(self) -> float:
+        assert self.is_scalar, 'Tensor must be a scalar'
+        return self[0]
 
     def tolist(self) -> list[float]:
         assert self.dtype == DType.F32, 'Invalid data type'
@@ -493,16 +502,24 @@ class Tensor:
         return C.mag_tensor_is_contiguous(self._ptr)
 
     @property
-    def grad(self) -> object | None: # -> Tensor | None     - Forward Reference ('Tensor') + None is a bug in Python, will be fixed in Python 3.5.3, so long we use object.
-        ptr: ffi.CData = C.mag_tensor_grad(self._ptr)
-        return Tensor(ptr) if ptr != ffi.NULL else None
+    def requires_grad(self) -> bool:
+        return C.mag_tensor_requires_grad(self._ptr)
 
-    @grad.setter
-    def grad(self, grad: 'Tensor') -> None:
-        C.mag_tensor_set_grad(self._ptr, grad._ptr)
+    @requires_grad.setter
+    def requires_grad(self, require: bool) -> None:
+        C.mag_tensor_set_requires_grad(self._ptr, require)
+
+    @property
+    def grad(self) -> 'Tensor':
+        assert self.requires_grad
+        return Tensor(C.mag_tensor_grad(self._ptr))
+
+    def backward(self) -> None:
+        assert self.requires_grad
+        C.mag_tensor_backward(self._ptr)
 
     def zero_grad(self) -> None:
-        C.mag_tensor_zero_grad(self._ptr)
+        raise NotImplementedError('Not implemented yet')
 
     def is_close(
         self, other: 'Tensor', eps: float = -1.0, print_eq_percent: bool = False

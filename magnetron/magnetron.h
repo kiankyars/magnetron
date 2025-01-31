@@ -96,8 +96,6 @@ typedef struct mag_device_descriptor_t {
 
 extern MAG_EXPORT mag_ctx_t* mag_ctx_create(mag_compute_device_type_t device); /* Create context with default config, and only specify device type. */
 extern MAG_EXPORT mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info); /* Create context with customized device config, and only specify device type. */
-extern MAG_EXPORT bool mag_ctx_is_grad_recorder_enabled(const mag_ctx_t* ctx); /* Check if gradient recording is enabled */
-extern MAG_EXPORT void mag_ctx_enable_grad_recorder(mag_ctx_t* ctx, bool enabled); /* Enable/disable gradient recording */
 extern MAG_EXPORT mag_exec_mode_t mag_ctx_get_exec_mode(const mag_ctx_t* ctx); /* Get execution mode */
 extern MAG_EXPORT void mag_ctx_set_exec_mode(mag_ctx_t* ctx, mag_exec_mode_t mode); /* Set execution mode */
 extern MAG_EXPORT mag_prng_algorithm_t mag_ctx_get_prng_algorithm(const mag_ctx_t* ctx); /* Get PRNG algorithm */
@@ -353,7 +351,8 @@ extern MAG_EXPORT bool mag_tensor_is_permuted(const mag_tensor_t* t); /* Check i
 extern MAG_EXPORT bool mag_tensor_is_contiguous(const mag_tensor_t* t); /* Check if the tensor memory is contiguous */
 
 extern MAG_EXPORT mag_tensor_t* mag_tensor_grad(const mag_tensor_t* t); /* Get the gradient tensor of the tensor */
-extern MAG_EXPORT void mag_tensor_required_grad(mag_tensor_t* t, bool requires_grad); /* Set if the tensor requires gradient computation */
+extern MAG_EXPORT bool mag_tensor_requires_grad(const mag_tensor_t* t); /* Check if the tensor requires gradient computation */
+extern MAG_EXPORT void mag_tensor_set_requires_grad(mag_tensor_t* t, bool requires_grad); /* Set if the tensor requires gradient computation */
 extern MAG_EXPORT void mag_tensor_backward(mag_tensor_t* t); /* Compute the gradient of the tensor */
 
 extern MAG_EXPORT float mag_tensor_get_scalar_physical_index(mag_tensor_t* t, int64_t d0, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5); /* Get scalar value at physical index */

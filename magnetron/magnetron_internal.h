@@ -708,7 +708,6 @@ struct mag_ctx_t {
     mag_fixed_intrusive_pool tensor_pool;           /* Fixed-size memory pool for tensors. */
     mag_exec_mode_t exec_mode;
     bool is_profiling;
-    bool is_grad_recording;
     mag_op_perf_info_t op_perf_mons_total[MAG_OP__NUM];
     union {
         struct {
@@ -735,13 +734,13 @@ struct mag_ctx_t {
 
 typedef enum mag_tensor_flags_t {
     MAG_TFLAG_NONE = 0,
-    MAG_TFLAG_OWNER = 1<<0,         /* Tensor is the owner of the buffer. */
-    MAG_TFLAG_VIEW = 1<<1,          /* Tensor is a view. */
-    MAG_TFLAG_IS_GRAD = 1<<2,       /* Tensor is a gradient. */
-    MAG_TFLAG_EXEC_EAGER = 1<<3,    /* Tensor is executed eagerly. */
-    MAG_TFLAG_REQUIRES_GRAD = 1<<4, /* Tensor requires gradient. */
+    MAG_TFLAG_OWNER = 1<<0,             /* Tensor is the owner of the buffer. */
+    MAG_TFLAG_VIEW = 1<<1,              /* Tensor is a view. */
+    MAG_TFLAG_IS_GRAD = 1<<2,           /* Tensor is a gradient. */
+    MAG_TFLAG_EXEC_EAGER = 1<<3,        /* Tensor is executed eagerly. */
+    MAG_TFLAG_REQUIRES_GRAD = 1<<4,     /* Tensor requires gradient. */
 
-    MAG_TFLAG_LEN = 4
+    MAG_TFLAG_LEN = 5                   /* Number of flags. */
 } mag_tensor_flags_t;
 mag_static_assert(MAG_TFLAG_LEN <= 0xff);
 

@@ -48,15 +48,24 @@ void mag_set_log_mode(bool enabled) {
     mag_log_enabled = enabled;
 }
 
+static void MAG_COLDPROC mag_panic_dump(FILE* f, bool cc, const char* msg, va_list args) {
+    if (cc) fprintf(f, "%s", MAG_CC_RED);
+    vfprintf(f, msg, args);
+    if (cc) fprintf(f, "%s", MAG_CC_RESET);
+    fputc('\n', f);
+    fflush(f);
+}
+
 MAG_NORET MAG_COLDPROC MAG_EXPORT void mag_panic(const char* msg, ...) {
-    fprintf(stdout, "%s", MAG_CC_RED);
     va_list args;
     va_start(args, msg);
-    vfprintf(stdout, msg, args);
+    FILE* f = fopen("magnetron_panic.log", "w");
+    if (f) {
+        mag_panic_dump(f, false, msg, args);
+        fclose(f), f = NULL;
+    }
+    mag_panic_dump(stdout, true, msg, args);
     va_end(args);
-    fprintf(stdout, "%s", MAG_CC_RESET);
-    fputc('\n', stdout);
-    fflush(stdout);
     abort();
 }
 
@@ -516,7 +525,6 @@ mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
     mag_fixed_intrusive_pool_init(&ctx->tensor_pool, sizeof(mag_tensor_t), __alignof(mag_tensor_t), 4096);
 
     ctx->tr_id = mag_thread_id(); /* Get thread ID. */
-    ctx->is_grad_recording = true; /* Enable gradient recording by default. */
 
     /* Query and print host system information. */
     mag_system_host_info_query(ctx);
@@ -571,14 +579,6 @@ void mag_ctx_destroy(mag_ctx_t* ctx) {
     (*mag_alloc)(ctx, 0);
     ctx = NULL;
     mag_log_info("magnetron context destroyed.");
-}
-
-bool mag_ctx_is_grad_recorder_enabled(const mag_ctx_t* ctx) {
-    return ctx->is_grad_recording;
-}
-
-void mag_ctx_enable_grad_recorder(mag_ctx_t* ctx, bool enabled) {
-    ctx->is_grad_recording = enabled;
 }
 
 mag_exec_mode_t mag_ctx_get_exec_mode(const mag_ctx_t* ctx) { return ctx->exec_mode; }
@@ -1605,7 +1605,7 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
         .dtype = type,
         .storage = {0},
         .numel = numel,
-        .flags = MAG_TFLAG_REQUIRES_GRAD | (view ? MAG_TFLAG_VIEW : MAG_TFLAG_OWNER),
+        .flags = (view ? (MAG_TFLAG_VIEW | (view->flags & MAG_TFLAG_REQUIRES_GRAD)) : MAG_TFLAG_OWNER),
         .op = MAG_OP_NOP,
         .op_inputs = {0},
         .op_params = {{0}},
@@ -2040,14 +2040,7 @@ void mag_tensor_print(const mag_tensor_t* t, bool with_header, bool with_data) {
         char strides[MAG_FMT_DIM_BUF_SIZE];
         mag_fmt_dims(&shape, &t->shape, t->rank);
         mag_fmt_dims(&strides, &t->strides, MAG_MAX_DIMS);
-        static const char* flag_abbrs = "OVGE";
-        mag_assert2(strlen(flag_abbrs) == MAG_TFLAG_LEN);
-        char flags[MAG_TFLAG_LEN+1] = {0};
-        for (uint32_t i=0, k=0; i < MAG_TFLAG_LEN; ++i)
-            if (t->flags & (1 << i))
-                flags[k++] = flag_abbrs[i];
-        flags[MAG_TFLAG_LEN] = '\0';
-        fprintf(f, "Tensor '%s', DType: %s, Rank: %" PRIi64 ", Elements: %" PRIi64 ", Shape: %s, Strides: %s, Mem: %.03f %s, Flags: %s (%x)\n",
+        fprintf(f, "Tensor '%s', DType: %s, Rank: %" PRIi64 ", Elements: %" PRIi64 ", Shape: %s, Strides: %s, Mem: %.03f %s, Flags: 0x%x\n",
             t->name,
             mag_dtype_meta_of(t->dtype)->name,
             t->rank,
@@ -2056,7 +2049,6 @@ void mag_tensor_print(const mag_tensor_t* t, bool with_header, bool with_data) {
             strides,
             buf_size_cvt,
             buf_size_unit,
-            flags,
             t->flags
         );
     }
@@ -2158,10 +2150,15 @@ bool mag_tensor_is_contiguous(const mag_tensor_t* t) {
 }
 
 mag_tensor_t* mag_tensor_grad(const mag_tensor_t* t) {
+    mag_assert(t->flags & MAG_TFLAG_REQUIRES_GRAD && t->grad && t->grad->flags & MAG_TFLAG_IS_GRAD, "Tensor must require grad and have a valid grad tensor");
     return t->grad;
 }
 
-void mag_tensor_required_grad(mag_tensor_t* t, bool requires_grad) {
+bool mag_tensor_requires_grad(const mag_tensor_t* t) {
+    return t->flags & MAG_TFLAG_REQUIRES_GRAD;
+}
+
+void mag_tensor_set_requires_grad(mag_tensor_t* t, bool requires_grad) {
     if (requires_grad) t->flags |= MAG_TFLAG_REQUIRES_GRAD;
     else t->flags &= ~MAG_TFLAG_REQUIRES_GRAD;
 }
@@ -2258,6 +2255,7 @@ static void mag_collect_topo_iterative(mag_tensor_t* root, mag_tensor_array_t* o
 }
 
 void mag_tensor_backward(mag_tensor_t* t) {
+    mag_assert(t->flags & MAG_TFLAG_REQUIRES_GRAD, "Tensor must require grad to backpropagate");
     mag_tensor_array_t post_order;
     mag_tensor_array_init(&post_order);
     mag_collect_topo_iterative(t, &post_order);
@@ -2268,7 +2266,7 @@ void mag_tensor_backward(mag_tensor_t* t) {
         t = post_order.data[id];
         if (id == 0 && !t->grad) {
             mag_tensor_t* grad = mag_tensor_create(t->ctx, t->dtype, t->shape, t->rank, NULL, 0);
-            grad->flags |= MAG_TFLAG_IS_GRAD;
+            grad->flags = (grad->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
             mag_tensor_fill(grad, 1.0f);
             t->grad = grad;
         }
@@ -2276,30 +2274,32 @@ void mag_tensor_backward(mag_tensor_t* t) {
         mag_tensor_t* grads[MAG_MAX_OP_PARAMS] = {0};
         mag_tensor_t* gout = t->grad;
         switch (t->op) {
+            case MAG_OP_CLONE: {
+                grads[0] = mag_clone(gout);
+            } break;
+            case MAG_OP_VIEW: {
+                grads[0] = mag_clone(gout);
+            } break;
             case MAG_OP_RELU: {
                 mag_tensor_t* x = t->op_inputs[0];
                 mag_tensor_t* mask = mag_step(x);
                 grads[0] = mag_mul(gout, mask);
                 mag_tensor_decref(mask);
-                break;
-            }
+            } break;
             case MAG_OP_ADD: {
                 grads[0] = mag_clone(gout);
                 grads[1] = mag_clone(gout);
-                break;
-            }
+            } break;
             case MAG_OP_SUB: {
                 grads[0] = mag_clone(gout);
                 grads[1] = mag_neg(gout);
-                break;
-            }
+            } break;
             case MAG_OP_MUL: {
                 mag_tensor_t* x = t->op_inputs[0];
                 mag_tensor_t* y = t->op_inputs[1];
                 grads[0] = mag_mul(gout, y);
                 grads[1] = mag_mul(gout, x);
-                break;
-            }
+            } break;
             case MAG_OP_DIV: {
                 mag_tensor_t* x = t->op_inputs[0];
                 mag_tensor_t* y = t->op_inputs[1];
@@ -2311,9 +2311,8 @@ void mag_tensor_backward(mag_tensor_t* t) {
                 mag_tensor_decref(tmp);
                 mag_tensor_decref(y2);
                 mag_tensor_decref(tmp2);
-                break;
-            }
-            default: mag_panic("Unsupported op in backward!");
+            } break;
+            default: mag_panic("Unsupported op in backward: %s", mag_op_meta_of(t->op)->mnemonic);
         }
         uint32_t numin = mag_op_meta_of(t->op)->argcount;
         for (uint32_t i = 0; i < numin; ++i) {
@@ -2323,10 +2322,12 @@ void mag_tensor_backward(mag_tensor_t* t) {
             mag_tensor_t* gri = grads[i];
             if (!gri) continue;
             if (!input->grad) {
+                gri->flags = (gri->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
                 input->grad = gri;
             } else {
                 mag_tensor_t* acc = mag_add(input->grad, gri);
                 mag_tensor_decref(input->grad);
+                acc->flags = (acc->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
                 input->grad = acc;
                 mag_tensor_decref(gri);
             }

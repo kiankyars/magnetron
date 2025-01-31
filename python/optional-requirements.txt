@@ -6,6 +6,7 @@ wheel
 setuptools
 pytest
 numpy
+torch
 matplotlib
 sphinx
 sphinx-autoapi
