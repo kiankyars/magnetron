@@ -268,10 +268,16 @@ class Tensor:
         *,
         dtype: DType = DType.F32,
         requires_grad: bool = False,
-        name: str | None = None
+        name: str | None = None,
     ) -> 'Tensor':
         tensor = cls(None)
-        tensor._new(Context.active(), shape=shape, dtype=dtype, requires_grad=requires_grad, name=name)
+        tensor._new(
+            Context.active(),
+            shape=shape,
+            dtype=dtype,
+            requires_grad=requires_grad,
+            name=name,
+        )
         return tensor
 
     @classmethod
@@ -285,7 +291,13 @@ class Tensor:
         name: str | None = None,
     ) -> 'Tensor':
         tensor = cls(None)
-        tensor._new(Context.active(), shape=shape, dtype=dtype, requires_grad=requires_grad, name=name)
+        tensor._new(
+            Context.active(),
+            shape=shape,
+            dtype=dtype,
+            requires_grad=requires_grad,
+            name=name,
+        )
         C.mag_tensor_fill(tensor._ptr, fill_value)
         return tensor
 
@@ -317,7 +329,13 @@ class Tensor:
 
         shape, flattened_data = flatten_nested_lists(data)
         tensor = cls(None)
-        tensor._new(Context.active(), shape=shape, dtype=dtype, requires_grad=requires_grad, name=name)
+        tensor._new(
+            Context.active(),
+            shape=shape,
+            dtype=dtype,
+            requires_grad=requires_grad,
+            name=name,
+        )
         size: int = len(flattened_data) * ffi.sizeof('float')
         C.mag_tensor_copy_buffer_from(
             tensor._ptr, ffi.new(f'float[{len(flattened_data)}]', flattened_data), size
@@ -333,7 +351,9 @@ class Tensor:
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
-        return cls.full(shape, fill_value=0.0, dtype=dtype, requires_grad=requires_grad, name=name)
+        return cls.full(
+            shape, fill_value=0.0, dtype=dtype, requires_grad=requires_grad, name=name
+        )
 
     @classmethod
     def uniform(
@@ -346,7 +366,13 @@ class Tensor:
         name: str | None = None,
     ) -> 'Tensor':
         tensor = cls(None)
-        tensor._new(Context.active(), shape=shape, dtype=dtype, requires_grad=requires_grad, name=name)
+        tensor._new(
+            Context.active(),
+            shape=shape,
+            dtype=dtype,
+            requires_grad=requires_grad,
+            name=name,
+        )
         if interval[1] < interval[0]:
             interval = (interval[1], interval[0])
         C.mag_tensor_fill_random_uniform(tensor._ptr, interval[0], interval[1])
@@ -363,7 +389,13 @@ class Tensor:
         name: str | None = None,
     ) -> 'Tensor':
         tensor = cls(None)
-        tensor._new(Context.active(), shape=shape, dtype=DType.F32, requires_grad=requires_grad, name=name)
+        tensor._new(
+            Context.active(),
+            shape=shape,
+            dtype=DType.F32,
+            requires_grad=requires_grad,
+            name=name,
+        )
         C.mag_tensor_fill_random_normal(tensor._ptr, mean, stddev)
         return tensor
 
@@ -512,7 +544,10 @@ class Tensor:
     @property
     def grad(self) -> 'Tensor':
         assert self.requires_grad
-        return Tensor(C.mag_tensor_grad(self._ptr))
+        ptr: ffi.CData = C.mag_tensor_grad(self._ptr)
+        assert ptr != ffi.NULL, 'Gradient tensor is not allocated'
+        C.mag_tensor_retain(ptr)
+        return Tensor(ptr)
 
     def backward(self) -> None:
         assert self.requires_grad

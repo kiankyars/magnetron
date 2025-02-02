@@ -358,18 +358,28 @@ static inline void* mag_pincr(void** p, size_t sz, size_t align) {
 **  Torbjörn Granlund and Peter L. Montgomery, "Division by Invariant Integers Using Multiplication", ACM SIGPLAN Notices, Issue 6, Vol 29, 61-72, June 1994.
 **	http://gmplib.org/~tege/divcnst-pldi94.pdf
 */
-static inline uint64_t mag_ivdiv_mkdi(uint32_t divisor) { /* Create packed division info from devisor. */
+
+typedef struct mag_ivdiv_t {
+    uint32_t s1;
+    uint32_t s2;
+    uint32_t d;
+} mag_ivdiv_t;
+
+static inline mag_ivdiv_t mag_ivdiv_mkdi(uint32_t divisor) { /* Create packed division info from devisor. */
     uint32_t l = (divisor-1) ? 32 - __builtin_clz((divisor-1)) : 0;
     uint32_t s1 = l > 1 ? 1 : l&0xff;
     uint32_t s2 = !l ? 0 : (l-1)&0xff;
-    return ((((1ull<<l) - divisor)*0x100000000ull) / divisor + 1)<<32 | s1<<8 | s2;
+    return (mag_ivdiv_t) {
+        s1, s2,
+        (uint32_t)(((1ull<<l) - divisor)*0x100000000ull) / divisor + 1
+    };
 }
-static inline uint32_t mag_ivdiv32(uint32_t x, uint32_t y, uint64_t di) { /* r = x / y. Fast division using invariant multiplication. Up to 40x times faster on some chips. */
+static inline uint32_t mag_ivdiv32(uint32_t x, uint32_t y, mag_ivdiv_t di) { /* r = x / y. Fast division using invariant multiplication. Up to 40x times faster on some chips. */
     (void)y;
-    uint32_t t = (uint64_t)x*(di>>32)>>32;
-    return (t + ((x - t)>>((di>>8)&0xff)))>>(di&0xff);
+    uint32_t t = (uint64_t)x*(di.d)>>32;
+    return (t + ((x - t)>>((di.s1)&0xff)))>>(di.s2);
 }
-static inline uint32_t mag_ivrem32(uint32_t x, uint32_t y, uint64_t ctx) { /* r = x % y. Fast remainder using invariant multiplication */
+static inline uint32_t mag_ivrem32(uint32_t x, uint32_t y, mag_ivdiv_t ctx) { /* r = x % y. Fast remainder using invariant multiplication */
     return x - y*mag_ivdiv32(x, y, ctx);
 }
 

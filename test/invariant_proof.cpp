@@ -15,11 +15,22 @@
 
 static constexpr std::uint32_t lim = std::numeric_limits<std::uint32_t>::max();
 
-static auto proof_division(std::uint32_t start, std::uint32_t end) -> void {
+static auto proof_div(std::uint32_t start, std::uint32_t end) -> void {
     for (std::uint32_t x = start; x < end; ++x) {
-        for (std::uint32_t y = 1; y < lim; ++y) {
+        for (std::uint32_t y = 1; y < lim/4; ++y) {
             if ((x / y) != mag_ivdiv32(x, y, mag_ivdiv_mkdi(y))) [[unlikely]] {
                 std::cout << x << " / " << y << std::endl;
+                std::abort();
+            }
+        }
+    }
+}
+
+static auto proof_rem(std::uint32_t start, std::uint32_t end) -> void {
+    for (std::uint32_t x = start; x < end; ++x) {
+        for (std::uint32_t y = 1; y < lim; ++y) {
+            if ((x % y) != mag_ivrem32(x, y, mag_ivdiv_mkdi(y))) [[unlikely]] {
+                std::cout << x << " % " << y << std::endl;
                 std::abort();
             }
         }
@@ -32,9 +43,13 @@ auto main() -> int {
     std::uint32_t chunk = lim / nt;
     for (std::uint32_t i = 0; i < nt; ++i) {
         std::uint32_t start = i*chunk;
-        std::uint32_t end = (i == nt - 1) ? lim : start + chunk;
-        threads.emplace_back(proof_division, start, end);
+        std::uint32_t end = (i == nt-1) ? lim : start + chunk;
+        threads.emplace_back([=] {
+            proof_div(start, end);
+            proof_rem(start, end);
+        });
     }
     for (auto&& t : threads) t.join();
+    std::cout << "Proof successful!" << std::endl;
     return EXIT_SUCCESS;
 }

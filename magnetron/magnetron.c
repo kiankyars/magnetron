@@ -2264,7 +2264,7 @@ void mag_tensor_backward(mag_tensor_t* t) {
         mag_swap(mag_tensor_t*, post_order.data[i], post_order.data[j]);
     for (size_t id = 0; id < post_order.size; ++id) {
         t = post_order.data[id];
-        if (id == 0 && !t->grad) {
+        if (!t->grad) {
             mag_tensor_t* grad = mag_tensor_create(t->ctx, t->dtype, t->shape, t->rank, NULL, 0);
             grad->flags = (grad->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
             mag_tensor_fill(grad, 1.0f);
