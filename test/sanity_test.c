@@ -3,27 +3,26 @@
 #include <magnetron.h>
 
 #include <stdio.h>
+#include <time.h>
 
-/*
-** Simple sanity test: I
-** Initialize Magnetron and compute matrix product of two random 1024x1024 matrices.
-*/
 int main(void) {
     printf("Running sanity test...\n");
     mag_set_log_mode(true); /* Enable logging */
 
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
+    mag_tensor_t* a = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 4096, 4096, 48);
+    mag_tensor_fill(a, 0.0f);
+
+    mag_tensor_t* b = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 4096, 4096, 48);
+    mag_tensor_fill(b, 0.0f);
+
     printf("Computing...\n");
-
-    mag_tensor_t* a = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, 4096, 4096);
-    mag_tensor_fill_random_uniform(a, -1.0f, 1.0f);
-
-    mag_tensor_t* b = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, 4096, 4096);
-    mag_tensor_fill_random_uniform(b, -1.0f, 1.0f);
-
-    mag_tensor_t* result = mag_matmul(a, b); /* Compute result = a @ b */
-    printf("Computed!\n");
+    clock_t begin = clock();
+    mag_tensor_t* result = mag_add(a, b); /* Compute result = a + b */
+    clock_t end = clock();
+    double secs = (double)(end - begin)/CLOCKS_PER_SEC;
+    printf("Computed in %f s\n", secs);
 
     /* Free tensors */
     mag_tensor_decref(result);

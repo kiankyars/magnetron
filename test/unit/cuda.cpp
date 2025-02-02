@@ -6,20 +6,33 @@
 
 TEST(cuda, simple_add) {
     mag_set_log_mode(true);
-    mag_ctx_t* cuda_ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_GPU_CUDA);
-    mag_tensor_t* gpu_a = mag_tensor_create_6d(cuda_ctx, MAG_DTYPE_F32, 8, 8, 8, 8, 8, 8);
-    mag_tensor_fill(gpu_a, 1.0f);
-    mag_tensor_t* gpu_b = mag_tensor_create_6d(cuda_ctx, MAG_DTYPE_F32, 8, 8, 8, 8, 8, 8);
-    mag_tensor_fill(gpu_b, 1.0f);
-    mag_tensor_t* gpu_r = mag_add(gpu_a, gpu_b);
-    mag_storage_buffer_t& buf {gpu_r->storage};
-    std::vector<float> result {};
-    result.resize(gpu_r->numel);
-    (*buf.cpy_device_host)(&buf, 0, result.data(), buf.size);
-    for (auto x : result) {
+
+    mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_GPU_CUDA);
+
+    mag_tensor_t* a = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 4096, 4096, 16);
+    mag_tensor_fill(a, 1.0f);
+
+    mag_tensor_t* b = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 4096, 4096, 16);
+    mag_tensor_fill(b, 1.0f);
+
+    printf("Computing...\n");
+    clock_t begin = clock();
+    mag_tensor_t* result = mag_add(a, b); /* Compute result = a + b */
+    clock_t end = clock();
+    double secs = (double)(end - begin)/CLOCKS_PER_SEC;
+    printf("Computed in %f s\n", secs);
+
+    mag_storage_buffer_t& buf {result->storage};
+    std::vector<float> data {};
+    data.resize(result->numel);
+    (*buf.cpy_device_host)(&buf, 0, data.data(), buf.size);
+    for (auto x : data) {
         EXPECT_FLOAT_EQ(x, 2.0f);
     }
-    mag_ctx_destroy(cuda_ctx);
+    mag_tensor_decref(result);
+    mag_tensor_decref(b);
+    mag_tensor_decref(a);
+    mag_ctx_destroy(ctx);
     mag_set_log_mode(false);
 }
 

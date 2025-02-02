@@ -1,6 +1,5 @@
 /* (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
 
-#include <bit>
 #include <array>
 #include <cstdint>
 #include <algorithm>
@@ -34,7 +33,7 @@ namespace mag::cuda {
 
     struct physical_device final {
         std::int32_t id {};             /* Device ID */
-        std::array<char, 256> name {};  /* Device name */
+        std::array<char, 128> name {};  /* Device name */
         std::size_t vram {};            /* Video memory in bytes */
         std::uint32_t cl {};            /* Compute capability */
         std::uint32_t nsm {};           /* Number of SMs */
@@ -66,9 +65,9 @@ namespace mag::cuda {
         mag_assert2(x->numel == r->numel);
         std::int64_t block_size {256};
         std::int64_t num_blocks {(r->numel + block_size - 1)/block_size};
-        auto* pr {std::bit_cast<float*>(r->storage.base)};
-        auto* px {std::bit_cast<float*>(x->storage.base)};
-        auto* py {std::bit_cast<float*>(y->storage.base)};
+        auto* pr {reinterpret_cast<float*>(r->storage.base)};
+        auto* px {reinterpret_cast<float*>(x->storage.base)};
+        auto* py {reinterpret_cast<float*>(y->storage.base)};
         kernels::add<<<num_blocks, block_size>>>(r->numel, pr, px, py);
     }
 
@@ -139,7 +138,7 @@ namespace mag::cuda {
         void* base;
         mag_cu_chk_rt(cudaMalloc(&base, sz));
         *out = mag_storage_buffer_t {
-            .base = std::bit_cast<std::uintptr_t>(base),
+            .base = reinterpret_cast<std::uintptr_t>(base),
             .size = sz,
             .alignment = 256,
             .host = dvc,
@@ -182,8 +181,8 @@ namespace mag::cuda {
             dvc.has_vmm = !!vmm_support;
             cudaDeviceProp props {};
             if (cudaGetDeviceProperties(&props, id) != cudaSuccess) [[unlikely]] continue; /* Get device properties */
+            std::snprintf(dvc.name.data(), dvc.name.size(), "%s", props.name);
             dvc.id = id;
-            dvc.name = std::bit_cast<decltype(dvc.name)>(props.name);
             dvc.nsm = props.multiProcessorCount;
             dvc.smpb = props.sharedMemPerBlock;
             dvc.smpb_opt = props.sharedMemPerBlockOptin;

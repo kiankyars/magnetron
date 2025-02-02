@@ -76,21 +76,13 @@ static void* mag_os_alloc_stub(void* blk, size_t size) {
     }
     if(!blk) {
         blk = malloc(size);
-        if (mag_unlikely(!blk)) {
-            double mem = 0.0;
-            const char* unit = "";
-            mag_humanize_memory_size(size, &mem, &unit);
-            mag_panic("Failed to allocate %.01f %s memory", mem, unit);
-        }
+        if (mag_unlikely(!blk))
+            mag_panic("Failed to allocate %zu B memory", size);
         return blk;
     }
     void* block = realloc(blk, size);
-    if (mag_unlikely(!block)) {
-        double mem = 0.0;
-        const char* unit = "";
-        mag_humanize_memory_size(size, &mem, &unit);
-        mag_panic("Failed to reallocate %.01f %s memory", mem, unit);
-    }
+    if (mag_unlikely(!block))
+        mag_panic("Failed to reallocate %zu B memory", size);
     return block;
 }
 
