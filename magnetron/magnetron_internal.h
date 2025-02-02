@@ -558,7 +558,7 @@ struct mag_storage_buffer_t {
     size_t size;                                                                                    /* Size of buffer in bytes. */
     size_t alignment;                                                                               /* Alignment of buffer. */
     mag_compute_device_t* host;                                                                     /* Host device. */
-    void (*set)(mag_storage_buffer_t* sto, size_t offs, uint8_t x);                                 /* Memset buffer. */
+    void (*broadcast)(mag_storage_buffer_t* sto, size_t offs, const void* src, size_t stride);      /* Broadcast (fill) buffer with x. */
     void (*cpy_host_device)(mag_storage_buffer_t* sto, size_t offs, const void* src, size_t n);     /* Copy data from host to device. */
     void (*cpy_device_host)(mag_storage_buffer_t* sto, size_t offs, void* dst, size_t n);           /* Copy data from device to host. */
 };

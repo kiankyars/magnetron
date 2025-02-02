@@ -355,9 +355,34 @@ static void mag_cpu_exec_bwd(mag_compute_device_t* dvc, mag_tensor_t* node) {
     mag_cpu_exec(dvc, false, node);
 }
 
-static void mag_cpu_buf_set(mag_storage_buffer_t* sto, size_t offs, uint8_t x) {
+static void mag_cpu_buf_broadcast(mag_storage_buffer_t* sto, size_t offs, const void* src, size_t stride) {
     mag_assert2(sto->base+offs <= sto->base+sto->size);
-    memset((void*)(sto->base+offs), x, sto->size-offs); /* On CPU just plain old memset with offset. */
+    switch (stride) {
+        case 1: {
+            uint8_t* p = (uint8_t*)(sto->base+offs);
+            memset(p, *(uint8_t*)src, sto->size);
+        } break;
+        case 2: {
+            uint16_t* p = (uint16_t*)(sto->base+offs);
+            const uint16_t* end = p+(sto->size/sizeof(*p));
+            uint16_t x = *(uint16_t*)src;
+            for (; p < end; ++p) *p = x;
+        } break;
+        case 4: {
+            uint32_t* p = (uint32_t*)(sto->base+offs);
+            const uint32_t* end = p+(sto->size/sizeof(*p));
+            uint32_t x = *(uint32_t*)src;
+            for (; p < end; ++p) *p = x;
+        } break;
+        default: {
+            uint8_t* p = (uint8_t*)(sto->base+offs);
+            const uint8_t* end = p+sto->size;
+            while (p < end) {
+                memcpy(p, src, stride);
+                p += stride;
+            }
+        } break;
+    }
 }
 
 static void mag_cpu_buf_cpy_host_device(mag_storage_buffer_t* sto, size_t offs, const void* src, size_t n) {
@@ -384,7 +409,7 @@ static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer
         .size = size,
         .alignment = MAG_CPU_BUF_ALIGN,
         .host = host,
-        .set = &mag_cpu_buf_set,
+        .broadcast = &mag_cpu_buf_broadcast,
         .cpy_host_device = &mag_cpu_buf_cpy_host_device,
         .cpy_device_host = &mag_cpu_buf_cpy_device_host
     };

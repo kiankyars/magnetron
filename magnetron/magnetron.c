@@ -1931,21 +1931,8 @@ void mag_tensor_copy_buffer_from(mag_tensor_t* t, const void* data, size_t size)
 }
 
 void mag_tensor_fill(mag_tensor_t* t, float x) {
-    if (x == 0.0f) {
-        mag_storage_buffer_t* sto = &t->storage;
-        (*sto->set)(sto, 0, 0); /* Zero out the buffer. */
-        return;
-    }
-    mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
-
-    switch (t->dtype) {
-        case MAG_DTYPE_F32: {
-            int64_t n = mag_tensor_numel(t);
-            float* buf = (float*)t->storage.base;
-            for (int64_t i=0; i < n; ++i) buf[i] = x;
-        } break;
-        default: mag_panic("Unsupported DType: %d", t->dtype);
-    }
+    mag_storage_buffer_t* sto = &t->storage;
+    (*sto->broadcast)(sto, 0, &x, sizeof(x)); /* Zero out the buffer. */
 }
 
 void mag_tensor_fill_random_uniform(mag_tensor_t* t, float min, float max) {
