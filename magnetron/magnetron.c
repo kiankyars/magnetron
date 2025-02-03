@@ -36,6 +36,10 @@
 #endif
 #endif
 
+#ifdef MAGNETRON_USE_MIMALLOC
+#include <mimalloc.h>
+#endif
+
 #ifdef MAG_DEBUG
 #define MAG_LOG_DEFAULT_ENABLE 1
 #else
@@ -69,7 +73,37 @@ MAG_NORET MAG_COLDPROC MAG_EXPORT void mag_panic(const char* msg, ...) {
     abort();
 }
 
-static void* mag_os_alloc_stub(void* blk, size_t size) {
+#ifdef MAGNETRON_USE_MIMALLOC
+
+static void* mag_alloc_stub(void* blk, size_t size) {
+    if (!size) {
+        mi_free(blk);
+        return NULL;
+    }
+    if(!blk) {
+        blk = mi_malloc(size);
+        if (mag_unlikely(!blk))
+            mag_panic("Failed to allocate %zu B memory", size);
+        return blk;
+    }
+    void* block = mi_realloc(blk, size);
+    if (mag_unlikely(!block))
+        mag_panic("Failed to reallocate %zu B memory", size);
+    return block;
+}
+
+void* mag_alloc_aligned(size_t size, size_t align) {
+    mag_assert(align && !(align&(align-1)), "Alignment must be power of 2: %zu", align); /* Alignment must be a power of 2 */
+    return mi_malloc_aligned(size, align);
+}
+
+void mag_free_aligned(void* blk) {
+    mi_free(blk);
+}
+
+#else
+
+static void* mag_alloc_stub(void* blk, size_t size) {
     if (!size) {
         free(blk);
         return NULL;
@@ -86,8 +120,6 @@ static void* mag_os_alloc_stub(void* blk, size_t size) {
     return block;
 }
 
-void* (*mag_alloc)(void* blk, size_t size) = &mag_os_alloc_stub;
-
 void* mag_alloc_aligned(size_t size, size_t align) {
     mag_assert(align && !(align&(align-1)), "Alignment must be power of 2: %zu", align); /* Alignment must be a power of 2 */
     void* p = (*mag_alloc)(NULL, size+sizeof(void*)+align-1);
@@ -99,6 +131,10 @@ void* mag_alloc_aligned(size_t size, size_t align) {
 void mag_free_aligned(void* blk) {
     (*mag_alloc)(((void**)blk)[-1], 0);
 }
+
+#endif
+
+void* (*mag_alloc)(void* blk, size_t size) = &mag_alloc_stub;
 
 /* Include STB libraries and override their allocator with ours. */
 #define STBI_STATIC
@@ -1123,6 +1159,159 @@ static mag_tensor_t* mag_result_constructor_routine_matmul(mag_tensor_t** inputs
     return mag_tensor_create(inputs[0]->ctx, MAG_DTYPE_F32, shape, rank, NULL, 0);
 }
 
+static void mag_op_backward_nop(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_clone(mag_tensor_t* node, mag_tensor_t** grads) {
+    *grads = mag_clone(node->grad);
+}
+
+static void mag_op_backward_view(mag_tensor_t* node, mag_tensor_t** grads) {
+    *grads = mag_clone(node->grad);
+}
+
+static void mag_op_backward_transpose(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_permute(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_mean(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_min(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_max(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_sum(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_abs(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_neg(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_log(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_sqr(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_sqrt(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_sin(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_cos(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_step(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_exp(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_softmax(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_sigmoid(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_silu(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_tanh(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_relu(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* mask = mag_step(x);
+    grads[0] = mag_mul(node->grad, mask);
+    mag_tensor_decref(mask);
+}
+
+static void mag_op_backward_gelu(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_add(mag_tensor_t* node, mag_tensor_t** grads) {
+    grads[0] = mag_clone(node->grad);
+    grads[1] = mag_clone(node->grad);
+}
+
+static void mag_op_backward_sub(mag_tensor_t* node, mag_tensor_t** grads) {
+    grads[0] = mag_clone(node->grad);
+    grads[1] = mag_neg(node->grad);
+}
+
+static void mag_op_backward_mul(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* y = node->op_inputs[1];
+    grads[0] = mag_mul(node->grad, y);
+    grads[1] = mag_mul(node->grad, x);
+}
+
+static void mag_op_backward_div(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* y = node->op_inputs[1];
+    grads[0] = mag_div(node->grad, y);
+    mag_tensor_t* tmp = mag_mul(node->grad, x);
+    mag_tensor_t* y2  = mag_mul(y, y);
+    mag_tensor_t* tmp2= mag_div(tmp, y2);
+    grads[1] = mag_neg(tmp2);
+    mag_tensor_decref(tmp);
+    mag_tensor_decref(y2);
+    mag_tensor_decref(tmp2);
+}
+
+static void mag_op_backward_adds(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_subs(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_muls(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_divs(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_pows(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
+static void mag_op_backward_matmul(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_panic("NYI");
+}
+
 const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
     static const mag_op_meta_t infos[MAG_OP__NUM] = {
         [MAG_OP_NOP] = {
@@ -1131,7 +1320,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = false,
-            .backward = false,
+            .backward = &mag_op_backward_nop,
             .r_alloc = NULL,
             .validator = NULL
         },
@@ -1141,7 +1330,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = false,
-            .backward = false,
+            .backward = &mag_op_backward_clone,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1151,7 +1340,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = false,
-            .backward = false,
+            .backward = &mag_op_backward_view,
             .r_alloc = &mag_result_constructor_routine_view,
             .validator = &mag_validate_op_unary
         },
@@ -1161,7 +1350,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = false,
-            .backward = false,
+            .backward = &mag_op_backward_transpose,
             .r_alloc = &mag_result_constructor_routine_transposed,
             .validator = &mag_validate_op_transpose
         },
@@ -1178,7 +1367,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
                 MAG_OP_TPARAM_U32,
             },
             .inplace = false,
-            .backward = true,
+            .backward = &mag_op_backward_permute,
             .r_alloc = &mag_result_constructor_routine_permuted,
             .validator = &mag_validate_op_transpose
         },
@@ -1188,7 +1377,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = false,
-            .backward = true,
+            .backward = &mag_op_backward_mean,
             .r_alloc = &mag_result_constructor_routine_scalar,
             .validator = &mag_validate_op_scalar
         },
@@ -1198,7 +1387,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = false,
-            .backward = true,
+            .backward = &mag_op_backward_min,
             .r_alloc = &mag_result_constructor_routine_scalar,
             .validator = &mag_validate_op_scalar
         },
@@ -1208,7 +1397,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = false,
-            .backward = true,
+            .backward = &mag_op_backward_max,
             .r_alloc = &mag_result_constructor_routine_scalar,
             .validator = &mag_validate_op_scalar
         },
@@ -1218,7 +1407,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = false,
-            .backward = true,
+            .backward = &mag_op_backward_sum,
             .r_alloc = &mag_result_constructor_routine_scalar,
             .validator = &mag_validate_op_scalar
         },
@@ -1228,7 +1417,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_abs,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1238,7 +1427,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_neg,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1248,7 +1437,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_log,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1258,7 +1447,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_sqr,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1268,7 +1457,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_sqrt,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1278,7 +1467,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_sin,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1288,7 +1477,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_cos,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1298,7 +1487,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_step,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1308,7 +1497,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_exp,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1318,7 +1507,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_softmax,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1328,7 +1517,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1338,7 +1527,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = mag_op_backward_sigmoid,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1348,7 +1537,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1358,6 +1547,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
+            .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1367,7 +1557,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_silu,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1377,7 +1567,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1387,7 +1577,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_tanh,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1397,7 +1587,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1407,7 +1597,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_relu,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1417,7 +1607,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1427,7 +1617,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_gelu,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1437,7 +1627,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1447,7 +1637,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_add,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_binary
         },
@@ -1457,7 +1647,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_sub,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_binary
         },
@@ -1467,7 +1657,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_mul,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_binary
         },
@@ -1477,7 +1667,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {MAG_OP_TPARAM_NONE},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_div,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_binary
         },
@@ -1487,7 +1677,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 1,
             .param_types = {MAG_OP_TPARAM_F32},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_adds,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1497,7 +1687,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 1,
             .param_types = {MAG_OP_TPARAM_F32},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_subs,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1507,7 +1697,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 1,
             .param_types = {MAG_OP_TPARAM_F32},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_muls,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1517,7 +1707,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 1,
             .param_types = {MAG_OP_TPARAM_F32},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_divs,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1527,7 +1717,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 1,
             .param_types = {MAG_OP_TPARAM_F32},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_pows,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
@@ -1537,7 +1727,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .paramcount = 0,
             .param_types = {},
             .inplace = true,
-            .backward = true,
+            .backward = &mag_op_backward_matmul,
             .r_alloc = &mag_result_constructor_routine_matmul,
             .validator = &mag_validate_op_matmul
         }
@@ -2243,6 +2433,7 @@ void mag_tensor_backward(mag_tensor_t* t) {
         mag_swap(mag_tensor_t*, post_order.data[i], post_order.data[j]);
     for (size_t id = 0; id < post_order.size; ++id) {
         t = post_order.data[id];
+        const mag_op_meta_t* meta = mag_op_meta_of(t->op);
         if (!t->grad) {
             mag_tensor_t* grad = mag_tensor_create(t->ctx, t->dtype, t->shape, t->rank, NULL, 0);
             grad->flags = (grad->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
@@ -2251,49 +2442,10 @@ void mag_tensor_backward(mag_tensor_t* t) {
         }
         if (mag_unlikely(t->op == MAG_OP_NOP)) continue;
         mag_tensor_t* grads[MAG_MAX_OP_PARAMS] = {0};
-        mag_tensor_t* gout = t->grad;
-        switch (t->op) {
-            case MAG_OP_CLONE: {
-                grads[0] = mag_clone(gout);
-            } break;
-            case MAG_OP_VIEW: {
-                grads[0] = mag_clone(gout);
-            } break;
-            case MAG_OP_RELU: {
-                mag_tensor_t* x = t->op_inputs[0];
-                mag_tensor_t* mask = mag_step(x);
-                grads[0] = mag_mul(gout, mask);
-                mag_tensor_decref(mask);
-            } break;
-            case MAG_OP_ADD: {
-                grads[0] = mag_clone(gout);
-                grads[1] = mag_clone(gout);
-            } break;
-            case MAG_OP_SUB: {
-                grads[0] = mag_clone(gout);
-                grads[1] = mag_neg(gout);
-            } break;
-            case MAG_OP_MUL: {
-                mag_tensor_t* x = t->op_inputs[0];
-                mag_tensor_t* y = t->op_inputs[1];
-                grads[0] = mag_mul(gout, y);
-                grads[1] = mag_mul(gout, x);
-            } break;
-            case MAG_OP_DIV: {
-                mag_tensor_t* x = t->op_inputs[0];
-                mag_tensor_t* y = t->op_inputs[1];
-                grads[0] = mag_div(gout, y);
-                mag_tensor_t* tmp = mag_mul(gout, x);
-                mag_tensor_t* y2  = mag_mul(y, y);
-                mag_tensor_t* tmp2= mag_div(tmp, y2);
-                grads[1] = mag_neg(tmp2);
-                mag_tensor_decref(tmp);
-                mag_tensor_decref(y2);
-                mag_tensor_decref(tmp2);
-            } break;
-            default: mag_panic("Unsupported op in backward: %s", mag_op_meta_of(t->op)->mnemonic);
-        }
-        uint32_t numin = mag_op_meta_of(t->op)->argcount;
+        void (*op_bwd)(mag_tensor_t*, mag_tensor_t**) = meta->backward;
+        mag_assert2(op_bwd);
+        (*op_bwd)(t, grads);
+        uint32_t numin = meta->argcount;
         for (uint32_t i = 0; i < numin; ++i) {
             mag_tensor_t* input = t->op_inputs[i];
             mag_assert2(input);

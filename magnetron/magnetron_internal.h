@@ -515,7 +515,7 @@ typedef struct mag_op_meta_t {
     uint8_t paramcount;                                     /* Number of parameters */
     mag_op_param_type_t param_types[MAG_MAX_OP_PARAMS];     /* Parameter types */
     bool inplace;                                           /* Supports inplace execution */
-    bool backward;                                          /* Supports backward execution */
+    void (*backward)(mag_tensor_t*, mag_tensor_t**);        /* Backward pass */
     mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_op_param_t*);
     bool (*validator)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_op_param_t*);
 } mag_op_meta_t;
