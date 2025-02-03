@@ -25,6 +25,7 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 if (${MAGNETRON_BUILD_TESTS})
     enable_testing()
+    add_subdirectory(extern/googletest)
 endif()
 
 if (${MAGNETRON_BUILD_TESTS} OR ${MAGNETRON_BUILD_BENCHMARKS} OR ${MAGNETRON_BUILD_FUZZERS})
