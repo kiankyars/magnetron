@@ -543,9 +543,11 @@ class Tensor:
 
     @property
     def grad(self) -> 'Tensor':
-        assert self.requires_grad
+        if not self.requires_grad:
+            return None
         ptr: ffi.CData = C.mag_tensor_grad(self._ptr)
-        assert ptr != ffi.NULL, 'Gradient tensor is not allocated'
+        if ptr is ffi.NULL:
+            return None
         C.mag_tensor_retain(ptr)
         return Tensor(ptr)
 

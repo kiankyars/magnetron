@@ -2319,7 +2319,7 @@ bool mag_tensor_is_contiguous(const mag_tensor_t* t) {
 }
 
 mag_tensor_t* mag_tensor_grad(const mag_tensor_t* t) {
-    mag_assert(t->flags & MAG_TFLAG_REQUIRES_GRAD && t->grad && t->grad->flags & MAG_TFLAG_IS_GRAD, "Tensor must require grad and have a valid grad tensor");
+    mag_assert2(t->flags & MAG_TFLAG_REQUIRES_GRAD);
     return t->grad;
 }
 
@@ -2423,31 +2423,32 @@ static void mag_collect_topo_iterative(mag_tensor_t* root, mag_tensor_array_t* o
     (*mag_alloc)(visited, 0);
 }
 
-void mag_tensor_backward(mag_tensor_t* t) {
-    mag_assert(t->flags & MAG_TFLAG_REQUIRES_GRAD, "Tensor must require grad to backpropagate");
+void mag_tensor_backward(mag_tensor_t* root) {
+    mag_assert(root->flags & MAG_TFLAG_REQUIRES_GRAD, "Tensor must require grad to backpropagate");
     mag_tensor_array_t post_order;
     mag_tensor_array_init(&post_order);
-    mag_collect_topo_iterative(t, &post_order);
+    mag_collect_topo_iterative(root, &post_order);
     if (mag_unlikely(!post_order.size)) return;
     for (size_t i = 0, j = post_order.size-1; i < j; ++i, --j)
         mag_swap(mag_tensor_t*, post_order.data[i], post_order.data[j]);
     for (size_t id = 0; id < post_order.size; ++id) {
-        t = post_order.data[id];
-        const mag_op_meta_t* meta = mag_op_meta_of(t->op);
-        if (!t->grad) {
-            mag_tensor_t* grad = mag_tensor_create(t->ctx, t->dtype, t->shape, t->rank, NULL, 0);
+        mag_tensor_t* child = post_order.data[id];
+        mag_assert2(child);
+        const mag_op_meta_t* meta = mag_op_meta_of(child->op);
+        if (!child->grad) {
+            mag_tensor_t* grad = mag_tensor_create(child->ctx, child->dtype, child->shape, child->rank, NULL, 0);
             grad->flags = (grad->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
             mag_tensor_fill(grad, 1.0f);
-            t->grad = grad;
+            child->grad = grad;
         }
-        if (mag_unlikely(t->op == MAG_OP_NOP)) continue;
+        if (mag_unlikely(child->op == MAG_OP_NOP)) continue;
         mag_tensor_t* grads[MAG_MAX_OP_PARAMS] = {0};
         void (*op_bwd)(mag_tensor_t*, mag_tensor_t**) = meta->backward;
         mag_assert2(op_bwd);
-        (*op_bwd)(t, grads);
+        (*op_bwd)(child, grads);
         uint32_t numin = meta->argcount;
         for (uint32_t i = 0; i < numin; ++i) {
-            mag_tensor_t* input = t->op_inputs[i];
+            mag_tensor_t* input = child->op_inputs[i];
             mag_assert2(input);
             if (!(input->flags & MAG_TFLAG_REQUIRES_GRAD)) continue;
             mag_tensor_t* gri = grads[i];
