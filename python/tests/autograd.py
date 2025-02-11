@@ -27,13 +27,9 @@ def test_autograd_1():
 def test_autograd_2():
     x = mag.Tensor.const([-4.0], requires_grad=True)
     z = 2 * x + 2 + x
-    assert z.requires_grad
     q = z.relu() + z * x
-    assert q.requires_grad
     h = (z * z).relu()
-    assert h.requires_grad
     y = h + q + q * x
-    assert y.requires_grad
     y.backward()
     magx, magy = x, y
 

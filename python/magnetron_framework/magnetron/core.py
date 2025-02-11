@@ -217,13 +217,14 @@ def no_grad() -> 'no_grad.Scope':
 
 @typing.final
 class Tensor:
-    __slots__ = ('_ctx', '_ptr')
+    __slots__ = ('_ctx', '_ptr', '_inputs')
 
     def __init__(self, ptr: ffi.CData | None = None) -> None:
         if isinstance(ptr, ffi.CData):
             assert ptr != ffi.NULL, 'Invalid tensor pointer'
         self._ctx = None
         self._ptr = ptr
+        self._inputs = None
 
     def __del__(self) -> None:
         if (
@@ -730,6 +731,7 @@ class Tensor:
         )
 
     def relu(self, derivative: bool = False) -> 'Tensor':
+        self._inputs = (self,)
         return Tensor(C.mag_relu_dv(self._ptr) if derivative else C.mag_relu(self._ptr))
 
     def relu_(self, derivative: bool = False) -> 'Tensor':
@@ -746,92 +748,97 @@ class Tensor:
         )
 
     def __add__(self, other: object | int | float) -> 'Tensor':
-        return Tensor(
-            C.mag_add(self._ptr, other._ptr)
-            if isinstance(other, Tensor)
-            else C.mag_adds(self._ptr, float(other))
-        )
+        if isinstance(other, Tensor):
+            self._inputs = (self, other)
+            return Tensor(C.mag_add(self._ptr, other._ptr))
+        else:
+            self._inputs = (self,)
+            return Tensor(C.mag_adds(self._ptr, float(other)))
 
     def __radd__(self, other: int | float) -> 'Tensor':
-        return Tensor(
-            C.mag_add(self._ptr, other._ptr)
-            if isinstance(other, Tensor)
-            else C.mag_adds(self._ptr, float(other))
-        )
+        self._inputs = (self,)
+        return Tensor(C.mag_adds(self._ptr, float(other)))
 
     def __iadd__(self, other: object | int | float) -> 'Tensor':
-        return Tensor(
-            C.mag_add_(self._ptr, other._ptr)
-            if isinstance(other, Tensor)
-            else C.mag_adds_(self._ptr, float(other))
-        )
+        assert not self.requires_grad, 'In-place operations are not supported for gradients'
+        if isinstance(other, Tensor):
+            return Tensor(C.mag_add_(self._ptr, other._ptr))
+        else:
+            return Tensor(C.mag_adds_(self._ptr, float(other)))
 
     def __sub__(self, other: object | int | float) -> 'Tensor':
-        return Tensor(
-            C.mag_sub(self._ptr, other._ptr)
-            if isinstance(other, Tensor)
-            else C.mag_subs(self._ptr, float(other))
-        )
+        if isinstance(other, Tensor):
+            self._inputs = (self, other)
+            return Tensor(C.mag_sub(self._ptr, other._ptr))
+        else:
+            self._inputs = (self,)
+            return Tensor(C.mag_subs(self._ptr, float(other)))
 
     def __rsub__(self, other: int | float) -> 'Tensor':
-        return Tensor.full(self.shape, fill_value=float(other)) - self
+        tmp = Tensor.full(self.shape, fill_value=float(other))
+        self._inputs = (tmp, self)
+        return tmp - self
 
     def __isub__(self, other: object | int | float) -> 'Tensor':
-        return Tensor(
-            C.mag_sub_(self._ptr, other._ptr)
-            if isinstance(other, Tensor)
-            else C.mag_subs_(self._ptr, float(other))
-        )
+        assert not self.requires_grad, 'In-place operations are not supported for gradients'
+        if isinstance(other, Tensor):
+            return Tensor(C.mag_sub_(self._ptr, other._ptr))
+        else:
+            return Tensor(C.mag_subs_(self._ptr, float(other)))
 
     def __mul__(self, other: object | int | float) -> 'Tensor':
-        return Tensor(
-            C.mag_mul(self._ptr, other._ptr)
-            if isinstance(other, Tensor)
-            else C.mag_muls(self._ptr, float(other))
-        )
+        if isinstance(other, Tensor):
+            self._inputs = (self, other)
+            return Tensor(C.mag_mul(self._ptr, other._ptr))
+        else:
+            self._inputs = (self,)
+            return Tensor(C.mag_muls(self._ptr, float(other)))
 
     def __rmul__(self, other: int | float) -> 'Tensor':
-        return Tensor(
-            C.mag_mul(self._ptr, other._ptr)
-            if isinstance(other, Tensor)
-            else C.mag_muls(self._ptr, float(other))
-        )
+        self._inputs = (self,)
+        return Tensor(C.mag_muls(self._ptr, float(other)))
 
     def __imul__(self, other: object | int | float) -> 'Tensor':
-        return Tensor(
-            C.mag_mul_(self._ptr, other._ptr)
-            if isinstance(other, Tensor)
-            else C.mag_muls_(self._ptr, float(other))
-        )
+        assert not self.requires_grad, 'In-place operations are not supported for gradients'
+        assert not self.requires_grad, 'In-place operations are not supported for gradients'
+        if isinstance(other, Tensor):
+            return Tensor(C.mag_mul_(self._ptr, other._ptr))
+        else:
+            return Tensor(C.mag_muls_(self._ptr, float(other)))
 
     def __truediv__(self, other: object | int | float) -> 'Tensor':
-        return Tensor(
-            C.mag_div(self._ptr, other._ptr)
-            if isinstance(other, Tensor)
-            else C.mag_divs(self._ptr, float(other))
-        )
+        if isinstance(other, Tensor):
+            self._inputs = (self, other)
+            return Tensor(C.mag_div(self._ptr, other._ptr))
+        else:
+            self._inputs = (self,)
+            return Tensor(C.mag_divs(self._ptr, float(other)))
 
     def __rtruediv__(self, other: int | float) -> 'Tensor':
-        return Tensor.full(self.shape, fill_value=float(other)) / self
+        tmp = Tensor.full(self.shape, fill_value=float(other))
+        self._inputs = (tmp, self)
+        return tmp / self
 
     def __itruediv__(self, other: object | int | float) -> 'Tensor':
-        return Tensor(
-            C.mag_div_(self._ptr, other._ptr)
-            if isinstance(other, Tensor)
-            else C.mag_divs_(self._ptr, float(other))
-        )
+        assert not self.requires_grad, 'In-place operations are not supported for gradients'
+        if isinstance(other, Tensor):
+            return Tensor(C.mag_div_(self._ptr, other._ptr))
+        else:
+            return Tensor(C.mag_divs_(self._ptr, float(other)))
+
+    def __matmul__(self, other: 'Tensor') -> 'Tensor':
+        self._inputs = (self, other)
+        return Tensor(C.mag_matmul(self._ptr, other._ptr))
+
+    def __imatmul__(self, other: 'Tensor') -> 'Tensor':
+        assert not self.requires_grad, 'In-place operations are not supported for gradients'
+        return Tensor(C.mag_matmul_(self._ptr, other._ptr))
 
     def __pow__(self, exponent: int | float) -> 'Tensor':
         return Tensor(C.mag_pows(self._ptr, float(exponent)))
 
     def __ipow__(self, exponent: int | float) -> 'Tensor':
         return Tensor(C.mag_pows_(self._ptr, float(exponent)))
-
-    def __matmul__(self, other: 'Tensor') -> 'Tensor':
-        return Tensor(C.mag_matmul(self._ptr, other._ptr))
-
-    def __imatmul__(self, other: 'Tensor') -> 'Tensor':
-        return Tensor(C.mag_matmul_(self._ptr, other._ptr))
 
     def __eq__(self, other: 'Tensor') -> bool:
         return C.mag_tensor_eq(self._ptr, other._ptr)
