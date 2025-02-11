@@ -26,7 +26,8 @@ def test_autograd_1():
 
 def test_autograd_2():
     x = mag.Tensor.const([-4.0], requires_grad=True)
-    z = 2 * x + 2 + x
+    two = mag.Tensor.const([2.0], requires_grad=False)
+    z = two * x + two + x
     q = z.relu() + z * x
     h = (z * z).relu()
     y = h + q + q * x
