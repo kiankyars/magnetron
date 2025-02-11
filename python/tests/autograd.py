@@ -3,7 +3,6 @@
 import magnetron as mag
 import torch
 
-
 def test_autograd_1():
     x = mag.Tensor.const([3.0], requires_grad=True)
     y = mag.Tensor.const([2.0], requires_grad=True)
@@ -26,8 +25,7 @@ def test_autograd_1():
 
 def test_autograd_2():
     x = mag.Tensor.const([-4.0], requires_grad=True)
-    two = mag.Tensor.const([2.0], requires_grad=False)
-    z = two * x + two + x
+    z = 2 * x + 2 + x
     q = z.relu() + z * x
     h = (z * z).relu()
     y = h + q + q * x

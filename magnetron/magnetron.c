@@ -1289,39 +1289,19 @@ static void mag_op_backward_div(mag_tensor_t* node, mag_tensor_t** grads) {
 }
 
 static void mag_op_backward_adds(mag_tensor_t* node, mag_tensor_t** grads) {
-    grads[0] = mag_clone(node->grad);
-    grads[1] = mag_sum(node->grad);
+    mag_panic("NYI");
 }
 
 static void mag_op_backward_subs(mag_tensor_t* node, mag_tensor_t** grads) {
-    grads[0] = mag_clone(node->grad);
-    mag_tensor_t* neg_grad = mag_neg(node->grad);
-    grads[1] = mag_sum(neg_grad);
-    mag_tensor_decref(neg_grad);
+    mag_panic("NYI");
 }
 
 static void mag_op_backward_muls(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_tensor_t* x = node->op_inputs[0];
-    mag_tensor_t* s = node->op_inputs[1];
-    grads[0] = mag_mul(node->grad, s);
-    mag_tensor_t* coeff = mag_mul(node->grad, x);
-    grads[1] = mag_sum(coeff);
-    mag_tensor_decref(coeff);
+    mag_panic("NYI");
 }
 
 static void mag_op_backward_divs(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_tensor_t* x = node->op_inputs[0];
-    mag_tensor_t* s = node->op_inputs[1];
-    grads[0] = mag_div(node->grad, s);
-    mag_tensor_t* grax = mag_mul(node->grad, x);
-    mag_tensor_t* s2 = mag_mul(s, s);
-    mag_tensor_t* gras = mag_div(grax, s2);
-    mag_tensor_t* ngras = mag_neg(gras);
-    grads[1] = mag_sum(ngras);
-    mag_tensor_decref(grax);
-    mag_tensor_decref(s2);
-    mag_tensor_decref(gras);
-    mag_tensor_decref(ngras);
+    mag_panic("NYI");
 }
 
 static void mag_op_backward_pows(mag_tensor_t* node, mag_tensor_t** grads) {

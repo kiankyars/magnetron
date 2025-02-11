@@ -748,16 +748,15 @@ class Tensor:
         )
 
     def __add__(self, other: object | int | float) -> 'Tensor':
-        if isinstance(other, Tensor):
-            self._inputs = (self, other)
-            return Tensor(C.mag_add(self._ptr, other._ptr))
-        else:
-            self._inputs = (self,)
-            return Tensor(C.mag_adds(self._ptr, float(other)))
+        if not isinstance(other, Tensor):
+            other = Tensor.full(self.shape, fill_value=float(other))
+        self._inputs = (self, other)
+        return Tensor(C.mag_add(self._ptr, other._ptr))
 
     def __radd__(self, other: int | float) -> 'Tensor':
-        self._inputs = (self,)
-        return Tensor(C.mag_adds(self._ptr, float(other)))
+        other = Tensor.full(self.shape, fill_value=float(other))
+        self._inputs = (other, self)
+        return other + self
 
     def __iadd__(self, other: object | int | float) -> 'Tensor':
         assert not self.requires_grad, 'In-place operations are not supported for gradients'
@@ -767,17 +766,15 @@ class Tensor:
             return Tensor(C.mag_adds_(self._ptr, float(other)))
 
     def __sub__(self, other: object | int | float) -> 'Tensor':
-        if isinstance(other, Tensor):
-            self._inputs = (self, other)
-            return Tensor(C.mag_sub(self._ptr, other._ptr))
-        else:
-            self._inputs = (self,)
-            return Tensor(C.mag_subs(self._ptr, float(other)))
+        if not isinstance(other, Tensor):
+            other = Tensor.full(self.shape, fill_value=float(other))
+        self._inputs = (self, other)
+        return Tensor(C.mag_sub(self._ptr, other._ptr))
 
     def __rsub__(self, other: int | float) -> 'Tensor':
-        tmp = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (tmp, self)
-        return tmp - self
+        other = Tensor.full(self.shape, fill_value=float(other))
+        self._inputs = (other, self)
+        return other - self
 
     def __isub__(self, other: object | int | float) -> 'Tensor':
         assert not self.requires_grad, 'In-place operations are not supported for gradients'
@@ -787,19 +784,17 @@ class Tensor:
             return Tensor(C.mag_subs_(self._ptr, float(other)))
 
     def __mul__(self, other: object | int | float) -> 'Tensor':
-        if isinstance(other, Tensor):
-            self._inputs = (self, other)
-            return Tensor(C.mag_mul(self._ptr, other._ptr))
-        else:
-            self._inputs = (self,)
-            return Tensor(C.mag_muls(self._ptr, float(other)))
+        if not isinstance(other, Tensor):
+            other = Tensor.full(self.shape, fill_value=float(other))
+        self._inputs = (self, other)
+        return Tensor(C.mag_mul(self._ptr, other._ptr))
 
     def __rmul__(self, other: int | float) -> 'Tensor':
-        self._inputs = (self,)
-        return Tensor(C.mag_muls(self._ptr, float(other)))
+        other = Tensor.full(self.shape, fill_value=float(other))
+        self._inputs = (other, self)
+        return other * self
 
     def __imul__(self, other: object | int | float) -> 'Tensor':
-        assert not self.requires_grad, 'In-place operations are not supported for gradients'
         assert not self.requires_grad, 'In-place operations are not supported for gradients'
         if isinstance(other, Tensor):
             return Tensor(C.mag_mul_(self._ptr, other._ptr))
@@ -807,17 +802,15 @@ class Tensor:
             return Tensor(C.mag_muls_(self._ptr, float(other)))
 
     def __truediv__(self, other: object | int | float) -> 'Tensor':
-        if isinstance(other, Tensor):
-            self._inputs = (self, other)
-            return Tensor(C.mag_div(self._ptr, other._ptr))
-        else:
-            self._inputs = (self,)
-            return Tensor(C.mag_divs(self._ptr, float(other)))
+        if not isinstance(other, Tensor):
+            other = Tensor.full(self.shape, fill_value=float(other))
+        self._inputs = (self, other)
+        return Tensor(C.mag_div(self._ptr, other._ptr))
 
     def __rtruediv__(self, other: int | float) -> 'Tensor':
-        tmp = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (tmp, self)
-        return tmp / self
+        other = Tensor.full(self.shape, fill_value=float(other))
+        self._inputs = (other, self)
+        return other / self
 
     def __itruediv__(self, other: object | int | float) -> 'Tensor':
         assert not self.requires_grad, 'In-place operations are not supported for gradients'
