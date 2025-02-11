@@ -1,7 +1,5 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
-add_subdirectory(googletest)
-
 file(GLOB_RECURSE TEST_SOURCES *.cpp)
 add_executable(magnetron_test ${TEST_SOURCES})
 target_link_libraries(magnetron_test magnetron)

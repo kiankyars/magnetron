@@ -11,7 +11,7 @@ if (CUDAToolkit_FOUND)
         set(CMAKE_CUDA_COMPILER "${MAGNETRON_CUDA_COMPILER}")
     endif()
 
-    set(CMAKE_CUDA_STANDARD 20)
+    set(CMAKE_CUDA_STANDARD 17)
     enable_language(CUDA)
     file(GLOB_RECURSE MAGNETRON_CUDA_SOURCES magnetron/*.cu magnetron/*.cuh)
     add_library(magnetron_cuda SHARED ${MAGNETRON_CUDA_SOURCES})

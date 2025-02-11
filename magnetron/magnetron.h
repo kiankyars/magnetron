@@ -249,6 +249,8 @@ extern MAG_EXPORT mag_tensor_t* mag_cos(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_cos_(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_step(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_step_(mag_tensor_t* x);
+extern MAG_EXPORT mag_tensor_t* mag_exp(mag_tensor_t* x);
+extern MAG_EXPORT mag_tensor_t* mag_exp_(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_softmax(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_softmax_(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_softmax_dv(mag_tensor_t* x);
@@ -275,7 +277,6 @@ extern MAG_EXPORT mag_tensor_t* mag_gelu(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_gelu_(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_gelu_dv(mag_tensor_t* x);
 extern MAG_EXPORT mag_tensor_t* mag_gelu_dv_(mag_tensor_t* x);
-
 extern MAG_EXPORT mag_tensor_t* mag_add(mag_tensor_t* x, mag_tensor_t* y);
 extern MAG_EXPORT mag_tensor_t* mag_add_(mag_tensor_t* x, mag_tensor_t* y);
 extern MAG_EXPORT mag_tensor_t* mag_sub( mag_tensor_t* x, mag_tensor_t* y);
@@ -292,6 +293,8 @@ extern MAG_EXPORT mag_tensor_t* mag_muls(mag_tensor_t* x, float xi);
 extern MAG_EXPORT mag_tensor_t* mag_muls_(mag_tensor_t* x, float xi);
 extern MAG_EXPORT mag_tensor_t* mag_divs(mag_tensor_t* x, float xi);
 extern MAG_EXPORT mag_tensor_t* mag_divs_(mag_tensor_t* x, float xi);
+extern MAG_EXPORT mag_tensor_t* mag_pows(mag_tensor_t* x, float xi);
+extern MAG_EXPORT mag_tensor_t* mag_pows_(mag_tensor_t* x, float xi);
 extern MAG_EXPORT mag_tensor_t* mag_matmul(mag_tensor_t* a, mag_tensor_t* b);
 
 /**
@@ -346,6 +349,12 @@ extern MAG_EXPORT bool mag_tensor_can_broadcast(const mag_tensor_t* a, const mag
 extern MAG_EXPORT bool mag_tensor_is_transposed(const mag_tensor_t* t); /* Check if the tensor is transposed */
 extern MAG_EXPORT bool mag_tensor_is_permuted(const mag_tensor_t* t); /* Check if the tensor is permuted */
 extern MAG_EXPORT bool mag_tensor_is_contiguous(const mag_tensor_t* t); /* Check if the tensor memory is contiguous */
+
+extern MAG_EXPORT mag_tensor_t* mag_tensor_grad(const mag_tensor_t* t); /* Get the gradient tensor of the tensor */
+extern MAG_EXPORT bool mag_tensor_requires_grad(const mag_tensor_t* t); /* Check if the tensor requires gradient computation */
+extern MAG_EXPORT void mag_tensor_set_requires_grad(mag_tensor_t* t, bool requires_grad); /* Set if the tensor requires gradient computation */
+extern MAG_EXPORT void mag_tensor_backward(mag_tensor_t* t); /* Compute the gradient of the tensor */
+
 extern MAG_EXPORT float mag_tensor_get_scalar_physical_index(mag_tensor_t* t, int64_t d0, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5); /* Get scalar value at physical index */
 extern MAG_EXPORT void mag_tensor_set_scalar_physical_index(mag_tensor_t* t, int64_t d0, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5, float x); /* Set scalar value at physical index */
 extern MAG_EXPORT float mag_tensor_get_scalar_virtual_index(mag_tensor_t* t, int64_t v_idx); /* Get scalar value at virtual index */

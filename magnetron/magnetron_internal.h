@@ -347,10 +347,40 @@ extern MAG_EXPORT uintptr_t mag_thread_id(void);
 #endif
 
 /* Increment pointer or size with correct type alignment. */
-static MAG_AINLINE void* mag_pincr(void** p, size_t sz, size_t align) {
+static inline void* mag_pincr(void** p, size_t sz, size_t align) {
     void* pp = (void*)(((uintptr_t)*p+align-1)&-align);
     *p = (void*)((uint8_t*)pp+sz);
     return pp;
+}
+
+/*
+**  Fast u32 division and remainder. Paper:
+**  Torbjörn Granlund and Peter L. Montgomery, "Division by Invariant Integers Using Multiplication", ACM SIGPLAN Notices, Issue 6, Vol 29, 61-72, June 1994.
+**	http://gmplib.org/~tege/divcnst-pldi94.pdf
+*/
+
+typedef struct mag_ivdiv_t {
+    uint32_t s1;
+    uint32_t s2;
+    uint32_t d;
+} mag_ivdiv_t;
+
+static inline mag_ivdiv_t mag_ivdiv_mkdi(uint32_t divisor) { /* Create packed division info from devisor. */
+    uint32_t l = (divisor-1) ? 32 - __builtin_clz((divisor-1)) : 0;
+    uint32_t s1 = l > 1 ? 1 : l&0xff;
+    uint32_t s2 = !l ? 0 : (l-1)&0xff;
+    return (mag_ivdiv_t) {
+        s1, s2,
+        (uint32_t)(((1ull<<l) - divisor)*0x100000000ull) / divisor + 1
+    };
+}
+static inline uint32_t mag_ivdiv32(uint32_t x, uint32_t y, mag_ivdiv_t di) { /* r = x / y. Fast division using invariant multiplication. Up to 40x times faster on some chips. */
+    (void)y;
+    uint32_t t = (uint64_t)x*(di.d)>>32;
+    return (t + ((x - t)>>((di.s1)&0xff)))>>(di.s2);
+}
+static inline uint32_t mag_ivrem32(uint32_t x, uint32_t y, mag_ivdiv_t ctx) { /* r = x % y. Fast remainder using invariant multiplication */
+    return x - y*mag_ivdiv32(x, y, ctx);
 }
 
 #ifdef _WIN32
@@ -431,6 +461,7 @@ typedef enum mag_op_t {
     MAG_OP_SIN,
     MAG_OP_COS,
     MAG_OP_STEP,
+    MAG_OP_EXP,
     MAG_OP_SOFTMAX,
     MAG_OP_SOFTMAX_DV,
     MAG_OP_SIGMOID,
@@ -452,6 +483,7 @@ typedef enum mag_op_t {
     MAG_OP_SUBS,
     MAG_OP_MULS,
     MAG_OP_DIVS,
+    MAG_OP_POWS,
     MAG_OP_MATMUL,
     MAG_OP__NUM
 } mag_op_t;
@@ -483,6 +515,7 @@ typedef struct mag_op_meta_t {
     uint8_t paramcount;                                     /* Number of parameters */
     mag_op_param_type_t param_types[MAG_MAX_OP_PARAMS];     /* Parameter types */
     bool inplace;                                           /* Supports inplace execution */
+    void (*backward)(mag_tensor_t*, mag_tensor_t**);        /* Backward pass */
     mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_op_param_t*);
     bool (*validator)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_op_param_t*);
 } mag_op_meta_t;
@@ -525,7 +558,7 @@ struct mag_storage_buffer_t {
     size_t size;                                                                                    /* Size of buffer in bytes. */
     size_t alignment;                                                                               /* Alignment of buffer. */
     mag_compute_device_t* host;                                                                     /* Host device. */
-    void (*set)(mag_storage_buffer_t* sto, size_t offs, uint8_t x);                                 /* Memset buffer. */
+    void (*broadcast)(mag_storage_buffer_t* sto, size_t offs, const void* src, size_t stride);      /* Broadcast (fill) buffer with x. */
     void (*cpy_host_device)(mag_storage_buffer_t* sto, size_t offs, const void* src, size_t n);     /* Copy data from host to device. */
     void (*cpy_device_host)(mag_storage_buffer_t* sto, size_t offs, void* dst, size_t n);           /* Copy data from device to host. */
 };
@@ -684,7 +717,7 @@ struct mag_ctx_t {
 #endif
     mag_fixed_intrusive_pool tensor_pool;           /* Fixed-size memory pool for tensors. */
     mag_exec_mode_t exec_mode;
-    bool profiler_enabled;
+    bool is_profiling;
     mag_op_perf_info_t op_perf_mons_total[MAG_OP__NUM];
     union {
         struct {
@@ -711,12 +744,13 @@ struct mag_ctx_t {
 
 typedef enum mag_tensor_flags_t {
     MAG_TFLAG_NONE = 0,
-    MAG_TFLAG_OWNER = 1<<0,         /* Tensor is the owner of the buffer. */
-    MAG_TFLAG_VIEW = 1<<1,          /* Tensor is a view. */
-    MAG_FLAG_GRAD = 1<<2,           /* Tensor is a gradient. */
-    MAG_TFLAG_EXEC_EAGER = 1<<3,    /* Tensor is executed eagerly. */
+    MAG_TFLAG_OWNER = 1<<0,             /* Tensor is the owner of the buffer. */
+    MAG_TFLAG_VIEW = 1<<1,              /* Tensor is a view. */
+    MAG_TFLAG_IS_GRAD = 1<<2,           /* Tensor is a gradient. */
+    MAG_TFLAG_EXEC_EAGER = 1<<3,        /* Tensor is executed eagerly. */
+    MAG_TFLAG_REQUIRES_GRAD = 1<<4,     /* Tensor requires gradient. */
 
-    MAG_TFLAG_LEN = 4
+    MAG_TFLAG_LEN = 5                   /* Number of flags. */
 } mag_tensor_flags_t;
 mag_static_assert(MAG_TFLAG_LEN <= 0xff);
 
@@ -768,6 +802,7 @@ typedef struct mag_compute_payload_t {
     int64_t thread_num;
     int64_t thread_idx;
     mag_tensor_t* node;
+    bool is_fwd;
 } mag_compute_payload_t;
 
 typedef struct mag_kernel_registry_t {
