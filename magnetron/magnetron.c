@@ -3499,7 +3499,7 @@ mag_tensor_t* mag_tensor_load(mag_ctx_t* ctx, const char* file) {
     long n_bytes = ftell(f);    /* Get file size */
     mag_assert(n_bytes > MAG_STO_FILE_HEADER_SIZE + MAG_STO_TENSOR_HEADER_SIZE + 1, "Malformed file size");   /* Check file size */
     mag_assert2(fseek(f, 0, SEEK_SET) == 0); /* Seek to start */
-    uint8_t* buf = (uint8_t*)(*mag_alloc)(NULL, n_bytes);  /* Allocate buffer */
+    uint8_t* buf = (*mag_alloc)(NULL, n_bytes);  /* Allocate buffer */
     mag_assert(fread(buf, 1, n_bytes, f) == n_bytes, "Failed to read %zu bytes from file: %s", n_bytes, file);    /* Read while file into buffer */
     fclose(f), f = NULL;    /* Close file */
     uint32_t n_tensors = 0, version = 0;
@@ -3575,21 +3575,20 @@ mag_tensor_t* mag_tensor_load_image(mag_ctx_t* ctx, const char* file, mag_color_
         (*load_free)(src);
         mag_log_info("Loaded and resized tensor from image: %s, %u x %u x %u", file, resize_w, resize_h, whc[2]);
         return t;
-    } else {
-        mag_tensor_t* t = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, whc[2], whc[1], whc[0]);
-        float* dst = mag_tensor_data_ptr(t);
-        for (int64_t k = 0; k < whc[2]; ++k) { /* Convert from interleaved to planar representation. */
-            for (int64_t j = 0; j < whc[1]; ++j) {
-                for (int64_t i = 0; i < whc[0]; ++i) {
-                    dst[i + whc[0]*j + whc[0]*whc[1]*k] = (float)src[k + whc[2]*i + whc[2]*whc[0]*j] / 255.0f;  /* Normalize pixel values to [0, 1] */
-                }
+    }
+    mag_tensor_t* t = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, whc[2], whc[1], whc[0]);
+    float* dst = mag_tensor_data_ptr(t);
+    for (int64_t k = 0; k < whc[2]; ++k) { /* Convert from interleaved to planar representation. */
+        for (int64_t j = 0; j < whc[1]; ++j) {
+            for (int64_t i = 0; i < whc[0]; ++i) {
+                dst[i + whc[0]*j + whc[0]*whc[1]*k] = (float)src[k + whc[2]*i + whc[2]*whc[0]*j] / 255.0f;  /* Normalize pixel values to [0, 1] */
             }
         }
-        mag_assert(whc[0]*whc[1]*whc[2] == mag_tensor_numel(t), "Buffer size mismatch: %zu != %zu", whc[0]*whc[1]*whc[2], (size_t)mag_tensor_numel(t));
-        (*load_free)(src);
-        mag_log_info("Loaded tensor from image: %s, %u x %u x %u", file, whc[0], whc[1], whc[2]);
-        return t;
     }
+    mag_assert(whc[0]*whc[1]*whc[2] == mag_tensor_numel(t), "Buffer size mismatch: %zu != %zu", whc[0]*whc[1]*whc[2], (size_t)mag_tensor_numel(t));
+    (*load_free)(src);
+    mag_log_info("Loaded tensor from image: %s, %u x %u x %u", file, whc[0], whc[1], whc[2]);
+    return t;
 }
 
 void mag_tensor_save_image(const mag_tensor_t* t, const char* file) {
