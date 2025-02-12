@@ -513,7 +513,7 @@ typedef enum mag_op_param_type_t {
 typedef struct mag_op_param_t {
     mag_op_param_type_t type : 8; /* Parameter type */
     union {
-        float f32;
+        float e8m23;
         int32_t i32;
         uint32_t u32;
     } x;

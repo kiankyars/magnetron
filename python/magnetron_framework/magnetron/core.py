@@ -29,17 +29,21 @@ class ComputeDevice:
 
 @unique
 class PRNGAlgorithm(Enum):
+    """Pseudo-random number generator algorithms"""
     MERSENNE_TWISTER = 0
     PCG = auto()
 
 
-@unique
 class DType(Enum):
-    F32 = 0
-
+    """Data types for tensors"""
+    E8M23 = 0       # float32 (same as E8M23)
+    F32 = E8M23     # float32 (same as F32)
+    E5M10 = auto()  # float16 (same as E5M10)
+    F16 = E5M10     # float16 (same as F16)
 
 @unique
 class ColorChannels(Enum):
+    """Color channels to load from image files"""
     AUTO = 0
     GRAY = auto()
     GRAY_A = auto()
@@ -62,27 +66,22 @@ class ColorChannels(Enum):
     def is_binary(self) -> bool:
         return self.argument_count == 2
 
-
-@unique
-class GraphEvalOrder(Enum):
-    FORWARD = 0
-    REVERSE = 1
-
-
 @unique
 class ExecutionMode(Enum):
+    """Execution modes for tensor operations"""
     EAGER = 0
     DEFERRED = 1
 
-
 @dataclass
 class GlobalConfig:
+    """Global configuration settings. Can be set via environment variables."""
     verbose: bool = getenv('MAG_VERBOSE', '0') == '1'
     compute_device: ComputeDevice.CPU | ComputeDevice.CUDA = ComputeDevice.CPU()
 
 
 @typing.final
 class Context:
+    """Execution context, owns all tensors. Only one context can be active at a time."""
     _active: 'Context' = None
 
     @staticmethod
@@ -217,6 +216,7 @@ def no_grad() -> 'no_grad.Scope':
 
 @typing.final
 class Tensor:
+    """Multi-dimensional tensor with support for automatic differentiation."""
     __slots__ = ('_ctx', '_ptr', '_inputs')
 
     def __init__(self, ptr: ffi.CData | None = None) -> None:
@@ -250,7 +250,7 @@ class Tensor:
         ctx: Context,
         *,
         shape: tuple[int, ...],
-        dtype: DType = DType.F32,
+        dtype: DType = DType.E8M23,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> None:
@@ -267,7 +267,7 @@ class Tensor:
         cls,
         shape: tuple[int, ...],
         *,
-        dtype: DType = DType.F32,
+        dtype: DType = DType.E8M23,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
@@ -287,7 +287,7 @@ class Tensor:
         shape: tuple[int, ...],
         *,
         fill_value: float,
-        dtype: DType = DType.F32,
+        dtype: DType = DType.E8M23,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
@@ -307,7 +307,7 @@ class Tensor:
         cls,
         data: list[float, ...],
         *,
-        dtype: DType = DType.F32,
+        dtype: DType = DType.E8M23,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
@@ -348,7 +348,7 @@ class Tensor:
         cls,
         shape: tuple[int, ...],
         *,
-        dtype: DType = DType.F32,
+        dtype: DType = DType.E8M23,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
@@ -362,7 +362,7 @@ class Tensor:
         shape: tuple[int, ...],
         *,
         interval: (float, float) = (-1.0, 1.0),
-        dtype: DType = DType.F32,
+        dtype: DType = DType.E8M23,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
@@ -393,7 +393,7 @@ class Tensor:
         tensor._new(
             Context.active(),
             shape=shape,
-            dtype=DType.F32,
+            dtype=DType.E8M23,
             requires_grad=requires_grad,
             name=name,
         )
@@ -464,7 +464,7 @@ class Tensor:
         return self[0]
 
     def tolist(self) -> list[float]:
-        assert self.dtype == DType.F32, 'Invalid data type'
+        assert self.dtype == DType.E8M23, 'Invalid data type'
         return ffi.unpack(
             ffi.cast('float*', C.mag_tensor_data_ptr(self._ptr)), self.numel
         )
