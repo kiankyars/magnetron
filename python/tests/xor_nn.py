@@ -90,8 +90,6 @@ def xor_nn_mag():
         d_z1 = (d_z2 @ w2.T.clone()) * a1.sigmoid(True)
         d_w1 = x.T @ d_z1
         d_b1 = d_z1.sum()
-        if epoch == 0:
-            d_b1.export_graphviz('xor_nn_mag.dot')
 
         w2 -= LR * d_w2
         b2 -= LR * d_b2

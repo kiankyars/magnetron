@@ -47,11 +47,11 @@ set(MAG_GCC_COMPILE_FLAGS
 )
 set(MAG_GCC_RELEASE_COMPILE_FLAGS
     -O3
-    -flto
+    -flto=auto
     -fomit-frame-pointer
 )
 set(MAG_GCC_LINK_OPTIONS "")
-set(MAG_GCC_RELEASE_LINK_OPTIONS -flto)
+set(MAG_GCC_RELEASE_LINK_OPTIONS -flto=auto)
 
 if (${IS_ARM64})
     set(MAG_CLANG_COMPILE_FLAGS ${MAG_CLANG_COMPILE_FLAGS} -march=armv8-a)
