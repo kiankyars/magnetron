@@ -52,6 +52,29 @@ void mag_set_log_mode(bool enabled) {
     mag_log_enabled = enabled;
 }
 
+#if defined(__linux__) && defined(__GLIBC__)
+#include <sys/wait.h>
+#include <execinfo.h>
+static void mag_dump_backtrace(void) {
+    char proc[64];
+    snprintf(proc, sizeof(proc), "attach %d", getpid());
+    int pid = fork();
+    if (pid == 0) {
+        execlp("gdb", "gdb", "--batch", "-ex", "set style enabled on", "-ex", proc, "-ex", "bt -frame-info source-and-location", "-ex", "detach", "-ex", "quit", NULL);
+        execlp("lldb", "lldb", "--batch", "-o", "bt", "-o", "quit", "-p", proc, NULL);
+        exit(EXIT_FAILURE);
+    }
+    int stat;
+    waitpid(pid, &stat, 0);
+    if (WIFEXITED(stat) && WEXITSTATUS(stat) == EXIT_FAILURE) {
+        void* trace[0xff];
+        backtrace_symbols_fd(trace, backtrace(trace, sizeof(trace)/sizeof(*trace)), STDERR_FILENO);
+    }
+}
+#else
+static void mag_dump_backtrace(void) { }
+#endif
+
 static void MAG_COLDPROC mag_panic_dump(FILE* f, bool cc, const char* msg, va_list args) {
     if (cc) fprintf(f, "%s", MAG_CC_RED);
     vfprintf(f, msg, args);
@@ -70,6 +93,7 @@ MAG_NORET MAG_COLDPROC MAG_EXPORT void mag_panic(const char* msg, ...) {
     }
     mag_panic_dump(stdout, true, msg, args);
     va_end(args);
+    mag_dump_backtrace();
     abort();
 }
 
