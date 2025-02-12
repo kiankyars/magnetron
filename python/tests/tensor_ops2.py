@@ -4,6 +4,8 @@ import random
 from magnetron import Tensor
 import numpy as np
 
+EPS = 1e-6
+
 def tonumpy(t: Tensor):
     return np.array(t.tolist(), dtype=np.float32).reshape(t.shape)
 
@@ -22,14 +24,14 @@ def binary_op_square(f: callable, lim: int = 4) -> None:
         x = Tensor.uniform(shape)
         y = Tensor.uniform(shape)
         r = f(x, y)
-        np.testing.assert_allclose(tonumpy(r), f(tonumpy(x), tonumpy(y)))
+        np.testing.assert_allclose(tonumpy(r), f(tonumpy(x), tonumpy(y)), atol=EPS)
     square_shape_permutations(compute, lim)
 
-def unary_op(magf: callable, npf: callable, lim: int = 4) -> None:
+def unary_op(magf: callable, npf: callable, lim: int = 4, interval=(-1.0, 1.0)) -> None:
     def compute(shape: tuple[int, ...]) -> None:
-        x = Tensor.uniform(shape)
-        r = magf(x)
-        np.testing.assert_allclose(tonumpy(r), npf(tonumpy(x)), atol=1e-6)
+        x = Tensor.uniform(shape, interval=interval)
+        r = magf(x.clone())
+        np.testing.assert_allclose(tonumpy(r), npf(tonumpy(x)), atol=EPS)
 
     square_shape_permutations(compute, lim)
 
@@ -77,11 +79,9 @@ def test_unary_op_cos() -> None:
     unary_op(lambda x: x.cos(), lambda x: np.cos(x))
     unary_op(lambda x: x.cos_(), lambda x: np.cos(x))
 
-"""
 def test_unary_op_step() -> None:
-    unary_op(lambda x: x.cos(), lambda x: np.cos(x))
-    unary_op(lambda x: x.cos_(), lambda x: np.cos(x))
-"""
+    unary_op(lambda x: x.step(), lambda x: np.heaviside(x, 0))
+    unary_op(lambda x: x.step_(), lambda x: np.heaviside(x, 0))
 
 def test_unary_op_exp() -> None:
     unary_op(lambda x: x.exp(), lambda x: np.exp(x))

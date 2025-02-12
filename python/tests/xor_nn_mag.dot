@@ -1,0 +1,32 @@
+digraph computation_graph {
+  rankdir=LR;
+  node [fontname="Helvetica", shape=box];
+  edge [fontname="Helvetica"];
+  "0x270f857de98" [label="⊕ sum|X|S (1)|F 0x1", shape=record, style="rounded,filled", fillcolor=skyblue2];
+  "0x270f857e318" -> "0x270f857de98" [label="x"];
+  "0x270f857e318" [label="⊕ mul|X|S (4, 4)|F 0x1", shape=record, style="rounded,filled", fillcolor=skyblue2];
+  "0x270f857e798" -> "0x270f857e318" [label="x"];
+  "0x270f857e798" [label="⊕ matmul|X|S (4, 4)|F 0x1", shape=record, style="rounded,filled", fillcolor=skyblue2];
+  "0x270f857f218" -> "0x270f857e798" [label="x"];
+  "0x270f857f218" [label="⊕ mul|X|S (4, 1)|F 0x1", shape=record, style="rounded,filled", fillcolor=skyblue2];
+  "0x270f857ef18" -> "0x270f857f218" [label="x"];
+  "0x270f857ef18" [label="⊕ neg|X|S (4, 1)|F 0x1", shape=record, style="rounded,filled", fillcolor=skyblue2];
+  "0x270f857ed98" -> "0x270f857ef18" [label="x"];
+  "0x270f857ed98" [label="⊕ sigmoid_dv|X|S (4, 1)|F 0x1", shape=record, style="rounded,filled", fillcolor=skyblue2];
+  "0x270f857f098" -> "0x270f857ed98" [label="x"];
+  "0x270f857f098" [label="⊕ sigmoid|X|S (4, 1)|F 0x1", shape=record, style="rounded,filled", fillcolor=skyblue2];
+  "0x270f857f218" -> "0x270f857f098" [label="x"];
+  "0x270f857ed98" -> "0x270f857f218" [label="y"];
+  "0x270f857e618" -> "0x270f857e798" [label="y"];
+  "0x270f857e618" [label="⊕ clone|X|S (1, 4)|F 0x1", shape=record, style="rounded,filled", fillcolor=skyblue2];
+  "0x270f857e798" -> "0x270f857e618" [label="x"];
+  "0x270f857e498" -> "0x270f857e318" [label="y"];
+  "0x270f857e498" [label="⊕ sigmoid_dv|X|S (4, 4)|F 0x1", shape=record, style="rounded,filled", fillcolor=skyblue2];
+  "0x270f857f398" -> "0x270f857e498" [label="x"];
+  "0x270f857f398" [label="⊕ sigmoid|X|S (4, 4)|F 0x1", shape=record, style="rounded,filled", fillcolor=skyblue2];
+  "0x270f857f518" -> "0x270f857f398" [label="x"];
+  "0x270f857f518" [label="⊕ matmul|X|S (4, 1)|F 0x1", shape=record, style="rounded,filled", fillcolor=skyblue2];
+  "0x270f857f398" -> "0x270f857f518" [label="x"];
+  "0x270f857f998" -> "0x270f857f518" [label="y"];
+  "0x270f857f998" [label="⊕ nop|X|S (4, 1)|F 0x1", shape=record, style="rounded,filled", fillcolor=palegreen];
+}

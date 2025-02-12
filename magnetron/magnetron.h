@@ -370,6 +370,7 @@ extern MAG_EXPORT void mag_tensor_save(const mag_tensor_t* t, const char* file);
 extern MAG_EXPORT mag_tensor_t* mag_tensor_load(mag_ctx_t* ctx, const char* file); /* Load tensor from magnetron binary file. */
 extern MAG_EXPORT mag_tensor_t* mag_tensor_load_image(mag_ctx_t* ctx, const char* file, mag_color_channels_t channels, uint32_t resize_w, uint32_t resize_h); /* Create a tensor from an image file. */
 extern MAG_EXPORT void mag_tensor_save_image(const mag_tensor_t* t, const char* file); /* Save tensor data as an image */
+extern MAG_EXPORT void mag_tensor_export_graphviz(const mag_tensor_t* t, const char* file); /* Export tensor computation graph as Graphviz DOT file */
 #define mag_tensor_image_width(tensor) (mag_tensor_shape(tensor)[2]) /* Get image width from tensor */
 #define mag_tensor_image_height(tensor) (mag_tensor_shape(tensor)[1]) /* Get image height from tensor */
 #define mag_tensor_image_channels(tensor) (mag_tensor_shape(tensor)[0]) /* Get image channels from tensor */

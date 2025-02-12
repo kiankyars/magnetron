@@ -83,6 +83,8 @@ TEST(autograd, bin_ops2) {
     mag_tensor_set_requires_grad(y, true);
     mag_tensor_backward(y);
 
+    //mag_tensor_export_graphviz(y, "autograd2.dot");
+
     // check forward pass
     float vx = mag_tensor_get_scalar_virtual_index(x, 0);
     float vy = mag_tensor_get_scalar_virtual_index(y, 0);

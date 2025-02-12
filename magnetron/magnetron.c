@@ -3613,6 +3613,57 @@ void mag_tensor_save_image(const mag_tensor_t* t, const char* file) {
     mag_log_info("Saved tensor to image: %s, width: %d, height: %d, channels: %d", file, (int)w, (int)h, (int)c);
 }
 
+static void mag_graphviz_dump(const mag_tensor_t* node, FILE *fp, const mag_tensor_t*** visited, size_t* len, size_t* cap) { /* TODO this function generates a wrong non DAG sometimes, needs to be fixed */
+    for (size_t i = 0; i < *len; ++i)
+        if ((*visited)[i] == node)
+            return;
+    if (*len >= *cap)
+        *visited = (*mag_alloc)(*visited, ((*cap <<= 1) * sizeof(mag_tensor_t*)));
+    (*visited)[*len] = node;
+    (*len)++;
+    bool is_input = true;
+    for (unsigned i = 0; i < MAG_MAX_INPUT_TENSORS; i++) {
+        if (node->op_inputs[i] != NULL) {
+            is_input = false;
+            break;
+        }
+    }
+    const char* fillcolor = is_input ? "palegreen" : "skyblue2";
+    char dim_buf[150];
+    mag_fmt_dims(&dim_buf, &node->shape, node->rank);
+    bool gra = node->flags & MAG_TFLAG_REQUIRES_GRAD;
+    fprintf(fp, "  \"%p\" [label=\"⊕ %s|%s|S %s|F 0x%x\", shape=record, style=\"rounded,filled\", fillcolor=%s];\n", (void*)node, mag_op_meta_of(node->op)->mnemonic, gra ? "→∇" : "X", dim_buf, node->flags, fillcolor);
+    const char* vars = "xy";
+    mag_assert2(strlen(vars) == MAG_MAX_INPUT_TENSORS);
+    for (unsigned i = 0; i < MAG_MAX_INPUT_TENSORS; ++i) {
+        mag_tensor_t* input = node->op_inputs[i];
+        if (!input)
+            continue;
+        char name[64];
+        if (*input->name)
+            snprintf(name, sizeof(name), "%s", input->name);
+        else
+            snprintf(name, sizeof(name), "%c", vars[i]);
+        fprintf(fp, "  \"%p\" -> \"%p\" [label=\"%s\"];\n", (void*)input, (void*)node, name);
+        mag_graphviz_dump(input, fp, visited, len, cap);
+    }
+}
+
+MAG_COLDPROC void mag_tensor_export_graphviz(const mag_tensor_t* t, const char* file) {
+    mag_assert2(t && file && *file);
+    FILE* f = mag_fopen(file, "w");
+    size_t len = 0, cap = 128;
+    const mag_tensor_t** visited = (*mag_alloc)(NULL, cap * sizeof(mag_tensor_t*));
+    fprintf(f, "digraph computation_graph {\n");
+    fprintf(f, "  rankdir=LR;\n");
+    fprintf(f, "  node [fontname=\"Helvetica\", shape=box];\n");
+    fprintf(f, "  edge [fontname=\"Helvetica\"];\n");
+    mag_graphviz_dump(t, f, &visited, &len, &cap);
+    fprintf(f, "}\n");
+    (*mag_alloc)(visited, 0);
+    fclose(f);
+}
+
 static uint8_t* mag_default_image_load_impl(const char* file, uint32_t(*whc)[3], mag_color_channels_t channels) {
     mag_assert2(file && *file && whc);
     int w, h, c, dc;

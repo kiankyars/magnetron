@@ -593,6 +593,9 @@ class Tensor:
         assert self.channels in (1, 3, 4), 'Invalid number of color channels'
         C.mag_tensor_save_image(self._ptr, bytes(file_path, 'utf-8'))
 
+    def export_graphviz(self, file_path: str) -> None:
+        C.mag_tensor_export_graphviz(self._ptr, bytes(file_path, 'utf-8'))
+
     def clone(self) -> 'Tensor':
         return Tensor(C.mag_clone(self._ptr))
 
@@ -607,9 +610,7 @@ class Tensor:
         return Tensor(C.mag_transpose(self._ptr))
 
     def permute(self, axes: tuple[int, ...]) -> 'Tensor':
-        assert len(axes) == self.rank, (
-            f'Invalid number of axes, require {self.rank}, got {len(axes)}'
-        )
+        assert len(axes) == self.rank, f'Invalid number of axes, require {self.rank}, got {len(axes)}'
         if len(axes) != MAX_DIMS:
             axes = axes + tuple(range(self.rank, MAX_DIMS))
         assert len(axes) == MAX_DIMS
