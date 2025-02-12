@@ -59,9 +59,86 @@
 #define __F16C__ 1
 #endif
 
+typedef uint16_t mag_f16_t;
 typedef float mag_f32_t;
 typedef double mag_f64_t;
 
+#define MAG_F16_E 0x4170
+#define MAG_F16_EPS 0x1400
+#define MAG_F16_INF 0x7c00
+#define MAG_F16_LN10 0x409b
+#define MAG_F16_LN2 0x398c
+#define MAG_F16_LOG10_2 0x34d1
+#define MAG_F16_LOG10_E 0x36f3
+#define MAG_F16_LOG2_10 0x42a5
+#define MAG_F16_LOG2_E 0x3dc5
+#define MAG_F16_MAX 0x7bff
+#define MAG_F16_MAX_SUBNORMAL 0x03ff
+#define MAG_F16_MIN 0xfbff
+#define MAG_F16_MIN_POS 0x0400
+#define MAG_F16_MIN_POS_SUBNORMAL 0x0001
+#define MAG_F16_NAN 0x7e00
+#define MAG_F16_NEG_INF 0xfc00
+#define MAG_F16_NEG_ONE 0xbc00
+#define MAG_F16_NEG_ZERO 0x8000
+#define MAG_F16_ONE 0x3c00
+#define MAG_F16_PI 0x4248
+#define MAG_F16_SQRT2 0x3da8
+#define MAG_F16_ZERO 0x0000
+
+static MAG_AINLINE mag_f16_t mag_f32_to_f16(mag_f32_t x) {
+    #ifdef __F16C__
+        #ifdef _MSC_VER
+            return (uint16_t)_mm_extract_epi16(_mm_cvtps_ph(_mm_set_ss(x), 0), 0);
+        #else
+            return _cvtss_sh(x, 0);
+        #endif
+    #elif defined(__ARM_NEON) && !defined(_MSC_VER)
+        #error "TODO"
+    #else
+        float base = fabs(x)*0x1.0p+112f*0x1.0p-110f;
+        uint32_t w = *(uint32_t*)&x;
+        uint32_t shl1_w = w+w;
+        uint32_t sign = w & 0x80000000u;
+        uint32_t bias = 0x07800000u+(mag_xmax(0x71000000u, shl1_w&0xff000000u)>>1);
+        float rfbits = base + *(float*)&bias;
+        uint32_t rbits = *(uint32_t*)&rfbits;
+        uint32_t exp_bits = (rbits>>13) & 0x00007c00u;
+        uint32_t mant_bits = rbits & 0x00000fffu;
+        uint32_t nonsign = exp_bits + mant_bits;
+        return (sign>>16)|(shl1_w > 0xff000000 ? 0x7e00 : nonsign);
+    #endif
+}
+
+static MAG_AINLINE mag_f32_t mag_f16_to_f32(mag_f16_t x) {
+    #ifdef __F16C__
+        #ifdef _MSC_VER
+            return _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128(x)));
+        #else
+            return _cvtsh_ss(x);
+        #endif
+    #elif defined(__ARM_NEON) && !defined(_MSC_VER)
+        #error "TODO"
+    #else
+        uint32_t w = (uint32_t)x<<16;
+        uint32_t sign = w & 0x80000000u;
+        uint32_t two_w = w+w;
+        uint32_t offs = 0xe0u<<23;
+        uint32_t t1 = (two_w>>4) + offs;
+        uint32_t t2 = (two_w>>17) | (126u<<23);
+        float norm_x = *(float*)&t1*0x1.0p-112f;
+        float denorm_x = *(float*)&t2 - 0.5f;
+        uint32_t denorm_cutoff = 1u<<27;
+        uint32_t r = sign
+            | (two_w < denorm_cutoff
+            ? *(uint32_t*)&denorm_x
+            : *(uint32_t*)&norm_x);
+        return *(float*)&r;
+    #endif
+}
+
+#define mag_f16p(t) ((const mag_f16_t*)(t)->storage.base)
+#define mag_f16p_mut(t) ((mag_f16_t*)(t)->storage.base)
 #define mag_f32p(t) ((const mag_f32_t*)(t)->storage.base)
 #define mag_f32p_mut(t) ((mag_f32_t*)(t)->storage.base)
 

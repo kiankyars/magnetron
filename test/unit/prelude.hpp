@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cstring>
+#include <numbers>
 
 inline auto mag_tensor_buf_f32_to_vec(const mag_tensor_t* tensor, std::vector<float>& out) -> void {
     out.clear();
