@@ -365,14 +365,24 @@ typedef struct mag_ivdiv_t {
     uint32_t d;
 } mag_ivdiv_t;
 
-static inline mag_ivdiv_t mag_ivdiv_mkdi(uint32_t divisor) { /* Create packed division info from devisor. */
-    uint32_t l = (divisor-1) ? 32 - __builtin_clz((divisor-1)) : 0;
+#ifdef _MSC_VER
+static inline DWORD mag_clz(DWORD x) {
+    DWORD z = 0;
+    return _BitScanForward(&z, x) ? z : 32;
+}
+#else
+#define mag_clz(x) __builtin_clz(x)
+#endif
+
+static inline mag_ivdiv_t mag_ivdiv_mkdi(uint32_t d) { /* Create packed division info from devisor. */
+    uint32_t l = (d-1) ? 32 - mag_clz((d-1)) : 0;
     uint32_t s1 = l > 1 ? 1 : l&0xff;
     uint32_t s2 = !l ? 0 : (l-1)&0xff;
-    return (mag_ivdiv_t) {
-        s1, s2,
-        (uint32_t)(((1ull<<l) - divisor)*0x100000000ull) / divisor + 1
-    };
+    mag_ivdiv_t r;
+    r.s1 = s1;
+    r.s2 = s2;
+    r.d = (uint32_t)(((1ull<<l) - d)*0x100000000ull)/d + 1;
+    return r;
 }
 static inline uint32_t mag_ivdiv32(uint32_t x, uint32_t y, mag_ivdiv_t di) { /* r = x / y. Fast division using invariant multiplication. Up to 40x times faster on some chips. */
     (void)y;
