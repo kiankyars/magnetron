@@ -106,7 +106,7 @@ jobs:
         shell: bash
         run: |
           . .venv/bin/activate
-          pip install pytest
+          pip install -r ${{ github.workspace }}/python/optional-requirements.txt
 
       - name: Run Python Tests
         if: runner.os != 'windows'
