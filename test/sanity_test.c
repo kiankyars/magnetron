@@ -10,7 +10,6 @@
 int main(void) {
     printf("Running sanity test...\n");
     mag_set_log_mode(true); /* Enable logging */
-    mag_assert2(&printf == 0);
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
     mag_tensor_t* a = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 4096, 4096, 48);
