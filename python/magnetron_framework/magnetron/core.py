@@ -543,7 +543,7 @@ class Tensor:
         C.mag_tensor_set_requires_grad(self._ptr, require)
 
     @property
-    def grad(self) -> 'Tensor':
+    def grad(self) -> 'Tensor' | None:
         if not self.requires_grad:
             return None
         ptr: ffi.CData = C.mag_tensor_grad(self._ptr)
@@ -610,7 +610,9 @@ class Tensor:
         return Tensor(C.mag_transpose(self._ptr))
 
     def permute(self, axes: tuple[int, ...]) -> 'Tensor':
-        assert len(axes) == self.rank, f'Invalid number of axes, require {self.rank}, got {len(axes)}'
+        assert len(axes) == self.rank, (
+            f'Invalid number of axes, require {self.rank}, got {len(axes)}'
+        )
         if len(axes) != MAX_DIMS:
             axes = axes + tuple(range(self.rank, MAX_DIMS))
         assert len(axes) == MAX_DIMS
@@ -621,132 +623,183 @@ class Tensor:
         return Tensor(C.mag_permute(self._ptr, *axes))
 
     def mean(self) -> 'Tensor':
+        self._inputs = (self,)
         return Tensor(C.mag_mean(self._ptr))
 
     def min(self) -> 'Tensor':
+        self._inputs = (self,)
         return Tensor(C.mag_min(self._ptr))
 
     def max(self) -> 'Tensor':
+        self._inputs = (self,)
         return Tensor(C.mag_max(self._ptr))
 
     def sum(self) -> 'Tensor':
+        self._inputs = (self,)
         return Tensor(C.mag_sum(self._ptr))
 
     def abs(self) -> 'Tensor':
+        self._inputs = (self,)
         return Tensor(C.mag_abs(self._ptr))
 
     def abs_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
         return Tensor(C.mag_abs_(self._ptr))
 
     def neg(self) -> 'Tensor':
+        self._inputs = (self,)
         return Tensor(C.mag_neg(self._ptr))
 
     def neg_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
         return Tensor(C.mag_neg_(self._ptr))
 
     def __neg__(self) -> 'Tensor':
         return self.neg()
 
     def log(self) -> 'Tensor':
+        self._inputs = (self,)
         return Tensor(C.mag_log(self._ptr))
 
     def log_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
         return Tensor(C.mag_log_(self._ptr))
 
     def sqr(self) -> 'Tensor':
+        self._inputs = (self,)
         return Tensor(C.mag_sqr(self._ptr))
 
     def sqr_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
         return Tensor(C.mag_sqr_(self._ptr))
 
     def sqrt(self) -> 'Tensor':
+        self._inputs = (self,)
         return Tensor(C.mag_sqrt(self._ptr))
 
     def sqrt_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
         return Tensor(C.mag_sqrt_(self._ptr))
 
     def sin(self) -> 'Tensor':
+        self._inputs = (self,)
         return Tensor(C.mag_sin(self._ptr))
 
     def sin_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
         return Tensor(C.mag_sin_(self._ptr))
 
     def cos(self) -> 'Tensor':
+        self._inputs = (self,)
         return Tensor(C.mag_cos(self._ptr))
 
     def cos_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
         return Tensor(C.mag_cos_(self._ptr))
 
     def step(self) -> 'Tensor':
+        self._inputs = (self,)
         return Tensor(C.mag_step(self._ptr))
 
     def step_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
         return Tensor(C.mag_step_(self._ptr))
 
     def exp(self) -> 'Tensor':
+        self._inputs = (self,)
         return Tensor(C.mag_exp(self._ptr))
 
     def exp_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
         return Tensor(C.mag_exp_(self._ptr))
 
-    def softmax(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(
-            C.mag_softmax_dv(self._ptr) if derivative else C.mag_softmax(self._ptr)
-        )
+    def softmax(self) -> 'Tensor':
+        self._inputs = (self,)
+        return Tensor(C.mag_softmax(self._ptr))
 
-    def softmax_(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(
-            C.mag_softmax_dv_(self._ptr) if derivative else C.mag_softmax_(self._ptr)
+    def softmax_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
         )
+        return Tensor(C.mag_softmax_(self._ptr))
 
-    def sigmoid(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(
-            C.mag_sigmoid_dv(self._ptr) if derivative else C.mag_sigmoid(self._ptr)
-        )
+    def sigmoid(self) -> 'Tensor':
+        self._inputs = (self,)
+        return Tensor(C.mag_sigmoid(self._ptr))
 
-    def sigmoid_(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(
-            C.mag_sigmoid_dv_(self._ptr) if derivative else C.mag_sigmoid_(self._ptr)
+    def sigmoid_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
         )
+        return Tensor(C.mag_sigmoid_(self._ptr))
 
     def hard_sigmoid(self) -> 'Tensor':
+        self._inputs = (self,)
         return Tensor(C.mag_hard_sigmoid(self._ptr))
 
     def hard_sigmoid_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
         return Tensor(C.mag_hard_sigmoid_(self._ptr))
 
-    def silu(self, derivative: bool = False) -> 'Tensor':
-        return C.mag_silu_dv(self._ptr) if derivative else C.mag_silu(self._ptr)
-
-    def silu_(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(
-            C.mag_silu_dv_(self._ptr) if derivative else C.mag_silu_(self._ptr)
-        )
-
-    def tanh(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(C.mag_tanh_dv(self._ptr) if derivative else C.mag_tanh(self._ptr))
-
-    def tanh_(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(
-            C.mag_tanh_dv_(self._ptr) if derivative else C.mag_tanh_(self._ptr)
-        )
-
-    def relu(self, derivative: bool = False) -> 'Tensor':
+    def silu(self) -> 'Tensor':
         self._inputs = (self,)
-        return Tensor(C.mag_relu_dv(self._ptr) if derivative else C.mag_relu(self._ptr))
+        return Tensor(C.mag_silu(self._ptr))
 
-    def relu_(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(
-            C.mag_relu_dv_(self._ptr) if derivative else C.mag_relu_(self._ptr)
+    def silu_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
         )
+        return Tensor(C.mag_silu_(self._ptr))
 
-    def gelu(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(C.mag_gelu_dv(self._ptr) if derivative else C.mag_gelu(self._ptr))
+    def tanh(self) -> 'Tensor':
+        self._inputs = (self,)
+        return Tensor(C.mag_tanh(self._ptr))
 
-    def gelu_(self, derivative: bool = False) -> 'Tensor':
-        return Tensor(
-            C.mag_gelu_dv_(self._ptr) if derivative else C.mag_gelu_(self._ptr)
+    def tanh_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
         )
+        return Tensor(C.mag_tanh_(self._ptr))
+
+    def relu(self) -> 'Tensor':
+        self._inputs = (self,)
+        return Tensor(C.mag_relu(self._ptr))
+
+    def relu_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
+        return Tensor(C.mag_relu_(self._ptr))
+
+    def gelu(self) -> 'Tensor':
+        self._inputs = (self,)
+        return Tensor(C.mag_gelu(self._ptr))
+
+    def gelu_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
+        return Tensor(C.mag_gelu_(self._ptr))
 
     def __add__(self, other: object | int | float) -> 'Tensor':
         if not isinstance(other, Tensor):
@@ -760,7 +813,9 @@ class Tensor:
         return other + self
 
     def __iadd__(self, other: object | int | float) -> 'Tensor':
-        assert not self.requires_grad, 'In-place operations are not supported for gradients'
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
         if isinstance(other, Tensor):
             return Tensor(C.mag_add_(self._ptr, other._ptr))
         else:
@@ -778,7 +833,9 @@ class Tensor:
         return other - self
 
     def __isub__(self, other: object | int | float) -> 'Tensor':
-        assert not self.requires_grad, 'In-place operations are not supported for gradients'
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
         if isinstance(other, Tensor):
             return Tensor(C.mag_sub_(self._ptr, other._ptr))
         else:
@@ -796,7 +853,9 @@ class Tensor:
         return other * self
 
     def __imul__(self, other: object | int | float) -> 'Tensor':
-        assert not self.requires_grad, 'In-place operations are not supported for gradients'
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
         if isinstance(other, Tensor):
             return Tensor(C.mag_mul_(self._ptr, other._ptr))
         else:
@@ -814,7 +873,9 @@ class Tensor:
         return other / self
 
     def __itruediv__(self, other: object | int | float) -> 'Tensor':
-        assert not self.requires_grad, 'In-place operations are not supported for gradients'
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
         if isinstance(other, Tensor):
             return Tensor(C.mag_div_(self._ptr, other._ptr))
         else:
@@ -825,7 +886,9 @@ class Tensor:
         return Tensor(C.mag_matmul(self._ptr, other._ptr))
 
     def __imatmul__(self, other: 'Tensor') -> 'Tensor':
-        assert not self.requires_grad, 'In-place operations are not supported for gradients'
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
         return Tensor(C.mag_matmul_(self._ptr, other._ptr))
 
     def __pow__(self, exponent: int | float) -> 'Tensor':
