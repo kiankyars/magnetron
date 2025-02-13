@@ -998,8 +998,8 @@ static void MAG_HOTPROC mag_vtanh_dv_f32( /* tanh' : ℝ -> (-1, 1), x |-> 1 / (
     const mag_f32_t* x
 ) {
     for (int64_t i=0; i < numel; ++i) {
-        const mag_f32_t cx = coshf(x[i]);
-        o[i] = 1.0f / (cx*cx);
+        float t = tanhf(x[i]);
+        o[i] = 1.0f - t*t;
     }
 }
 

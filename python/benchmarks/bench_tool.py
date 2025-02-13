@@ -52,7 +52,7 @@ class PerformanceInfo:
             ax2.set_xticklabels(x_labels, rotation=45, ha='right')
         else:
             dims = [sa[0] for sa in self.shapes_a]  # For square matrices, any dimension works
-            markers = ['o', '+', 'x', '*', '.', 'X', '^']
+            markers = ['o', '+', 'x', '*', '.', 'x', '^']
             
             for i, participant in enumerate(self.participants):
                 ax1.plot(dims, participant.timings, label=participant.name, 

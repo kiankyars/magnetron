@@ -1,53 +1,49 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
-from magnetron import Tensor
-from magnetron.layer import DenseLayer
-from magnetron.model import SequentialModel, HyperParams
-import matplotlib.pyplot as plt
+from magnetron import Tensor, Module, Linear
+from magnetron.optim import SGD, mse_loss
 
-EPOCHS: int = 10000
-RATE: float = 0.1
 
-# Inputs: shape (4, 2)
-inputs = Tensor.const([
+class XOR(Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.l1 = Linear(2, 2)
+        self.l2 = Linear(2, 1)
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = self.l1(x).tanh()
+        x = self.l2(x).tanh()
+        return x
+
+model = XOR()
+optim = SGD(model.parameters(), lr=1e-1)
+
+x = Tensor.const([
     [0, 0],
     [0, 1],
     [1, 0],
     [1, 1]
-])
+], name='x')
 
-# Targets: shape (4, 1)
-targets = Tensor.const([
+y = Tensor.const([
     [0],
     [1],
     [1],
     [0]
-])
+], name='y')
 
-params = HyperParams(lr=RATE, epochs=EPOCHS)
-mlp = SequentialModel(params, [
-    DenseLayer(2, 4),
-    DenseLayer(4, 1)
-])
+epochs: int = 2000
 
-# Train
-losses = mlp.train(inputs, targets)
+y_hat = model(x)
+print(y_hat)
+for epoch in range(epochs):
+    y_hat = model(x)
+    loss = mse_loss(y_hat, y)
+    loss.backward()
+    optim.step()
+    optim.zero_grad()
+    if epoch % 1000 == 0:
+        print(f'Epoch: {epoch}, Loss: {loss.item()}')
 
-# Inference
-test_points = [
-    (0, 0),
-    (0, 1),
-    (1, 0),
-    (1, 1),
-]
-
-for (x_val, y_val) in test_points:
-    result = mlp.forward(Tensor.const([[x_val, y_val]]))[0]
-    print(f"{x_val} XOR {y_val} => {result:.4f}")
-
-# Plot MSE loss
-plt.plot(list(range(0, EPOCHS)), losses)
-plt.xlabel('Epochs')
-plt.ylabel('MSE Loss')
-plt.title('XOR Problem')
-plt.show()
+y_hat = model(x)
+print(y_hat)

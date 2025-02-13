@@ -1202,7 +1202,9 @@ static void mag_op_backward_view(mag_tensor_t* node, mag_tensor_t** grads) {
 }
 
 static void mag_op_backward_transpose(mag_tensor_t* node, mag_tensor_t** grads) {
-    *grads = mag_transpose(node->grad);
+    mag_tensor_t* t = mag_transpose(node->grad);
+    *grads = mag_clone(t);
+    mag_tensor_decref(t);
 }
 
 static void mag_op_backward_permute(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1219,7 +1221,7 @@ static void mag_op_backward_permute(mag_tensor_t* node, mag_tensor_t** grads) {
 static void mag_op_backward_mean(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
     double scale = 1.0/(double)x->numel;
-    *grads = mag_muls(node->grad, scale);
+    *grads = mag_muls(node->grad, (float)scale);
 }
 
 static void mag_op_backward_min(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1318,7 +1320,7 @@ static void mag_op_backward_softmax(mag_tensor_t* node, mag_tensor_t** grads) {
 static void mag_op_backward_sigmoid(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
     mag_tensor_t* dv = mag_sigmoid_dv(x);
-    grads[0] = mag_mul(node->grad, dv);
+    grads[0] = mag_mul(dv, node->grad);
     mag_tensor_decref(dv);
 }
 
@@ -1334,6 +1336,13 @@ static void mag_op_backward_tanh(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* dv = mag_tanh_dv(x);
     grads[0] = mag_mul(node->grad, dv);
     mag_tensor_decref(dv);
+}
+
+static void mag_op_backward_relu(mag_tensor_t* node, mag_tensor_t** grads) {
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* mask = mag_step(x);
+    grads[0] = mag_mul(node->grad, mask);
+    mag_tensor_decref(mask);
 }
 
 static void mag_op_backward_gelu(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1356,8 +1365,8 @@ static void mag_op_backward_sub(mag_tensor_t* node, mag_tensor_t** grads) {
 static void mag_op_backward_mul(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
     mag_tensor_t* y = node->op_inputs[1];
-    grads[0] = mag_mul(node->grad, y);
-    grads[1] = mag_mul(node->grad, x);
+    grads[0] = mag_mul(y, node->grad);
+    grads[1] = mag_mul(x, node->grad);
 }
 
 static void mag_op_backward_div(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -2017,12 +2026,12 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
     const mag_op_meta_t* meta = mag_op_meta_of(op);
     mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_op_param_t*) = meta->r_alloc;
     bool (*validate_op)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_op_param_t*) = meta->validator;
-    mag_tensor_t* R = (inplace && numin && meta->inplace)                                                   /* Inplace requested? */
-        ? mag_tensor_create(ctx, (*inputs)->dtype, (*inputs)->shape, (*inputs)->rank, *inputs, 0)  /* View R <- X for inplace aliasing op. */
-        : (*r_alloc)(inputs, params);                                                                       /* Construct new result tensor. */
-    if (mag_unlikely(!(*validate_op)(op, R, inputs, params))) return NULL;                                  /* Validation failed. */
-    R->op = op;                                                         /* Set operation for deferred execution mode. */
-    for (uint32_t i=0; i < numin; ++i) {                             /* Set input tensors and flags. */
+    mag_tensor_t* R = (inplace && numin && meta->inplace)                                                       /* Inplace requested? */
+        ? mag_tensor_create(ctx, (*inputs)->dtype, (*inputs)->shape, (*inputs)->rank, *inputs, 0)       /* View R <- X for inplace aliasing op. */
+        : (*r_alloc)(inputs, params);                                                                           /* Construct new result tensor. */
+    mag_assert((*validate_op)(op, R, inputs, params), "Invalid operation %s.", meta->mnemonic);                 /* Validate operation */
+    R->op = op;                                                                                                 /* Set operation for deferred execution mode. */
+    for (uint32_t i=0; i < numin; ++i) {                                                                        /* Set input tensors and flags. */
         mag_tensor_t* input = inputs[i];
         R->op_inputs[i] = input;
         if (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)
@@ -2533,6 +2542,7 @@ void mag_tensor_backward(mag_tensor_t* root) {
             mag_tensor_t* grad = mag_tensor_create(child->ctx, child->dtype, child->shape, child->rank, NULL, 0);
             grad->flags = (grad->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
             mag_tensor_fill(grad, 1.0f);
+            mag_tensor_fmt_name(grad, "%s (grad)", child->name);
             child->grad = grad;
         }
         if (mag_unlikely(child->op == MAG_OP_NOP)) continue;
@@ -2546,7 +2556,8 @@ void mag_tensor_backward(mag_tensor_t* root) {
             mag_assert2(input);
             if (!(input->flags & MAG_TFLAG_REQUIRES_GRAD)) continue;
             mag_tensor_t* gri = grads[i];
-            if (!gri) continue;
+            mag_tensor_fmt_name(gri, "%s (grad)", input->name);
+            mag_assert(gri, "Gradient for op %s, input #%d is not computed", meta->mnemonic, i);
             if (!input->grad) {
                 gri->flags = (gri->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
                 input->grad = gri;
