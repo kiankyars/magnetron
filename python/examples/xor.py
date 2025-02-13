@@ -32,13 +32,14 @@ y = Tensor.const([
     [0]
 ], name='y')
 
-epochs: int = 2000
+epochs: int = 1
 
 y_hat = model(x)
 print(y_hat)
 for epoch in range(epochs):
     y_hat = model(x)
     loss = mse_loss(y_hat, y)
+    loss.export_graphviz('loss.dot')
     loss.backward()
     optim.step()
     optim.zero_grad()

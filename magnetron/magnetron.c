@@ -370,6 +370,134 @@ mag_static_assert(sizeof(mag_bitset_t) == 4);
 #define mag_bitset_clear(sets, i) (sets[(i)>>5]&=~(1u<<((i)&((4<<3)-1))))
 #define mag_bitset_toggle(sets, i) (sets[(i)>>5]^=(1u<<((i)&((4<<3)-1))))
 
+typedef struct mag_hashset_t {
+    size_t len;
+    mag_bitset_t* used;
+    const mag_tensor_t** keys;
+} mag_hashset_t;
+#define MAG_HASHSET_FULL ((size_t)-1)
+#define MAG_HASHSET_DUPLICATE ((size_t)-2)
+#define MAG_HASHSET_MAX ((size_t)-3) /* Must be last. */
+#define mag_hashset_hash_fn(ptr) ((size_t)(uintptr_t)(ptr)>>3)
+
+static size_t mag_hashset_compute_hash_size(size_t sz) {
+    mag_assert2(sz > 0 && sz < MAG_HASHSET_MAX);
+    static const size_t prime_lut[] = {
+        2, 3, 5, 11, 17, 37, 67, 131, 257, 521, 1031,
+        2053, 4099, 8209, 16411, 32771, 65537, 131101,
+        262147, 524309, 1048583, 2097169, 4194319, 8388617,
+        16777259, 33554467, 67108879, 134217757, 268435459,
+        536870923, 1073741827, 2147483659
+    };
+    size_t l = 0;
+    size_t r = sizeof(prime_lut)/sizeof(*prime_lut);
+    while (l < r) { /* Binary search for the smallest prime > sz. */
+        size_t mid = (l+r)>>1;
+        if (prime_lut[mid] < sz) l = mid+1;
+        else r = mid;
+    }
+    return l < sizeof(prime_lut)/sizeof(*prime_lut) ? prime_lut[l] : sz|1;
+}
+static mag_hashset_t mag_hashset_init(size_t size) {
+    size = mag_hashset_compute_hash_size(size);
+    mag_hashset_t set = {
+        .len = size,
+        .used = (*mag_alloc)(NULL, mag_bitset_size(size)*sizeof(*set.used)),
+        .keys = (*mag_alloc)(NULL, size*sizeof(*set.keys)),
+    };
+    memset(set.used, 0, mag_bitset_size(size)*sizeof(*set.used));
+    return set;
+}
+static size_t mag_hashset_lookup(mag_hashset_t* set, const mag_tensor_t* key) {
+    size_t k = mag_hashset_hash_fn(key) % set->len, i = k;
+    while (mag_bitset_get(set->used, i) && set->keys[i] != key) { /* Linear probing. */
+        i = (i+1) % set->len;
+        if (i == k) return MAG_HASHSET_FULL;
+    }
+    return i;
+}
+static bool mag_hashset_contains_key(mag_hashset_t* set, const mag_tensor_t* key) {
+    size_t i = mag_hashset_lookup(set, key);
+    return mag_bitset_get(set->used, i) && i != MAG_HASHSET_FULL;
+}
+static size_t mag_hashset_insert(mag_hashset_t* set, const mag_tensor_t* key) {
+    size_t k = mag_hashset_hash_fn(key) % set->len, i = k;
+    do { /* Simple linear probing */
+        if (!mag_bitset_get(set->used, i)) { /* Insert key. */
+            mag_bitset_set(set->used, i);
+            set->keys[i] = key;
+            return i;
+        }
+        if (set->keys[i] == key) return MAG_HASHSET_DUPLICATE; /* Key already exists. */
+        i = (i+1) % set->len;
+    } while (i != k);
+    mag_panic("Insertion target not found");
+}
+static void mag_hashset_reset(mag_hashset_t* set) {
+    memset(set->used, 0, mag_bitset_size(set->len)*sizeof(*set->used));
+}
+static void mag_hashset_free(mag_hashset_t* set) {
+    (*mag_alloc)(set->used, 0);
+    (*mag_alloc)(set->keys, 0);
+}
+
+static void mag_compute_graph_fold_impl(
+    const mag_tensor_t* node,
+    mag_hashset_t* visited,
+    const mag_tensor_t** nodes,
+    const mag_tensor_t** leafs,
+    size_t* n_nodes,
+    size_t* n_leafs,
+    bool forward,
+    size_t cap
+) {
+    if (!node) return;
+    if (mag_hashset_insert(visited, node) == MAG_HASHSET_FULL) return; /* Already visited */
+    for (unsigned i = 0; i < MAG_MAX_INPUT_TENSORS; ++i) {
+        unsigned k = forward ? i : MAG_MAX_INPUT_TENSORS-i-1;
+        if (node->op_inputs[k]) /* Recurse to parent nodes */
+            mag_compute_graph_fold_impl(node->op_inputs[k], visited, nodes, leafs, n_nodes, n_leafs, forward, cap);
+    }
+    if (node->op == MAG_OP_NOP) { /* Leaf node */
+        mag_assert(*n_leafs < cap, "Graph fold cap exhausted: %zu, increase cap", cap);
+        leafs[(*n_leafs)++] = node;
+    } else { /* Connected node */
+        mag_assert(*n_nodes < cap, "Graph fold cap exhausted: %zu, increase cap", cap);
+        nodes[(*n_nodes)++] = node;
+    }
+}
+
+static void mag_compute_graph_fold(
+    size_t cap,
+    const mag_tensor_t* root,
+    void (*f)(const mag_tensor_t** nodes, size_t n_nodes, const mag_tensor_t** leafs, size_t n_leafs, void* ud),
+    bool forward,
+    void* ud
+) {
+    mag_hashset_t visited = mag_hashset_init(cap);
+    size_t n_nodes = 0, n_leafs = 0;
+    const mag_tensor_t** nodes = (*mag_alloc)(NULL, sizeof(*nodes)*cap);
+    const mag_tensor_t** leafs = (*mag_alloc)(NULL, sizeof(*leafs)*cap);
+    memset(nodes, 0, sizeof(*nodes)*cap);
+    memset(leafs, 0, sizeof(*leafs)*cap);
+    mag_compute_graph_fold_impl(root, &visited, nodes, leafs, &n_nodes, &n_leafs, forward, cap);
+    (*f)(nodes, n_nodes, leafs, n_leafs, ud);
+    (*mag_alloc)(nodes, 0);
+    (*mag_alloc)(leafs, 0);
+    mag_hashset_free(&visited);
+}
+
+static bool mag_compute_graph_contains(
+    const mag_tensor_t** nodes,
+    size_t n_nodes,
+    const mag_tensor_t* node
+) {
+    for (size_t i=0; i < n_nodes; ++i)
+        if (nodes[i] == node)
+            return true;
+    return false;
+}
+
 /* Eval Chebyshev coeffs steps for some x. f(x) : [a, b] -> ℝ. */
 static double mag_chebyshev_eval(double x, double a, double b, const double* coeffs, uint32_t steps) {
     double scale = 4.0/(b - a);
@@ -2686,9 +2814,9 @@ void mag_tensor_img_draw_box(mag_tensor_t* t, int32_t x1, int32_t y1, int32_t x2
     mag_assert(t->rank == 3, "Tensor must be 3D image tensor");
     mag_assert2(x2 > x1 && y2 > y1 && x1 > 0 && y1 > 0 && x2 > 0 && y2 > 0);
     float* buf = mag_tensor_data_ptr(t);
-    int32_t w = (int32_t)mag_tensor_image_width(t);
-    int32_t h = (int32_t)mag_tensor_image_height(t);
-    int32_t c = (int32_t)mag_tensor_image_channels(t);
+    int32_t w = (int32_t)mag_tensor_width(t);
+    int32_t h = (int32_t)mag_tensor_height(t);
+    int32_t c = (int32_t)mag_tensor_channels(t);
     mag_assert2(w && h && c == 3);
     float r = (float)((rgb>>16)&0xff) / 255.0f;
     float g = (float)((rgb>>8)&0xff) / 255.0f;
@@ -2771,9 +2899,9 @@ void mag_tensor_img_draw_text(mag_tensor_t* t, int32_t x, int32_t y, int32_t siz
     mag_assert2(x >= 0 && y >= 0 && size >= 8 && txt && *txt);
     mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
     float* buf = (float*)t->storage.base;
-    int32_t w = (int32_t)mag_tensor_image_width(t);
-    int32_t h = (int32_t)mag_tensor_image_height(t);
-    int32_t c = (int32_t)mag_tensor_image_channels(t);
+    int32_t w = (int32_t)mag_tensor_width(t);
+    int32_t h = (int32_t)mag_tensor_height(t);
+    int32_t c = (int32_t)mag_tensor_channels(t);
     mag_assert2(w && h && c == 3);
     float* pr = buf;
     float* pg = buf + w*h;
@@ -3706,9 +3834,9 @@ void mag_tensor_save_image(const mag_tensor_t* t, const char* file) {
     mag_assert(saver, "Image saver not set");
     int64_t rank = mag_tensor_rank(t);
     mag_assert(rank == 3, "Tensor rank must be 3, but is: %" PRIi64, (size_t)rank);
-    int64_t w = mag_tensor_image_width(t);
-    int64_t h = mag_tensor_image_height(t);
-    int64_t c = mag_tensor_image_channels(t);
+    int64_t w = mag_tensor_width(t);
+    int64_t h = mag_tensor_height(t);
+    int64_t c = mag_tensor_channels(t);
     mag_assert(c == 1 || c == 3 || c == 4, "Invalid number of channels: %zu", (size_t)c);
     mag_assert(w*h*c == mag_tensor_numel(t), "Buffer size mismatch: %zu != %zu", w*h*c, (size_t)mag_tensor_numel(t));
     uint8_t* dst = (*mag_alloc)(NULL, w*h*c); /* Allocate memory for image data */
@@ -3722,54 +3850,84 @@ void mag_tensor_save_image(const mag_tensor_t* t, const char* file) {
     mag_log_info("Saved tensor to image: %s, width: %d, height: %d, channels: %d", file, (int)w, (int)h, (int)c);
 }
 
-static void mag_graphviz_dump(const mag_tensor_t* node, FILE *fp, const mag_tensor_t*** visited, size_t* len, size_t* cap) { /* TODO this function generates a wrong non DAG sometimes, needs to be fixed */
-    for (size_t i = 0; i < *len; ++i)
-        if ((*visited)[i] == node)
-            return;
-    if (*len >= *cap)
-        *visited = (*mag_alloc)(*visited, ((*cap <<= 1) * sizeof(mag_tensor_t*)));
-    (*visited)[*len] = node;
-    (*len)++;
-    bool is_input = true;
-    for (unsigned i = 0; i < MAG_MAX_INPUT_TENSORS; i++) {
-        if (node->op_inputs[i] != NULL) {
-            is_input = false;
-            break;
+static MAG_COLDPROC void mag_graphviz_dump_node_edge(FILE* f, const mag_tensor_t* node, const mag_tensor_t* parent, const char* label)  {
+   const mag_tensor_t* gparent = NULL;
+   const mag_tensor_t* gparent0 = NULL;
+    fprintf(
+        f,
+        "  \"%p\":%s -> \"%p\":%s [ arrowhead = %s; style = %s; label = \"%s\"; ]\n",
+        gparent0 ? (void*)gparent0 : (void*)parent,
+        gparent0 ? "g" : "x",
+        gparent ? (void*)gparent : (void*)node,
+        gparent ? "g" : "x",
+        gparent ? "empty" : "vee",
+        gparent ? "dashed" : "solid",
+        label
+    );
+}
+
+static void mag_graphviz_dump_leaf_edge(FILE* f, const mag_tensor_t* node, const mag_tensor_t* parent, const char* label)  {
+    fprintf(
+        f,
+        "  \"%p\":%s -> \"%p\":%s [ label = \"%s\"; ]\n",
+        (void*)parent, "x",
+        (void*)node, "x",
+        label
+    );
+}
+
+static MAG_COLDPROC void mag_tensor_dump_folded_graph(
+    const mag_tensor_t** nodes,
+    size_t n_nodes,
+    const mag_tensor_t** leafs,
+    size_t n_leafs,
+    void* ud
+) {
+    FILE* f = ud;
+    for (size_t i=0; i < n_nodes; ++i) {
+        const mag_tensor_t* node = nodes[i];
+        fprintf(f, "  \"%p\" [ style = filled; fillcolor = %s; shape = record; label=\"", (void*)node, "skyblue2");
+        fprintf(f, "\"; ]\n");
+    }
+    for (size_t i=0; i < n_leafs; ++i) {
+        const mag_tensor_t* node = leafs[i];
+        fprintf(f, "  \"%p\" [ style = filled; fillcolor = %s; shape = record; label=\"<x>", (void*)node, "pink");
+        fprintf(f, "\"; ]\n");
+    }
+    for (size_t i=0; i < n_nodes; ++i) {
+        const mag_tensor_t* node = nodes[i];
+        for (size_t j=0; j < MAG_MAX_INPUT_TENSORS; ++j) {
+            const mag_tensor_t* input = node->op_inputs[j];
+            if (input) {
+                char label[16];
+                snprintf(label, sizeof(label), "src %zu", j);
+                mag_graphviz_dump_node_edge(f, node, input, label);
+            }
         }
     }
-    const char* fillcolor = is_input ? "palegreen" : "skyblue2";
-    char dim_buf[150];
-    mag_fmt_dims(&dim_buf, &node->shape, node->rank);
-    bool gra = node->flags & MAG_TFLAG_REQUIRES_GRAD;
-    fprintf(fp, "  \"%p\" [label=\"⊕ %s|%s|S %s|F 0x%x\", shape=record, style=\"rounded,filled\", fillcolor=%s];\n", (void*)node, mag_op_meta_of(node->op)->mnemonic, gra ? "→∇" : "X", dim_buf, node->flags, fillcolor);
-    const char* vars = "xy";
-    mag_assert2(strlen(vars) == MAG_MAX_INPUT_TENSORS);
-    for (unsigned i = 0; i < MAG_MAX_INPUT_TENSORS; ++i) {
-        mag_tensor_t* input = node->op_inputs[i];
-        if (!input)
-            continue;
-        char name[64];
-        if (*input->name)
-            snprintf(name, sizeof(name), "%s", input->name);
-        else
-            snprintf(name, sizeof(name), "%c", vars[i]);
-        fprintf(fp, "  \"%p\" -> \"%p\" [label=\"%s\"];\n", (void*)input, (void*)node, name);
-        mag_graphviz_dump(input, fp, visited, len, cap);
+    for (size_t i=0; i < n_leafs; ++i) {
+        const mag_tensor_t* node = leafs[i];
+        for (size_t j=0; j < MAG_MAX_INPUT_TENSORS; ++j) {
+            const mag_tensor_t* input = node->op_inputs[j];
+            if (input) {
+                char label[16];
+                snprintf(label, sizeof(label), "src %zu", j);
+                mag_graphviz_dump_leaf_edge(f, node, input, label);
+            }
+        }
     }
 }
 
 MAG_COLDPROC void mag_tensor_export_graphviz(const mag_tensor_t* t, const char* file) {
     mag_assert2(t && file && *file);
-    FILE* f = mag_fopen(file, "w");
-    size_t len = 0, cap = 128;
-    const mag_tensor_t** visited = (*mag_alloc)(NULL, cap * sizeof(mag_tensor_t*));
+    FILE* f = mag_fopen(file, "wt");
     fprintf(f, "digraph computation_graph {\n");
-    fprintf(f, "  rankdir=LR;\n");
+    fprintf(f, "  newrank=true;\n");
+    fprintf(f, "  rankdir=TD;\n");
     fprintf(f, "  node [fontname=\"Helvetica\", shape=box];\n");
     fprintf(f, "  edge [fontname=\"Helvetica\"];\n");
-    mag_graphviz_dump(t, f, &visited, &len, &cap);
+    mag_compute_graph_fold(0xffff, t, &mag_tensor_dump_folded_graph, true, f);
     fprintf(f, "}\n");
-    (*mag_alloc)(visited, 0);
     fclose(f);
 }
 

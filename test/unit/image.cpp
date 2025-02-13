@@ -7,12 +7,12 @@ TEST(image, load) {
 
     mag_tensor_t* img = mag_tensor_load_image(ctx, "test_data/test_img.png", MAG_COLOR_CHANNELS_RGB, 0, 0);
     mag_tensor_print(img, true, true);
-    ASSERT_EQ(mag_tensor_image_channels(img), 3);
-    ASSERT_EQ(mag_tensor_image_width(img), 2);
-    ASSERT_EQ(mag_tensor_image_height(img), 4);
-    ASSERT_EQ(mag_tensor_shape(img)[2], mag_tensor_image_width(img));
-    ASSERT_EQ(mag_tensor_shape(img)[1], mag_tensor_image_height(img));
-    ASSERT_EQ(mag_tensor_shape(img)[0], mag_tensor_image_channels(img)); // RGB
+    ASSERT_EQ(mag_tensor_channels(img), 3);
+    ASSERT_EQ(mag_tensor_width(img), 2);
+    ASSERT_EQ(mag_tensor_height(img), 4);
+    ASSERT_EQ(mag_tensor_shape(img)[2], mag_tensor_width(img));
+    ASSERT_EQ(mag_tensor_shape(img)[1], mag_tensor_height(img));
+    ASSERT_EQ(mag_tensor_shape(img)[0], mag_tensor_channels(img)); // RGB
 
     auto* buf = mag_tensor_data_ptr(img);
     for (int64_t i=0; i < mag_tensor_numel(img); ++i) {
@@ -33,9 +33,9 @@ TEST(image, load_resize) {
     ASSERT_EQ(mag_tensor_shape(img)[2], 256);
     ASSERT_EQ(mag_tensor_shape(img)[1], 211);
     ASSERT_EQ(mag_tensor_shape(img)[0], 3); // RGB
-    ASSERT_EQ(mag_tensor_shape(img)[2], mag_tensor_image_width(img));
-    ASSERT_EQ(mag_tensor_shape(img)[1], mag_tensor_image_height(img));
-    ASSERT_EQ(mag_tensor_shape(img)[0], mag_tensor_image_channels(img)); // RGB
+    ASSERT_EQ(mag_tensor_shape(img)[2], mag_tensor_width(img));
+    ASSERT_EQ(mag_tensor_shape(img)[1], mag_tensor_height(img));
+    ASSERT_EQ(mag_tensor_shape(img)[0], mag_tensor_channels(img)); // RGB
 
     // mag_tensor_save_image(img, "test_data/car_resized.jpg");
 
