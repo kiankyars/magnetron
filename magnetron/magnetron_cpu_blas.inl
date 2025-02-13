@@ -1093,9 +1093,10 @@ static void MAG_HOTPROC mag_vgelu_dv_f32( /* gelu' : ℝ -> ℝ, x |-> TODO */
     }
 }
 
-static void mag_blas_nop(const mag_compute_payload_t* payload) { (void)payload; }
+static void mag_blas_nop(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) { (void)payload; (void)ctx; }
 
-static void mag_blas_clone(const mag_compute_payload_t* payload) {
+static void mag_blas_clone(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
+    (void)ctx;
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* x = r->op_inputs[0];
     mag_assert2(mag_tensor_is_shape_eq(x, r));
@@ -1104,7 +1105,8 @@ static void mag_blas_clone(const mag_compute_payload_t* payload) {
     memcpy(b_r, b_x, mag_tensor_data_size(r));
 }
 
-static void MAG_HOTPROC mag_blas_mean_f32(const mag_compute_payload_t* payload) {
+static void MAG_HOTPROC mag_blas_mean_f32(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
+    (void)ctx;
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* x = r->op_inputs[0];
     mag_f32_t* b_r = mag_f32p_mut(r);
@@ -1133,7 +1135,8 @@ static void MAG_HOTPROC mag_blas_mean_f32(const mag_compute_payload_t* payload) 
     *b_r = (mag_f32_t)sum;
 }
 
-static void MAG_HOTPROC mag_blas_min_f32(const mag_compute_payload_t* payload) {
+static void MAG_HOTPROC mag_blas_min_f32(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
+    (void)ctx;
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* const x = r->op_inputs[0];
     mag_f32_t* b_r = mag_f32p_mut(r);
@@ -1158,7 +1161,8 @@ static void MAG_HOTPROC mag_blas_min_f32(const mag_compute_payload_t* payload) {
     *b_r = min;
 }
 
-static void MAG_HOTPROC mag_blas_max_f32(const mag_compute_payload_t* payload) {
+static void MAG_HOTPROC mag_blas_max_f32(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
+    (void)ctx;
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* const x = r->op_inputs[0];
     mag_f32_t* b_r = mag_f32p_mut(r);
@@ -1183,7 +1187,8 @@ static void MAG_HOTPROC mag_blas_max_f32(const mag_compute_payload_t* payload) {
     *b_r = max;
 }
 
-static void MAG_HOTPROC mag_blas_sum_f32(const mag_compute_payload_t* payload) {
+static void MAG_HOTPROC mag_blas_sum_f32(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
+    (void)ctx;
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* const x = r->op_inputs[0];
     mag_f32_t* b_r = mag_f32p_mut(r);
@@ -1209,7 +1214,8 @@ static void MAG_HOTPROC mag_blas_sum_f32(const mag_compute_payload_t* payload) {
 }
 
 #define mag_cpu_blas_impl_unary(T, name) \
-    static void MAG_HOTPROC mag_blas_##name##_##T(const mag_compute_payload_t* payload) { \
+    static void MAG_HOTPROC mag_blas_##name##_##T(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) { \
+        (void)ctx; \
         mag_tensor_t* r = payload->node; \
         const mag_tensor_t* x = r->op_inputs[0]; \
         mag_##T##_t* br = mag_##T##p_mut(r); \
@@ -1256,7 +1262,8 @@ mag_cpu_blas_impl_unary(f32, gelu_dv)
 #undef mag_cpu_blas_impl_unary
 
 #define mag_cpu_blas_impl_unary_scalar(T, name) \
-    static void MAG_HOTPROC mag_blas_##name##s_##T(const mag_compute_payload_t* payload) { \
+    static void MAG_HOTPROC mag_blas_##name##s_##T(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) { \
+        (void)ctx; \
         mag_tensor_t* r = payload->node; \
         const mag_tensor_t* x = r->op_inputs[0]; \
         mag_##T##_t xi = r->op_params->x.T; \
@@ -1287,7 +1294,8 @@ mag_cpu_blas_impl_unary_scalar(f32, pow)
 #undef mag_cpu_blas_impl_unary_scalar
 
 #define mag_cpu_blas_impl_binary(T, name, op) \
-    static void MAG_HOTPROC mag_blas_##name##_##T(const mag_compute_payload_t* payload) { \
+    static void MAG_HOTPROC mag_blas_##name##_##T(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) { \
+        (void)ctx; \
         mag_tensor_t* r = payload->node; \
         const mag_tensor_t* x = r->op_inputs[0]; \
         const mag_tensor_t* y = r->op_inputs[1]; \
@@ -1378,11 +1386,7 @@ mag_cpu_blas_impl_binary(f32, sub, -)
 mag_cpu_blas_impl_binary(f32, mul, *)
 mag_cpu_blas_impl_binary(f32, div, /)
 
-/*
-** Matrix multiplication.
-** R = A x B
-*/
-static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload) {
+static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* x = r->op_inputs[0];
     const mag_tensor_t* y = r->op_inputs[1];
@@ -1404,24 +1408,42 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
     int64_t ra = chunk*ti;
     int64_t rb = mag_xmin(ra+chunk, numel);
     bool tx = mag_tensor_is_transposed(x);
-    for (int64_t i = ra; i < rb; ++i) { /* Rows */
+
+    // For each row index (i) in the result.
+    for (int64_t i = ra; i < rb; ++i) {
+        // Initialize row i in R to 0.
         for (int64_t j = 0; j < yd1; ++j) {
-            float* xo = br + rd1*i + j;
-            mag_bnd_chk(xo, br, mag_tensor_data_size(r));
-            *xo = 0.0f;
+            /* Using the computed strides:
+             *   rs[0] == 1  and rs[1] == M.
+             * Thus, element (i,j) is at offset: i + M*j.
+             */
+            float* pr = br + rs0 * i + rs1 * j;
+            mag_bnd_chk(pr, br, mag_tensor_data_size(r));
+            *pr = 0.0f;
         }
-        for (int64_t k = 0; k < xd1; ++k) { /* Inner dim */
-            const mag_f32_t* px = bx + (tx ? k*xd0 + i : xd1*i + k);
+        // Multiply: R(i,j) += X(i,k) * Y(k,j)
+        for (int64_t k = 0; k < xd1; ++k) {
+            const mag_f32_t* px;
+            if (tx) {
+                // If X is transposed, treat it as X^T,
+                // so element (i,k) is stored at (k,i).
+                px = bx + xs0 * k + xs1 * i;
+            } else {
+                // Otherwise, access X(i,k) as: i + M*k.
+                px = bx + xs0 * i + xs1 * k;
+            }
             mag_bnd_chk(px, bx, mag_tensor_data_size(x));
-            for (int64_t j = 0; j < yd1; ++j) { /* Columns */
-                mag_f32_t* pr = br + rd1*i + j;
-                const mag_f32_t* py = by + yd1*k + j;
+            for (int64_t j = 0; j < yd1; ++j) {
+                float* pr = br + rs0 * i + rs1 * j;  // R(i,j) = i + M*j.
+                // Y is [K, N] stored with strides: ys0 == 1 and ys1 == K.
+                const mag_f32_t* py = by + ys0 * k + ys1 * j;  // Y(k,j) = k + K*j.
                 mag_bnd_chk(pr, br, mag_tensor_data_size(r));
                 mag_bnd_chk(py, by, mag_tensor_data_size(y));
                 *pr += (*px) * (*py);
             }
         }
     }
+
 }
 
 #ifndef MAG_BLAS_SPECIALIZATION
@@ -1587,7 +1609,7 @@ uint64_t MAG_BLAS_SPECIALIZATION_FEAT_REQUEST(void) {
 
 #endif
 
-static void (*const forward_kernels[MAG_OP__NUM])(const mag_compute_payload_t*) = {
+static void (*const forward_kernels[MAG_OP__NUM])(const mag_compute_payload_t*, mag_kernel_context_t* ctx) = {
     [MAG_OP_NOP] = &mag_blas_nop,
     [MAG_OP_CLONE] = &mag_blas_clone,
     [MAG_OP_VIEW] = &mag_blas_nop,
@@ -1631,7 +1653,95 @@ static void (*const forward_kernels[MAG_OP__NUM])(const mag_compute_payload_t*) 
     [MAG_OP_MATMUL] = &mag_blas_matmul_f32,
 };
 
-static void (*const backward_kernels[MAG_OP__NUM])(const mag_compute_payload_t*) = {
+static uint32_t (*const pre_forward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
+    [MAG_OP_NOP] = NULL,
+    [MAG_OP_CLONE] = NULL,
+    [MAG_OP_VIEW] = NULL,
+    [MAG_OP_TRANSPOSE] = NULL,
+    [MAG_OP_PERMUTE] = NULL,
+    [MAG_OP_MEAN] = NULL,
+    [MAG_OP_MIN] = NULL,
+    [MAG_OP_MAX] = NULL,
+    [MAG_OP_SUM] = NULL,
+    [MAG_OP_ABS] = NULL,
+    [MAG_OP_NEG] = NULL,
+    [MAG_OP_LOG] = NULL,
+    [MAG_OP_SQR] = NULL,
+    [MAG_OP_SQRT] = NULL,
+    [MAG_OP_SIN] = NULL,
+    [MAG_OP_COS] = NULL,
+    [MAG_OP_STEP] = NULL,
+    [MAG_OP_EXP] = NULL,
+    [MAG_OP_SOFTMAX] = NULL,
+    [MAG_OP_SOFTMAX_DV] = NULL,
+    [MAG_OP_SIGMOID] = NULL,
+    [MAG_OP_SIGMOID_DV] = NULL,
+    [MAG_OP_HARD_SIGMOID] = NULL,
+    [MAG_OP_SILU] = NULL,
+    [MAG_OP_SILU_DV] = NULL,
+    [MAG_OP_TANH] = NULL,
+    [MAG_OP_TANH_DV] = NULL,
+    [MAG_OP_RELU] = NULL,
+    [MAG_OP_RELU_DV] = NULL,
+    [MAG_OP_GELU] = NULL,
+    [MAG_OP_GELU_DV] = NULL,
+    [MAG_OP_ADD] = NULL,
+    [MAG_OP_SUB] = NULL,
+    [MAG_OP_MUL] = NULL,
+    [MAG_OP_DIV] = NULL,
+    [MAG_OP_ADDS] = NULL,
+    [MAG_OP_SUBS] = NULL,
+    [MAG_OP_MULS] = NULL,
+    [MAG_OP_DIVS] = NULL,
+    [MAG_OP_POWS] = NULL,
+    [MAG_OP_MATMUL] = NULL,
+};
+
+static void (*const post_forward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
+    [MAG_OP_NOP] = NULL,
+    [MAG_OP_CLONE] = NULL,
+    [MAG_OP_VIEW] = NULL,
+    [MAG_OP_TRANSPOSE] = NULL,
+    [MAG_OP_PERMUTE] = NULL,
+    [MAG_OP_MEAN] = NULL,
+    [MAG_OP_MIN] = NULL,
+    [MAG_OP_MAX] = NULL,
+    [MAG_OP_SUM] = NULL,
+    [MAG_OP_ABS] = NULL,
+    [MAG_OP_NEG] = NULL,
+    [MAG_OP_LOG] = NULL,
+    [MAG_OP_SQR] = NULL,
+    [MAG_OP_SQRT] = NULL,
+    [MAG_OP_SIN] = NULL,
+    [MAG_OP_COS] = NULL,
+    [MAG_OP_STEP] = NULL,
+    [MAG_OP_EXP] = NULL,
+    [MAG_OP_SOFTMAX] = NULL,
+    [MAG_OP_SOFTMAX_DV] = NULL,
+    [MAG_OP_SIGMOID] = NULL,
+    [MAG_OP_SIGMOID_DV] = NULL,
+    [MAG_OP_HARD_SIGMOID] = NULL,
+    [MAG_OP_SILU] = NULL,
+    [MAG_OP_SILU_DV] = NULL,
+    [MAG_OP_TANH] = NULL,
+    [MAG_OP_TANH_DV] = NULL,
+    [MAG_OP_RELU] = NULL,
+    [MAG_OP_RELU_DV] = NULL,
+    [MAG_OP_GELU] = NULL,
+    [MAG_OP_GELU_DV] = NULL,
+    [MAG_OP_ADD] = NULL,
+    [MAG_OP_SUB] = NULL,
+    [MAG_OP_MUL] = NULL,
+    [MAG_OP_DIV] = NULL,
+    [MAG_OP_ADDS] = NULL,
+    [MAG_OP_SUBS] = NULL,
+    [MAG_OP_MULS] = NULL,
+    [MAG_OP_DIVS] = NULL,
+    [MAG_OP_POWS] = NULL,
+    [MAG_OP_MATMUL] = NULL,
+};
+
+static void (*const backward_kernels[MAG_OP__NUM])(const mag_compute_payload_t*, mag_kernel_context_t* ctx) = {
     [MAG_OP_NOP] = &mag_blas_nop,
     [MAG_OP_CLONE] = &mag_blas_clone,
     [MAG_OP_VIEW] = &mag_blas_nop,
@@ -1675,7 +1785,101 @@ static void (*const backward_kernels[MAG_OP__NUM])(const mag_compute_payload_t*)
     [MAG_OP_MATMUL] = &mag_blas_matmul_f32,
 };
 
-void MAG_BLAS_SPECIALIZATION(mag_kernel_registry_t* kernels) {
-    memcpy(kernels->fwd, forward_kernels, sizeof(forward_kernels));
-    memcpy(kernels->bwd, backward_kernels, sizeof(backward_kernels));
+static uint32_t (*const pre_backward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
+    [MAG_OP_NOP] = NULL,
+    [MAG_OP_CLONE] = NULL,
+    [MAG_OP_VIEW] = NULL,
+    [MAG_OP_TRANSPOSE] = NULL,
+    [MAG_OP_PERMUTE] = NULL,
+    [MAG_OP_MEAN] = NULL,
+    [MAG_OP_MIN] = NULL,
+    [MAG_OP_MAX] = NULL,
+    [MAG_OP_SUM] = NULL,
+    [MAG_OP_ABS] = NULL,
+    [MAG_OP_NEG] = NULL,
+    [MAG_OP_LOG] = NULL,
+    [MAG_OP_SQR] = NULL,
+    [MAG_OP_SQRT] = NULL,
+    [MAG_OP_SIN] = NULL,
+    [MAG_OP_COS] = NULL,
+    [MAG_OP_STEP] = NULL,
+    [MAG_OP_EXP] = NULL,
+    [MAG_OP_SOFTMAX] = NULL,
+    [MAG_OP_SOFTMAX_DV] = NULL,
+    [MAG_OP_SIGMOID] = NULL,
+    [MAG_OP_SIGMOID_DV] = NULL,
+    [MAG_OP_HARD_SIGMOID] = NULL,
+    [MAG_OP_SILU] = NULL,
+    [MAG_OP_SILU_DV] = NULL,
+    [MAG_OP_TANH] = NULL,
+    [MAG_OP_TANH_DV] = NULL,
+    [MAG_OP_RELU] = NULL,
+    [MAG_OP_RELU_DV] = NULL,
+    [MAG_OP_GELU] = NULL,
+    [MAG_OP_GELU_DV] = NULL,
+    [MAG_OP_ADD] = NULL,
+    [MAG_OP_SUB] = NULL,
+    [MAG_OP_MUL] = NULL,
+    [MAG_OP_DIV] = NULL,
+    [MAG_OP_ADDS] = NULL,
+    [MAG_OP_SUBS] = NULL,
+    [MAG_OP_MULS] = NULL,
+    [MAG_OP_DIVS] = NULL,
+    [MAG_OP_POWS] = NULL,
+    [MAG_OP_MATMUL] = NULL,
+};
+
+static void (*const post_backward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
+    [MAG_OP_NOP] = NULL,
+    [MAG_OP_CLONE] = NULL,
+    [MAG_OP_VIEW] = NULL,
+    [MAG_OP_TRANSPOSE] = NULL,
+    [MAG_OP_PERMUTE] = NULL,
+    [MAG_OP_MEAN] = NULL,
+    [MAG_OP_MIN] = NULL,
+    [MAG_OP_MAX] = NULL,
+    [MAG_OP_SUM] = NULL,
+    [MAG_OP_ABS] = NULL,
+    [MAG_OP_NEG] = NULL,
+    [MAG_OP_LOG] = NULL,
+    [MAG_OP_SQR] = NULL,
+    [MAG_OP_SQRT] = NULL,
+    [MAG_OP_SIN] = NULL,
+    [MAG_OP_COS] = NULL,
+    [MAG_OP_STEP] = NULL,
+    [MAG_OP_EXP] = NULL,
+    [MAG_OP_SOFTMAX] = NULL,
+    [MAG_OP_SOFTMAX_DV] = NULL,
+    [MAG_OP_SIGMOID] = NULL,
+    [MAG_OP_SIGMOID_DV] = NULL,
+    [MAG_OP_HARD_SIGMOID] = NULL,
+    [MAG_OP_SILU] = NULL,
+    [MAG_OP_SILU_DV] = NULL,
+    [MAG_OP_TANH] = NULL,
+    [MAG_OP_TANH_DV] = NULL,
+    [MAG_OP_RELU] = NULL,
+    [MAG_OP_RELU_DV] = NULL,
+    [MAG_OP_GELU] = NULL,
+    [MAG_OP_GELU_DV] = NULL,
+    [MAG_OP_ADD] = NULL,
+    [MAG_OP_SUB] = NULL,
+    [MAG_OP_MUL] = NULL,
+    [MAG_OP_DIV] = NULL,
+    [MAG_OP_ADDS] = NULL,
+    [MAG_OP_SUBS] = NULL,
+    [MAG_OP_MULS] = NULL,
+    [MAG_OP_DIVS] = NULL,
+    [MAG_OP_POWS] = NULL,
+    [MAG_OP_MATMUL] = NULL,
+};
+
+void MAG_BLAS_SPECIALIZATION(mag_kernel_registry_t* kernels, mag_kernel_context_t* ctx) {
+    for (unsigned i=0; i < MAG_OP__NUM; ++i) {
+        kernels->fwd_pre[i] = pre_forward_kernels[i];
+        kernels->fwd[i] = forward_kernels[i];
+        kernels->fwd_post[i] = post_forward_kernels[i];
+        kernels->bwd_pre[i] = pre_backward_kernels[i];
+        kernels->bwd[i] = backward_kernels[i];
+        kernels->bwd_post[i] = post_backward_kernels[i];
+    }
 }

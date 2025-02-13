@@ -259,6 +259,8 @@ defined(__WIN32__) || defined(__TOS_WIN__) || defined(__WINDOWS__)
 /* Hardware destructive interference size. */
 #define MAG_CACHE_LINE_SIZE 64
 #endif
+#define PAGE_SIZE_4k 0x1000
+#define PAGE_SIZE_2m 0x200000
 
 static uint32_t MAG_AINLINE mag_bswap32(uint32_t x) { /* Swap bytes for endianess switch. Should be optimized to a (bswap/rev) instruction on modern compilers. */
     #ifdef MAG_BE
@@ -814,16 +816,42 @@ struct mag_tensor_t {
     (void)prefix##4; \
     (void)prefix##5
 
-typedef struct mag_compute_payload_t {
+typedef struct mag_compute_payload_t { /* Compute payload for kernel execution. */
     int64_t thread_num;
     int64_t thread_idx;
     mag_tensor_t* node;
     bool is_fwd;
 } mag_compute_payload_t;
 
-typedef struct mag_kernel_registry_t {
-    void (*fwd[MAG_OP__NUM])(const mag_compute_payload_t*);
-    void (*bwd[MAG_OP__NUM])(const mag_compute_payload_t*);
+typedef struct mag_kctx_mm_t { /* Matmul kernel context. */
+    float* c_buffers;
+    float* ws_buffers;
+    int64_t nthr_m;
+    int64_t nthr_n;
+    int64_t nthr_k;
+    int64_t nthr_mn;
+    int64_t ws_size_per_thr;
+    int64_t MB;
+    int64_t NB;
+    int64_t KB;
+    bool do_copy;
+} mag_kctx_mm_t;
+
+typedef struct mag_kernel_context_t { /* General op kernel context. */
+    mag_tensor_t* node;
+    int64_t alloced_threads;
+    union {
+        mag_kctx_mm_t mm;
+    } per_op;
+} mag_kernel_context_t;
+
+typedef struct mag_kernel_registry_t { /* Kernel registry for operators. */
+    uint32_t (*fwd_pre[MAG_OP__NUM])(mag_kernel_context_t*);
+    void (*fwd[MAG_OP__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
+    void (*fwd_post[MAG_OP__NUM])(mag_kernel_context_t*);
+    uint32_t (*bwd_pre[MAG_OP__NUM])(mag_kernel_context_t*);
+    void (*bwd[MAG_OP__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
+    void (*bwd_post[MAG_OP__NUM])(mag_kernel_context_t*);
 } mag_kernel_registry_t;
 
 #define mag_load_local_storage_group(xk, prefix, var) mag_load_local_storage_group_arr((xk)->var, prefix)
