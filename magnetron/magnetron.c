@@ -1190,7 +1190,7 @@ static mag_tensor_t* mag_result_constructor_routine_matmul(mag_tensor_t** inputs
 }
 
 static void mag_op_backward_nop(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    *grads = mag_clone(node->grad);
 }
 
 static void mag_op_backward_clone(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1202,15 +1202,24 @@ static void mag_op_backward_view(mag_tensor_t* node, mag_tensor_t** grads) {
 }
 
 static void mag_op_backward_transpose(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    *grads = mag_transpose(node->grad);
 }
 
 static void mag_op_backward_permute(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_panic("NYI");
+    /*
+    uint32_t inv_perm[6];
+    for (int i = 0; i < 6; i++) {
+        inv_perm[node->dim[i]] = i;
+    }
+    *grads = mag_permute(node->grad, inv_perm[0], inv_perm[1], inv_perm[2],
+                          inv_perm[3], inv_perm[4], inv_perm[5]);*/
 }
 
 static void mag_op_backward_mean(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    double scale = 1.0/(double)x->numel;
+    *grads = mag_muls(node->grad, scale);
 }
 
 static void mag_op_backward_min(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1222,70 +1231,116 @@ static void mag_op_backward_max(mag_tensor_t* node, mag_tensor_t** grads) {
 }
 
 static void mag_op_backward_sum(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* zeros = mag_muls(x, 0.f);
+    mag_tensor_t* ones  = mag_adds(zeros, 1.f);
+    *grads = mag_mul(ones, node->grad);
+    mag_tensor_decref(zeros);
+    mag_tensor_decref(ones);
 }
 
 static void mag_op_backward_abs(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* step = mag_step(x);
+    mag_tensor_t* step2 = mag_muls(step, 2.f);
+    mag_tensor_t* sign = mag_subs(step2, 1.f);
+    grads[0] = mag_mul(node->grad, sign);
+    mag_tensor_decref(step);
+    mag_tensor_decref(step2);
+    mag_tensor_decref(sign);
 }
 
 static void mag_op_backward_neg(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    grads[0] = mag_muls(node->grad, -1.f);
 }
 
 static void mag_op_backward_log(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    grads[0] = mag_div(node->grad, x);
 }
 
 static void mag_op_backward_sqr(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* two_x = mag_muls(x, 2.f);
+    grads[0] = mag_mul(node->grad, two_x);
+    mag_tensor_decref(two_x);
 }
 
 static void mag_op_backward_sqrt(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* sqrt_x = mag_sqrt(x);
+    mag_tensor_t* denom = mag_muls(sqrt_x, 2.f);
+    grads[0] = mag_div(node->grad, denom);
+    mag_tensor_decref(sqrt_x);
+    mag_tensor_decref(denom);
 }
 
 static void mag_op_backward_sin(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* cos_x = mag_cos(x);
+    grads[0] = mag_mul(node->grad, cos_x);
+    mag_tensor_decref(cos_x);
 }
 
 static void mag_op_backward_cos(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* sin_x = mag_sin(x);
+    mag_tensor_t* neg_sin_x = mag_muls(sin_x, -1.f);
+    grads[0] = mag_mul(node->grad, neg_sin_x);
+    mag_tensor_decref(sin_x);
+    mag_tensor_decref(neg_sin_x);
 }
 
 static void mag_op_backward_step(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    grads[0] = mag_muls(node->grad, 0.f);
 }
 
 static void mag_op_backward_exp(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* exp_x = mag_exp(x);
+    grads[0] = mag_mul(node->grad, exp_x);
+    mag_tensor_decref(exp_x);
 }
 
 static void mag_op_backward_softmax(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* y = mag_softmax(x);
+    mag_tensor_t* tmp = mag_mul(node->grad, y);
+    mag_tensor_t* sum_tmp = mag_sum(tmp);
+    mag_tensor_t* diff = mag_sub(node->grad, sum_tmp);
+    grads[0] = mag_mul(y, diff);
+    mag_tensor_decref(tmp);
+    mag_tensor_decref(sum_tmp);
+    mag_tensor_decref(diff);
+    mag_tensor_decref(y);
 }
 
 static void mag_op_backward_sigmoid(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* dv = mag_sigmoid_dv(x);
+    grads[0] = mag_mul(node->grad, dv);
+    mag_tensor_decref(dv);
 }
 
 static void mag_op_backward_silu(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* dv = mag_silu_dv(x);
+    grads[0] = mag_mul(node->grad, dv);
+    mag_tensor_decref(dv);
 }
 
 static void mag_op_backward_tanh(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
-}
-
-static void mag_op_backward_relu(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
-    mag_tensor_t* mask = mag_step(x);
-    grads[0] = mag_mul(node->grad, mask);
-    mag_tensor_decref(mask);
+    mag_tensor_t* dv = mag_tanh_dv(x);
+    grads[0] = mag_mul(node->grad, dv);
+    mag_tensor_decref(dv);
 }
 
 static void mag_op_backward_gelu(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* dv = mag_gelu_dv(x);
+    grads[0] = mag_mul(node->grad, dv);
+    mag_tensor_decref(dv);
 }
 
 static void mag_op_backward_add(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1339,7 +1394,14 @@ static void mag_op_backward_pows(mag_tensor_t* node, mag_tensor_t** grads) {
 }
 
 static void mag_op_backward_matmul(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* y = node->op_inputs[1];
+    mag_tensor_t* yt = mag_transpose(y);
+    grads[0] = mag_matmul(node->grad, yt);
+    mag_tensor_t* xt = mag_transpose(x);
+    grads[1] = mag_matmul(xt, node->grad);
+    mag_tensor_decref(yt);
+    mag_tensor_decref(xt);
 }
 
 const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
