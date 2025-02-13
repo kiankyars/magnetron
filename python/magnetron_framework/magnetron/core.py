@@ -219,8 +219,9 @@ class no_grad(contextlib.ContextDecorator):
         Context.active().start_grad_recorder()
 
 
-@typing.final
 class Tensor:
+    """A 1-6 dimensional tensor with support for automatic differentiation."""
+
     __slots__ = ('_ctx', '_ptr', '_inputs')
 
     def __init__(self, ptr: ffi.CData | None = None) -> None:
@@ -326,7 +327,7 @@ class Tensor:
                 for item in nested:
                     shape_lst, flat = flatten_nested_lists(item)
                     shapes.append(shape_lst)
-                    flattened.extend(flat)
+                    flattened += flat
                 first_shape = shapes[0]
                 for s in shapes:
                     assert s == first_shape, 'All sub-lists must have the same shape'
@@ -561,7 +562,8 @@ class Tensor:
         C.mag_tensor_backward(self._ptr)
 
     def zero_grad(self) -> None:
-        raise NotImplementedError('Not implemented yet')
+        assert self.requires_grad, 'Tensor must require gradient tracking'
+        C.mag_tensor_zero_grad(self._ptr)
 
     def is_close(
         self, other: 'Tensor', eps: float = -1.0, print_eq_percent: bool = False
@@ -925,3 +927,79 @@ class Tensor:
             C.mag_tensor_set_scalar_physical_index(self._ptr, *idx, float(value))
         else:
             raise TypeError('Indices must be an int or a tuple of ints.')
+
+
+class Parameter:
+    """A tensor that is a learnable parameter of a model."""
+
+    __slots__ = ('x',)
+
+    def __init__(self, x: Tensor) -> None:
+        x.requires_grad = True
+        self.x = x
+
+
+class Module:
+    """Base class for all neural network modules."""
+
+    def parameters(self) -> list[Parameter]:
+        """Returns all unique and nested parameters of the module."""
+        params: list[Parameter] = []
+        for k, v in self.__dict__.items():
+            if isinstance(v, Parameter):
+                params.append(v)
+            elif isinstance(v, Module):
+                params += v.parameters()
+            elif isinstance(v, ModuleList):
+                for mod in v:
+                    params += mod.parameters()
+        return list(set(params))
+
+    def eval(self) -> None:
+        """Sets the module in evaluation mode."""
+        for p in self.parameters():
+            p.x.requires_grad = False
+
+    def train(self) -> None:
+        """Sets the module in training mode."""
+        for p in self.parameters():
+            p.x.requires_grad = True
+
+    def forward(self, *args: Tensor, **kwargs: dict) -> Tensor:
+        """Forward pass must be implemented by subclass."""
+        raise NotImplementedError
+
+    def __call__(self, *args: Tensor, **kwargs: dict) -> Tensor:
+        return self.forward(*args, **kwargs)
+
+
+class ModuleList(Module, list):
+    """A list of modules that can be used as a single module."""
+
+    def __init__(self, mods: list[Module] | None) -> None:
+        super().__init__()
+        if mods is not None:
+            self += mods
+
+    def append(self, mod: Module) -> None:
+        super().append(mod)
+
+    def extend(self, __iterable: list[Module]) -> None:
+        super().extend(__iterable)
+
+    def __iadd__(self, other: list[Module]) -> 'ModuleList':
+        self.extend(other)
+        return self
+
+    def __setitem__(self, k: int, v: Module) -> None:
+        super().__setitem__(k, v)
+
+    def __getitem__(self, k: int) -> Module:
+        return super().__getitem__(k)
+
+    def parameters(self) -> list[Parameter]:
+        """Returns all unique and nested parameters of the module."""
+        params: list[Parameter] = []
+        for mod in self:
+            params += mod.parameters()
+        return list(set(params))

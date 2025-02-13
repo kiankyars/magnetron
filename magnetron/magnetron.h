@@ -358,6 +358,7 @@ extern MAG_EXPORT mag_tensor_t* mag_tensor_grad(const mag_tensor_t* t); /* Get t
 extern MAG_EXPORT bool mag_tensor_requires_grad(const mag_tensor_t* t); /* Check if the tensor requires gradient computation */
 extern MAG_EXPORT void mag_tensor_set_requires_grad(mag_tensor_t* t, bool requires_grad); /* Set if the tensor requires gradient computation */
 extern MAG_EXPORT void mag_tensor_backward(mag_tensor_t* t); /* Compute the gradient of the tensor */
+extern MAG_EXPORT void mag_tensor_zero_grad(mag_tensor_t* t); /* Zero the gradient of the tensor */
 
 extern MAG_EXPORT float mag_tensor_get_scalar_physical_index(mag_tensor_t* t, int64_t d0, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5); /* Get scalar value at physical index */
 extern MAG_EXPORT void mag_tensor_set_scalar_physical_index(mag_tensor_t* t, int64_t d0, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5, float x); /* Set scalar value at physical index */

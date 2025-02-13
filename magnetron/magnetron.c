@@ -2562,6 +2562,11 @@ void mag_tensor_backward(mag_tensor_t* root) {
     mag_tensor_array_free(&post_order);
 }
 
+void mag_tensor_zero_grad(mag_tensor_t* t) {
+    if (t->grad && t->flags & MAG_TFLAG_REQUIRES_GRAD)
+        mag_tensor_fill(t->grad, 0.0f);
+}
+
 float mag_tensor_get_scalar_physical_index(mag_tensor_t* t, int64_t d0, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5) {
     mag_static_assert(MAG_MAX_DIMS == 6);
     mag_load_local_storage_group(t, s, strides);
