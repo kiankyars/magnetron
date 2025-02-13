@@ -701,6 +701,12 @@ extern const char* const mag_arm64_cap_names[MAG_ARM64_CAP__NUM];
 
 #endif
 
+typedef enum mag_ctx_flags_t {
+    MAG_CTX_FLAG_NONE = 0,
+    MAG_CTX_FLAG_PROFILER = 1<<0,          /* Is profiling */
+    MAG_CTX_FLAG_GRAD_RECORDER = 1<<1,     /* Gradient recording */
+} mag_ctx_flags_t;
+
 /*
 ** Context contains all isolated state and data.
 ** Lifetimes of tensors and compute graphs are bound to the context - the context is the owner.
@@ -726,8 +732,8 @@ struct mag_ctx_t {
     mag_tensor_node_t* rc_tracked;                  /* Linked list of RC tensors for sanitize. */
 #endif
     mag_fixed_intrusive_pool tensor_pool;           /* Fixed-size memory pool for tensors. */
-    mag_exec_mode_t exec_mode;
-    bool is_profiling;
+    mag_exec_mode_t exec_mode;                      /* Execution mode. */
+    mag_ctx_flags_t flags;                          /* Context flags. */
     mag_op_perf_info_t op_perf_mons_total[MAG_OP__NUM];
     union {
         struct {

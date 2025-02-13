@@ -1,5 +1,5 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
-
+import contextlib
 import faulthandler
 import typing
 import weakref
@@ -180,39 +180,43 @@ class Context:
         return C.mag_ctx_get_total_tensors_allocated(self._ptr)
 
     def start_profiler(self) -> None:
-        C.mag_ctx_profile_start_recording(self._ptr)
+        C.mag_ctx_profiler_start(self._ptr)
 
     def stop_profiler(self, export_csv_file: str | None = None) -> None:
-        csv_file = (
+        csv_file: ffi.CData | bytes = (
             ffi.NULL if export_csv_file is None else bytes(export_csv_file, 'utf-8')
         )
-        C.mag_ctx_profile_stop_recording(self._ptr, csv_file)
+        C.mag_ctx_profiler_end(self._ptr, csv_file)
+
+    @property
+    def is_profiling(self) -> bool:
+        return C.mag_ctx_profiler_is_running(self._ptr)
+
+    def start_grad_recorder(self) -> None:
+        C.mag_ctx_grad_recorder_start(self._ptr)
+
+    def stop_grad_recorder(self) -> None:
+        C.mag_ctx_grad_recorder_stop(self._ptr)
+
+    @property
+    def is_grad_recording(self) -> bool:
+        return C.mag_ctx_grad_recorder_is_running(self._ptr)
 
     def __del__(self) -> None:
         C.mag_ctx_destroy(self._ptr)
         self._ptr = ffi.NULL
 
 
-def no_grad() -> 'no_grad.Scope':
-    """Temporary disable gradient computation"""
+class no_grad(contextlib.ContextDecorator):
+    """Disables gradient recording within a function or block."""
 
-    class Scope:
-        def __call__(self, func: callable) -> None:
-            def f(*args: tuple[object, ...], **kwargs: dict[str, object]) -> None:
-                with Scope():
-                    return func(*args, **kwargs)
+    def __enter__(self) -> None:
+        """Disable gradient tracking by stopping the active context's recorder."""
+        Context.active().stop_grad_recorder()
 
-            return f
-
-        def __enter__(self) -> None:
-            pass
-
-        def __exit__(
-            self, exc_type: object, exc_value: object, traceback: object
-        ) -> None:
-            pass
-
-    return Scope()
+    def __exit__(self, exc_type: any, exc_value: any, traceback: any) -> None:
+        """Re-enable gradient tracking when exiting the context."""
+        Context.active().start_grad_recorder()
 
 
 @typing.final
@@ -235,7 +239,7 @@ class Tensor:
             C.mag_tensor_decref(self._ptr)
         self._ptr = ffi.NULL
 
-    _DISPATCH: list[int, ffi.CData] = {
+    _ALLOC_DISPATCH: list[int, ffi.CData] = {
         1: C.mag_tensor_create_1d,
         2: C.mag_tensor_create_2d,
         3: C.mag_tensor_create_3d,
@@ -243,7 +247,7 @@ class Tensor:
         5: C.mag_tensor_create_5d,
         6: C.mag_tensor_create_6d,
     }
-    assert len(_DISPATCH) == MAX_DIMS
+    assert len(_ALLOC_DISPATCH) == MAX_DIMS
 
     def _new(
         self,
@@ -257,7 +261,7 @@ class Tensor:
         assert 0 < len(shape) <= MAX_DIMS, f'Invalid number of dimensions: {len(shape)}'
         assert all(0 < dim <= DIM_MAX for dim in shape), 'Invalid dimension size'
         self._ctx = weakref.ref(ctx)
-        self._ptr = self._DISPATCH[len(shape)](ctx._ptr, dtype.value, *shape)
+        self._ptr = self._ALLOC_DISPATCH[len(shape)](ctx._ptr, dtype.value, *shape)
         self.requires_grad = requires_grad
         if name:
             self.name = name
@@ -543,7 +547,7 @@ class Tensor:
         C.mag_tensor_set_requires_grad(self._ptr, require)
 
     @property
-    def grad(self) -> 'Tensor' | None:
+    def grad(self) -> 'Tensor':
         if not self.requires_grad:
             return None
         ptr: ffi.CData = C.mag_tensor_grad(self._ptr)
@@ -553,7 +557,7 @@ class Tensor:
         return Tensor(ptr)
 
     def backward(self) -> None:
-        assert self.requires_grad
+        assert self.requires_grad, 'Tensor must require gradient tracking'
         C.mag_tensor_backward(self._ptr)
 
     def zero_grad(self) -> None:

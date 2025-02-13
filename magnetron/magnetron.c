@@ -577,6 +577,7 @@ mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
     mag_fixed_intrusive_pool_init(&ctx->tensor_pool, sizeof(mag_tensor_t), __alignof(mag_tensor_t), 4096);
 
     ctx->tr_id = mag_thread_id(); /* Get thread ID. */
+    ctx->flags |= MAG_CTX_FLAG_GRAD_RECORDER; /* Enable gradient recording by default. */
 
     /* Query and print host system information. */
     mag_system_host_info_query(ctx);
@@ -798,10 +799,10 @@ MAG_COLDPROC void mag_fixed_intrusive_pool_print_info(mag_fixed_intrusive_pool* 
     mag_log_info("\t Real Mem Allocated: %.03f %s, Total Pool Mem %.03f %s", mem_alloced, mem_unit_alloced, pool_mem, mem_unit_pool);
 }
 
-void mag_ctx_profile_start_recording(mag_ctx_t* ctx) {
-    if (ctx->is_profiling) return;
+void mag_ctx_profiler_start(mag_ctx_t* ctx) {
+    if (ctx->flags & MAG_CTX_FLAG_PROFILER) return;
     memset(ctx->op_perf_mons_total, 0, sizeof(ctx->op_perf_mons_total));
-    ctx->is_profiling = true;
+    ctx->flags |= MAG_CTX_FLAG_PROFILER;
 }
 
 typedef struct mag_op_perf_record_t {
@@ -817,9 +818,9 @@ static int mag_cmp_perf_info(const void* x, const void* y) {
     return 0;
 }
 
-void mag_ctx_profile_stop_recording(mag_ctx_t* ctx, const char* export_csv_file) {
-    mag_assert(ctx->is_profiling, "Profiler must be enabled to generate report");
-    ctx->is_profiling = false;
+void mag_ctx_profiler_end(mag_ctx_t* ctx, const char* export_csv_file) {
+    mag_assert(ctx->flags & MAG_CTX_FLAG_PROFILER, "Profiler must be enabled to generate report");
+    ctx->flags &= ~MAG_CTX_FLAG_PROFILER;
     bool csv = export_csv_file && *export_csv_file;
     if (!csv) {
         mag_print_separator(stdout);
@@ -881,6 +882,11 @@ void mag_ctx_profile_stop_recording(mag_ctx_t* ctx, const char* export_csv_file)
         mag_print_separator(stdout);
     }
 }
+
+bool mag_ctx_profiler_is_running(const mag_ctx_t* ctx) { return ctx->flags & MAG_CTX_FLAG_PROFILER; }
+void mag_ctx_grad_recorder_start(mag_ctx_t* ctx) { ctx->flags |= MAG_CTX_FLAG_GRAD_RECORDER; }
+void mag_ctx_grad_recorder_stop(mag_ctx_t* ctx) { ctx->flags &= ~MAG_CTX_FLAG_GRAD_RECORDER; }
+bool mag_ctx_grad_recorder_is_running(const mag_ctx_t* ctx) { return ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER; }
 
 uint32_t mag_pack_color_u8(uint8_t r, uint8_t g, uint8_t b) { return ((uint32_t)r<<16)|((uint32_t)g<<8)|(uint32_t)b; }
 uint32_t mag_pack_color_f32(float r, float g, float b) {
@@ -1811,7 +1817,7 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
         .dtype = type,
         .storage = {0},
         .numel = numel,
-        .flags = (view ? (MAG_TFLAG_VIEW | (view->flags & MAG_TFLAG_REQUIRES_GRAD)) : MAG_TFLAG_OWNER),
+        .flags = (view ? (MAG_TFLAG_VIEW | (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER ? view->flags & MAG_TFLAG_REQUIRES_GRAD : 0)) : MAG_TFLAG_OWNER),
         .op = MAG_OP_NOP,
         .op_inputs = {0},
         .op_params = {{0}},
@@ -1920,11 +1926,11 @@ mag_tensor_t* mag_tensor_create_6d(mag_ctx_t* ctx, mag_dtype_t type, int64_t d1,
 static void MAG_HOTPROC mag_op_exec(mag_tensor_t* R, mag_compute_device_t* dvc, mag_graph_eval_order_t ord) {
     mag_perf_mon_t* pmon = &R->pmon;
     mag_op_perf_info_t (*pmon_ops)[MAG_OP__NUM] = &R->ctx->op_perf_mons_total;
-    mag_op_perf_info_t* pmon_op = (*pmon_ops)+R->op;
-    uint64_t start = R->ctx->is_profiling ? mag_hpc_clock_ns() : 0;    /* Profiling monitoring */
+    mag_op_perf_info_t* pmon_op = *pmon_ops+R->op;
+    uint64_t start = R->ctx->flags & MAG_CTX_FLAG_PROFILER ? mag_hpc_clock_ns() : 0;    /* Profiling monitoring */
     void (*exec)(mag_compute_device_t*, mag_tensor_t*) = ord == MAG_GRAPH_EVAL_ORDER_FORWARD ? dvc->eager_exec_fwd : dvc->eager_exec_bwd;
     (*exec)(dvc, R); /* Dispatch to backend. */
-    if (!R->ctx->is_profiling) return; /* Profiling disabled. */
+    if (!(R->ctx->flags & MAG_CTX_FLAG_PROFILER)) return; /* Profiling disabled. */
     pmon->elapsed_ns = mag_hpc_clock_elapsed_ns(start);
     pmon->elapsed_ns_acc += pmon->elapsed_ns;
     pmon_op->elapsed_ns_acc += pmon->elapsed_ns;
@@ -1957,7 +1963,8 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
     for (uint32_t i=0; i < numin; ++i) {                             /* Set input tensors and flags. */
         mag_tensor_t* input = inputs[i];
         R->op_inputs[i] = input;
-        R->flags |= input->flags & MAG_TFLAG_REQUIRES_GRAD;
+        if (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)
+            R->flags |= input->flags & MAG_TFLAG_REQUIRES_GRAD;
     }
     if (params) memcpy(R->op_params, params, sizeof(*params));   /* Copy operation parameters */
     if (ctx->exec_mode == MAG_EXEC_MODE_EAGER) {                    /* In eager execution mode, we execute immediately. */
@@ -2352,7 +2359,8 @@ bool mag_tensor_requires_grad(const mag_tensor_t* t) {
 }
 
 void mag_tensor_set_requires_grad(mag_tensor_t* t, bool requires_grad) {
-    if (requires_grad) t->flags |= MAG_TFLAG_REQUIRES_GRAD;
+    if (requires_grad && t->ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)
+        t->flags |= MAG_TFLAG_REQUIRES_GRAD;
     else t->flags &= ~MAG_TFLAG_REQUIRES_GRAD;
 }
 
@@ -2481,7 +2489,7 @@ void mag_tensor_backward(mag_tensor_t* root) {
                 gri->flags = (gri->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
                 input->grad = gri;
             } else {
-                mag_tensor_t* acc = mag_add(input->grad, gri);
+                mag_tensor_t* acc = mag_add_(input->grad, gri);
                 mag_tensor_decref(input->grad);
                 acc->flags = (acc->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
                 input->grad = acc;

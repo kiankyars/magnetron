@@ -111,8 +111,12 @@ extern MAG_EXPORT uint64_t mag_ctx_get_physical_memory_total(const mag_ctx_t* ct
 extern MAG_EXPORT uint64_t mag_ctx_get_physical_memory_free(const mag_ctx_t* ctx); /* Get the free physical memory in bytes */
 extern MAG_EXPORT bool mag_ctx_is_numa_system(const mag_ctx_t* ctx); /* Check if the system is NUMA */
 extern MAG_EXPORT size_t mag_ctx_get_total_tensors_created(const mag_ctx_t* ctx); /* Get total tensors created. (Including views) */
-extern MAG_EXPORT void mag_ctx_profile_start_recording(mag_ctx_t* ctx); /* Start profiling */
-extern MAG_EXPORT void mag_ctx_profile_stop_recording(mag_ctx_t* ctx, const char* export_csv_file); /* Reset profiling data */
+extern MAG_EXPORT void mag_ctx_profiler_start(mag_ctx_t* ctx); /* Start profiling */
+extern MAG_EXPORT void mag_ctx_profiler_end(mag_ctx_t* ctx, const char* export_csv_file); /* Reset profiling data */
+extern MAG_EXPORT bool mag_ctx_profiler_is_running(const mag_ctx_t* ctx); /* Check if profiler is running */
+extern MAG_EXPORT void mag_ctx_grad_recorder_start(mag_ctx_t* ctx); /* Start gradient recording */
+extern MAG_EXPORT void mag_ctx_grad_recorder_stop(mag_ctx_t* ctx); /* Stop gradient recording */
+extern MAG_EXPORT bool mag_ctx_grad_recorder_is_running(const mag_ctx_t* ctx); /* Check if gradient recording is running */
 extern MAG_EXPORT void mag_ctx_destroy(mag_ctx_t* ctx); /* Destroy context and free memory */
 
 /**

@@ -1,4 +1,5 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+import random
 
 import magnetron as mag
 import torch
@@ -43,3 +44,66 @@ def test_autograd_2():
 
     assert magy.item() == torchy.data.item()
     assert magx.grad.item() == torchx.grad.item()
+
+def test_autograd_inherit():
+    xi1 = random.random() * 128.0
+    xi2 = random.random() * 512.0
+    x = mag.Tensor.const([xi1], requires_grad=True)
+    y = mag.Tensor.const([xi2], requires_grad=True)
+    t1 = (x + y)
+    t2 = (x - y)
+    t3 = t1 * t2
+    y = t3.relu()
+    assert x.requires_grad
+    assert y.requires_grad
+    assert t1.requires_grad
+    assert t2.requires_grad
+    assert t3.requires_grad
+    assert y.requires_grad
+    y.backward()
+    magx, magy = x, y
+
+    x = torch.Tensor([xi1])
+    x.requires_grad = True
+    y = torch.Tensor([xi2])
+    y.requires_grad = True
+    t1 = (x + y)
+    t2 = (x - y)
+    t3 = t1 * t2
+    y = t3.relu()
+    y.backward()
+    torchx, torchy = x, y
+
+    assert magy.item() == torchy.data.item()
+    assert magx.grad.item() == torchx.grad.item()
+
+def test_autograd_inherit_nograd():
+    xi1 = random.random() * 128.0
+    xi2 = random.random() * 512.0
+    with mag.no_grad():
+        x = mag.Tensor.const([xi1], requires_grad=True)
+        y = mag.Tensor.const([xi2], requires_grad=True)
+        t1 = (x + y)
+        t2 = (x - y)
+        t3 = t1 * t2
+        y = t3.relu()
+        assert not x.requires_grad
+        assert not y.requires_grad
+        assert not t1.requires_grad
+        assert not t2.requires_grad
+        assert not t3.requires_grad
+        assert not y.requires_grad
+        magy = y
+
+    with torch.no_grad():
+        x = torch.Tensor([xi1])
+        x.requires_grad = True
+        y = torch.Tensor([xi2])
+        y.requires_grad = True
+        t1 = (x + y)
+        t2 = (x - y)
+        t3 = t1 * t2
+        y = t3.relu()
+        torchy = y
+
+    assert magy.item() == torchy.data.item()
