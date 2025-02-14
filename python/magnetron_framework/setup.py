@@ -46,7 +46,7 @@ class CMakeBuildExecutor(build_ext):
         cmake_args = [
             '-DMAGNETRON_ENABLE_CUDA=OFF',  # TODO: Fix cuda compilation
             f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={os.path.abspath(os.path.join(self.build_lib, "magnetron"))}',
-            '-DCMAKE_BUILD_TYPE=Debug',
+            '-DCMAKE_BUILD_TYPE=Release',
         ]
         build_args = [
             '--target magnetron',  # Only build the magnetron library
