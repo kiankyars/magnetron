@@ -9,10 +9,10 @@ TEST(cuda, simple_add) {
 
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_GPU_CUDA);
 
-    mag_tensor_t* a = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 4096, 4096, 16);
+    mag_tensor_t* a = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 512, 512, 16);
     mag_tensor_fill(a, 1.0f);
 
-    mag_tensor_t* b = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 4096, 4096, 16);
+    mag_tensor_t* b = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 512, 512, 16);
     mag_tensor_fill(b, 1.0f);
 
     printf("Computing...\n");

@@ -1386,6 +1386,10 @@ mag_cpu_blas_impl_binary(f32, sub, -)
 mag_cpu_blas_impl_binary(f32, mul, *)
 mag_cpu_blas_impl_binary(f32, div, /)
 
+#ifdef MAG_OPENBLAS
+
+#include <cblas.h>
+
 static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* x = r->op_inputs[0];
@@ -1399,34 +1403,51 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
     mag_load_local_storage_group(x, xs, strides);
     mag_load_local_storage_group(y, yd, shape);
     mag_load_local_storage_group(y, ys, strides);
-    mag_assert2(xd2 == 1 && xd3 == 1 && xd4 == 1&& xd5 == 1);
-    mag_assert2(yd2 == 1 && yd3 == 1 && yd4 == 1&& yd5 == 1);
-    int64_t tc = payload->thread_num;
     int64_t ti = payload->thread_idx;
-    int64_t numel = xd0;
-    int64_t chunk = (numel + tc - 1)/tc;
-    int64_t ra = chunk*ti;
-    int64_t rb = mag_xmin(ra+chunk, numel);
-    bool tx = mag_tensor_is_transposed(x);
-    for (int64_t i = ra; i < rb; ++i) { /* Rows */
-        for (int64_t j = 0; j < yd1; ++j) {
-            float* xo = br + rd1*i + j;
-            mag_bnd_chk(xo, br, mag_tensor_data_size(r));
-            *xo = 0.0f;
-        }
-        for (int64_t k = 0; k < xd1; ++k) { /* Inner dim */
-            const mag_f32_t* px = bx + (tx ? k*xd0 + i : xd1*i + k);
-            mag_bnd_chk(px, bx, mag_tensor_data_size(x));
-            for (int64_t j = 0; j < yd1; ++j) { /* Columns */
-                mag_f32_t* pr = br + rd1*i + j;
-                const mag_f32_t* py = by + yd1*k + j;
-                mag_bnd_chk(pr, br, mag_tensor_data_size(r));
-                mag_bnd_chk(py, by, mag_tensor_data_size(y));
-                *pr += (*px) * (*py);
+    if (ti != 0) return;
+    mag_assert2(mag_tensor_is_contiguous(x) && mag_tensor_is_contiguous(y) && mag_tensor_is_contiguous(r));
+    bool trans_a = mag_tensor_is_transposed(x);
+    if (x->op == MAG_OP_CLONE && x->op_inputs[0]) trans_a |= mag_tensor_is_transposed(x->op_inputs[0]);
+    bool trans_b = mag_tensor_is_transposed(y);
+    if (y->op == MAG_OP_CLONE && y->op_inputs[0]) trans_a |= mag_tensor_is_transposed(y->op_inputs[0]);
+    int64_t b2 = yd2/xd2;
+    int64_t b3 = yd3/xd3;
+    int64_t b4 = yd4/xd4;
+    int64_t b5 = yd5/xd5;
+    for (int64_t i5=0; i5 < xd5; ++i5) {
+        for (int64_t i4=0; i4 < xd4; ++i4) {
+            for (int64_t i3=0; i3 < xd3; ++i3) {
+                for (int64_t i2=0; i2 < xd2; ++i2) {
+                    int64_t xi5 = i5/b5;
+                    int64_t xi4 = i4/b4;
+                    int64_t xi3 = i3/b3;
+                    int64_t xi2 = i2/b2;
+                    const mag_f32_t* px = bx + xi5*xs5 + xi4*xs4 + xi3*xs3 + xi2*xs2;
+                    const mag_f32_t* py = by + i5*ys5 + i4*ys4 + i3*ys3 + i2*ys2;
+                    mag_f32_t* pr = br + i5*rs5 + i4*rs4 + i3*rs3 + i2*rs2;
+                    mag_bnd_chk(pr, br, mag_tensor_data_size(r));
+                    mag_bnd_chk(px, bx, mag_tensor_data_size(x));
+                    mag_bnd_chk(py, by, mag_tensor_data_size(y));
+                    cblas_sgemm(
+                        CblasRowMajor,
+                        trans_a ? CblasTrans : CblasNoTrans,
+                        trans_b ? CblasTrans : CblasNoTrans,
+                        rd0,
+                        yd1,
+                        xd1,
+                        1.0f,
+                        px, xd1,
+                        py, yd1,
+                        0.0f,
+                        pr, yd1
+                    );
+                }
             }
         }
     }
 }
+
+#endif
 
 #ifndef MAG_BLAS_SPECIALIZATION
 #error "BLAS specialization undefined"

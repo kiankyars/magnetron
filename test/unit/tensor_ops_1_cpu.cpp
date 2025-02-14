@@ -159,7 +159,7 @@ impl_test_unary_op(tanh, 1e-3, tanh, [](float x) -> float {
     return std::tanh(x);
 })
 impl_test_unary_op(tanh_dv, 1e-9, tanh_dv, [](float x) -> float {
-    return 1.0f / (std::cosh(x)*std::cosh(x));
+    return 1.0f - (std::tanh(x) * std::tanh(x));
 })
 
 impl_test_unary_op(relu, 1e-9, relu, [](float x) -> float {

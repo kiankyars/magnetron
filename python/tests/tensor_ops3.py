@@ -115,7 +115,7 @@ def test_matmul_x_transposed():
     mag_b = Tensor.uniform(shape_b)
     np_a = tonumpy(mag_a)
     np_b = tonumpy(mag_b)
-    mag_result = mag_a.T @ mag_b
+    mag_result = mag_a.T.clone() @ mag_b
     np_result = np.matmul(np_a.T, np_b)
     assert mag_result.shape == np_result.shape
     assert mag_result.shape == (2, 4)

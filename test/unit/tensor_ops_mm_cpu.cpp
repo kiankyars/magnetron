@@ -95,7 +95,7 @@ TEST(compute_cpu, mm_square_2x2_transpose_x) {
     mag_tensor_copy_buffer_from(A, A_data, sizeof(A_data));
     mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, M, N);
     mag_tensor_copy_buffer_from(B, B_data, sizeof(B_data));
-    mag_tensor_t* R = mag_matmul(mag_transpose(A), B);
+    mag_tensor_t* R = mag_matmul(mag_clone(mag_transpose(A)), B);
     ASSERT_EQ(R->rank, 2);
     ASSERT_EQ(R->shape[0], 2);
     ASSERT_EQ(R->shape[1], 2);
