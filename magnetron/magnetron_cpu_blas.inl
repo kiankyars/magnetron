@@ -1,6 +1,8 @@
-/* (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
-
 /*
+** (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+**
+**
+** !!! Make sure all functions in this file are static. This is required to correctly clone the impl for each specialized compilation unit.
 ** This file implements the core math for magnetron, optimized for different CPU instruction sets.
 ** This file is also included into different compilation units, which are all compiled with different architecture flags, thus the impl is 'cloned'.
 ** At runtime the best impl for the host-CPU is chose automatically, by detecting the CPU and querying the hardware features.
@@ -19,8 +21,6 @@
 ** +==============+=============+==============+======================================================+
 ** Some CPUs fall inbetween those, for example my old rusty test server has four old AMD Opteron CPUs with 16 cores each. They support AVX but not AVX2.
 ** For CPUs like this, we still support more granular feature levels: SSE42, AVX, AVX2 and AVX512F.
-**
-**
 **
 ** +==============+=============+==============+======================================================+
 ** | ARM 64 Versions and Features
@@ -52,6 +52,9 @@
 
 #if defined(__APPLE__) && defined(MAG_ACCELERATE)
 #include <Accelerate/Accelerate.h>
+#endif
+#ifdef MAG_OPENBLAS
+#include <cblas.h>
 #endif
 
 #if defined(_MSC_VER) && defined(__AVX2__) /*MSVC does not define FMA and F16C with AVX 2*/
@@ -1386,9 +1389,7 @@ mag_cpu_blas_impl_binary(f32, sub, -)
 mag_cpu_blas_impl_binary(f32, mul, *)
 mag_cpu_blas_impl_binary(f32, div, /)
 
-#ifdef MAG_OPENBLAS
-
-#include <cblas.h>
+#if defined(MAG_OPENBLAS) || defined(MAG_ACCELERATE)
 
 static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
     mag_tensor_t* r = payload->node;
