@@ -754,9 +754,6 @@ struct mag_ctx_t {
     size_t sh_cap;                                      /* Maximum number of shutdown hooks. */
     mag_compute_device_type_t device_type;              /* Active compute device. */
     mag_compute_device_t* device;                       /* Active compute device. */
-    uint8_t* (*image_load_fn)(const char*, uint32_t(*)[3], mag_color_channels_t);    /* Image loader. stb_image by default, you can plug-in your own. */
-    void (*image_load_free_fn)(uint8_t*);                                           /* Image loader free function.  stb_image by default, you can plug-in your own. */
-    bool (*image_save_fn)(const char*, const uint8_t*, const uint32_t(*)[3]);       /* Image saver. stb_image by default, you can plug-in your own. */
     void* ud; /* User data. */
 };
 

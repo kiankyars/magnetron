@@ -1,7 +1,7 @@
 /*
 ** (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 **
-** This file implement the core framework:
+** This file implements the magnetron runtime core:
 **  - The magnetron core API which is used from Python and C as declared in magnetron.h.
 **  - Context creation, destruction and all related functions.
 **  - Tensor creation, destruction and utility functions, all except the compute functions.
@@ -168,19 +168,6 @@ void mag_free_aligned(void* blk) {
 #endif
 
 void* (*mag_alloc)(void* blk, size_t size) = &mag_alloc_stub;
-
-/* Include STB libraries and override their allocator with ours. */
-#define STBI_STATIC
-#define STBI_MALLOC(sz) ((*mag_alloc)(NULL, (sz)))
-#define STBI_FREE(ptr) ((*mag_alloc)((ptr), 0))
-#define STBI_REALLOC(ptr, sz) ((*mag_alloc)((ptr), (sz)))
-#define STBIW_MALLOC(sz) ((*mag_alloc)(NULL, (sz)))
-#define STBIW_FREE(ptr) ((*mag_alloc)((ptr), 0))
-#define STBIW_REALLOC(ptr, sz) ((*mag_alloc)((ptr), (sz)))
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb_image_write.h>
 
 void* (*mag_get_alloc_fn(void))(void* blk, size_t size) { return mag_alloc; } /* Get global allocator. */
 void mag_set_alloc_fn(void* (*alloc)(void* blk, size_t size)) { mag_assert2(alloc); mag_alloc = alloc; } /* Set global allocator. */
@@ -732,11 +719,6 @@ mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
     /* Query and print host system information. */
     mag_system_host_info_query(ctx);
     mag_system_host_info_dump(ctx);
-
-    /* Configure configureable media processors */
-    ctx->image_load_fn = &mag_default_image_load_impl;
-    ctx->image_load_free_fn = &mag_default_image_load_free_fn_impl;
-    ctx->image_save_fn = &mag_default_image_save_impl;
 
     /* Initialize PRNG state. */
     ctx->prng_algorithm = MAG_PRNG_MERSENNE_TWISTER;
@@ -3798,102 +3780,6 @@ mag_tensor_t* mag_tensor_load(mag_ctx_t* ctx, const char* file) {
     return target;
 }
 
-mag_tensor_t* mag_tensor_load_image(mag_ctx_t* ctx, const char* file, mag_color_channels_t channels, uint32_t resize_w, uint32_t resize_h) {
-    uint8_t* (*loader)(const char*, uint32_t(*)[3], mag_color_channels_t) = ctx->image_load_fn;
-    void (*load_free)(uint8_t*) = ctx->image_load_free_fn;
-    mag_assert(loader && load_free, "Image loader not set");
-    uint32_t whc[3] = {0};
-    uint8_t* src = (*loader)(file, &whc, channels);
-    mag_assert(src, "Failed to load tensor from image: '%s'", file);
-    if (resize_w && resize_h) { /* Resize requested. */
-        float* ori = (*mag_alloc)(NULL, whc[2]*whc[1]*whc[0]*sizeof(*ori));
-        for (int64_t k=0; k < whc[2]; ++k) { /* Convert from interleaved to planar representation. */
-            for (int64_t j=0; j < whc[1]; ++j) {
-                for (int64_t i=0; i < whc[0]; ++i) {
-                    ori[i + whc[0]*j + whc[0]*whc[1]*k] = (float)src[k + whc[2]*i + whc[2]*whc[0]*j] / 255.0f;  /* Normalize pixel values to [0, 1] */
-                }
-            }
-        }
-        mag_tensor_t* t = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, whc[2], resize_h, resize_w);
-        float* dst = mag_tensor_data_ptr(t);
-        float* part = (*mag_alloc)(NULL, whc[2] * whc[1] * resize_w * sizeof(*part));
-        float ws = (float)(whc[0] - 1)/(float)(resize_w - 1);
-        float hs = (float)(whc[1] - 1)/(float)(resize_h - 1);
-        for (uint32_t k = 0; k < whc[2]; ++k){
-            for (uint32_t r = 0; r < whc[1]; ++r) {
-                for (uint32_t c = 0; c < resize_w; ++c) {
-                    float val = 0;
-                    if (c == resize_w - 1 || whc[0] == 1) {
-                        val = ori[k*(whc[0])*(whc[1]) + r*(whc[0]) + (whc[0] - 1)];
-                    } else {
-                        float sx = (float)c*ws;
-                        uint32_t ix = (uint32_t)sx;
-                        float dx = sx - (float)ix;
-                        val = (1-dx) * (ori[k*(whc[0])*(whc[1]) + r*(whc[0]) + ix]) + dx*(ori[k*(whc[0])*(whc[1]) + r*(whc[0]) + (ix + 1)]);
-                    }
-                    part[k * resize_w * (whc[1]) + r * resize_w + c] = val;
-                }
-            }
-        }
-        for (uint32_t k = 0; k < whc[2]; ++k) {
-            for (uint32_t r = 0; r < resize_h; ++r) {
-                float sy = (float)r*hs;
-                uint32_t iy = (uint32_t)sy;
-                float dy = sy - (float)iy;
-                for (uint32_t c = 0; c < resize_w; ++c) {
-                    float val = (1-dy)*(part[k * resize_w * whc[1] + iy * resize_w + c]);
-                    dst[k * resize_w * resize_h + r * resize_w + c] = val;
-                }
-                if (r == resize_h - 1 || whc[1] == 1) continue;
-                for (uint32_t c = 0; c < resize_w; ++c) {
-                    float val = dy*(part[k * resize_w * (whc[1]) + (iy + 1) * resize_w + c]);
-                    dst[k * resize_w * resize_h + r * resize_w + c] += val;
-                }
-            }
-        }
-        (*mag_alloc)(ori, 0);
-        (*mag_alloc)(part, 0);
-        mag_assert(resize_w * resize_h * whc[2] == mag_tensor_numel(t), "Buffer size mismatch: %zu != %zu", resize_w * resize_h * whc[2], (size_t)mag_tensor_numel(t));
-        (*load_free)(src);
-        mag_log_info("Loaded and resized tensor from image: %s, %u x %u x %u", file, resize_w, resize_h, whc[2]);
-        return t;
-    }
-    mag_tensor_t* t = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, whc[2], whc[1], whc[0]);
-    float* dst = mag_tensor_data_ptr(t);
-    for (int64_t k = 0; k < whc[2]; ++k) { /* Convert from interleaved to planar representation. */
-        for (int64_t j = 0; j < whc[1]; ++j) {
-            for (int64_t i = 0; i < whc[0]; ++i) {
-                dst[i + whc[0]*j + whc[0]*whc[1]*k] = (float)src[k + whc[2]*i + whc[2]*whc[0]*j] / 255.0f;  /* Normalize pixel values to [0, 1] */
-            }
-        }
-    }
-    mag_assert(whc[0]*whc[1]*whc[2] == mag_tensor_numel(t), "Buffer size mismatch: %zu != %zu", whc[0]*whc[1]*whc[2], (size_t)mag_tensor_numel(t));
-    (*load_free)(src);
-    mag_log_info("Loaded tensor from image: %s, %u x %u x %u", file, whc[0], whc[1], whc[2]);
-    return t;
-}
-
-void mag_tensor_save_image(const mag_tensor_t* t, const char* file) {
-    bool (*saver)(const char*, const uint8_t*, const uint32_t(*)[3]) = t->ctx->image_save_fn;
-    mag_assert(saver, "Image saver not set");
-    int64_t rank = mag_tensor_rank(t);
-    mag_assert(rank == 3, "Tensor rank must be 3, but is: %" PRIi64, (size_t)rank);
-    int64_t w = mag_tensor_width(t);
-    int64_t h = mag_tensor_height(t);
-    int64_t c = mag_tensor_channels(t);
-    mag_assert(c == 1 || c == 3 || c == 4, "Invalid number of channels: %zu", (size_t)c);
-    mag_assert(w*h*c == mag_tensor_numel(t), "Buffer size mismatch: %zu != %zu", w*h*c, (size_t)mag_tensor_numel(t));
-    uint8_t* dst = (*mag_alloc)(NULL, w*h*c); /* Allocate memory for image data */
-    const float* src = mag_tensor_data_ptr(t);
-    for (int64_t k = 0; k < c; ++k) /* Convert from planar to interleaved format. */
-        for (int64_t i = 0; i < w*h; ++i)
-            dst[i*c + k] = (uint8_t)(src[i + k*w*h]*255.0f);
-    const uint32_t whc[3] = {(uint32_t)w,(uint32_t)h,(uint32_t)c};
-    mag_assert((*saver)(file, dst, &whc), "Failed to save tensor to image: %s", file);
-    (*mag_alloc)(dst, 0); /* Free image data */
-    mag_log_info("Saved tensor to image: %s, width: %d, height: %d, channels: %d", file, (int)w, (int)h, (int)c);
-}
-
 static MAG_COLDPROC void mag_graphviz_dump_node_edge(FILE* f, const mag_tensor_t* node, const mag_tensor_t* parent, const char* label)  {
    const mag_tensor_t* gparent = NULL;
    const mag_tensor_t* gparent0 = NULL;
@@ -3973,31 +3859,4 @@ MAG_COLDPROC void mag_tensor_export_graphviz(const mag_tensor_t* t, const char* 
     mag_compute_graph_fold(0xffff, t, &mag_tensor_dump_folded_graph, true, f);
     fprintf(f, "}\n");
     fclose(f);
-}
-
-static uint8_t* mag_default_image_load_impl(const char* file, uint32_t(*whc)[3], mag_color_channels_t channels) {
-    mag_assert2(file && *file && whc);
-    int w, h, c, dc;
-    switch (channels) {
-        default: dc = STBI_default; break;
-        case MAG_COLOR_CHANNELS_GRAY: dc = STBI_grey; break;
-        case MAG_COLOR_CHANNELS_GRAY_A: dc = STBI_grey_alpha; break;
-        case MAG_COLOR_CHANNELS_RGB: dc = STBI_rgb; break;
-        case MAG_COLOR_CHANNELS_RGBA: dc = STBI_rgb_alpha; break;
-    }
-    uint8_t* buf = stbi_load(file, &w, &h, &c, dc);
-    if (mag_unlikely(!buf || !w || !h || !c || (c != 1 && c != 3 && c != 4))) return NULL;
-    (*whc)[0] = (uint32_t)w;
-    (*whc)[1] = (uint32_t)h;
-    (*whc)[2] = (uint32_t)c;
-    return buf;
-}
-
-static void mag_default_image_load_free_fn_impl(uint8_t* p) {
-    stbi_image_free(p);
-}
-
-static bool mag_default_image_save_impl(const char* file, const uint8_t* buf, const uint32_t(*whc)[3]) {
-    mag_assert2(file && *file && buf && whc);
-    return stbi_write_jpg(file, (int)(*whc)[0], (int)(*whc)[1], (int)(*whc)[2], buf, 100) != 0;
 }

@@ -35,7 +35,7 @@ auto main() -> int {
         .warmup(100)
         .performanceCounters(true);
 
-    bench_op(bench, 15000);
+    bench_op(bench, 20000);
     bench_op(bench, 10000);
     bench_op(bench, 1000);
     bench_op(bench, 750);
