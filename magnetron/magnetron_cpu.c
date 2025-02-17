@@ -163,9 +163,9 @@ static const mag_cpu_op_info_t mag_cpu_op_infos[MAG_OP__NUM] = {
 
 typedef struct mag_worker_t mag_worker_t;
 typedef struct mag_threadpool_t {
-    mag_alignas(MAG_CACHE_LINE_SIZE) volatile bool interrupt;   /* Interrupt flag, 1=stop */
-    mag_alignas(MAG_CACHE_LINE_SIZE) uint64_t phase;            /* Current compute phase */
-    mag_alignas(MAG_CACHE_LINE_SIZE) uint64_t num_completed;    /* Number of workers that have completed their work */
+    mag_alignas(MAG_DESTRUCTIVE_INTERFERENCE_SIZE) volatile bool interrupt;   /* Interrupt flag, 1=stop */
+    mag_alignas(MAG_DESTRUCTIVE_INTERFERENCE_SIZE) uint64_t phase;            /* Current compute phase */
+    mag_alignas(MAG_DESTRUCTIVE_INTERFERENCE_SIZE) uint64_t num_completed;    /* Number of workers that have completed their work */
     mag_cond_var_t cv;                              /* Condition variable for thread wakeup */
     mag_mutex_t mtx;                                /* Mutex for synchronization */
     uint32_t num_allocated_workers;                 /* Number of intra-op workers allocated */
@@ -183,7 +183,7 @@ struct mag_worker_t {
     mag_threadpool_t* pool;                 /* Host thread pool */
     bool is_async;                          /* True if worker is async (executed on a different thread)  */
     mag_thread_t thread;                    /* Thread handle */
-} mag_alignas(MAG_CACHE_LINE_SIZE);
+} mag_alignas(MAG_DESTRUCTIVE_INTERFERENCE_SIZE);
 
 typedef struct mag_cpu_device_t {
     mag_ctx_t* ctx;
@@ -407,7 +407,7 @@ static void mag_cpu_buf_cpy_device_host(mag_storage_buffer_t* sto, size_t offs, 
 }
 
 /* Align CPU buffer to cache line size, which should also be satisfy alignment requirements for SSE, AVX and AVX512 on x86-64. */
-#define MAG_CPU_BUF_ALIGN MAG_CACHE_LINE_SIZE
+#define MAG_CPU_BUF_ALIGN MAG_DESTRUCTIVE_INTERFERENCE_SIZE
 mag_static_assert((MAG_CPU_BUF_ALIGN & 15) == 0);
 mag_static_assert((MAG_CPU_BUF_ALIGN & 31) == 0);
 mag_static_assert((MAG_CPU_BUF_ALIGN & 63) == 0);

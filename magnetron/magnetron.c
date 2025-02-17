@@ -1560,10 +1560,14 @@ static void mag_op_backward_matmul(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
     mag_tensor_t* y = node->op_inputs[1];
     mag_tensor_t* yt = mag_transpose(y);
-    grads[0] = mag_matmul(node->grad, yt);
+    mag_tensor_t* ytc = mag_clone(yt);
+    grads[0] = mag_matmul(node->grad, ytc);
     mag_tensor_t* xt = mag_transpose(x);
-    grads[1] = mag_matmul(xt, node->grad);
+    mag_tensor_t* xtc = mag_clone(xt);
+    grads[1] = mag_matmul(xtc, node->grad);
+    mag_tensor_decref(ytc);
     mag_tensor_decref(yt);
+    mag_tensor_decref(xtc);
     mag_tensor_decref(xt);
 }
 

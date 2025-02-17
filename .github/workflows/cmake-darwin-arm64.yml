@@ -1,0 +1,79 @@
+name: CMake Build - Darwin AMD64
+
+on:
+  push:
+    branches: [ "master", "develop" ]
+  pull_request:
+    branches: [ "*" ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    strategy:
+      matrix:
+        build_type: [Release]
+        # On macOS, we use clang
+        compiler:
+          - { c_compiler: clang, cpp_compiler: clang++ }
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set reusable strings
+        id: strings
+        run: |
+          echo "build-output-dir=${GITHUB_WORKSPACE}/build" >> $GITHUB_OUTPUT
+
+      - name: Configure CMake
+        run: >
+          cmake -B ${{ steps.strings.outputs.build-output-dir }}
+                -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cpp_compiler }}
+                -DCMAKE_C_COMPILER=${{ matrix.compiler.c_compiler }}
+                -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+                -S ${{ github.workspace }}
+
+      - name: Build C++ Runtime
+        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }} -j4
+
+      - name: Prepare C++ Test Data
+        run: |
+          cp -r ${{ github.workspace }}/test_data ${{ steps.strings.outputs.build-output-dir }}/test/unit/test_data
+
+      - name: Run C++ Runtime Tests
+        working-directory: ${{ steps.strings.outputs.build-output-dir }}
+        run: ctest --build-config ${{ matrix.build_type }} --verbose
+
+      - name: Setup Python Virtual Environment
+        shell: bash
+        run: |
+          python3 -m venv .venv
+          . .venv/bin/activate
+          pip install --upgrade pip
+
+      - name: Build Python wheel
+        shell: bash
+        run: |
+          . .venv/bin/activate
+          cd ${{ github.workspace }}/python/magnetron_framework
+          pip wheel --verbose -w dist .
+
+      - name: Install Python wheel
+        shell: bash
+        run: |
+          . .venv/bin/activate
+          pip install ${{ github.workspace }}/python/magnetron_framework/dist/*.whl
+
+      - name: Install Pytest
+        shell: bash
+        run: |
+          . .venv/bin/activate
+          pip install -r ${{ github.workspace }}/python/optional-requirements.txt
+
+      - name: Run Python Tests
+        shell: bash
+        run: |
+          . .venv/bin/activate
+          python -m pytest ${{ github.workspace }}/python/tests/*

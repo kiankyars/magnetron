@@ -1,5 +1,7 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
+# To install locally, use: pip3 install . --force-reinstall
+
 import os
 import subprocess
 import multiprocessing
