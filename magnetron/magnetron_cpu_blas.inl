@@ -1877,7 +1877,7 @@ static void (*const post_backward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) =
     [MAG_OP_MATMUL] = NULL,
 };
 
-void MAG_BLAS_SPECIALIZATION(mag_kernel_registry_t* kernels, mag_kernel_context_t* ctx) {
+void MAG_BLAS_SPECIALIZATION(mag_kernel_registry_t* kernels) {
     for (unsigned i=0; i < MAG_OP__NUM; ++i) {
         kernels->fwd_pre[i] = pre_forward_kernels[i];
         kernels->fwd[i] = forward_kernels[i];

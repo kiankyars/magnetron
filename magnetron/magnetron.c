@@ -668,11 +668,6 @@ static void mag_system_host_info_dump(mag_ctx_t* ctx) {
     mag_log_info("Physical Machine Memory: %.03f %s, Free: %.03f %s, Used: %.03f %s (%.02f%%)", mem_total, mem_unit_total, mem_free, mem_unit_free, mem_used, mem_unit_used, mem_used_percent);
 }
 
-/* Default image loader/saver implementation. */
-static uint8_t* mag_default_image_load_impl(const char*, uint32_t(*)[3], mag_color_channels_t);
-static void mag_default_image_load_free_fn_impl(uint8_t*);
-static bool mag_default_image_save_impl(const char*, const uint8_t*, const uint32_t(*)[3]);
-
 /* Print compiler information such as name, version and build time. */
 static MAG_COLDPROC void mag_ctx_dump_compiler_info(void) {
     const char* compiler_name = "Unknown";
