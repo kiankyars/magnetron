@@ -1450,6 +1450,38 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
 
 #else
 
+static void MAG_HOTPROC mag_sgemm(
+    const bool trans_a, const bool trans_b,
+    const int64_t M, const int64_t N, const int64_t K,
+    const float alpha, const float* A, const int64_t lda,
+    const float* B, const int64_t ldb,
+    const float beta, float* C, const int64_t ldc
+)
+{
+    for (int64_t i=0; i < M; i++) {
+        for (int64_t j=0; j < N; j++) {
+            float sum = 0.0f;
+            if (!trans_a && !trans_b) {
+                for (int p = 0; p < K; p++) {
+                    sum += A[i * lda + p] * B[p * ldb + j];
+                }
+            } else if (!trans_a && trans_b) {
+                for (int p = 0; p < K; p++) {
+                    sum += A[i * lda + p] * B[j * ldb + p];
+                }
+            } else if (trans_a && !trans_b) {
+                for (int p = 0; p < K; p++) {
+                    sum += A[p * lda + i] * B[p * ldb + j];
+                }
+            } else {
+                for (int p = 0; p < K; p++) {
+                    sum += A[p * lda + i] * B[j * ldb + p];
+                }
+            }
+            C[i * ldc + j] = alpha * sum + beta * C[i * ldc + j];
+        }
+    }
+}
 static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* x = r->op_inputs[0];
@@ -1465,9 +1497,10 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
     mag_load_local_storage_group(y, ys, strides);
     int64_t ti = payload->thread_idx;
     if (ti != 0) return;
-    mag_assert2(mag_tensor_is_contiguous(x) && mag_tensor_is_contiguous(y) && mag_tensor_is_contiguous(r));
     bool trans_a = mag_tensor_is_transposed(x);
     if (x->op == MAG_OP_CLONE && x->op_inputs[0]) trans_a |= mag_tensor_is_transposed(x->op_inputs[0]);
+    bool trans_b = mag_tensor_is_transposed(y);
+    if (y->op == MAG_OP_CLONE && y->op_inputs[0]) trans_b |= mag_tensor_is_transposed(y->op_inputs[0]);
     memset(br, 0, mag_tensor_data_size(r));
     int64_t b2 = yd2/xd2;
     int64_t b3 = yd3/xd3;
@@ -1487,19 +1520,18 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
                     mag_bnd_chk(pr, br, mag_tensor_data_size(r));
                     mag_bnd_chk(px, bx, mag_tensor_data_size(x));
                     mag_bnd_chk(py, by, mag_tensor_data_size(y));
-                    for (int64_t i = 0; i < x->numel; ++i) { /* Rows */
-                        for (int64_t k = 0; k < xd1; ++k) { /* Inner dim */
-                            const mag_f32_t* ppx = px + (trans_a ? k*xd0 + i : xd1*i + k);
-                            mag_bnd_chk(px, bx, mag_tensor_data_size(x));
-                            for (int64_t j = 0; j < yd1; ++j) { /* Columns */
-                                mag_f32_t* ppr = br + rd1*i + j;
-                                const mag_f32_t* ppy = py + yd1*k + j;
-                                mag_bnd_chk(pr, br, mag_tensor_data_size(r));
-                                mag_bnd_chk(py, by, mag_tensor_data_size(y));
-                                *ppr += (*ppx) * (*ppy);
-                            }
-                        }
-                    }
+                    mag_sgemm(
+                        trans_a,
+                        trans_b,
+                        rd0,
+                        yd1,
+                        xd1,
+                        1.0f,
+                        px, xd1,
+                        py, yd1,
+                        0.0f,
+                        pr, yd1
+                    );
                 }
             }
         }

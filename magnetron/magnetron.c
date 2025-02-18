@@ -96,11 +96,13 @@ static void MAG_COLDPROC mag_panic_dump(FILE* f, bool cc, const char* msg, va_li
 MAG_NORET MAG_COLDPROC MAG_EXPORT void mag_panic(const char* msg, ...) { /* Panic and exit the program. If available print backtrace. */
     va_list args;
     va_start(args, msg);
-    FILE* f = fopen("magnetron_panic.log", "w");
-    if (f) {
-        mag_panic_dump(f, false, msg, args);
-        fclose(f), f = NULL;
-    }
+    #if 0
+        FILE* f = fopen("magnetron_panic.log", "w");
+        if (f) {
+            mag_panic_dump(f, false, msg, args);
+            fclose(f), f = NULL;
+        }
+    #endif
     mag_panic_dump(stdout, true, msg, args);
     va_end(args);
     mag_dump_backtrace();
