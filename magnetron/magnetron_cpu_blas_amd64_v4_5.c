@@ -17,8 +17,7 @@
     || !defined(__AVX512BW__) \
     || !defined(__AVX512DQ__) \
     || !defined(__AVX512VL__) \
-    || !defined(__AVX512VNNI__) \
-    || !defined(__AVX512BF16__)
+    || !defined(__AVX512VNNI__) /* __AVX512BF16__ is ommited because some older GCC's don't support it so we make it optional */
 #error "BLAS specialization requires matching compile flags"
 #endif
 #endif
