@@ -5,6 +5,7 @@ import typing
 import weakref
 from dataclasses import dataclass
 from enum import Enum, auto, unique
+from functools import lru_cache
 from os import getenv
 from os.path import isfile
 
@@ -83,14 +84,14 @@ class GlobalConfig:
 
 @typing.final
 class Context:
-    _active: 'Context' = None
+    """Manages the execution context and owns all tensors and active compute devices."""
 
     @staticmethod
-    def active() -> 'Context':
-        if Context._active is None:
-            C.mag_set_log_mode(GlobalConfig.verbose)
-            Context._active = Context(GlobalConfig.compute_device)
-        return Context._active
+    @lru_cache(maxsize=1)
+    def primary() -> 'Context':
+        """Get global context singleton."""
+        C.mag_set_log_mode(GlobalConfig.verbose)
+        return Context(GlobalConfig.compute_device)
 
     def __init__(
         self,
@@ -212,11 +213,11 @@ class no_grad(contextlib.ContextDecorator):
 
     def __enter__(self) -> None:
         """Disable gradient tracking by stopping the active context's recorder."""
-        Context.active().stop_grad_recorder()
+        Context.primary().stop_grad_recorder()
 
     def __exit__(self, exc_type: any, exc_value: any, traceback: any) -> None:
         """Re-enable gradient tracking when exiting the context."""
-        Context.active().start_grad_recorder()
+        Context.primary().start_grad_recorder()
 
 
 class Tensor:
@@ -276,7 +277,7 @@ class Tensor:
     ) -> 'Tensor':
         tensor = cls(None)
         tensor._new(
-            Context.active(),
+            Context.primary(),
             shape=shape,
             dtype=dtype,
             requires_grad=requires_grad,
@@ -296,7 +297,7 @@ class Tensor:
     ) -> 'Tensor':
         tensor = cls(None)
         tensor._new(
-            Context.active(),
+            Context.primary(),
             shape=shape,
             dtype=dtype,
             requires_grad=requires_grad,
@@ -334,7 +335,7 @@ class Tensor:
         shape, flattened_data = flatten_nested_lists(data)
         tensor = cls(None)
         tensor._new(
-            Context.active(),
+            Context.primary(),
             shape=shape,
             dtype=dtype,
             requires_grad=requires_grad,
@@ -371,7 +372,7 @@ class Tensor:
     ) -> 'Tensor':
         tensor = cls(None)
         tensor._new(
-            Context.active(),
+            Context.primary(),
             shape=shape,
             dtype=dtype,
             requires_grad=requires_grad,
@@ -394,7 +395,7 @@ class Tensor:
     ) -> 'Tensor':
         tensor = cls(None)
         tensor._new(
-            Context.active(),
+            Context.primary(),
             shape=shape,
             dtype=DType.F32,
             requires_grad=requires_grad,
@@ -406,7 +407,7 @@ class Tensor:
     @classmethod
     def load(cls, file_path: str) -> 'Tensor':
         assert file_path.endswith('.magnetron'), 'File must be a magnetron file'
-        instance = C.mag_tensor_load(Context.active()._ptr, bytes(file_path, 'utf-8'))
+        instance = C.mag_tensor_load(Context.primary()._ptr, bytes(file_path, 'utf-8'))
         return cls(ptr=instance)
 
     @classmethod
@@ -420,7 +421,7 @@ class Tensor:
     ) -> 'Tensor':
         assert isfile(file_path), f'File not found: {file_path}'
         instance = C.mag_tensor_load_image(
-            Context.active()._ptr,
+            Context.primary()._ptr,
             bytes(file_path, 'utf-8'),
             channels.value,
             resize_to[0],

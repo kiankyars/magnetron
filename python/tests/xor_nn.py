@@ -4,7 +4,7 @@ import numpy as np
 from magnetron import Tensor, Context
 
 np.random.seed(932002)
-Context.active().seed(932002)
+Context.primary().seed(932002)
 
 LR: float = 0.1
 EPOCHS: int = 10000
@@ -106,6 +106,7 @@ def xor_nn_mag() -> None:
         return a2
 
     return [predict(Tensor.const([xr]))[0] for xr in INPUT]
+
 
 """
 def test_xor_nn() -> None:

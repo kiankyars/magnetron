@@ -2,10 +2,14 @@
 
 from magnetron import *
 
+GlobalConfig.verbose = True
+
 
 def test_context_creation() -> None:
     # Test that a context can be created and defaults are correct.
-    ctx = Context.active()
+    ctx = Context.primary()
+    ctx = Context.primary()
+    ctx = Context.primary()
     assert ctx.execution_mode.name in ('EAGER', 'DEFERRED')
     assert isinstance(ctx.os_name, str)
     assert isinstance(ctx.cpu_name, str)

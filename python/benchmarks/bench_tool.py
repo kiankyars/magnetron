@@ -130,7 +130,7 @@ class PerformanceInfo:
         ax2.legend()
         ax2.grid(True)
 
-        plt.suptitle(f'{mag.Context.active().cpu_name}', y=1.05)
+        plt.suptitle(f'{mag.Context.primary().cpu_name}', y=1.05)
         plt.tight_layout()
         plt.show()
 
