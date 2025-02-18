@@ -1532,19 +1532,39 @@ static void mag_op_backward_div(mag_tensor_t* node, mag_tensor_t** grads) {
 }
 
 static void mag_op_backward_adds(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    grads[0] = mag_clone(node->grad);
+    grads[1] = mag_sum(node->grad);
 }
 
 static void mag_op_backward_subs(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    grads[0] = mag_clone(node->grad);
+    mag_tensor_t* tmp = mag_sum(node->grad);
+    grads[1] = mag_neg(tmp);
+    mag_tensor_decref(tmp);
 }
 
 static void mag_op_backward_muls(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    float xi = node->op_params[0].x.f32;
+    grads[0] = mag_muls(node->grad, xi);
+    mag_tensor_t* tmp = mag_mul(node->grad, x);
+    grads[1] = mag_sum(tmp);
+    mag_tensor_decref(tmp);
 }
 
 static void mag_op_backward_divs(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
+    mag_tensor_t* x = node->op_inputs[0];
+    mag_tensor_t* c = node->op_inputs[1];
+    grads[0] = mag_div(node->grad, c);
+    mag_tensor_t* tmp = mag_mul(node->grad, x);
+    mag_tensor_t* c2  = mag_mul(c, c);
+    mag_tensor_t* tmp2 = mag_div(tmp, c2);
+    mag_tensor_t* neg_tmp2 = mag_neg(tmp2);
+    grads[1] = mag_sum(neg_tmp2);
+    mag_tensor_decref(tmp);
+    mag_tensor_decref(c2);
+    mag_tensor_decref(tmp2);
+    mag_tensor_decref(neg_tmp2);
 }
 
 static void mag_op_backward_pows(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -2114,8 +2134,8 @@ void mag_tensor_incref(mag_tensor_t* t) {
 }
 
 bool mag_tensor_decref(mag_tensor_t* t) {
-    if (t->view_uplink) mag_tensor_decref(t->view_uplink);  /* If tensor is a view, decrement base RC and free tensor chain */
-    if (t->grad) mag_tensor_decref(t->grad);                /* Decrement gradient tensor RC */
+    //TODO if (t->view_uplink) mag_tensor_decref(t->view_uplink);  /* If tensor is a view, decrement base RC and free tensor chain */
+    //TODO if (t->grad) mag_tensor_decref(t->grad);                /* Decrement gradient tensor RC */
     if (!--t->rcb.rc_strong) {                              /* Strong RC reaches zero, destroy. */
         mag_tensor_destroy(t);
         return true;
@@ -2221,62 +2241,229 @@ mag_tensor_t* mag_permute(mag_tensor_t* x, uint32_t d0, uint32_t d1, uint32_t d2
     return mag_tensor_operator(x->ctx, MAG_OP_PERMUTE, false, &x, 1, params, sizeof(params)/sizeof(*params), MAG_GRA_FWD);
 }
 
-mag_tensor_t* mag_mean(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_MEAN, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_min(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_MIN, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_max(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_MAX, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_sum(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SUM, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_abs(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_ABS, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_abs_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_ABS, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_neg(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_NEG, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_neg_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_NEG, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_log(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_LOG, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_log_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_LOG, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_sqr(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SQR, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_sqr_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SQR, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_sqrt(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SQRT, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_sqrt_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SQRT, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_sin(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SIN, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_sin_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SIN, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_cos(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_COS, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_cos_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_COS, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_step(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_STEP, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_step_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_STEP, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_exp(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_EXP, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_exp_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_EXP, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_softmax(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_softmax_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_softmax_dv(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX_DV, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_softmax_dv_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_sigmoid(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SIGMOID, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_sigmoid_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SIGMOID, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_sigmoid_dv(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SIGMOID_DV, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_sigmoid_dv_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SIGMOID_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_hard_sigmoid(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_HARD_SIGMOID, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_hard_sigmoid_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_HARD_SIGMOID, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_silu(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SILU, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_silu_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SILU, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_silu_dv(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SILU_DV, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_silu_dv_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_SILU_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_tanh(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_TANH, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_tanh_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_TANH, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_tanh_dv(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_TANH_DV, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_tanh_dv_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_TANH_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_relu(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_RELU, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_relu_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_RELU, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_relu_dv(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_RELU_DV, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_relu_dv_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_RELU_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_gelu(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_GELU, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_gelu_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_GELU, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_gelu_dv(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_GELU_DV, false, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_gelu_dv_(mag_tensor_t* x) { return mag_tensor_operator(x->ctx, MAG_OP_GELU_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_add(mag_tensor_t* x, mag_tensor_t* y) { return mag_tensor_operator(x->ctx, MAG_OP_ADD, false, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_add_(mag_tensor_t* x, mag_tensor_t* y) { return mag_tensor_operator(x->ctx, MAG_OP_ADD, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_sub(mag_tensor_t* x, mag_tensor_t* y) { return mag_tensor_operator(x->ctx, MAG_OP_SUB, false, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_sub_(mag_tensor_t* x, mag_tensor_t* y) { return mag_tensor_operator(x->ctx, MAG_OP_SUB, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_mul(mag_tensor_t* x, mag_tensor_t* y) { return mag_tensor_operator(x->ctx, MAG_OP_MUL, false, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_mul_(mag_tensor_t* x, mag_tensor_t* y) { return mag_tensor_operator(x->ctx, MAG_OP_MUL, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_div(mag_tensor_t* x, mag_tensor_t* y) { return mag_tensor_operator(x->ctx, MAG_OP_DIV, false, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD); }
-mag_tensor_t* mag_div_(mag_tensor_t* x, mag_tensor_t* y) { return mag_tensor_operator(x->ctx, MAG_OP_DIV, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD); }
+mag_tensor_t* mag_mean(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_MEAN, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_min(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_MIN, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_max(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_MAX, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_sum(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SUM, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_abs(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_ABS, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_abs_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_ABS, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_neg(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_NEG, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_neg_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_NEG, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_log(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_LOG, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_log_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_LOG, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_sqr(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SQR, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_sqr_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SQR, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_sqrt(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SQRT, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_sqrt_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SQRT, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_sin(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SIN, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_sin_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SIN, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_cos(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_COS, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_cos_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_COS, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_step(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_STEP, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_step_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_STEP, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_exp(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_EXP, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_exp_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_EXP, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_softmax(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_softmax_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_softmax_dv(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX_DV, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_softmax_dv_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_sigmoid(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SIGMOID, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_sigmoid_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SIGMOID, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_sigmoid_dv(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SIGMOID_DV, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_sigmoid_dv_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SIGMOID_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_hard_sigmoid(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_HARD_SIGMOID, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_hard_sigmoid_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_HARD_SIGMOID, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_silu(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SILU, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_silu_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SILU, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_silu_dv(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SILU_DV, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_silu_dv_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SILU_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_tanh(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_TANH, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_tanh_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_TANH, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_tanh_dv(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_TANH_DV, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_tanh_dv_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_TANH_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_relu(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_RELU, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_relu_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_RELU, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_relu_dv(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_RELU_DV, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_relu_dv_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_RELU_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_gelu(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_GELU, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_gelu_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_GELU, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_gelu_dv(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_GELU_DV, false, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_gelu_dv_(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_GELU_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_add(mag_tensor_t* x, mag_tensor_t* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_ADD, false, mag_tensor_can_broadcast(y,x) ? (mag_tensor_t*[]){x, y} : (mag_tensor_t*[]){y, x}, 2, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_add_(mag_tensor_t* x, mag_tensor_t* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_ADD, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_sub(mag_tensor_t* x, mag_tensor_t* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SUB, false, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_sub_(mag_tensor_t* x, mag_tensor_t* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SUB, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_mul(mag_tensor_t* x, mag_tensor_t* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_MUL, false, mag_tensor_can_broadcast(y,x) ? (mag_tensor_t*[]){x, y} : (mag_tensor_t*[]){y, x}, 2, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_mul_(mag_tensor_t* x, mag_tensor_t* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_MUL, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_div(mag_tensor_t* x, mag_tensor_t* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_DIV, false, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_div_(mag_tensor_t* x, mag_tensor_t* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_DIV, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
+}
 
 mag_tensor_t* mag_adds(mag_tensor_t* x, float xi) {
     mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.f32=xi};
@@ -2715,7 +2902,11 @@ void mag_tensor_backward(mag_tensor_t* root) {
                 gri->flags = (gri->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
                 input->grad = gri;
             } else {
-                mag_tensor_t* acc = mag_add_(input->grad, gri);
+                mag_tensor_t* acc;
+                if (mag_tensor_can_broadcast(input->grad,gri))
+                    acc = mag_add_(gri, input->grad);
+                else
+                    acc = mag_add_(input->grad, gri);
                 mag_tensor_decref(input->grad);
                 acc->flags = (acc->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
                 input->grad = acc;

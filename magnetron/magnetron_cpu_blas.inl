@@ -1410,7 +1410,7 @@ static void MAG_HOTPROC mag_blas_matmul_f32(const mag_compute_payload_t* payload
     bool trans_a = mag_tensor_is_transposed(x);
     if (x->op == MAG_OP_CLONE && x->op_inputs[0]) trans_a |= mag_tensor_is_transposed(x->op_inputs[0]);
     bool trans_b = mag_tensor_is_transposed(y);
-    if (y->op == MAG_OP_CLONE && y->op_inputs[0]) trans_a |= mag_tensor_is_transposed(y->op_inputs[0]);
+    if (y->op == MAG_OP_CLONE && y->op_inputs[0]) trans_b |= mag_tensor_is_transposed(y->op_inputs[0]);
     int64_t b2 = yd2/xd2;
     int64_t b3 = yd3/xd3;
     int64_t b4 = yd4/xd4;

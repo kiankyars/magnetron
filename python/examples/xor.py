@@ -32,7 +32,7 @@ y = Tensor.const([
     [0]
 ], name='y')
 
-epochs: int = 1
+epochs: int = 2000
 
 y_hat = model(x)
 print(y_hat)

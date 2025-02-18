@@ -1,7 +1,8 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 import math
 
-from magnetron.core import Tensor
+from magnetron.core import Tensor, ffi
+
 
 class Parameter:
     """A tensor that is a learnable parameter of a model."""
@@ -85,7 +86,7 @@ class Linear(Module):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
-        weight = Tensor.normal((in_features, out_features), mean=0, stddev=1)
+        weight = Tensor.normal((out_features, in_features), mean=0, stddev=1)
         weight = weight / math.sqrt(in_features + out_features)
         self.weight = Parameter(weight)
         if bias:
