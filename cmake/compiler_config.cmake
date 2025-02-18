@@ -1,5 +1,8 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
+message("Configuring magnetron project for ${CMAKE_SYSTEM_PROCESSOR}...")
+message("C compiler: ${CMAKE_C_COMPILER_ID}")
+
 set(MAG_MSVC_COMPILE_FLAGS
     /W3
     /Oi
@@ -69,7 +72,6 @@ if (WIN32) # Windows (MSVC) specific config
     endif()
 else() # GCC/Clang specific config
     target_link_libraries(magnetron m) # link math library
-
     if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
         target_compile_options(magnetron PRIVATE ${MAG_GCC_COMPILE_FLAGS})
         target_link_options(magnetron PRIVATE ${MAG_GCC_LINK_OPTIONS})
