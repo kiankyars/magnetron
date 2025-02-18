@@ -452,7 +452,8 @@ static void mag_compute_graph_fold_impl(
     size_t cap
 ) {
     if (!node) return;
-    if (mag_hashset_insert(visited, node) == MAG_HASHSET_FULL) return; /* Already visited */
+    if (mag_hashset_contains_key(visited, node)) return; /* Already visited */
+    if (mag_unlikely(mag_hashset_insert(visited, node) == MAG_HASHSET_FULL)) return; /* Insert failed */
     for (unsigned i = 0; i < MAG_MAX_INPUT_TENSORS; ++i) {
         unsigned k = forward ? i : MAG_MAX_INPUT_TENSORS-i-1; /* Forward or reverse order */
         if (node->op_inputs[k]) /* Recurse to parent nodes */
@@ -3970,83 +3971,52 @@ mag_tensor_t* mag_tensor_load(mag_ctx_t* ctx, const char* file) {
     return target;
 }
 
-static MAG_COLDPROC void mag_graphviz_dump_node_edge(FILE* f, const mag_tensor_t* node, const mag_tensor_t* parent, const char* label)  {
-   const mag_tensor_t* gparent = NULL;
-   const mag_tensor_t* gparent0 = NULL;
-    fprintf(
-        f,
-        "  \"%p\":%s -> \"%p\":%s [ arrowhead = %s; style = %s; label = \"%s\"; ]\n",
-        gparent0 ? (void*)gparent0 : (void*)parent,
-        gparent0 ? "g" : "x",
-        gparent ? (void*)gparent : (void*)node,
-        gparent ? "g" : "x",
-        gparent ? "empty" : "vee",
-        gparent ? "dashed" : "solid",
-        label
-    );
-}
-
-static void mag_graphviz_dump_leaf_edge(FILE* f, const mag_tensor_t* node, const mag_tensor_t* parent, const char* label)  {
-    fprintf(
-        f,
-        "  \"%p\":%s -> \"%p\":%s [ label = \"%s\"; ]\n",
-        (void*)parent, "x",
-        (void*)node, "x",
-        label
-    );
-}
-
-static MAG_COLDPROC void mag_tensor_dump_folded_graph(
-    const mag_tensor_t** nodes,
-    size_t n_nodes,
-    const mag_tensor_t** leafs,
-    size_t n_leafs,
-    void* ud
-) {
-    FILE* f = ud;
-    for (size_t i=0; i < n_nodes; ++i) {
-        const mag_tensor_t* node = nodes[i];
-        fprintf(f, "  \"%p\" [ style = filled; fillcolor = %s; shape = record; label=\"", (void*)node, "skyblue2");
-        fprintf(f, "\"; ]\n");
-    }
-    for (size_t i=0; i < n_leafs; ++i) {
-        const mag_tensor_t* node = leafs[i];
-        fprintf(f, "  \"%p\" [ style = filled; fillcolor = %s; shape = record; label=\"<x>", (void*)node, "pink");
-        fprintf(f, "\"; ]\n");
-    }
-    for (size_t i=0; i < n_nodes; ++i) {
-        const mag_tensor_t* node = nodes[i];
-        for (size_t j=0; j < MAG_MAX_INPUT_TENSORS; ++j) {
-            const mag_tensor_t* input = node->op_inputs[j];
-            if (input) {
-                char label[16];
-                snprintf(label, sizeof(label), "src %zu", j);
-                mag_graphviz_dump_node_edge(f, node, input, label);
-            }
+static MAG_COLDPROC void mag_graphviz_dump(const mag_tensor_t* node, FILE *fp, mag_hashset_t* visited) {
+    if (mag_hashset_contains_key(visited, node)) return;
+    mag_hashset_insert(visited, node);
+    bool is_input = true;
+    for (unsigned i = 0; i < MAG_MAX_INPUT_TENSORS; ++i) {
+        if (node->op_inputs[i] != NULL) {
+            is_input = false;
+            break;
         }
     }
-    for (size_t i=0; i < n_leafs; ++i) {
-        const mag_tensor_t* node = leafs[i];
-        for (size_t j=0; j < MAG_MAX_INPUT_TENSORS; ++j) {
-            const mag_tensor_t* input = node->op_inputs[j];
-            if (input) {
-                char label[16];
-                snprintf(label, sizeof(label), "src %zu", j);
-                mag_graphviz_dump_leaf_edge(f, node, input, label);
-            }
-        }
+    const char* fillcolor = is_input ? "palegreen" : "skyblue2";
+    char dim_buf[150];
+    mag_fmt_dims(&dim_buf, &node->shape, node->rank);
+    bool gra = node->flags & MAG_TFLAG_REQUIRES_GRAD;
+    fprintf(
+        fp,
+        "  \"%p\" [label=\"⊕ %s|∇ %s|%s|0x%x\", shape=record, style=\"rounded,filled\", fillcolor=%s];\n",
+        (void*)node,
+        mag_op_meta_of(node->op)->mnemonic,\
+        gra ? "✓" : "🗙",
+        dim_buf,
+        node->flags,
+        fillcolor
+    );
+    for (unsigned i=0; i < MAG_MAX_INPUT_TENSORS; ++i) {
+        mag_tensor_t* input = node->op_inputs[i];
+        if (!input) continue;
+        char name[64];
+        if (*input->name) snprintf(name, sizeof(name), " in %u (%s)", i, input->name);
+        else snprintf(name, sizeof(name), " in %u", i);
+        fprintf(fp, "  \"%p\" -> \"%p\" [label=\"%s\"];\n", (void*)input, (void*)node, name);
+        mag_graphviz_dump(input, fp, visited);
     }
 }
 
 MAG_COLDPROC void mag_tensor_export_graphviz(const mag_tensor_t* t, const char* file) {
     mag_assert2(t && file && *file);
-    FILE* f = mag_fopen(file, "wt");
+    FILE* f = mag_fopen(file, "w");
     fprintf(f, "digraph computation_graph {\n");
-    fprintf(f, "  newrank=true;\n");
     fprintf(f, "  rankdir=TD;\n");
     fprintf(f, "  node [fontname=\"Helvetica\", shape=box];\n");
     fprintf(f, "  edge [fontname=\"Helvetica\"];\n");
-    mag_compute_graph_fold(0xffff, t, &mag_tensor_dump_folded_graph, true, f);
+    mag_hashset_t visited = mag_hashset_init(0xffff);
+    mag_graphviz_dump(t, f, &visited);
+    mag_hashset_free(&visited);
     fprintf(f, "}\n");
     fclose(f);
 }
+

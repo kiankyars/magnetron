@@ -48,7 +48,7 @@ class SGD(Optimizer):
 
     def step(self) -> None:
         for param in self.params:
-            param -= param.x.grad * self.lr
+            param.x -= param.x.grad * self.lr
 
 
 class Adam(Optimizer):
