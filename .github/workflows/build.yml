@@ -88,16 +88,9 @@ jobs:
         run: |
           . .venv/bin/activate
           cd "${{ github.workspace }}/python/src/magnetron"
-          pip wheel --verbose -w dist .
+          pip install .
 
-      - name: Install Python wheel
-        if: runner.os != 'windows'
-        shell: bash
-        run: |
-          . .venv/bin/activate
-          pip install "${{ github.workspace }}/python/src/magnetron"
-
-      - name: Install Pytest
+      - name: Install PyTest
         if: runner.os != 'windows'
         shell: bash
         run: |
