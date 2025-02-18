@@ -102,4 +102,4 @@ jobs:
         shell: bash
         run: |
           . .venv/bin/activate
-          python -m pytest "${{ github.workspace }}/python/tests/"
+          python -m pytest "${{ github.workspace }}/python/tests/*"
