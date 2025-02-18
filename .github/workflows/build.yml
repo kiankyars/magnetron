@@ -87,7 +87,7 @@ jobs:
         shell: bash
         run: |
           . .venv/bin/activate
-          cd "${{ github.workspace }}/python/src/magnetron"
+          cd "${{ github.workspace }}/python"
           pip install .
 
       - name: Install PyTest
