@@ -5,19 +5,17 @@ import numpy as np
 
 EPS = 1e-4
 
-def tonumpy(t: Tensor):
+
+def tonumpy(t: Tensor) -> np.array:
     return np.array(t.tolist(), dtype=np.float32).reshape(t.shape)
 
-def sigmoid(x):
+
+def sigmoid(x: np.array) -> None:
     return 1 / (1 + np.exp(-x))
 
-def test_simple_ff():
-    truth_table = [
-        [0, 0],
-        [0, 1],
-        [1, 0],
-        [1, 1]
-    ]
+
+def test_simple_ff() -> None:
+    truth_table = [[0, 0], [0, 1], [1, 0], [1, 1]]
 
     W1 = Tensor.uniform((2, 4))
     b1 = Tensor.uniform((1, 4))
@@ -49,7 +47,8 @@ def test_simple_ff():
     for mag, np_ in zip(mag_data, np_data):
         np.testing.assert_allclose(tonumpy(mag), np_)
 
-def test_matmul_squared():
+
+def test_matmul_squared() -> None:
     shapes = [4, 8, 16, 32, 64, 128, 256, 512, 1024]
     for shape in shapes:
         mag_a = Tensor.uniform((shape, shape))
@@ -61,8 +60,18 @@ def test_matmul_squared():
         assert mag_result.shape == np_result.shape
         np.testing.assert_allclose(tonumpy(mag_result), np_result, atol=EPS)
 
-def test_matmul():
-    shapes = [(4, 8), (8, 16), (16, 32), (32, 64), (64, 128), (128, 256), (256, 512), (512, 1024)]
+
+def test_matmul() -> None:
+    shapes = [
+        (4, 8),
+        (8, 16),
+        (16, 32),
+        (32, 64),
+        (64, 128),
+        (128, 256),
+        (256, 512),
+        (512, 1024),
+    ]
     for shape in shapes:
         mag_a = Tensor.uniform(shape)
         mag_b = Tensor.uniform((shape[1], shape[0]))
@@ -73,8 +82,18 @@ def test_matmul():
         assert mag_result.shape == np_result.shape
         np.testing.assert_allclose(tonumpy(mag_result), np_result, atol=EPS)
 
-def test_matmul_matrix_by_vector():
-    shapes = [(4, 8), (8, 16), (16, 32), (32, 64), (64, 128), (128, 256), (256, 512), (512, 1024)]
+
+def test_matmul_matrix_by_vector() -> None:
+    shapes = [
+        (4, 8),
+        (8, 16),
+        (16, 32),
+        (32, 64),
+        (64, 128),
+        (128, 256),
+        (256, 512),
+        (512, 1024),
+    ]
     for shape in shapes:
         mag_a = Tensor.uniform(shape)
         mag_b = Tensor.uniform((shape[1], 1))
@@ -85,8 +104,18 @@ def test_matmul_matrix_by_vector():
         assert mag_result.shape == np_result.shape
         np.testing.assert_allclose(tonumpy(mag_result), np_result, atol=EPS)
 
-def test_matmul_vector_by_matrix():
-    shapes = [(4, 8), (8, 16), (16, 32), (32, 64), (64, 128), (128, 256), (256, 512), (512, 1024)]
+
+def test_matmul_vector_by_matrix() -> None:
+    shapes = [
+        (4, 8),
+        (8, 16),
+        (16, 32),
+        (32, 64),
+        (64, 128),
+        (128, 256),
+        (256, 512),
+        (512, 1024),
+    ]
     for shape in shapes:
         mag_a = Tensor.uniform((1, shape[0]))
         mag_b = Tensor.uniform(shape)
@@ -97,8 +126,18 @@ def test_matmul_vector_by_matrix():
         assert mag_result.shape == np_result.shape
         np.testing.assert_allclose(tonumpy(mag_result), np_result, atol=EPS)
 
-def test_matmul_scalar_by_matrix():
-    shapes = [(4, 8), (8, 16), (16, 32), (32, 64), (64, 128), (128, 256), (256, 512), (512, 1024)]
+
+def test_matmul_scalar_by_matrix() -> None:
+    shapes = [
+        (4, 8),
+        (8, 16),
+        (16, 32),
+        (32, 64),
+        (64, 128),
+        (128, 256),
+        (256, 512),
+        (512, 1024),
+    ]
     for shape in shapes:
         scalar = np.random.rand()
         mag_b = Tensor.uniform(shape)
@@ -108,7 +147,8 @@ def test_matmul_scalar_by_matrix():
         assert mag_result.shape == np_result.shape
         np.testing.assert_allclose(tonumpy(mag_result), np_result, atol=EPS)
 
-def test_matmul_x_transposed():
+
+def test_matmul_x_transposed() -> None:
     shape_a = (4, 2)
     shape_b = (4, 4)
     mag_a = Tensor.uniform(shape_a)

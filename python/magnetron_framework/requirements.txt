@@ -1,3 +1,0 @@
-# Magnetron requirements to use magnetron framework in production as Python library (no unit tests, benchmarks etc..)
-
-cffi

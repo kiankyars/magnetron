@@ -9,8 +9,9 @@ import multiprocessing
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 
+BUILD_RELEASE: bool = True
 CMAKE_ROOT: str = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), '..', '..')
+    os.path.join(os.path.dirname(__file__), '..')
 )  # Root directory of the CMake project
 NUM_JOBS: int = max(multiprocessing.cpu_count() - 1, 1)  # Use all but one core
 
@@ -48,7 +49,7 @@ class CMakeBuildExecutor(build_ext):
         cmake_args = [
             '-DMAGNETRON_ENABLE_CUDA=OFF',  # TODO: Fix cuda compilation
             f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={os.path.abspath(os.path.join(self.build_lib, "magnetron"))}',
-            '-DCMAKE_BUILD_TYPE=Release',
+            f'-DCMAKE_BUILD_TYPE={"Release" if BUILD_RELEASE else "Debug"}',
         ]
         build_args = [
             '--target magnetron',  # Only build the magnetron library
@@ -84,6 +85,7 @@ setup(
     description='A lightweight machine learning library with GPU support.',
     long_description='A lightweight machine learning library with GPU support.',
     packages=['magnetron'],
+    package_dir={'': 'src'},
     package_data={
         'magnetron': ['*.dylib', '*.so', '*.dll'],
     },

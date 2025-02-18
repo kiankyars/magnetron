@@ -13,6 +13,7 @@ class Parameter:
         x.requires_grad = True
         self.x = x
 
+
 class Module:
     """Base class for all neural network modules."""
 
@@ -78,8 +79,10 @@ class ModuleList(Module, list):
             params += mod.parameters()
         return list(set(params))
 
+
 class Linear(Module):
     """A fully connected linear layer."""
+
     __slots__ = ('in_features', 'out_features', 'weight', 'bias')
 
     def __init__(self, in_features: int, out_features: int, bias: bool = True) -> None:

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "magnetron"
+version = "0.1.0"
+authors = [
+    {name = "Mario Sieg", email = "mario.sieg.64@gmail.com"},
+]
+description = "A lightweight machine learning library with GPU support."
+readme = "README.md"
+dependencies = ["cffi"]
+
+[project.optional-dependencies]
+dev = ["pytest", "matplotlib", "sphinx", "sphinx-autoapi", "sphinx-rtd-theme", "torch", "numpy", "pre-commit", "ruff"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py38"
+
+[tool.ruff.lint]
+ignore = ["F403"]
+select = ["ANN"]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint.per-file-ignores]
+"setup.py" = ["ANN"]

@@ -15,22 +15,13 @@ class XOR(Module):
         x = self.l2(x).tanh()
         return x
 
+
 model = XOR()
 optim = SGD(model.parameters(), lr=1e-1)
 
-x = Tensor.const([
-    [0, 0],
-    [0, 1],
-    [1, 0],
-    [1, 1]
-], name='x')
+x = Tensor.const([[0, 0], [0, 1], [1, 0], [1, 1]], name='x')
 
-y = Tensor.const([
-    [0],
-    [1],
-    [1],
-    [0]
-], name='y')
+y = Tensor.const([[0], [1], [1], [0]], name='y')
 
 epochs: int = 2000
 

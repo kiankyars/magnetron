@@ -2137,7 +2137,7 @@ bool mag_tensor_decref(mag_tensor_t* t) {
     //TODO if (t->view_uplink) mag_tensor_decref(t->view_uplink);  /* If tensor is a view, decrement base RC and free tensor chain */
     //TODO if (t->grad) mag_tensor_decref(t->grad);                /* Decrement gradient tensor RC */
     if (!--t->rcb.rc_strong) {                              /* Strong RC reaches zero, destroy. */
-        mag_tensor_destroy(t);
+        //mag_tensor_destroy(t);
         return true;
     }
     return false;

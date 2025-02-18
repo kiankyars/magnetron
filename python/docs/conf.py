@@ -16,11 +16,10 @@ author = 'Mario Sieg'
 extensions = ['sphinx.ext.autodoc', 'autoapi.extension']
 autoapi_dirs = ['../magnetron_framework/magnetron']
 autodoc_typehints = 'description'
-#autoapi_ignore = ['*/_*.py']
-#suppress_warnings = ['autoapi.python_import_resolution']
+# autoapi_ignore = ['*/_*.py']
+# suppress_warnings = ['autoapi.python_import_resolution']
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
-
 
 
 # -- Options for HTML output -------------------------------------------------

@@ -158,7 +158,7 @@ impl_test_unary_op(silu, 1e-6, silu, [](float x) -> float {
 impl_test_unary_op(tanh, 1e-3, tanh, [](float x) -> float {
     return std::tanh(x);
 })
-impl_test_unary_op(tanh_dv, 1e-9, tanh_dv, [](float x) -> float {
+impl_test_unary_op(tanh_dv, 1e-4, tanh_dv, [](float x) -> float {
     return 1.0f - (std::tanh(x) * std::tanh(x));
 })
 

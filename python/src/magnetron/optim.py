@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from magnetron import Tensor
 from magnetron.module import Parameter
 
+
 class PolynomialDecayLRScheduler:
     """Polynomial Decay Learning Rate Scheduler"""
 
@@ -15,12 +16,15 @@ class PolynomialDecayLRScheduler:
         y: float = iter / self.max_iter
         return max(self.initial_lr * (1 - y) ** 2, 1.0e-7)
 
+
 def mse_loss(y_hat: Tensor, y: Tensor) -> Tensor:
     delta = y_hat - y
     return (delta * delta).mean()
 
+
 class Optimizer(ABC):
     """Base class for all optimizers."""
+
     __slots__ = ('params', 'lr')
 
     def __init__(self, params: list[Parameter], lr: float) -> None:
@@ -34,6 +38,7 @@ class Optimizer(ABC):
     def zero_grad(self) -> None:
         for param in self.params:
             param.x.zero_grad()
+
 
 class SGD(Optimizer):
     """Stochastic Gradient Descent"""

@@ -2,7 +2,8 @@
 
 from magnetron import *
 
-def test_context_creation():
+
+def test_context_creation() -> None:
     # Test that a context can be created and defaults are correct.
     ctx = Context.active()
     assert ctx.execution_mode.name in ('EAGER', 'DEFERRED')

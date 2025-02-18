@@ -9,7 +9,7 @@ A = mag.Tensor.uniform((N, N), name='A')
 B = mag.Tensor.uniform((N, N), name='B')
 print(A.shape)
 
-flop = 2*N**3
+flop = 2 * N**3
 avg = 0
 I = 10
 for _ in range(I):
@@ -17,7 +17,7 @@ for _ in range(I):
     C = A @ B
     et = time.monotonic()
     s = et - st
-    print(f'{flop/s * 1e-12} TFLOP/s')
-    avg += flop/s
+    print(f'{flop / s * 1e-12} TFLOP/s')
+    avg += flop / s
 
-print(f'Average: {avg/I * 1e-12} TFLOP/s')
+print(f'Average: {avg / I * 1e-12} TFLOP/s')

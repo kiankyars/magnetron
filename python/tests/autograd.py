@@ -4,7 +4,8 @@ import random
 import magnetron as mag
 import torch
 
-def test_autograd_1():
+
+def test_autograd_1() -> None:
     x = mag.Tensor.const([3.0], requires_grad=True)
     y = mag.Tensor.const([2.0], requires_grad=True)
     assert x.requires_grad
@@ -24,7 +25,8 @@ def test_autograd_1():
     assert magy.item() == torchy.data.item()
     assert magx.grad.item() == torchx.grad.item()
 
-def test_autograd_2():
+
+def test_autograd_2() -> None:
     x = mag.Tensor.const([-4.0], requires_grad=True)
     z = 2 * x + 2 + x
     q = z.relu() + z * x
@@ -45,13 +47,14 @@ def test_autograd_2():
     assert magy.item() == torchy.data.item()
     assert magx.grad.item() == torchx.grad.item()
 
-def test_autograd_inherit():
+
+def test_autograd_inherit() -> None:
     xi1 = random.random() * 128.0
     xi2 = random.random() * 512.0
     x = mag.Tensor.const([xi1], requires_grad=True)
     y = mag.Tensor.const([xi2], requires_grad=True)
-    t1 = (x + y)
-    t2 = (x - y)
+    t1 = x + y
+    t2 = x - y
     t3 = t1 * t2
     y = t3.relu()
     assert x.requires_grad
@@ -67,8 +70,8 @@ def test_autograd_inherit():
     x.requires_grad = True
     y = torch.Tensor([xi2])
     y.requires_grad = True
-    t1 = (x + y)
-    t2 = (x - y)
+    t1 = x + y
+    t2 = x - y
     t3 = t1 * t2
     y = t3.relu()
     y.backward()
@@ -77,14 +80,15 @@ def test_autograd_inherit():
     assert magy.item() == torchy.data.item()
     assert magx.grad.item() == torchx.grad.item()
 
-def test_autograd_inherit_nograd():
+
+def test_autograd_inherit_nograd() -> None:
     xi1 = random.random() * 128.0
     xi2 = random.random() * 512.0
     with mag.no_grad():
         x = mag.Tensor.const([xi1], requires_grad=True)
         y = mag.Tensor.const([xi2], requires_grad=True)
-        t1 = (x + y)
-        t2 = (x - y)
+        t1 = x + y
+        t2 = x - y
         t3 = t1 * t2
         y = t3.relu()
         assert not x.requires_grad
@@ -100,8 +104,8 @@ def test_autograd_inherit_nograd():
         x.requires_grad = True
         y = torch.Tensor([xi2])
         y.requires_grad = True
-        t1 = (x + y)
-        t2 = (x - y)
+        t1 = x + y
+        t2 = x - y
         t3 = t1 * t2
         y = t3.relu()
         torchy = y

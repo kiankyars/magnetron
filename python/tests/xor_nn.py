@@ -8,18 +8,16 @@ Context.active().seed(932002)
 
 LR: float = 0.1
 EPOCHS: int = 10000
-INPUT: list[list[float]] = [[0, 0],
-         [0, 1],
-         [1, 0],
-         [1, 1]]
+INPUT: list[list[float]] = [[0, 0], [0, 1], [1, 0], [1, 1]]
 TARGET: list[list[float]] = [[0], [1], [1], [0]]
 HIDDEN_DIM: int = 4
 
-def xor_nn_np():
-    def sigmoid(x):
+
+def xor_nn_np() -> None:
+    def sigmoid(x: np.array) -> np.array:
         return 1 / (1 + np.exp(-x))
 
-    def sigmoid_derivative(x):
+    def sigmoid_derivative(x: np.array) -> np.array:
         return x * (1 - x)
 
     x = np.array(INPUT, dtype=np.float32)
@@ -56,7 +54,7 @@ def xor_nn_np():
         w1 -= LR * d_w1
         b1 -= LR * d_b1
 
-    def predict(x):
+    def predict(x: np.array) -> np.array:
         z1 = np.matmul(x, w1) + b1
         a1 = sigmoid(z1)
         z2 = np.matmul(a1, w2) + b2
@@ -65,7 +63,8 @@ def xor_nn_np():
 
     return [float(predict(xr)[0][0]) for xr in x]
 
-def xor_nn_mag():
+
+def xor_nn_mag() -> None:
     x = Tensor.const(INPUT)
     y = Tensor.const(TARGET)
 
@@ -96,7 +95,7 @@ def xor_nn_mag():
         w1 -= LR * d_w1
         b1 -= LR * d_b1
 
-    def predict(x):
+    def predict(x: Tensor) -> Tensor:
         z1 = x @ w1 + b1
         a1 = z1.sigmoid()
         z2 = a1 @ w2 + b2
@@ -105,11 +104,12 @@ def xor_nn_mag():
 
     return [predict(Tensor.const([xr]))[0] for xr in INPUT]
 
-def test_xor_nn():
+
+def test_xor_nn() -> None:
     np_out = xor_nn_np()
     mag_out = xor_nn_mag()
     assert [round(x) for x in np_out] == [0, 1, 1, 0]
     assert [round(x) for x in mag_out] == [0, 1, 1, 0]
     print(np_out)
     print(mag_out)
-    #assert np.allclose(np_out, mag_out, atol=0.1)
+    # assert np.allclose(np_out, mag_out, atol=0.1)
