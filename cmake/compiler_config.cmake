@@ -40,7 +40,6 @@ set(MAG_GCC_COMPILE_FLAGS
     -fno-math-errno
     -Wall
     -Werror
-    -Wno-gnu-zero-variadic-macro-arguments
     -Wno-error=overflow
     -Wno-error=unused-function
     -Wno-error=format-truncation
