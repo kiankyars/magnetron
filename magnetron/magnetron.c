@@ -3998,7 +3998,7 @@ static MAG_COLDPROC void mag_graphviz_dump(const mag_tensor_t* node, FILE *fp, m
     for (unsigned i=0; i < MAG_MAX_INPUT_TENSORS; ++i) {
         mag_tensor_t* input = node->op_inputs[i];
         if (!input) continue;
-        char name[64];
+        char name[128];
         if (*input->name) snprintf(name, sizeof(name), " in %u (%s)", i, input->name);
         else snprintf(name, sizeof(name), " in %u", i);
         fprintf(fp, "  \"%p\" -> \"%p\" [label=\"%s\"];\n", (void*)input, (void*)node, name);
