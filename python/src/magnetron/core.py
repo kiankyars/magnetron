@@ -1,4 +1,5 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+
 import contextlib
 import faulthandler
 import typing
@@ -223,7 +224,7 @@ class no_grad(contextlib.ContextDecorator):
 class Tensor:
     """A 1-6 dimensional tensor with support for automatic differentiation."""
 
-    __slots__ = ('_ctx', '_ptr', '_inputs')
+    __slots__ = ('__weakref__', '_ctx', '_ptr', '_inputs')
 
     def __init__(self, ptr: ffi.CData | None = None) -> None:
         self._ctx = None
@@ -628,23 +629,23 @@ class Tensor:
         return Tensor(C.mag_permute(self._ptr, *axes))
 
     def mean(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_mean(self._ptr))
 
     def min(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_min(self._ptr))
 
     def max(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_max(self._ptr))
 
     def sum(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_sum(self._ptr))
 
     def abs(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_abs(self._ptr))
 
     def abs_(self) -> 'Tensor':
@@ -654,7 +655,7 @@ class Tensor:
         return Tensor(C.mag_abs_(self._ptr))
 
     def neg(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_neg(self._ptr))
 
     def neg_(self) -> 'Tensor':
@@ -667,7 +668,7 @@ class Tensor:
         return self.neg()
 
     def log(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_log(self._ptr))
 
     def log_(self) -> 'Tensor':
@@ -677,7 +678,7 @@ class Tensor:
         return Tensor(C.mag_log_(self._ptr))
 
     def sqr(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_sqr(self._ptr))
 
     def sqr_(self) -> 'Tensor':
@@ -687,7 +688,7 @@ class Tensor:
         return Tensor(C.mag_sqr_(self._ptr))
 
     def sqrt(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_sqrt(self._ptr))
 
     def sqrt_(self) -> 'Tensor':
@@ -697,7 +698,7 @@ class Tensor:
         return Tensor(C.mag_sqrt_(self._ptr))
 
     def sin(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_sin(self._ptr))
 
     def sin_(self) -> 'Tensor':
@@ -707,7 +708,7 @@ class Tensor:
         return Tensor(C.mag_sin_(self._ptr))
 
     def cos(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_cos(self._ptr))
 
     def cos_(self) -> 'Tensor':
@@ -717,7 +718,7 @@ class Tensor:
         return Tensor(C.mag_cos_(self._ptr))
 
     def step(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_step(self._ptr))
 
     def step_(self) -> 'Tensor':
@@ -727,7 +728,7 @@ class Tensor:
         return Tensor(C.mag_step_(self._ptr))
 
     def exp(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_exp(self._ptr))
 
     def exp_(self) -> 'Tensor':
@@ -737,7 +738,7 @@ class Tensor:
         return Tensor(C.mag_exp_(self._ptr))
 
     def softmax(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_softmax(self._ptr))
 
     def softmax_(self) -> 'Tensor':
@@ -747,7 +748,7 @@ class Tensor:
         return Tensor(C.mag_softmax_(self._ptr))
 
     def sigmoid(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_sigmoid(self._ptr))
 
     def sigmoid_(self) -> 'Tensor':
@@ -757,7 +758,7 @@ class Tensor:
         return Tensor(C.mag_sigmoid_(self._ptr))
 
     def hard_sigmoid(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_hard_sigmoid(self._ptr))
 
     def hard_sigmoid_(self) -> 'Tensor':
@@ -767,7 +768,7 @@ class Tensor:
         return Tensor(C.mag_hard_sigmoid_(self._ptr))
 
     def silu(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_silu(self._ptr))
 
     def silu_(self) -> 'Tensor':
@@ -777,7 +778,7 @@ class Tensor:
         return Tensor(C.mag_silu_(self._ptr))
 
     def tanh(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_tanh(self._ptr))
 
     def tanh_(self) -> 'Tensor':
@@ -787,7 +788,7 @@ class Tensor:
         return Tensor(C.mag_tanh_(self._ptr))
 
     def relu(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_relu(self._ptr))
 
     def relu_(self) -> 'Tensor':
@@ -797,7 +798,7 @@ class Tensor:
         return Tensor(C.mag_relu_(self._ptr))
 
     def gelu(self) -> 'Tensor':
-        self._inputs = (self,)
+        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_gelu(self._ptr))
 
     def gelu_(self) -> 'Tensor':
@@ -809,12 +810,12 @@ class Tensor:
     def __add__(self, other: object | int | float) -> 'Tensor':
         if not isinstance(other, Tensor):
             other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (self, other)
+        self._inputs = (weakref.ref(self), weakref.ref(other))
         return Tensor(C.mag_add(self._ptr, other._ptr))
 
     def __radd__(self, other: int | float) -> 'Tensor':
         other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (other, self)
+        self._inputs = (weakref.ref(other), weakref.ref(self))
         return other + self
 
     def __iadd__(self, other: object | int | float) -> 'Tensor':
@@ -829,12 +830,12 @@ class Tensor:
     def __sub__(self, other: object | int | float) -> 'Tensor':
         if not isinstance(other, Tensor):
             other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (self, other)
+        self._inputs = (weakref.ref(self), weakref.ref(other))
         return Tensor(C.mag_sub(self._ptr, other._ptr))
 
     def __rsub__(self, other: int | float) -> 'Tensor':
         other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (other, self)
+        self._inputs = (weakref.ref(other), weakref.ref(self))
         return other - self
 
     def __isub__(self, other: object | int | float) -> 'Tensor':
@@ -849,12 +850,12 @@ class Tensor:
     def __mul__(self, other: object | int | float) -> 'Tensor':
         if not isinstance(other, Tensor):
             other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (self, other)
+        self._inputs = (weakref.ref(self), weakref.ref(other))
         return Tensor(C.mag_mul(self._ptr, other._ptr))
 
     def __rmul__(self, other: int | float) -> 'Tensor':
         other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (other, self)
+        self._inputs = (weakref.ref(other), weakref.ref(self))
         return other * self
 
     def __imul__(self, other: object | int | float) -> 'Tensor':
@@ -869,12 +870,12 @@ class Tensor:
     def __truediv__(self, other: object | int | float) -> 'Tensor':
         if not isinstance(other, Tensor):
             other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (self, other)
+        self._inputs = (weakref.ref(self), weakref.ref(other))
         return Tensor(C.mag_div(self._ptr, other._ptr))
 
     def __rtruediv__(self, other: int | float) -> 'Tensor':
         other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (other, self)
+        self._inputs = (weakref.ref(other), weakref.ref(self))
         return other / self
 
     def __itruediv__(self, other: object | int | float) -> 'Tensor':
@@ -887,7 +888,7 @@ class Tensor:
             return Tensor(C.mag_divs_(self._ptr, float(other)))
 
     def __matmul__(self, other: 'Tensor') -> 'Tensor':
-        self._inputs = (self, other)
+        self._inputs = (weakref.ref(self), weakref.ref(other))
         return Tensor(C.mag_matmul(self._ptr, other._ptr))
 
     def __imatmul__(self, other: 'Tensor') -> 'Tensor':

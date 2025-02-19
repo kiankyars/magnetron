@@ -30,9 +30,8 @@ print(y_hat)
 for epoch in range(epochs):
     y_hat = model(x)
     loss = mse_loss(y_hat, y)
+    loss.export_graphviz(f'xor_{epoch}.dot')
     loss.backward()
-    if epoch == 0:
-        loss.export_graphviz(f'xor_{epoch}.dot')
     optim.step()
     optim.zero_grad()
     if epoch % 100 == 0:

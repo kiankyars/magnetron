@@ -1373,7 +1373,8 @@ static void mag_op_backward_permute(mag_tensor_t* node, mag_tensor_t** grads) {
 static void mag_op_backward_mean(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
     double scale = 1.0/(double)x->numel;
-    *grads = mag_muls(node->grad, (float)scale);
+    *grads = mag_tensor_create(x->ctx, x->dtype, x->shape, x->rank, NULL, 0);
+    mag_tensor_fill(*grads, scale);
 }
 
 static void mag_op_backward_min(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -2437,7 +2438,7 @@ mag_tensor_t* mag_gelu_dv_(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_add(mag_tensor_t* x, mag_tensor_t* y) {
-    return mag_tensor_operator(x->ctx, MAG_OP_ADD, false, mag_tensor_can_broadcast(y,x) ? (mag_tensor_t*[]){x, y} : (mag_tensor_t*[]){y, x}, 2, NULL, 0, MAG_GRA_FWD);
+    return mag_tensor_operator(x->ctx, MAG_OP_ADD, false, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
 }
 
 mag_tensor_t* mag_add_(mag_tensor_t* x, mag_tensor_t* y) {
@@ -2453,7 +2454,7 @@ mag_tensor_t* mag_sub_(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_mul(mag_tensor_t* x, mag_tensor_t* y) {
-    return mag_tensor_operator(x->ctx, MAG_OP_MUL, false, mag_tensor_can_broadcast(y,x) ? (mag_tensor_t*[]){x, y} : (mag_tensor_t*[]){y, x}, 2, NULL, 0, MAG_GRA_FWD);
+    return mag_tensor_operator(x->ctx, MAG_OP_MUL, false, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
 }
 
 mag_tensor_t* mag_mul_(mag_tensor_t* x, mag_tensor_t* y) {
@@ -2869,6 +2870,21 @@ static void mag_collect_topo_iterative(mag_tensor_t* root, mag_tensor_array_t* o
     (*mag_alloc)(visited, 0);
 }
 
+static void mag_tensor_patch_grad(mag_tensor_t* dst, mag_tensor_t* new_grad) {
+    if (!mag_tensor_is_shape_eq(dst, new_grad)) {
+        char shape_dst[MAG_FMT_DIM_BUF_SIZE];
+        char shape_grad[MAG_FMT_DIM_BUF_SIZE];
+        mag_fmt_dims(&shape_dst, &dst->shape, dst->rank);
+        mag_fmt_dims(&shape_grad, &new_grad->shape, new_grad->rank);
+        const char* dst_op = mag_op_meta_of(dst->op)->mnemonic;
+        const char* grad_op = mag_op_meta_of(new_grad->op)->mnemonic;
+        mag_panic("Shape mismatch: %s (%s) != %s (%s)", shape_dst, dst_op, shape_grad, grad_op);
+    }
+    mag_tensor_fmt_name(new_grad, "%s (grad)", dst->name);
+    new_grad->flags = (new_grad->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
+    dst->grad = new_grad;
+}
+
 void mag_tensor_backward(mag_tensor_t* root) {
     mag_assert(root->flags & MAG_TFLAG_REQUIRES_GRAD, "Tensor must require grad to backpropagate");
     mag_tensor_array_t post_order;
@@ -2883,10 +2899,8 @@ void mag_tensor_backward(mag_tensor_t* root) {
         const mag_op_meta_t* meta = mag_op_meta_of(child->op);
         if (!child->grad) {
             mag_tensor_t* grad = mag_tensor_create(child->ctx, child->dtype, child->shape, child->rank, NULL, 0);
-            grad->flags = (grad->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
             mag_tensor_fill(grad, 1.0f);
-            mag_tensor_fmt_name(grad, "%s (grad)", child->name);
-            child->grad = grad;
+            mag_tensor_patch_grad(child, grad);
         }
         if (mag_unlikely(child->op == MAG_OP_NOP)) continue;
         mag_tensor_t* grads[MAG_MAX_OP_PARAMS] = {0};
@@ -2897,22 +2911,16 @@ void mag_tensor_backward(mag_tensor_t* root) {
         for (uint32_t i = 0; i < numin; ++i) {
             mag_tensor_t* input = child->op_inputs[i];
             mag_assert2(input);
-            if (!(input->flags & MAG_TFLAG_REQUIRES_GRAD)) continue;
+            if (!(input->flags & MAG_TFLAG_REQUIRES_GRAD) || input->op == MAG_OP_NOP) continue;
             mag_tensor_t* gri = grads[i];
             mag_tensor_fmt_name(gri, "%s (grad)", input->name);
             mag_assert(gri, "Gradient for op %s, input #%d is not computed", meta->mnemonic, i);
             if (!input->grad) {
-                gri->flags = (gri->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
-                input->grad = gri;
+                mag_tensor_patch_grad(input, gri);
             } else {
-                mag_tensor_t* acc;
-                if (mag_tensor_can_broadcast(input->grad,gri))
-                    acc = mag_add_(gri, input->grad);
-                else
-                    acc = mag_add_(input->grad, gri);
+                mag_tensor_t* acc = mag_add_(gri, input->grad);
                 mag_tensor_decref(input->grad);
-                acc->flags = (acc->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
-                input->grad = acc;
+                mag_tensor_patch_grad(input, acc);
                 mag_tensor_decref(gri);
             }
         }
