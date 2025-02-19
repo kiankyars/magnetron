@@ -7,8 +7,6 @@ from magnetron.core import Tensor, ffi
 class Parameter:
     """A tensor that is a learnable parameter of a model."""
 
-    __slots__ = ('x',)
-
     def __init__(self, x: Tensor) -> None:
         x.requires_grad = True
         self.x = x
@@ -82,8 +80,6 @@ class ModuleList(Module, list):
 
 class Linear(Module):
     """A fully connected linear layer."""
-
-    __slots__ = ('in_features', 'out_features', 'weight', 'bias')
 
     def __init__(self, in_features: int, out_features: int, bias: bool = True) -> None:
         super().__init__()

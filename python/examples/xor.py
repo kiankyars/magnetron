@@ -23,7 +23,7 @@ x = Tensor.const([[0, 0], [0, 1], [1, 0], [1, 1]], name='x')
 
 y = Tensor.const([[0], [1], [1], [0]], name='y')
 
-epochs: int = 1
+epochs: int = 2000
 
 y_hat = model(x)
 print(y_hat)
@@ -35,7 +35,7 @@ for epoch in range(epochs):
         loss.export_graphviz(f'xor_{epoch}.dot')
     optim.step()
     optim.zero_grad()
-    if epoch % 1000 == 0:
+    if epoch % 100 == 0:
         print(f'Epoch: {epoch}, Loss: {loss.item()}')
 
 y_hat = model(x)
