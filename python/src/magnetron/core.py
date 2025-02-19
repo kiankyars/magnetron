@@ -552,7 +552,7 @@ class Tensor:
         if not self.requires_grad:
             return None
         ptr: ffi.CData = C.mag_tensor_grad(self._ptr)
-        if ptr is ffi.NULL:
+        if ptr == ffi.NULL:
             return None
         C.mag_tensor_retain(ptr)
         return Tensor(ptr)

@@ -3,6 +3,8 @@
 from magnetron import Tensor, Module, Linear
 from magnetron.optim import SGD, mse_loss
 
+from src.magnetron import no_grad
+
 
 class XOR(Module):
     def __init__(self) -> None:
@@ -23,7 +25,7 @@ x = Tensor.const([[0, 0], [0, 1], [1, 0], [1, 1]], name='x')
 
 y = Tensor.const([[0], [1], [1], [0]], name='y')
 
-epochs: int = 2000
+epochs: int = 3
 
 y_hat = model(x)
 print(y_hat)
