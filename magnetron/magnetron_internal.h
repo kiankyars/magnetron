@@ -258,7 +258,7 @@ defined(__WIN32__) || defined(__TOS_WIN__) || defined(__WINDOWS__)
 #define MAG_DESTRUCTIVE_INTERFERENCE_SIZE 64
 #endif
 #define MAG_PAGE_SIZE_4K 0x1000
-#define PAGE_SIZE_2M 0x200000
+#define MAG_PAGE_SIZE_2M 0x200000
 
 static uint32_t MAG_AINLINE mag_bswap32(uint32_t x) { /* Swap bytes for endianess switch. Should be optimized to a (bswap/rev) instruction on modern compilers. */
     #ifdef MAG_BE
