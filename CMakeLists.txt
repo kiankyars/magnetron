@@ -68,3 +68,9 @@ if (${MAGNETRON_BUILD_BENCHMARKS})
     add_subdirectory(benchmark)
 endif()
 
+message(STATUS "C Compiler: ${CMAKE_C_COMPILER}")
+message(STATUS "C++ Compiler: ${CMAKE_CXX_COMPILER}")
+get_target_property(MAIN_CFLAGS magnetron COMPILE_OPTIONS)
+message(STATUS "Compilation flags: ${MAIN_CFLAGS}")
+
+message(STATUS "Configuring magnetron project for ${CMAKE_SYSTEM_PROCESSOR}... done")
