@@ -630,7 +630,7 @@ static void mag_prng_init(mag_ctx_t* ctx, uint64_t seed) {
     }
 }
 
-static void mag_system_host_info_query(mag_ctx_t* ctx); /* Query host system information. */
+static void mag_machine_probe(mag_ctx_t* ctx); /* Query host system information. */
 
 /* Print host system and machine information. */
 static void mag_system_host_info_dump(mag_ctx_t* ctx) {
@@ -715,7 +715,7 @@ mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
     ctx->flags |= MAG_CTX_FLAG_GRAD_RECORDER; /* Enable gradient recording by default. */
 
     /* Query and print host system information. */
-    mag_system_host_info_query(ctx);
+    mag_machine_probe(ctx);
     mag_system_host_info_dump(ctx);
 
     /* Initialize PRNG state. */
@@ -3253,7 +3253,7 @@ static void mag_trim_quotes(char* in) {
 }
 #endif
 
-static void MAG_COLDPROC mag_system_host_info_query_os_name(char (*out_os_name)[128]) { /* Get OS name */
+static void MAG_COLDPROC mag_machine_probe_os_name(char (*out_os_name)[128]) { /* Get OS name */
     #ifdef _WIN32
 
     #elif defined(__APPLE__)
@@ -3330,7 +3330,7 @@ static void MAG_COLDPROC mag_system_host_info_query_os_name(char (*out_os_name)[
     #endif
 }
 
-static void MAG_COLDPROC mag_system_host_info_query_cpu_name(char (*out_cpu_name)[128]) { /* Get CPU name */
+static void MAG_COLDPROC mag_machine_probe_cpu_name(char (*out_cpu_name)[128]) { /* Get CPU name */
     #ifdef _WIN32
         HKEY key;
         if (mag_unlikely(RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", 0, KEY_READ, &key))) return;
@@ -3351,7 +3351,7 @@ static void MAG_COLDPROC mag_system_host_info_query_cpu_name(char (*out_cpu_name
     #endif
 }
 
-static void MAG_COLDPROC mag_system_host_info_query_cpu_cores(uint32_t* out_virtual, uint32_t* out_physical, uint32_t* out_sockets) { /* Get CPU virtual (logical) cores. */
+static void MAG_COLDPROC mag_machine_probe_cpu_cores(uint32_t* out_virtual, uint32_t* out_physical, uint32_t* out_sockets) { /* Get CPU virtual (logical) cores. */
     #ifdef _WIN32
         DWORD size = 0;
         GetLogicalProcessorInformation(NULL, &size);
@@ -3441,7 +3441,7 @@ static void MAG_COLDPROC mag_system_host_info_query_cpu_cores(uint32_t* out_virt
     #endif
 }
 
-static void MAG_COLDPROC mag_system_host_info_query_memory(uint64_t* out_phys_mem_total, uint64_t* out_phys_mem_free) { /* Get physical memory */
+static void MAG_COLDPROC mag_machine_probe_memory(uint64_t* out_phys_mem_total, uint64_t* out_phys_mem_free) { /* Get physical memory */
     #ifdef _WIN32
         MEMORYSTATUSEX mem;
         mem.dwLength = sizeof(mem);
@@ -3650,11 +3650,11 @@ static void MAG_COLDPROC mag_system_info_query_arm64_cpu_caps(uint64_t* caps, in
 }
 #endif
 
-static void MAG_COLDPROC mag_system_host_info_query(mag_ctx_t* ctx) {
-    mag_system_host_info_query_os_name(&ctx->machine.os_name);
-    mag_system_host_info_query_cpu_name(&ctx->machine.cpu_name);
-    mag_system_host_info_query_cpu_cores(&ctx->machine.cpu_virtual_cores, &ctx->machine.cpu_physical_cores, &ctx->machine.cpu_sockets);
-    mag_system_host_info_query_memory(&ctx->machine.phys_mem_total, &ctx->machine.phys_mem_free);
+static void MAG_COLDPROC mag_machine_probe(mag_ctx_t* ctx) {
+    mag_machine_probe_os_name(&ctx->machine.os_name);
+    mag_machine_probe_cpu_name(&ctx->machine.cpu_name);
+    mag_machine_probe_cpu_cores(&ctx->machine.cpu_virtual_cores, &ctx->machine.cpu_physical_cores, &ctx->machine.cpu_sockets);
+    mag_machine_probe_memory(&ctx->machine.phys_mem_total, &ctx->machine.phys_mem_free);
     #if defined(__x86_64__) || defined(_M_X64)
         mag_system_info_query_amd64_cpu_caps(&ctx->machine.amd64_cpu_caps);
     #elif defined(__aarch64__)
