@@ -36,7 +36,7 @@ if(${IS_AMD64})  # x86-64 specific compilation options
         "-mtune=nehalem -mcx16 -mpopcnt -msse3 -mssse3 -msse4.1 -msse4.2"
         "/arch:SSE4.2")
     set_blas_spec_arch("magnetron_cpu_blas_amd64_v2_5.c"
-        "-mtune=ivybridge -mavx -mno-avx2 -mcx16 -mpopcnt -msse3 -mssse3 -msse4.1 -msse4.2"
+        "-mtune=ivybridge -mavx -mf16c -mno-avx2 -mcx16 -mpopcnt -msse3 -mssse3 -msse4.1 -msse4.2"
         "/arch:AVX")
     set_blas_spec_arch("magnetron_cpu_blas_amd64_v3.c"
         "-mtune=haswell -mavx -mavx2 -mbmi -mbmi2 -mf16c -mfma -mlzcnt -mmovbe"
