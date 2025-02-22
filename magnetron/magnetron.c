@@ -3495,7 +3495,7 @@ static void MAG_COLDPROC mag_machine_probe_memory(uint64_t* out_phys_mem_total, 
             return (uint64_t)lo | ((uint64_t)hi << 32);
         #endif
     }
-    static void MAG_COLDPROC mag_system_info_query_amd64_cpu_caps(uint64_t* caps) {
+    static void MAG_COLDPROC mag_system_info_query_amd64_cpu_caps(uint64_t* caps, bool* is_amd) {
         *caps = 0;
         uint32_t regs[8][4] = {0};
 
@@ -3535,7 +3535,7 @@ static void MAG_COLDPROC mag_machine_probe_memory(uint64_t* out_phys_mem_total, 
         #undef _
         #undef mag_x86_64_feature_def
         #undef _
-
+        /* Detect features. */
         uint32_t eax=0, ebx=0, ecx=0, edx=0;
         uint32_t max_basic_leaf, max_extended_leaf;
         mag_cpuid(0, -1, &eax, &ebx, &ecx, &edx);
@@ -3598,6 +3598,15 @@ static void MAG_COLDPROC mag_machine_probe_memory(uint64_t* out_phys_mem_total, 
             if (regs[feature_leaves[i]][feature_regs[i]] & feature_masks[i])
                 *caps |= 1ull<<i;
 
+        /* Check if AMD CPU using brand string. */
+        char vendor[12+1];
+        mag_cpuid(0, -1, &eax, &ebx, &ecx, &edx);
+        ((uint32_t*)vendor)[0] = ebx;
+        ((uint32_t*)vendor)[1] = edx;
+        ((uint32_t*)vendor)[2] = ecx;
+        vendor[sizeof(vendor)-1] = '\0';
+        *is_amd = !strncmp(vendor, "AuthenticAMD", sizeof(vendor));
+
         #undef H0
         #undef H1
         #undef H2
@@ -3656,7 +3665,7 @@ static void MAG_COLDPROC mag_machine_probe(mag_ctx_t* ctx) {
     mag_machine_probe_cpu_cores(&ctx->machine.cpu_virtual_cores, &ctx->machine.cpu_physical_cores, &ctx->machine.cpu_sockets);
     mag_machine_probe_memory(&ctx->machine.phys_mem_total, &ctx->machine.phys_mem_free);
     #if defined(__x86_64__) || defined(_M_X64)
-        mag_system_info_query_amd64_cpu_caps(&ctx->machine.amd64_cpu_caps);
+        mag_system_info_query_amd64_cpu_caps(&ctx->machine.amd64_cpu_caps, &ctx->machine.is_amd);
     #elif defined(__aarch64__)
         mag_system_info_query_arm64_cpu_caps(&ctx->machine.arm64_cpu_caps, &ctx->machine.arm64_cpu_sve_width);
     #endif

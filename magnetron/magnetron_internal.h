@@ -723,6 +723,7 @@ struct mag_ctx_t {
         uint64_t phys_mem_free;                     /* Free physical memory in bytes. */
 #if defined(__x86_64__) || defined(_M_X64)
         uint64_t amd64_cpu_caps;                    /* x86-64 CPU features. Bitset of 1ull<<MAG_AMD64_CAP_* */
+        bool is_amd;                                /* Is AMD CPU? */
 #elif defined (__aarch64__)
         uint64_t arm64_cpu_caps;                    /* ARM64 CPU features. */
         int64_t arm64_cpu_sve_width;                /* ARM64 SVE vector register width. */
