@@ -131,8 +131,9 @@ extern MAG_EXPORT void mag_ctx_destroy(mag_ctx_t* ctx); /* Destroy context and f
 typedef struct mag_tensor_t mag_tensor_t;
 
 typedef enum mag_dtype_t {
-    MAG_DTYPE_F32,   /* 32-bit floating-point data type */
-    MAG_DTYPE__NUM /* Total number of data types */
+    MAG_DTYPE_E8M23,    /* f32 */
+    MAG_DTYPE_E5M10,    /* f16 */
+    MAG_DTYPE__NUM      /* Total number of data types */
 } mag_dtype_t;
 mag_static_assert(MAG_DTYPE__NUM <= 0xff);
 

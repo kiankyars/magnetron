@@ -8,11 +8,11 @@ TEST(graph_dynamic, simple) {
 
     // ((W * X) + B).relu()
 
-    auto* W = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, 2, 2);
+    auto* W = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, 2, 2);
     mag_tensor_fill(W, 0.6f);
     mag_tensor_set_name(W, "W");
 
-    auto* X = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, 2, 2);
+    auto* X = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, 2, 2);
     mag_tensor_fill(X, 2.11f);
     mag_tensor_set_name(X, "X");
 
@@ -22,7 +22,7 @@ TEST(graph_dynamic, simple) {
         ASSERT_EQ(buf[i], 0.6f*2.11f);
     }
 
-    auto* B = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, 2, 2);
+    auto* B = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, 2, 2);
     mag_tensor_fill(B, 0.1f);
     mag_tensor_set_name(B, "B");
 
