@@ -97,12 +97,12 @@ static MAG_AINLINE mag_e5m10_t mag_e8m23_to_e5m10_scalar(mag_e8m23_t x) {
         __fp16 h = (__fp16)x;
         r = *(uint16_t*)&h;
     #else
-        float base = fabs(x)*0x1.0p+112f*0x1.0p-110f;
+        mag_e8m23_t base = fabs(x)*0x1.0p+112f*0x1.0p-110f;
         uint32_t w = *(uint32_t*)&x;
         uint32_t shl1_w = w+w;
         uint32_t sign = w & 0x80000000u;
         uint32_t bias = 0x07800000u+(mag_xmax(0x71000000u, shl1_w&0xff000000u)>>1);
-        float rfbits = base + *(float*)&bias;
+        mag_e8m23_t rfbits = base + *(mag_e8m23_t*)&bias;
         uint32_t rbits = *(uint32_t*)&rfbits;
         uint32_t exp_bits = (rbits>>13) & 0x00007c00u;
         uint32_t mant_bits = rbits & 0x00000fffu;
@@ -128,14 +128,14 @@ static MAG_AINLINE mag_e8m23_t mag_e5m10_to_e8m23_scalar(mag_e5m10_t x) {
         uint32_t offs = 0xe0u<<23;
         uint32_t t1 = (two_w>>4) + offs;
         uint32_t t2 = (two_w>>17) | (126u<<23);
-        float norm_x = *(float*)&t1*0x1.0p-112f;
-        float denorm_x = *(float*)&t2 - 0.5f;
+        mag_e8m23_t norm_x = *(mag_e8m23_t*)&t1*0x1.0p-112f;
+        mag_e8m23_t denorm_x = *(mag_e8m23_t*)&t2 - 0.5f;
         uint32_t denorm_cutoff = 1u<<27;
         uint32_t r = sign
             | (two_w < denorm_cutoff
             ? *(uint32_t*)&denorm_x
             : *(uint32_t*)&norm_x);
-        return *(float*)&r;
+        return *(mag_e8m23_t*)&r;
     #endif
 }
 
