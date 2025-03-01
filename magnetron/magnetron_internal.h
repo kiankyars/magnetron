@@ -5,6 +5,7 @@
 
 #include "magnetron.h"
 
+#include <math.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -354,6 +355,14 @@ static inline void* mag_pincr(void** p, size_t sz, size_t align) {
 }
 
 /*
+** Because multiple floating-point formats with the same bit width exist (e.g. f16, bf16), all floats are described by their exponent (E) and mantissa (M) bits.
+** The builtin float keyword is only used for the public API in magnetron.h. The internal code uses the following types:
+*/
+typedef double mag_e11m52_t;        /* IEEE 754 double precision float. */
+typedef float mag_e8m23_t;          /* IEEE 754 single precision float. */
+typedef uint16_t mag_e5m10_t;       /* IEEE 754 half precision float. */
+
+/*
 **  Fast u32 division and remainder. Paper:
 **  Torbjörn Granlund and Peter L. Montgomery, "Division by Invariant Integers Using Multiplication", ACM SIGPLAN Notices, Issue 6, Vol 29, 61-72, June 1994.
 **	http://gmplib.org/~tege/divcnst-pldi94.pdf
@@ -513,7 +522,7 @@ typedef enum mag_op_param_type_t {
 typedef struct mag_op_param_t {
     mag_op_param_type_t type : 8; /* Parameter type */
     union {
-        float f32;
+        mag_e8m23_t e8m23;
         int32_t i32;
         uint32_t u32;
     } x;
@@ -820,17 +829,7 @@ typedef struct mag_compute_payload_t { /* Compute payload for kernel execution. 
 } mag_compute_payload_t;
 
 typedef struct mag_kctx_mm_t { /* Matmul kernel context. */
-    float* c_buffers;
-    float* ws_buffers;
-    int64_t nthr_m;
-    int64_t nthr_n;
-    int64_t nthr_k;
-    int64_t nthr_mn;
-    int64_t ws_size_per_thr;
-    int64_t MB;
-    int64_t NB;
-    int64_t KB;
-    bool do_copy;
+
 } mag_kctx_mm_t;
 
 typedef struct mag_kernel_context_t { /* General op kernel context. */

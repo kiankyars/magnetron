@@ -65,9 +65,9 @@ namespace mag::cuda {
         mag_assert2(x->numel == r->numel);
         std::int64_t block_size {256};
         std::int64_t num_blocks {(r->numel + block_size - 1)/block_size};
-        auto* pr {reinterpret_cast<float*>(r->storage.base)};
-        auto* px {reinterpret_cast<float*>(x->storage.base)};
-        auto* py {reinterpret_cast<float*>(y->storage.base)};
+        auto* pr {reinterpret_cast<mag_e8m23_t*>(r->storage.base)};
+        auto* px {reinterpret_cast<mag_e8m23_t*>(x->storage.base)};
+        auto* py {reinterpret_cast<mag_e8m23_t*>(y->storage.base)};
         kernels::add<<<num_blocks, block_size>>>(r->numel, pr, px, py);
     }
 
@@ -120,8 +120,8 @@ namespace mag::cuda {
         auto numel {static_cast<std::int64_t>(sto->size/4)};
         std::int64_t block_size {256};
         std::int64_t num_blocks {(numel + block_size - 1)/block_size};
-        float* dst {reinterpret_cast<float*>(sto->base+offs)};
-        float x {*reinterpret_cast<const float*>(src)};
+        mag_e8m23_t* dst {reinterpret_cast<mag_e8m23_t*>(sto->base+offs)};
+        mag_e8m23_t x {*reinterpret_cast<const mag_e8m23_t*>(src)};
         kernels::broadcast<<<num_blocks, block_size>>>(numel, dst+offs, x);
         cudaDeviceSynchronize();
     }

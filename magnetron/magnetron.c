@@ -561,8 +561,8 @@ static bool MAG_AINLINE mag_imull64_ov(int64_t a, int64_t b, int64_t* c) {
 }
 
 /* Generate n uniform random floats within [min, max] with the selected algorithm. */
-static void mag_prng_generate_n(mag_ctx_t* ctx, float* out_gen, int64_t out_n, float min, float max) {
-    float rescale_uniform = max - min;
+static void mag_prng_generate_n(mag_ctx_t* ctx, mag_e8m23_t* out_gen, int64_t out_n, mag_e8m23_t min, mag_e8m23_t max) {
+    mag_e8m23_t rescale_uniform = max - min;
     switch (ctx->prng_algorithm) {
         case MAG_PRNG_MERSENNE_TWISTER: { /* Use Mersenne Twister. */
             uint32_t* rem = &ctx->prng.mersenne.remaining;
@@ -589,7 +589,7 @@ static void mag_prng_generate_n(mag_ctx_t* ctx, float* out_gen, int64_t out_n, f
                 y ^= (y << 7) & 0x9d2c5680;
                 y ^= (y << 15) & 0xefc60000;
                 y ^= y >> 18;
-                out_gen[ii] = min + rescale_uniform * (1.f/(float)(1<<23)*((float)(y>>9) + 0.5f)); /* Generate canonical and rescale. */
+                out_gen[ii] = min + rescale_uniform * (1.f/(mag_e8m23_t)(1<<23)*((mag_e8m23_t)(y>>9) + 0.5f)); /* Generate canonical and rescale. */
             }
         } break;
         case MAG_PRNG_PCG: { /* Use Permuted Congruential Generator. */
@@ -601,7 +601,7 @@ static void mag_prng_generate_n(mag_ctx_t* ctx, float* out_gen, int64_t out_n, f
                 uint32_t mixed = ((prev>>18u) ^ prev) >> 27u;
                 uint32_t rot = prev >> 59u;
                 uint32_t y = (mixed>>rot) | (mixed << ((-rot)&31));
-                out_gen[ii] = min + rescale_uniform * (1.f/(float)(1<<23)*((float)(y>>9) + 0.5f)); /* Generate canonical and rescale. */
+                out_gen[ii] = min + rescale_uniform * (1.f/(mag_e8m23_t)(1<<23)*((mag_e8m23_t)(y>>9) + 0.5f)); /* Generate canonical and rescale. */
             }
         } break;
         default:
@@ -1035,7 +1035,7 @@ bool mag_ctx_grad_recorder_is_running(const mag_ctx_t* ctx) { return ctx->flags 
 uint32_t mag_pack_color_u8(uint8_t r, uint8_t g, uint8_t b) { return ((uint32_t)r<<16)|((uint32_t)g<<8)|(uint32_t)b; }
 
 /* Pack rgb8 into a 32-bit color and normalize. Alpha channel unused. */
-uint32_t mag_pack_color_f32(float r, float g, float b) {
+uint32_t mag_pack_color_f32(mag_e8m23_t r, mag_e8m23_t g, mag_e8m23_t b) {
     return (((uint32_t)(r*255.0f)&255)<<16)|(((uint32_t)(g*255.0f)&255)<<8)|((uint32_t)(b*255.0f)&255);
 }
 
@@ -1050,7 +1050,7 @@ const char* mag_device_type_get_name(mag_compute_device_type_t op) {
 const mag_dtype_meta_t* mag_dtype_meta_of(mag_dtype_t type) {
     static const mag_dtype_meta_t infos[MAG_DTYPE__NUM] = {
         [MAG_DTYPE_F32] = {
-            sizeof(float),
+            sizeof(mag_e8m23_t),
             "f32"
         },
     };
@@ -1549,7 +1549,7 @@ static void mag_op_backward_subs(mag_tensor_t* node, mag_tensor_t** grads) {
 
 static void mag_op_backward_muls(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
-    float xi = node->op_params[0].x.f32;
+    mag_e8m23_t xi = node->op_params[0].x.e8m23;
     grads[0] = mag_muls(node->grad, xi);
     mag_tensor_t* tmp = mag_mul(node->grad, x);
     grads[1] = mag_sum(tmp);
@@ -2472,53 +2472,53 @@ mag_tensor_t* mag_div_(mag_tensor_t* x, mag_tensor_t* y) {
     return mag_tensor_operator(x->ctx, MAG_OP_DIV, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
 }
 
-mag_tensor_t* mag_adds(mag_tensor_t* x, float xi) {
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.f32=xi};
+mag_tensor_t* mag_adds(mag_tensor_t* x, mag_e8m23_t xi) {
+    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_ADDS, false, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
-mag_tensor_t* mag_adds_(mag_tensor_t* x, float xi) {
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.f32=xi};
+mag_tensor_t* mag_adds_(mag_tensor_t* x, mag_e8m23_t xi) {
+    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_ADDS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
-mag_tensor_t* mag_subs(mag_tensor_t* x, float xi) {
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.f32=xi};
+mag_tensor_t* mag_subs(mag_tensor_t* x, mag_e8m23_t xi) {
+    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_SUBS, false, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
-mag_tensor_t* mag_subs_(mag_tensor_t* x, float xi) {
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.f32=xi};
+mag_tensor_t* mag_subs_(mag_tensor_t* x, mag_e8m23_t xi) {
+    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_SUBS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
-mag_tensor_t* mag_muls(mag_tensor_t* x, float xi) {
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.f32=xi};
+mag_tensor_t* mag_muls(mag_tensor_t* x, mag_e8m23_t xi) {
+    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_MULS, false, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
-mag_tensor_t* mag_muls_(mag_tensor_t* x, float xi) {
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.f32=xi};
+mag_tensor_t* mag_muls_(mag_tensor_t* x, mag_e8m23_t xi) {
+    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_MULS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
-mag_tensor_t* mag_divs(mag_tensor_t* x, float xi) {
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.f32=xi};
+mag_tensor_t* mag_divs(mag_tensor_t* x, mag_e8m23_t xi) {
+    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_DIVS, false, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
-mag_tensor_t* mag_divs_(mag_tensor_t* x, float xi) {
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.f32=xi};
+mag_tensor_t* mag_divs_(mag_tensor_t* x, mag_e8m23_t xi) {
+    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_DIVS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
-mag_tensor_t* mag_pows(mag_tensor_t* x, float xi) {
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.f32=xi};
+mag_tensor_t* mag_pows(mag_tensor_t* x, mag_e8m23_t xi) {
+    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_POWS, false, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
-mag_tensor_t* mag_pows_(mag_tensor_t* x, float xi) {
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.f32=xi};
+mag_tensor_t* mag_pows_(mag_tensor_t* x, mag_e8m23_t xi) {
+    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_POWS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
@@ -2561,37 +2561,37 @@ void mag_tensor_copy_buffer_from(mag_tensor_t* t, const void* data, size_t size)
     (*sto->cpy_host_device)(sto, 0, data, size);
 }
 
-void mag_tensor_fill(mag_tensor_t* t, float x) {
+void mag_tensor_fill(mag_tensor_t* t, mag_e8m23_t x) {
     mag_storage_buffer_t* sto = &t->storage;
     (*sto->broadcast)(sto, 0, &x, sizeof(x)); /* Zero out the buffer. */
 }
 
-void mag_tensor_fill_random_uniform(mag_tensor_t* t, float min, float max) {
+void mag_tensor_fill_random_uniform(mag_tensor_t* t, mag_e8m23_t min, mag_e8m23_t max) {
     mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
     switch (t->dtype) {
         case MAG_DTYPE_F32: {
             int64_t n = mag_tensor_numel(t);
-            float* buf = (float*)t->storage.base;
+            mag_e8m23_t* buf = (mag_e8m23_t*)t->storage.base;
             mag_prng_generate_n(t->ctx, buf, n, min, max); /* Generate uniform random numbers. */
         } break;
         default: mag_panic("Unsupported DType: %d", t->dtype);
     }
 }
 
-void mag_tensor_fill_random_normal(mag_tensor_t* t, float mean, float stddev) {
+void mag_tensor_fill_random_normal(mag_tensor_t* t, mag_e8m23_t mean, mag_e8m23_t stddev) {
     mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
     switch (t->dtype) {
         case MAG_DTYPE_F32: {
             int64_t n = mag_tensor_numel(t);
             mag_assert((n & 1) == 0, "Number of elements must be even");
-            float* buf = (float*)t->storage.base;
+            mag_e8m23_t* buf = (mag_e8m23_t*)t->storage.base;
             mag_prng_generate_n(t->ctx, buf, n, 0.0f, 1.0f); /* Generate uniform random numbers. */
             for (int64_t i=0; i < n; i += 2) { /* Map uniform to normal distribution using Box-Muller transform. */
-                float* u1 = buf+i;
-                float* u2 = buf+i+1;
-                float mag = stddev*sqrtf(-2.0f*logf(*u1));
-                float y0 = mag*cosf((float)(2.0*M_PI)*(*u2)) + mean;
-                float y1 = mag*sinf((float)(2.0*M_PI)*(*u2)) + mean;
+                mag_e8m23_t* u1 = buf+i;
+                mag_e8m23_t* u2 = buf+i+1;
+                mag_e8m23_t mag = stddev*sqrtf(-2.0f*logf(*u1));
+                mag_e8m23_t y0 = mag*cosf((mag_e8m23_t)(2.0*M_PI)*(*u2)) + mean;
+                mag_e8m23_t y1 = mag*sinf((mag_e8m23_t)(2.0*M_PI)*(*u2)) + mean;
                 *u1 = y0;
                 *u2 = y1;
             }
@@ -2621,7 +2621,7 @@ static void mag_print_tensor_recursive(FILE* f, const mag_tensor_t* t, int64_t (
         for (int64_t i = 0; i < dim_size; ++i) {
             (*idx)[curr_dim] = i;
             mag_load_local_storage_group_arr(*idx, i);
-            float val = *((const float*)t->storage.base + i0*s0 + i1*s1 + i2*s2 + i3*s3 + i4*s4 + i5*s5);
+            mag_e8m23_t val = *((const mag_e8m23_t*)t->storage.base + i0*s0 + i1*s1 + i2*s2 + i3*s3 + i4*s4 + i5*s5);
             fprintf(f, "%g", val);
             if (i < dim_size - 1) {
                 fprintf(f, " ");
@@ -2941,12 +2941,12 @@ void mag_tensor_zero_grad(mag_tensor_t* t) {
         mag_tensor_fill(t->grad, 0.0f);
 }
 
-float mag_tensor_get_scalar_physical_index(mag_tensor_t* t, int64_t d0, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5) {
+mag_e8m23_t mag_tensor_get_scalar_physical_index(mag_tensor_t* t, int64_t d0, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5) {
     mag_static_assert(MAG_MAX_DIMS == 6);
     mag_load_local_storage_group(t, s, strides);
     switch (t->dtype) {
         case MAG_DTYPE_F32: {
-            float r;
+            mag_e8m23_t r;
             mag_storage_buffer_t* sto = &t->storage;
             (*sto->cpy_device_host)(sto, sizeof(r)*(d0*s0 + d1*s1 + d2*s2 + d3*s3 + d4*s4 + d5*s5), &r, sizeof(r));
             return r;
@@ -2955,7 +2955,7 @@ float mag_tensor_get_scalar_physical_index(mag_tensor_t* t, int64_t d0, int64_t 
     }
 }
 
-void mag_tensor_set_scalar_physical_index(mag_tensor_t* t, int64_t d0, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5, float x) {
+void mag_tensor_set_scalar_physical_index(mag_tensor_t* t, int64_t d0, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5, mag_e8m23_t x) {
     mag_static_assert(MAG_MAX_DIMS == 6);
     mag_load_local_storage_group(t, s, strides);
     switch (t->dtype) {
@@ -2967,7 +2967,7 @@ void mag_tensor_set_scalar_physical_index(mag_tensor_t* t, int64_t d0, int64_t d
     }
 }
 
-float mag_tensor_get_scalar_virtual_index(mag_tensor_t* t, int64_t v_idx) {
+mag_e8m23_t mag_tensor_get_scalar_virtual_index(mag_tensor_t* t, int64_t v_idx) {
     if (!mag_tensor_is_contiguous(t)) {
         int64_t pidx[MAG_MAX_DIMS];
         mag_tensor_virtual_to_physical_index(t, v_idx, &pidx);
@@ -2975,7 +2975,7 @@ float mag_tensor_get_scalar_virtual_index(mag_tensor_t* t, int64_t v_idx) {
     }
     switch (t->dtype) {
         case MAG_DTYPE_F32: {
-            float r;
+            mag_e8m23_t r;
             mag_storage_buffer_t* sto = &t->storage;
             (*sto->cpy_device_host)(sto, sizeof(r)*v_idx, &r, sizeof(r));
             return r;
@@ -2985,7 +2985,7 @@ float mag_tensor_get_scalar_virtual_index(mag_tensor_t* t, int64_t v_idx) {
     }
 }
 
-void mag_tensor_set_scalar_virtual_index(mag_tensor_t* t, int64_t v_idx, float x) {
+void mag_tensor_set_scalar_virtual_index(mag_tensor_t* t, int64_t v_idx, mag_e8m23_t x) {
     if (!mag_tensor_is_contiguous(t)) {
         int64_t pidx[MAG_MAX_DIMS];
         mag_tensor_virtual_to_physical_index(t, v_idx, &pidx);
@@ -3010,8 +3010,8 @@ bool mag_tensor_eq(const mag_tensor_t* a, const mag_tensor_t* b) {
     /*int64_t n = mag_tensor_num_elements(a); TODO
     switch (a->dtype) {
         case MAG_DTYPE_F32: {
-            const float* buf_a = (const float*)a->buf;
-            const float* buf_b = (const float*)b->buf;
+            const mag_e8m23_t* buf_a = (const mag_e8m23_t*)a->buf;
+            const mag_e8m23_t* buf_b = (const mag_e8m23_t*)b->buf;
             for (int64_t i = 0; i < n; ++i) {
                 if (buf_a[i] != buf_b[i]) {
                     return false;
@@ -3023,7 +3023,7 @@ bool mag_tensor_eq(const mag_tensor_t* a, const mag_tensor_t* b) {
     return false;
 }
 
-bool mag_tensor_is_close(const mag_tensor_t* a, const mag_tensor_t* b, float eps, double* percent_eq) {
+bool mag_tensor_is_close(const mag_tensor_t* a, const mag_tensor_t* b, mag_e8m23_t eps, double* percent_eq) {
     if (a->dtype != b->dtype) return false;
     if (a->rank != b->rank) return false;
     if (memcmp(a->shape, b->shape, sizeof(a->shape)) != 0) return false;
@@ -3033,8 +3033,8 @@ bool mag_tensor_is_close(const mag_tensor_t* a, const mag_tensor_t* b, float eps
     int64_t n_eq = 0;
     switch (a->dtype) {
         case MAG_DTYPE_F32: {
-            const float* buf_a = (const float*)a->buf;
-            const float* buf_b = (const float*)b->buf;
+            const mag_e8m23_t* buf_a = (const mag_e8m23_t*)a->buf;
+            const mag_e8m23_t* buf_b = (const mag_e8m23_t*)b->buf;
             for (int64_t i = 0; i < n; ++i)   |x - y| <= ε     ∀ x, y ∈ A, B
                 if (fabsf(buf_a[i] - buf_b[i]) <= eps) ++n_eq;
         } break;
@@ -3048,14 +3048,14 @@ bool mag_tensor_is_close(const mag_tensor_t* a, const mag_tensor_t* b, float eps
 void mag_tensor_img_draw_box(mag_tensor_t* t, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t wi, uint32_t rgb) {
     mag_assert(t->rank == 3, "Tensor must be 3D image tensor");
     mag_assert2(x2 > x1 && y2 > y1 && x1 > 0 && y1 > 0 && x2 > 0 && y2 > 0);
-    float* buf = mag_tensor_data_ptr(t);
+    mag_e8m23_t* buf = mag_tensor_data_ptr(t);
     int32_t w = (int32_t)mag_tensor_width(t);
     int32_t h = (int32_t)mag_tensor_height(t);
     int32_t c = (int32_t)mag_tensor_channels(t);
     mag_assert2(w && h && c == 3);
-    float r = (float)((rgb>>16)&0xff) / 255.0f;
-    float g = (float)((rgb>>8)&0xff) / 255.0f;
-    float b = (float)(rgb&0xff) / 255.0f;
+    mag_e8m23_t r = (mag_e8m23_t)((rgb>>16)&0xff) / 255.0f;
+    mag_e8m23_t g = (mag_e8m23_t)((rgb>>8)&0xff) / 255.0f;
+    mag_e8m23_t b = (mag_e8m23_t)(rgb&0xff) / 255.0f;
     wi = mag_xmax(1, wi);
     for (int32_t i=0; i < wi; ++i) {
         int32_t xx1 = x1+i;
@@ -3067,12 +3067,12 @@ void mag_tensor_img_draw_box(mag_tensor_t* t, int32_t x1, int32_t y1, int32_t x2
         if (mag_unlikely(yy1 >= h)) yy1 = h-1;
         if (mag_unlikely(yy2 >= h)) yy2 = h-1;
         for (int32_t j=xx1; j <= xx2; ++j) {
-            float* r1 = buf + j + yy1*w + 0*w*h;
-            float* r2 = buf + j + yy2*w + 0*w*h;
-            float* g1 = buf + j + yy1*w + 1*w*h;
-            float* g2 = buf + j + yy2*w + 1*w*h;
-            float* b1 = buf + j + yy1*w + 2*w*h;
-            float* b2 = buf + j + yy2*w + 2*w*h;
+            mag_e8m23_t* r1 = buf + j + yy1*w + 0*w*h;
+            mag_e8m23_t* r2 = buf + j + yy2*w + 0*w*h;
+            mag_e8m23_t* g1 = buf + j + yy1*w + 1*w*h;
+            mag_e8m23_t* g2 = buf + j + yy2*w + 1*w*h;
+            mag_e8m23_t* b1 = buf + j + yy1*w + 2*w*h;
+            mag_e8m23_t* b2 = buf + j + yy2*w + 2*w*h;
             mag_bnd_chk(r1, buf, mag_tensor_data_size(t));
             mag_bnd_chk(r2, buf, mag_tensor_data_size(t));
             mag_bnd_chk(g1, buf, mag_tensor_data_size(t));
@@ -3084,12 +3084,12 @@ void mag_tensor_img_draw_box(mag_tensor_t* t, int32_t x1, int32_t y1, int32_t x2
             *b1 = *b2 = b;
         }
         for (int32_t j = yy1; j <= yy2; ++j) {
-            float* r1 = buf + xx1 + j*w + 0*w*h;
-            float* r2 = buf + xx2 + j*w + 0*w*h;
-            float* g1 = buf + xx1 + j*w + 1*w*h;
-            float* g2 = buf + xx2 + j*w + 1*w*h;
-            float* b1 = buf + xx1 + j*w + 2*w*h;
-            float* b2 = buf + xx2 + j*w + 2*w*h;
+            mag_e8m23_t* r1 = buf + xx1 + j*w + 0*w*h;
+            mag_e8m23_t* r2 = buf + xx2 + j*w + 0*w*h;
+            mag_e8m23_t* g1 = buf + xx1 + j*w + 1*w*h;
+            mag_e8m23_t* g2 = buf + xx2 + j*w + 1*w*h;
+            mag_e8m23_t* b1 = buf + xx1 + j*w + 2*w*h;
+            mag_e8m23_t* b2 = buf + xx2 + j*w + 2*w*h;
             mag_bnd_chk(r1, buf, mag_tensor_data_size(t));
             mag_bnd_chk(r2, buf, mag_tensor_data_size(t));
             mag_bnd_chk(g1, buf, mag_tensor_data_size(t));
@@ -3133,17 +3133,17 @@ void mag_tensor_img_draw_text(mag_tensor_t* t, int32_t x, int32_t y, int32_t siz
     mag_assert(t->rank == 3, "Tensor must be a 3D image tensor");
     mag_assert2(x >= 0 && y >= 0 && size >= 8 && txt && *txt);
     mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
-    float* buf = (float*)t->storage.base;
+    mag_e8m23_t* buf = (mag_e8m23_t*)t->storage.base;
     int32_t w = (int32_t)mag_tensor_width(t);
     int32_t h = (int32_t)mag_tensor_height(t);
     int32_t c = (int32_t)mag_tensor_channels(t);
     mag_assert2(w && h && c == 3);
-    float* pr = buf;
-    float* pg = buf + w*h;
-    float* pb = buf + w*h*2;
-    float r = (float)((rgb>>16)&0xff) / 255.0f;
-    float g = (float)((rgb>>8)&0xff) / 255.0f;
-    float b = (float)(rgb&0xff) / 255.0f;
+    mag_e8m23_t* pr = buf;
+    mag_e8m23_t* pg = buf + w*h;
+    mag_e8m23_t* pb = buf + w*h*2;
+    mag_e8m23_t r = (mag_e8m23_t)((rgb>>16)&0xff) / 255.0f;
+    mag_e8m23_t g = (mag_e8m23_t)((rgb>>8)&0xff) / 255.0f;
+    mag_e8m23_t b = (mag_e8m23_t)(rgb&0xff) / 255.0f;
     int32_t ly = y;
     for (int32_t lx = x; *txt; lx = (*txt == '\n' ? x : lx+8), ly = (*txt == '\n' ? ly+14 : ly), txt++) {
         if (mag_unlikely(!isprint(*txt))) continue;

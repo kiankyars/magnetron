@@ -62,42 +62,42 @@ mag_tensor_t* mag_tensor_load_image(mag_ctx_t* ctx, const char* file, mag_color_
            whc[1] = rh;
        }
     #else
-        float* ori = (*mag_alloc)(NULL, whc[2]*whc[1]*whc[0]*sizeof(*ori));
+        mag_e8m23_t* ori = (*mag_alloc)(NULL, whc[2]*whc[1]*whc[0]*sizeof(*ori));
         for (int64_t k=0; k < whc[2]; ++k)
          for (int64_t j=0; j < whc[1]; ++j)
              for (int64_t i=0; i < whc[0]; ++i)
-                 ori[i + whc[0]*j + whc[0]*whc[1]*k] = (float)buf[k + whc[2]*i + whc[2]*whc[0]*j] / 255.0f;
+                 ori[i + whc[0]*j + whc[0]*whc[1]*k] = (mag_e8m23_t)buf[k + whc[2]*i + whc[2]*whc[0]*j] / 255.0f;
         mag_tensor_t* t = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, whc[2], rh, rw);
-        float* dst = mag_tensor_data_ptr(t);
-        float* part = (*mag_alloc)(NULL, whc[2] * whc[1] * rw * sizeof(*part));
-        float ws = (float)(whc[0] - 1)/(float)(rw - 1);
-        float hs = (float)(whc[1] - 1)/(float)(rh - 1);
+        mag_e8m23_t* dst = mag_tensor_data_ptr(t);
+        mag_e8m23_t* part = (*mag_alloc)(NULL, whc[2] * whc[1] * rw * sizeof(*part));
+        mag_e8m23_t ws = (mag_e8m23_t)(whc[0] - 1)/(mag_e8m23_t)(rw - 1);
+        mag_e8m23_t hs = (mag_e8m23_t)(whc[1] - 1)/(mag_e8m23_t)(rh - 1);
         for (uint32_t k = 0; k < whc[2]; ++k)
          for (uint32_t r = 0; r < whc[1]; ++r)
             for (uint32_t c = 0; c < rw; ++c) {
-              float val = 0;
+              mag_e8m23_t val = 0;
               if (c == rw - 1 || whc[0] == 1)
                   val = ori[k*(whc[0])*(whc[1]) + r*(whc[0]) + (whc[0] - 1)];
               else {
-                  float sx = (float)c*ws;
+                  mag_e8m23_t sx = (mag_e8m23_t)c*ws;
                   uint32_t ix = (uint32_t)sx;
-                  float dx = sx - (float)ix;
+                  mag_e8m23_t dx = sx - (mag_e8m23_t)ix;
                   val = (1-dx) * (ori[k*(whc[0])*(whc[1]) + r*(whc[0]) + ix]) + dx*(ori[k*(whc[0])*(whc[1]) + r*(whc[0]) + (ix + 1)]);
               }
               part[k * rw * (whc[1]) + r * rw + c] = val;
             }
         for (uint32_t k = 0; k < whc[2]; ++k)
          for (uint32_t r = 0; r < rh; ++r) {
-             float sy = (float)r*hs;
+             mag_e8m23_t sy = (mag_e8m23_t)r*hs;
              uint32_t iy = (uint32_t)sy;
-             float dy = sy - (float)iy;
+             mag_e8m23_t dy = sy - (mag_e8m23_t)iy;
              for (uint32_t c = 0; c < rw; ++c) {
-                 float val = (1-dy)*(part[k * rw * whc[1] + iy * rw + c]);
+                 mag_e8m23_t val = (1-dy)*(part[k * rw * whc[1] + iy * rw + c]);
                  dst[k * rw * rh + r * rw + c] = val;
              }
              if (r == rh - 1 || whc[1] == 1) continue;
              for (uint32_t c = 0; c < rw; ++c) {
-                 float val = dy*(part[k * rw * (whc[1]) + (iy + 1) * rw + c]);
+                 mag_e8m23_t val = dy*(part[k * rw * (whc[1]) + (iy + 1) * rw + c]);
                  dst[k * rw * rh + r * rw + c] += val;
              }
          }
@@ -110,11 +110,11 @@ mag_tensor_t* mag_tensor_load_image(mag_ctx_t* ctx, const char* file, mag_color_
     #endif
    }
    mag_tensor_t* t = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, whc[2], whc[1], whc[0]);
-   float* dst = mag_tensor_data_ptr(t);
+   mag_e8m23_t* dst = mag_tensor_data_ptr(t);
    for (int64_t k = 0; k < whc[2]; ++k) { /* Convert from interleaved to planar representation. */
      for (int64_t j = 0; j < whc[1]; ++j) {
          for (int64_t i = 0; i < whc[0]; ++i) {
-             dst[i + whc[0]*j + whc[0]*whc[1]*k] = (float)buf[k + whc[2]*i + whc[2]*whc[0]*j] / 255.0f;  /* Normalize pixel values to [0, 1] */
+             dst[i + whc[0]*j + whc[0]*whc[1]*k] = (mag_e8m23_t)buf[k + whc[2]*i + whc[2]*whc[0]*j] / 255.0f;  /* Normalize pixel values to [0, 1] */
          }
      }
    }
@@ -133,7 +133,7 @@ void mag_tensor_save_image(const mag_tensor_t* t, const char* file) {
    mag_assert(c == 1 || c == 3 || c == 4, "Invalid number of channels: %zu", (size_t)c);
    mag_assert(w*h*c == mag_tensor_numel(t), "Buffer size mismatch: %zu != %zu", w*h*c, (size_t)mag_tensor_numel(t));
    uint8_t* dst = (*mag_alloc)(NULL, w*h*c); /* Allocate memory for image data */
-   const float* src = mag_tensor_data_ptr(t);
+   const mag_e8m23_t* src = mag_tensor_data_ptr(t);
    for (int64_t k = 0; k < c; ++k) /* Convert from planar to interleaved format. */
       for (int64_t i = 0; i < w*h; ++i)
          dst[i*c + k] = (uint8_t)(src[i + k*w*h]*255.0f);
