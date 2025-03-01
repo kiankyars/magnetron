@@ -20,7 +20,7 @@ static constexpr std::int64_t k_lim_broadcast = 2;
         for (std::int64_t i3=1; i3 <= k_lim_same_shape; ++i3) \
         for (std::int64_t i4=1; i4 <= k_lim_same_shape; ++i4) \
         for (std::int64_t i5=1; i5 <= k_lim_same_shape; ++i5) { \
-            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0, i1, i2, i3, i4, i5); \
+            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5); \
             mag_tensor_fill_random_uniform(x, 0.0f, 1.0f); \
             \
             mag_tensor_t* r = mag_##op(x); \
@@ -47,10 +47,10 @@ static constexpr std::int64_t k_lim_broadcast = 2;
             for (std::int64_t i3=1; i3 <= k_lim_same_shape; ++i3) \
             for (std::int64_t i4=1; i4 <= k_lim_same_shape; ++i4) \
             for (std::int64_t i5=1; i5 <= k_lim_same_shape; ++i5) { \
-                mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0, i1, i2, i3, i4, i5); \
+                mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5); \
                 mag_tensor_fill_random_uniform(x, 0.0f, 1.0f); \
                 std::vector<float> x_origin {}; \
-                mag_tensor_buf_f32_to_vec(x, x_origin); \
+                mag_tensor_buf_e8m23_to_vec(x, x_origin); \
                 \
                 mag_tensor_t* r = mag_##op##_(x); \
                 mag_tensor_set_name(r, "result");  \
@@ -82,7 +82,7 @@ TEST(compute_cpu, neg_same_shape) {
     for (std::int64_t i3=1; i3 <= k_lim_same_shape; ++i3)
     for (std::int64_t i4=1; i4 <= k_lim_same_shape; ++i4)
     for (std::int64_t i5=1; i5 <= k_lim_same_shape; ++i5) {
-        mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0, i1, i2, i3, i4, i5);
+        mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5);
         mag_tensor_fill_random_uniform(x, 0.0f, 1.0f);
         mag_tensor_t* r = mag_neg(x);
         const auto* b_x = static_cast<const float*>(mag_tensor_data_ptr(x));
@@ -184,7 +184,7 @@ TEST(compute_cpu, clone_same_shape) {
                 for (std::int64_t i3=1; i3 <= k_lim_same_shape; ++i3)
                     for (std::int64_t i4=1; i4 <= k_lim_same_shape; ++i4)
                         for (std::int64_t i5=1; i5 <= k_lim_same_shape; ++i5) {
-                            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0, i1, i2, i3, i4, i5);
+                            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5);
                             mag_tensor_fill_random_uniform(x, 0.0f, 1.0f);
                             mag_tensor_t* r = mag_clone(x);
                             const auto* b_x = static_cast<const float*>(mag_tensor_data_ptr(x));
@@ -207,7 +207,7 @@ TEST(compute_cpu, clone_transpose) {
                 for (std::int64_t i3=1; i3 <= k_lim_same_shape; ++i3)
                     for (std::int64_t i4=1; i4 <= k_lim_same_shape; ++i4)
                         for (std::int64_t i5=1; i5 <= k_lim_same_shape; ++i5) {
-                            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0, i1, i2, i3, i4, i5);
+                            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5);
                             mag_tensor_fill_random_uniform(x, 0.0f, 1.0f);
                             mag_tensor_t* r = mag_clone(mag_transpose(x));
                             const auto* b_x = static_cast<const float*>(mag_tensor_data_ptr(x));
@@ -233,7 +233,7 @@ TEST(compute_cpu, clone_transpose) {
         for (std::int64_t i3=1; i3 <= k_lim_same_shape; ++i3) \
         for (std::int64_t i4=1; i4 <= k_lim_same_shape; ++i4) \
         for (std::int64_t i5=1; i5 <= k_lim_same_shape; ++i5) { \
-            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0, i1, i2, i3, i4, i5); \
+            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5); \
             mag_tensor_t* y = mag_clone(x); \
             mag_tensor_fill_random_uniform(x, 0.0f, 1.0f); \
             mag_tensor_fill_random_uniform(y, -5.0f, 5.0f); \
@@ -267,8 +267,8 @@ TEST(compute_cpu, clone_transpose) {
         for (std::int64_t i3=1; i3 <= k_lim_broadcast; ++i3) \
         for (std::int64_t i4=1; i4 <= k_lim_broadcast; ++i4) \
         for (std::int64_t i5=1; i5 <= k_lim_broadcast; ++i5) { \
-            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0*factor, i1*factor, i2*factor, i3*factor, i4*factor, i5*factor); \
-            mag_tensor_t* y = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0, i1, i2, i3, i4, i5); \
+            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0*factor, i1*factor, i2*factor, i3*factor, i4*factor, i5*factor); \
+            mag_tensor_t* y = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5); \
             mag_tensor_fill_random_uniform(x, 0.0f, 1.0f); \
             mag_tensor_fill(y, 2.2f); \
             \
@@ -297,12 +297,12 @@ TEST(compute_cpu, clone_transpose) {
         for (std::int64_t i3=1; i3 <= k_lim_same_shape; ++i3) \
         for (std::int64_t i4=1; i4 <= k_lim_same_shape; ++i4) \
         for (std::int64_t i5=1; i5 <= k_lim_same_shape; ++i5) { \
-            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0, i1, i2, i3, i4, i5); \
+            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5); \
             mag_tensor_t* y = mag_clone(x); \
             mag_tensor_fill_random_uniform(x, 0.0f, 1.0f); \
             mag_tensor_fill_random_uniform(y, -5.0f, 5.0f); \
             std::vector<float> x_origin {}; \
-            mag_tensor_buf_f32_to_vec(x, x_origin); \
+            mag_tensor_buf_e8m23_to_vec(x, x_origin); \
             \
             mag_tensor_t* r = mag_##op##_(x, y); \
                                                  \
@@ -335,13 +335,13 @@ TEST(compute_cpu, clone_transpose) {
         for (std::int64_t i3=1; i3 <= k_lim_broadcast; ++i3) \
         for (std::int64_t i4=1; i4 <= k_lim_broadcast; ++i4) \
         for (std::int64_t i5=1; i5 <= k_lim_broadcast; ++i5) { \
-            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0*factor, i1*factor, i2*factor, i3*factor, i4*factor, i5*factor); \
-            mag_tensor_t* y = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0, i1, i2, i3, i4, i5); \
+            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0*factor, i1*factor, i2*factor, i3*factor, i4*factor, i5*factor); \
+            mag_tensor_t* y = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5); \
             mag_tensor_fill_random_uniform(x, 0.0f, 1.0f); \
             mag_tensor_fill(y, 2.2f); \
             \
             std::vector<float> x_origin {}; \
-            mag_tensor_buf_f32_to_vec(x, x_origin); \
+            mag_tensor_buf_e8m23_to_vec(x, x_origin); \
             \
             mag_tensor_t* r = mag_##op##_(x, y); \
             \
@@ -370,7 +370,7 @@ TEST(compute_cpu, clone_transpose) {
         for (std::int64_t i3=1; i3 <= k_lim_same_shape; ++i3) \
         for (std::int64_t i4=1; i4 <= k_lim_same_shape; ++i4) \
         for (std::int64_t i5=1; i5 <= k_lim_same_shape; ++i5) { \
-            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0, i1, i2, i3, i4, i5); \
+            mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5); \
             mag_tensor_fill_random_uniform(x, 0.0f, 1.0f); \
             \
             mag_tensor_t* r = mag_##op##s(x, static_cast<float>(i0+i1+i2+i3+i4+i5)*0.221f); \
@@ -389,10 +389,10 @@ TEST(compute_cpu, clone_transpose) {
         mag_ctx_destroy(ctx); \
     }
 
-impl_test_binary_op(add_f32, add, +)
-impl_test_binary_op(sub_f32, sub, -)
-impl_test_binary_op(mul_f32, mul, *)
-impl_test_binary_op(div_f32, div, /)
+impl_test_binary_op(add_e8m23, add, +)
+impl_test_binary_op(sub_e8m23, sub, -)
+impl_test_binary_op(mul_e8m23, mul, *)
+impl_test_binary_op(div_e8m23, div, /)
 
 #undef impl_test_binary_op
 
@@ -404,7 +404,7 @@ TEST(compute_cpu, pows) {
     for (std::int64_t i3=1; i3 <= k_lim_same_shape; ++i3)
     for (std::int64_t i4=1; i4 <= k_lim_same_shape; ++i4)
     for (std::int64_t i5=1; i5 <= k_lim_same_shape; ++i5) {
-        mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, i0, i1, i2, i3, i4, i5);
+        mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5);
         mag_tensor_fill_random_uniform(x, 0.0f, 1.0f);
         mag_tensor_t* r = mag_pows(x, static_cast<float>(i0+i1+i2+i3+i4+i5)*0.221f);
         const auto* b_x = static_cast<const float*>(mag_tensor_data_ptr(x));
@@ -421,7 +421,7 @@ TEST(compute_cpu, pows) {
 
 TEST(compute_cpu, arithmetic_mean) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
-    mag_tensor_t* A = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 4, 1, 3, 2);
+    mag_tensor_t* A = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 4, 1, 3, 2);
     mag_tensor_fill_random_uniform(A, -1.0f, 1.0f);
     mag_tensor_t* R = mag_mean(A);
     ASSERT_NE(R, nullptr);
@@ -437,7 +437,7 @@ TEST(compute_cpu, arithmetic_mean) {
 
 TEST(compute_cpu, min) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
-    mag_tensor_t* A = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 4, 1, 3, 2);
+    mag_tensor_t* A = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 4, 1, 3, 2);
     mag_tensor_fill_random_uniform(A, -1.0f, 1.0f);
     mag_tensor_t* R = mag_min(A);
     ASSERT_NE(R, nullptr);
@@ -450,7 +450,7 @@ TEST(compute_cpu, min) {
 
 TEST(compute_cpu, max) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
-    mag_tensor_t* A = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 4, 1, 3, 2);
+    mag_tensor_t* A = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 4, 1, 3, 2);
     mag_tensor_fill_random_uniform(A, -1.0f, 1.0f);
     mag_tensor_t* R = mag_max(A);
     ASSERT_NE(R, nullptr);
@@ -463,7 +463,7 @@ TEST(compute_cpu, max) {
 
 TEST(compute_cpu, hsum) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
-    mag_tensor_t* A = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 4, 1, 3, 2);
+    mag_tensor_t* A = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 4, 1, 3, 2);
     mag_tensor_fill_random_uniform(A, -1.0f, 1.0f);
     mag_tensor_t* R = mag_sum(A);
     ASSERT_NE(R, nullptr);
@@ -478,7 +478,7 @@ TEST(compute_cpu, hsum) {
 
 TEST(compute_cpu, heavy_compute_single_op) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
-    mag_tensor_t* A = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 8192, 8192, 3);
+    mag_tensor_t* A = mag_tensor_create_3d(ctx, MAG_DTYPE_E8M23, 8192, 8192, 3);
     mag_tensor_t* B = mag_clone(A);
     mag_tensor_fill(B, 3.0);
     mag_tensor_t* R = mag_add(A, B);
@@ -491,7 +491,7 @@ TEST(compute_cpu, heavy_compute_single_op) {
 
 TEST(compute_cpu, heavy_compute_single_op_scalar) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
-    mag_tensor_t* A = mag_tensor_create_1d(ctx, MAG_DTYPE_F32, 1);
+    mag_tensor_t* A = mag_tensor_create_1d(ctx, MAG_DTYPE_E8M23, 1);
     mag_tensor_t* B =  mag_clone(A);
     mag_tensor_fill(B, 3.0);
     mag_tensor_t* R = mag_add(A, B);
@@ -504,10 +504,10 @@ TEST(compute_cpu, heavy_compute_single_op_scalar) {
 
 TEST(compute_cpu, threaded_add) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
-    mag_tensor_t* A = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 512, 512, 32);
+    mag_tensor_t* A = mag_tensor_create_3d(ctx, MAG_DTYPE_E8M23, 512, 512, 32);
     mag_tensor_fill(A, 1.0f);
 
-    mag_tensor_t* B = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 512, 512, 32);
+    mag_tensor_t* B = mag_tensor_create_3d(ctx, MAG_DTYPE_E8M23, 512, 512, 32);
     mag_tensor_fill(B, 2.0f);
 
     ASSERT_EQ(A->numel, B->numel);

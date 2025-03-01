@@ -358,9 +358,9 @@ static inline void* mag_pincr(void** p, size_t sz, size_t align) {
 ** Because multiple floating-point formats with the same bit width exist (e.g. f16, bf16), all floats are described by their exponent (E) and mantissa (M) bits.
 ** The builtin float keyword is only used for the public API in magnetron.h. The internal code uses the following types:
 */
-typedef double mag_e11m52_t;        /* IEEE 754 double precision float. */
-typedef float mag_e8m23_t;          /* IEEE 754 single precision float. */
-typedef uint16_t mag_e5m10_t;       /* IEEE 754 half precision float. */
+typedef double mag_e11m52_t;            /* IEEE 754 double precision float. */
+typedef float mag_e8m23_t;              /* IEEE 754 single precision float. */
+typedef struct mag_e5m10_t { uint16_t bits; } mag_e5m10_t;  /* IEEE 754 half precision float. */
 
 /*
 **  Fast u32 division and remainder. Paper:
@@ -828,8 +828,8 @@ typedef struct mag_compute_payload_t { /* Compute payload for kernel execution. 
     bool is_fwd;
 } mag_compute_payload_t;
 
-typedef struct mag_kctx_mm_t { /* Matmul kernel context. */
-
+typedef struct mag_kctx_mm_t { /* Matmul kernel context. TODO: get rid of this */
+    int unused;
 } mag_kctx_mm_t;
 
 typedef struct mag_kernel_context_t { /* General op kernel context. */

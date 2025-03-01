@@ -62,39 +62,40 @@
 #define __F16C__ 1
 #endif
 
-#define MAG_E5M10_E 0x4170
-#define MAG_E5M10_EPS 0x1400
-#define MAG_E5M10_INF 0x7c00
-#define MAG_E5M10_LN10 0x409b
-#define MAG_E5M10_LN2 0x398c
-#define MAG_E5M10_LOG10_2 0x34d1
-#define MAG_E5M10_LOG10_E 0x36f3
-#define MAG_E5M10_LOG2_10 0x42a5
-#define MAG_E5M10_LOG2_E 0x3dc5
-#define MAG_E5M10_MAX 0x7bff
-#define MAG_E5M10_MAX_SUBNORMAL 0x03ff
-#define MAG_E5M10_MIN 0xfbff
-#define MAG_E5M10_MIN_POS 0x0400
-#define MAG_E5M10_MIN_POS_SUBNORMAL 0x0001
-#define MAG_E5M10_NAN 0x7e00
-#define MAG_E5M10_NEG_INF 0xfc00
-#define MAG_E5M10_NEG_ONE 0xbc00
-#define MAG_E5M10_NEG_ZERO 0x8000
-#define MAG_E5M10_ONE 0x3c00
-#define MAG_E5M10_PI 0x4248
-#define MAG_E5M10_SQRT2 0x3da8
-#define MAG_E5M10_ZERO 0x0000
+#define MAG_E5M10_E                 (mag_e5m10_t){.bits=0x4170}
+#define MAG_E5M10_EPS               (mag_e5m10_t){.bits=0x1400}
+#define MAG_E5M10_INF               (mag_e5m10_t){.bits=0x7c00}
+#define MAG_E5M10_LN10              (mag_e5m10_t){.bits=0x409b}
+#define MAG_E5M10_LN2               (mag_e5m10_t){.bits=0x398c}
+#define MAG_E5M10_LOG10_2           (mag_e5m10_t){.bits=0x34d1}
+#define MAG_E5M10_LOG10_E           (mag_e5m10_t){.bits=0x36f3}
+#define MAG_E5M10_LOG2_10           (mag_e5m10_t){.bits=0x42a5}
+#define MAG_E5M10_LOG2_E            (mag_e5m10_t){.bits=0x3dc5}
+#define MAG_E5M10_MAX               (mag_e5m10_t){.bits=0x7bff}
+#define MAG_E5M10_MAX_SUBNORMAL     (mag_e5m10_t){.bits=0x03ff}
+#define MAG_E5M10_MIN               (mag_e5m10_t){.bits=0xfbff}
+#define MAG_E5M10_MIN_POS           (mag_e5m10_t){.bits=0x0400}
+#define MAG_E5M10_MIN_POS_SUBNORMAL (mag_e5m10_t){.bits=0x0001}
+#define MAG_E5M10_NAN               (mag_e5m10_t){.bits=0x7e00}
+#define MAG_E5M10_NEG_INF           (mag_e5m10_t){.bits=0xfc00}
+#define MAG_E5M10_NEG_ONE           (mag_e5m10_t){.bits=0xbc00}
+#define MAG_E5M10_NEG_ZERO          (mag_e5m10_t){.bits=0x8000}
+#define MAG_E5M10_ONE               (mag_e5m10_t){.bits=0x3c00}
+#define MAG_E5M10_PI                (mag_e5m10_t){.bits=0x4248}
+#define MAG_E5M10_SQRT2             (mag_e5m10_t){.bits=0x3da8}
+#define MAG_E5M10_ZERO              (mag_e5m10_t){.bits=0x0000}
 
-static MAG_AINLINE mag_e5m10_t mag_e8m23_to_e5m10(mag_e8m23_t x) {
+static MAG_AINLINE mag_e5m10_t mag_e8m23_to_e5m10_scalar(mag_e8m23_t x) {
+    uint16_t r;
     #ifdef __F16C__
         #ifdef _MSC_VER
-            return (uint16_t)_mm_extract_epi16(_mm_cvtps_ph(_mm_set_ss(x), 0), 0);
+            r = (uint16_t)_mm_extract_epi16(_mm_cvtps_ph(_mm_set_ss(x), 0), 0);
         #else
-            return _cvtss_sh(x, 0);
+            r = _cvtss_sh(x, 0);
         #endif
     #elif defined(__ARM_NEON) && !defined(_MSC_VER)
         __fp16 h = (__fp16)x;
-        return *(mag_e5m10_t*)&h;
+        r = *(uint16_t*)&h;
     #else
         float base = fabs(x)*0x1.0p+112f*0x1.0p-110f;
         uint32_t w = *(uint32_t*)&x;
@@ -106,21 +107,22 @@ static MAG_AINLINE mag_e5m10_t mag_e8m23_to_e5m10(mag_e8m23_t x) {
         uint32_t exp_bits = (rbits>>13) & 0x00007c00u;
         uint32_t mant_bits = rbits & 0x00000fffu;
         uint32_t nonsign = exp_bits + mant_bits;
-        return (sign>>16)|(shl1_w > 0xff000000 ? 0x7e00 : nonsign);
+        r = (sign>>16)|(shl1_w > 0xff000000 ? 0x7e00 : nonsign);
     #endif
+    return (mag_e5m10_t){.bits=r};
 }
 
-static MAG_AINLINE mag_e8m23_t mag_e5m10_to_e8m23(mag_e5m10_t x) {
+static MAG_AINLINE mag_e8m23_t mag_e5m10_to_e8m23_scalar(mag_e5m10_t x) {
     #ifdef __F16C__
         #ifdef _MSC_VER
-            return _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128(x)));
+            return _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128(x.bits)));
         #else
-            return _cvtsh_ss(x);
+            return _cvtsh_ss(x.bits);
         #endif
     #elif defined(__ARM_NEON) && !defined(_MSC_VER)
-        return *(__fp16*)&x;
+        return *(__fp16*)&x.bits;
     #else
-        uint32_t w = (uint32_t)x<<16;
+        uint32_t w = (uint32_t)x.bits<<16;
         uint32_t sign = w & 0x80000000u;
         uint32_t two_w = w+w;
         uint32_t offs = 0xe0u<<23;
@@ -139,6 +141,8 @@ static MAG_AINLINE mag_e8m23_t mag_e5m10_to_e8m23(mag_e5m10_t x) {
 
 #define mag_e8m23p(t) ((const mag_e8m23_t*)(t)->storage.base)
 #define mag_e8m23p_mut(t) ((mag_e8m23_t*)(t)->storage.base)
+#define mag_e5m10p(t) ((const mag_e5m10_t*)(t)->storage.base)
+#define mag_e5m10p_mut(t) ((mag_e5m10_t*)(t)->storage.base)
 
 #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
 
@@ -286,6 +290,7 @@ static __m256 mag_simd_tanh(__m256 x) { /* tanh' : ℝ -> (-1, 1), x |-> 1 / ((c
 }
 
 #elif MAG_APPROXMATH && defined(__SSE2__)
+
 static __m128 mag_simd_expf(const __m128 x) { /* exp(x) : ℝ -> (0, ∞), x |-> e^x. Error = 1.45358 + 0.5 ulps. x > 88.38 -> INF, x < -103.97 -> 0 */
     __m128 r = _mm_set1_ps(0x1.8p23f);
     __m128 z = _mm_add_ps(_mm_mul_ps(x, _mm_set1_ps(0x1.715476p+0f)), r);
@@ -380,6 +385,39 @@ static void MAG_HOTPROC mag_vadd_e8m23(
         o[i] = x[i] + y[i];
     }
 #endif
+}
+
+static void MAG_HOTPROC mag_vadd_e5m10(
+    int64_t numel,
+    mag_e5m10_t* o,
+    const mag_e5m10_t* x,
+    const mag_e5m10_t* y
+) {
+    int64_t i=0;
+    #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
+        /* TODO */
+    #elif MAG_APPROXMATH && defined(__AVX512F__)
+        for (; i+15 < numel; i += 16) {
+            __m256i xph = _mm256_loadu_si256((const __m256i*)(x+i));
+            __m256i yph = _mm256_loadu_si256((const __m256i*)(y+i));
+            __m512 xps = _mm512_cvt_roundph_ps(xph, _MM_FROUND_CUR_DIRECTION);
+            __m512 yps = _mm512_cvt_roundph_ps(yph, _MM_FROUND_CUR_DIRECTION);
+            __m512 rps = _mm512_add_ps(xps, yps);
+            _mm256_storeu_si256((__m256i*)(o+i), _mm512_cvtps_ph(rps, _MM_FROUND_CUR_DIRECTION));
+        }
+    #elif MAG_APPROXMATH && defined(__AVX__) && defined(__F16C__)
+        for (; i+7 < numel; i += 8) {
+            __m128i xph = _mm_loadu_si128((const __m128i*)(x+i));
+            __m128i yph = _mm_loadu_si128((const __m128i*)(y+i));
+            __m256 xps = _mm256_cvtph_ps(xph);
+            __m256 yps = _mm256_cvtph_ps(yph);
+            __m256 sum = _mm256_add_ps(xps, yps);
+            _mm_storeu_si128((__m128i*)(o + i), _mm256_cvtps_ph(sum, _MM_FROUND_CUR_DIRECTION));
+        }
+    #endif
+    for (; i < numel; ++i) { /* Scalar drain loop */
+        o[i] = mag_e8m23_to_e5m10_scalar(mag_e5m10_to_e8m23_scalar(x[i]) + mag_e5m10_to_e8m23_scalar(y[i]));
+    }
 }
 
 static void MAG_HOTPROC mag_vsub_e8m23(
@@ -510,7 +548,7 @@ static mag_e8m23_t MAG_UNUSED MAG_HOTPROC mag_vdot_e8m23(
     *acc = vaddq_e8m23(*acc, acc[2]);     /* Fold acc[0] += acc[2] */
     *acc = vaddq_e8m23(*acc, acc[1]);     /* Fold acc[0] += acc[1] */
     mag_e8m23_t sum = vaddvq_e8m23(*acc);       /* Reduce to scalar with horizontal sum. */
-    for (int64_t i=k; i < numel; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
+    for (int64_t i=k; i < numel; ++i) sum += x[i]*y[i]; /* Scalar drain loop */
     return sum;
 #elif defined(__AVX512F__) && defined(__FMA__)
     int64_t k = numel & -64;
@@ -535,7 +573,7 @@ static mag_e8m23_t MAG_UNUSED MAG_HOTPROC mag_vdot_e8m23(
     *acc = _mm512_add_ps(*acc, acc[2]);
     *acc = _mm512_add_ps(*acc, acc[1]);
     mag_e8m23_t sum = _mm512_reduce_add_ps(*acc);
-    for (int64_t i=k; i < numel; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
+    for (int64_t i=k; i < numel; ++i) sum += x[i]*y[i]; /* Scalar drain loop */
     return sum;
 #elif defined(__AVX__) && defined(__FMA__)
     int64_t k = numel & -32;
@@ -563,7 +601,7 @@ static mag_e8m23_t MAG_UNUSED MAG_HOTPROC mag_vdot_e8m23(
     v0 = _mm_hadd_ps(v0, v0);
     v0 = _mm_hadd_ps(v0, v0);
     mag_e8m23_t sum = _mm_cvtss_f32(v0);
-    for (int64_t i=k; i < numel; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
+    for (int64_t i=k; i < numel; ++i) sum += x[i]*y[i]; /* Scalar drain loop */
     return sum;
 #elif defined(__SSE2__)
     int64_t k = numel & -16;
@@ -598,7 +636,7 @@ static mag_e8m23_t MAG_UNUSED MAG_HOTPROC mag_vdot_e8m23(
         sums = _mm_add_ss(sums, shuf);
         mag_e8m23_t sum = _mm_cvtss_f32(sums);
     #endif
-    for (int64_t i=k; i < numel; ++i) sum += x[i]*y[i]; /* Process leftovers scalar-wise */
+    for (int64_t i=k; i < numel; ++i) sum += x[i]*y[i]; /* Scalar drain loop */
     return sum;
 #else
     mag_e11m52_t r = 0.0;
@@ -802,7 +840,7 @@ static void MAG_HOTPROC mag_vsin_e8m23( /* o = sin x */
         _mm_storeu_ps(o+i, xi);
     }
 #endif
-    for (; i < numel; ++i) { /* Process leftovers scalar-wise */
+    for (; i < numel; ++i) { /* Scalar drain loop */
         o[i] = sinf(x[i]);
     }
 }
@@ -832,7 +870,7 @@ static void MAG_HOTPROC mag_vcos_e8m23( /* o = cos x */
         _mm_storeu_ps(o+i, xi);
     }
 #endif
-    for (; i < numel; ++i) { /* Process leftovers scalar-wise */
+    for (; i < numel; ++i) { /* Scalar drain loop */
         o[i] = cosf(x[i]);
     }
 }
@@ -870,7 +908,7 @@ static void MAG_HOTPROC mag_vexp_e8m23( /* e^x */
         _mm_storeu_ps(o+i, mag_simd_expf(_mm_loadu_ps(x+i)));
     }
 #endif
-    for (; i < numel; ++i) o[i] = expf(x[i]); /* Process leftovers scalar-wise */
+    for (; i < numel; ++i) o[i] = expf(x[i]); /* Scalar drain loop */
 }
 
 static void MAG_HOTPROC mag_vsoftmax_e8m23( /* softmax : ℝ -> (0, ∞), x |-> e^x */
@@ -896,7 +934,7 @@ static void MAG_HOTPROC mag_vsoftmax_e8m23( /* softmax : ℝ -> (0, ∞), x |-> 
         _mm_storeu_ps(o+i, mag_simd_expf(_mm_loadu_ps(x+i)));
     }
 #endif
-    for (; i < numel; ++i) o[i] = expf(x[i]); /* Process leftovers scalar-wise */
+    for (; i < numel; ++i) o[i] = expf(x[i]); /* Scalar drain loop */
 }
 
 static void MAG_HOTPROC mag_vsoftmax_dv_e8m23( /* softmax' = softmax : ℝ -> (0, ∞), x |-> e^x */
@@ -954,7 +992,7 @@ static void MAG_HOTPROC mag_vsigmoid_e8m23( /* σ : ℝ -> (0, 1), x |-> 1/(1 + 
         _mm_storeu_ps(o+i, _mm_div_ps(one, one_plus_exp_neg_x));
     }
 #endif
-    for (; i < numel; ++i) o[i] = 1.0f / (1.0f + expf(-x[i])); /* Process leftovers scalar-wise */
+    for (; i < numel; ++i) o[i] = 1.0f / (1.0f + expf(-x[i])); /* Scalar drain loop */
 }
 
 static void MAG_HOTPROC mag_vsigmoid_dv_e8m23( /* σ' : ℝ -> (0, 1), x |-> x * (1-x) */

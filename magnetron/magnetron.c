@@ -1049,9 +1049,13 @@ const char* mag_device_type_get_name(mag_compute_device_type_t op) {
 
 const mag_dtype_meta_t* mag_dtype_meta_of(mag_dtype_t type) {
     static const mag_dtype_meta_t infos[MAG_DTYPE__NUM] = {
-        [MAG_DTYPE_F32] = {
+        [MAG_DTYPE_E8M23] = {
             sizeof(mag_e8m23_t),
-            "f32"
+            "e8m23 (f32)"
+        },
+        [MAG_DTYPE_E5M10] = {
+            sizeof(mag_e5m10_t),
+            "e5m10 (f16)"
         },
     };
     return &infos[type];
@@ -1338,7 +1342,7 @@ static mag_tensor_t* mag_result_constructor_routine_matmul(mag_tensor_t** inputs
         *rd1 = inputs[1]->shape[1];
         rank = 2;
     }
-    return mag_tensor_create(inputs[0]->ctx, MAG_DTYPE_F32, shape, rank, NULL, 0);
+    return mag_tensor_create(inputs[0]->ctx, MAG_DTYPE_E8M23, shape, rank, NULL, 0);
 }
 
 static void mag_op_backward_nop(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -2569,7 +2573,7 @@ void mag_tensor_fill(mag_tensor_t* t, mag_e8m23_t x) {
 void mag_tensor_fill_random_uniform(mag_tensor_t* t, mag_e8m23_t min, mag_e8m23_t max) {
     mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
     switch (t->dtype) {
-        case MAG_DTYPE_F32: {
+        case MAG_DTYPE_E8M23: {
             int64_t n = mag_tensor_numel(t);
             mag_e8m23_t* buf = (mag_e8m23_t*)t->storage.base;
             mag_prng_generate_n(t->ctx, buf, n, min, max); /* Generate uniform random numbers. */
@@ -2581,7 +2585,7 @@ void mag_tensor_fill_random_uniform(mag_tensor_t* t, mag_e8m23_t min, mag_e8m23_
 void mag_tensor_fill_random_normal(mag_tensor_t* t, mag_e8m23_t mean, mag_e8m23_t stddev) {
     mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
     switch (t->dtype) {
-        case MAG_DTYPE_F32: {
+        case MAG_DTYPE_E8M23: {
             int64_t n = mag_tensor_numel(t);
             mag_assert((n & 1) == 0, "Number of elements must be even");
             mag_e8m23_t* buf = (mag_e8m23_t*)t->storage.base;
@@ -2645,7 +2649,7 @@ static void mag_print_tensor_recursive(FILE* f, const mag_tensor_t* t, int64_t (
 
 
 void mag_tensor_print(const mag_tensor_t* t, bool with_header, bool with_data) {
-    mag_assert(t->dtype == MAG_DTYPE_F32, "Tensor must be F32");
+    mag_assert(t->dtype == MAG_DTYPE_E8M23, "Tensor must be F32");
     mag_assert2(with_header || with_data);
     mag_load_local_storage_group(t, x_d, shape);
     mag_load_local_storage_group(t, x_s, strides);
@@ -2945,7 +2949,7 @@ mag_e8m23_t mag_tensor_get_scalar_physical_index(mag_tensor_t* t, int64_t d0, in
     mag_static_assert(MAG_MAX_DIMS == 6);
     mag_load_local_storage_group(t, s, strides);
     switch (t->dtype) {
-        case MAG_DTYPE_F32: {
+        case MAG_DTYPE_E8M23: {
             mag_e8m23_t r;
             mag_storage_buffer_t* sto = &t->storage;
             (*sto->cpy_device_host)(sto, sizeof(r)*(d0*s0 + d1*s1 + d2*s2 + d3*s3 + d4*s4 + d5*s5), &r, sizeof(r));
@@ -2959,7 +2963,7 @@ void mag_tensor_set_scalar_physical_index(mag_tensor_t* t, int64_t d0, int64_t d
     mag_static_assert(MAG_MAX_DIMS == 6);
     mag_load_local_storage_group(t, s, strides);
     switch (t->dtype) {
-        case MAG_DTYPE_F32: {
+        case MAG_DTYPE_E8M23: {
             mag_storage_buffer_t* sto = &t->storage;
             (*sto->cpy_host_device)(sto, sizeof(x)*(d0*s0 + d1*s1 + d2*s2 + d3*s3 + d4*s4 + d5*s5), &x, sizeof(x));
         } break;
@@ -2974,7 +2978,7 @@ mag_e8m23_t mag_tensor_get_scalar_virtual_index(mag_tensor_t* t, int64_t v_idx) 
         return mag_tensor_get_scalar_physical_index(t, pidx[0], pidx[1], pidx[2], pidx[3], pidx[4], pidx[5]);
     }
     switch (t->dtype) {
-        case MAG_DTYPE_F32: {
+        case MAG_DTYPE_E8M23: {
             mag_e8m23_t r;
             mag_storage_buffer_t* sto = &t->storage;
             (*sto->cpy_device_host)(sto, sizeof(r)*v_idx, &r, sizeof(r));
@@ -2993,7 +2997,7 @@ void mag_tensor_set_scalar_virtual_index(mag_tensor_t* t, int64_t v_idx, mag_e8m
         return;
     }
     switch (t->dtype) {
-        case MAG_DTYPE_F32: {
+        case MAG_DTYPE_E8M23: {
             mag_storage_buffer_t* sto = &t->storage;
             (*sto->cpy_host_device)(sto, sizeof(x)*v_idx, &x, sizeof(x));
         } break;
@@ -3009,7 +3013,7 @@ bool mag_tensor_eq(const mag_tensor_t* a, const mag_tensor_t* b) {
     if (a->numel != b->numel) return false;
     /*int64_t n = mag_tensor_num_elements(a); TODO
     switch (a->dtype) {
-        case MAG_DTYPE_F32: {
+        case MAG_DTYPE_E8M23: {
             const mag_e8m23_t* buf_a = (const mag_e8m23_t*)a->buf;
             const mag_e8m23_t* buf_b = (const mag_e8m23_t*)b->buf;
             for (int64_t i = 0; i < n; ++i) {
@@ -3032,7 +3036,7 @@ bool mag_tensor_is_close(const mag_tensor_t* a, const mag_tensor_t* b, mag_e8m23
     int64_t n = mag_tensor_num_elements(a);
     int64_t n_eq = 0;
     switch (a->dtype) {
-        case MAG_DTYPE_F32: {
+        case MAG_DTYPE_E8M23: {
             const mag_e8m23_t* buf_a = (const mag_e8m23_t*)a->buf;
             const mag_e8m23_t* buf_b = (const mag_e8m23_t*)b->buf;
             for (int64_t i = 0; i < n; ++i)   |x - y| <= ε     ∀ x, y ∈ A, B

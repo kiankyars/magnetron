@@ -67,7 +67,7 @@ mag_tensor_t* mag_tensor_load_image(mag_ctx_t* ctx, const char* file, mag_color_
          for (int64_t j=0; j < whc[1]; ++j)
              for (int64_t i=0; i < whc[0]; ++i)
                  ori[i + whc[0]*j + whc[0]*whc[1]*k] = (mag_e8m23_t)buf[k + whc[2]*i + whc[2]*whc[0]*j] / 255.0f;
-        mag_tensor_t* t = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, whc[2], rh, rw);
+        mag_tensor_t* t = mag_tensor_create_3d(ctx, MAG_DTYPE_E8M23, whc[2], rh, rw);
         mag_e8m23_t* dst = mag_tensor_data_ptr(t);
         mag_e8m23_t* part = (*mag_alloc)(NULL, whc[2] * whc[1] * rw * sizeof(*part));
         mag_e8m23_t ws = (mag_e8m23_t)(whc[0] - 1)/(mag_e8m23_t)(rw - 1);
@@ -109,7 +109,7 @@ mag_tensor_t* mag_tensor_load_image(mag_ctx_t* ctx, const char* file, mag_color_
        return t;
     #endif
    }
-   mag_tensor_t* t = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, whc[2], whc[1], whc[0]);
+   mag_tensor_t* t = mag_tensor_create_3d(ctx, MAG_DTYPE_E8M23, whc[2], whc[1], whc[0]);
    mag_e8m23_t* dst = mag_tensor_data_ptr(t);
    for (int64_t k = 0; k < whc[2]; ++k) { /* Convert from interleaved to planar representation. */
      for (int64_t j = 0; j < whc[1]; ++j) {
