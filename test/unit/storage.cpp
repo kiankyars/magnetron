@@ -7,7 +7,7 @@
 TEST(storage, load_store) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* A = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, 10, 4, 2, 5, 2, 2);
+    mag_tensor_t* A = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, 10, 4, 2, 5, 2, 2);
     mag_tensor_fill_random_uniform(A, -1.0f, 1.0f);
 
     if (std::filesystem::exists("test_data/test.magnetron"))
@@ -15,7 +15,7 @@ TEST(storage, load_store) {
     mag_tensor_save(A, "test_data/test.magnetron");
     ASSERT_TRUE(std::filesystem::exists("test_data/test.magnetron"));
     mag_tensor_t* B = mag_tensor_load(ctx, "test_data/test.magnetron");
-    ASSERT_EQ(mag_tensor_dtype(B), MAG_DTYPE_E8M23);
+    ASSERT_EQ(mag_tensor_dtype(B), MAG_DTYPE_F32);
     ASSERT_EQ(mag_tensor_rank(B), 6);
     ASSERT_EQ(mag_tensor_shape(B)[0], 10);
     ASSERT_EQ(mag_tensor_shape(B)[1], 4);
@@ -41,7 +41,7 @@ TEST(storage, load_store_image) {
     mag_tensor_save(img, "test_data/car.magnetron");
     ASSERT_TRUE(std::filesystem::exists("test_data/car.magnetron"));
     mag_tensor_t* B = mag_tensor_load(ctx, "test_data/car.magnetron");
-    ASSERT_EQ(mag_tensor_dtype(B), MAG_DTYPE_E8M23);
+    ASSERT_EQ(mag_tensor_dtype(B), MAG_DTYPE_F32);
     ASSERT_EQ(mag_tensor_shape(B)[2], 1536);
     ASSERT_EQ(mag_tensor_shape(B)[1], 2048);
     ASSERT_EQ(mag_tensor_shape(B)[0], 3);

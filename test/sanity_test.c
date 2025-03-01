@@ -12,10 +12,10 @@ int main(void) {
     mag_set_log_mode(true); /* Enable logging */
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* a = mag_tensor_create_3d(ctx, MAG_DTYPE_E8M23, 4096, 4096, 48);
+    mag_tensor_t* a = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 4096, 4096, 48);
     mag_tensor_fill(a, 0.0f);
 
-    mag_tensor_t* b = mag_tensor_create_3d(ctx, MAG_DTYPE_E8M23, 4096, 4096, 48);
+    mag_tensor_t* b = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 4096, 4096, 48);
     mag_tensor_fill(b, 0.0f);
 
     printf("Computing...\n");

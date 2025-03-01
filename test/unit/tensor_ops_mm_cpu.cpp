@@ -52,9 +52,9 @@ TEST(compute_cpu, mm_square_2x2) {
         {-1.0069681, -0.40955952}
     };
 
-    mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, M, N);
+    mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, M, N);
     mag_tensor_copy_buffer_from(A, A_data, sizeof(A_data));
-    mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, M, N);
+    mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, M, N);
     mag_tensor_copy_buffer_from(B, B_data, sizeof(B_data));
     mag_tensor_t* R = mag_matmul(A, B);
     ASSERT_EQ(R->rank, 2);
@@ -91,9 +91,9 @@ TEST(compute_cpu, mm_square_2x2_transpose_x) {
         {-1.0069681, -0.40955952}
     };
 
-    mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, M, N);
+    mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, M, N);
     mag_tensor_copy_buffer_from(A, A_data, sizeof(A_data));
-    mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, M, N);
+    mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, M, N);
     mag_tensor_copy_buffer_from(B, B_data, sizeof(B_data));
     mag_tensor_t* R = mag_matmul(mag_clone(mag_transpose(A)), B);
     ASSERT_EQ(R->rank, 2);
@@ -129,9 +129,9 @@ TEST(compute_cpu, mm_square_2x2_transpose_y) {
         {-1.0069681, -0.40955952}
     };
 
-    mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, M, N);
+    mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, M, N);
     mag_tensor_copy_buffer_from(A, A_data, sizeof(A_data));
-    mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, M, N);
+    mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, M, N);
     mag_tensor_copy_buffer_from(B, B_data, sizeof(B_data));
     mag_tensor_t* R = mag_matmul(mag_transpose(A), B);
     ASSERT_EQ(R->rank, 2);
@@ -174,8 +174,8 @@ TEST(compute_cpu, mm_rect_2x3_3x4) {
         { 83.0f,  98.0f, 113.0f, 128.0f}
     };
 
-    mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, M, K);
-    mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, K, N);
+    mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, M, K);
+    mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, K, N);
     mag_tensor_copy_buffer_from(A, A_data, sizeof(A_data));
     mag_tensor_copy_buffer_from(B, B_data, sizeof(B_data));
 
@@ -212,8 +212,8 @@ TEST(compute_cpu, mm_matrix_vector_2x3) {
     static constexpr float v_data[K] = {7.0f, 8.0f, 9.0f};
     static constexpr float expected[M] = {50.0f, 122.0f};
 
-    mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, M, K);
-    mag_tensor_t* v = mag_tensor_create_1d(ctx, MAG_DTYPE_E8M23, K);
+    mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, M, K);
+    mag_tensor_t* v = mag_tensor_create_1d(ctx, MAG_DTYPE_F32, K);
     mag_tensor_copy_buffer_from(A, A_data, sizeof(A_data));
     mag_tensor_copy_buffer_from(v, v_data, sizeof(v_data));
 
@@ -253,8 +253,8 @@ TEST(compute_cpu, mm_vector_matrix_3x2) {
         {40.0f, 46.0f}
     };
 
-    mag_tensor_t* v = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, 1, K);
-    mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, K, N);
+    mag_tensor_t* v = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, 1, K);
+    mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, K, N);
     mag_tensor_copy_buffer_from(v, v_data, sizeof(v_data));
     mag_tensor_copy_buffer_from(B, B_data, sizeof(B_data));
 

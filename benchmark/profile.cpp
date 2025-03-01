@@ -14,9 +14,9 @@ auto main() -> int {
     desc.type = MAG_COMPUTE_DEVICE_TYPE_CPU;
     desc.thread_count = threads;
     mag_ctx_t* ctx = mag_ctx_create2(&desc);
-    mag_tensor_t* A = mag_tensor_create_3d(ctx, MAG_DTYPE_E8M23, 8192, 8192, 2);
+    mag_tensor_t* A = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 8192, 8192, 2);
     mag_tensor_fill_random_normal(A, 0.0f, 1.0f);
-    mag_tensor_t* B = mag_tensor_create_3d(ctx, MAG_DTYPE_E8M23, 8192, 8192, 2);
+    mag_tensor_t* B = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 8192, 8192, 2);
     mag_tensor_fill_random_normal(B, 0.0f, 1.0f);
     for (volatile std::uint32_t i=0; i < 100; ++i) {
         mag_tensor_t* R = mag_add(A, B);

@@ -12,15 +12,15 @@ TEST(autograd, bin_ops1) {
 
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    auto* x = mag_tensor_create_1d(ctx, MAG_DTYPE_E8M23, 1);
+    auto* x = mag_tensor_create_1d(ctx, MAG_DTYPE_F32, 1);
     mag_tensor_set_requires_grad(x, true);
     mag_tensor_fill(x, 3.0f);
 
-    auto* y = mag_tensor_create_1d(ctx, MAG_DTYPE_E8M23, 1);
+    auto* y = mag_tensor_create_1d(ctx, MAG_DTYPE_F32, 1);
     mag_tensor_fill(y, 2.0f);
     mag_tensor_set_requires_grad(y, true);
 
-    auto* k = mag_tensor_create_1d(ctx, MAG_DTYPE_E8M23, 1);
+    auto* k = mag_tensor_create_1d(ctx, MAG_DTYPE_F32, 1);
     mag_tensor_fill(k, 10.0f);
     mag_tensor_set_requires_grad(k, true);
 
@@ -68,11 +68,11 @@ TEST(autograd, bin_ops2) {
 
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    auto* two = mag_tensor_create_1d(ctx, MAG_DTYPE_E8M23, 1);
+    auto* two = mag_tensor_create_1d(ctx, MAG_DTYPE_F32, 1);
     mag_tensor_set_requires_grad(two, true);
     mag_tensor_fill(two, 2.0f);
 
-    auto* x = mag_tensor_create_1d(ctx, MAG_DTYPE_E8M23, 1);
+    auto* x = mag_tensor_create_1d(ctx, MAG_DTYPE_F32, 1);
     mag_tensor_set_requires_grad(x, true);
     mag_tensor_fill(x, -4.0f);
 

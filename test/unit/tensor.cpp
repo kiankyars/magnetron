@@ -9,10 +9,10 @@
 TEST(mag_tensor_t, init_1d) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* tensor = mag_tensor_create_1d(ctx, MAG_DTYPE_E8M23, 10);
+    mag_tensor_t* tensor = mag_tensor_create_1d(ctx, MAG_DTYPE_F32, 10);
     ASSERT_NE(tensor, nullptr);
     ASSERT_EQ(mag_tensor_get_ctx(tensor), ctx);
-    ASSERT_EQ(mag_tensor_dtype(tensor), MAG_DTYPE_E8M23);
+    ASSERT_EQ(mag_tensor_dtype(tensor), MAG_DTYPE_F32);
     ASSERT_EQ(mag_tensor_rank(tensor), 1);
     ASSERT_EQ(mag_tensor_shape(tensor)[0], 10);
     ASSERT_EQ(mag_tensor_shape(tensor)[1], 1);
@@ -39,10 +39,10 @@ TEST(mag_tensor_t, init_1d) {
 TEST(mag_tensor_t, init_2d) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* tensor = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, 10, 4);
+    mag_tensor_t* tensor = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, 10, 4);
     ASSERT_NE(tensor, nullptr);
     ASSERT_EQ(mag_tensor_get_ctx(tensor), ctx);
-    ASSERT_EQ(mag_tensor_dtype(tensor), MAG_DTYPE_E8M23);
+    ASSERT_EQ(mag_tensor_dtype(tensor), MAG_DTYPE_F32);
     ASSERT_EQ(mag_tensor_rank(tensor), 2);
     ASSERT_EQ(mag_tensor_shape(tensor)[0], 10);
     ASSERT_EQ(mag_tensor_shape(tensor)[1], 4);
@@ -69,10 +69,10 @@ TEST(mag_tensor_t, init_2d) {
 TEST(mag_tensor_t, init_3d) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* tensor = mag_tensor_create_3d(ctx, MAG_DTYPE_E8M23, 10, 4, 2);
+    mag_tensor_t* tensor = mag_tensor_create_3d(ctx, MAG_DTYPE_F32, 10, 4, 2);
     ASSERT_NE(tensor, nullptr);
     ASSERT_EQ(mag_tensor_get_ctx(tensor), ctx);
-    ASSERT_EQ(mag_tensor_dtype(tensor), MAG_DTYPE_E8M23);
+    ASSERT_EQ(mag_tensor_dtype(tensor), MAG_DTYPE_F32);
     ASSERT_EQ(mag_tensor_rank(tensor), 3);
     ASSERT_EQ(mag_tensor_shape(tensor)[0], 10);
     ASSERT_EQ(mag_tensor_shape(tensor)[1], 4);
@@ -99,10 +99,10 @@ TEST(mag_tensor_t, init_3d) {
 TEST(mag_tensor_t, init_4d) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 10, 4, 2, 5);
+    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 10, 4, 2, 5);
     ASSERT_NE(tensor, nullptr);
     ASSERT_EQ(mag_tensor_get_ctx(tensor), ctx);
-    ASSERT_EQ(mag_tensor_dtype(tensor), MAG_DTYPE_E8M23);
+    ASSERT_EQ(mag_tensor_dtype(tensor), MAG_DTYPE_F32);
     ASSERT_EQ(mag_tensor_rank(tensor), 4);
     ASSERT_EQ(mag_tensor_shape(tensor)[0], 10);
     ASSERT_EQ(mag_tensor_shape(tensor)[1], 4);
@@ -129,10 +129,10 @@ TEST(mag_tensor_t, init_4d) {
 TEST(mag_tensor_t, init_5d) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* tensor = mag_tensor_create_5d(ctx, MAG_DTYPE_E8M23, 10, 4, 2, 5, 3);
+    mag_tensor_t* tensor = mag_tensor_create_5d(ctx, MAG_DTYPE_F32, 10, 4, 2, 5, 3);
     ASSERT_NE(tensor, nullptr);
     ASSERT_EQ(mag_tensor_get_ctx(tensor), ctx);
-    ASSERT_EQ(mag_tensor_dtype(tensor), MAG_DTYPE_E8M23);
+    ASSERT_EQ(mag_tensor_dtype(tensor), MAG_DTYPE_F32);
     ASSERT_EQ(mag_tensor_rank(tensor), 5);
     ASSERT_EQ(mag_tensor_shape(tensor)[0], 10);
     ASSERT_EQ(mag_tensor_shape(tensor)[1], 4);
@@ -164,10 +164,10 @@ TEST(mag_tensor_t, init_5d) {
 TEST(mag_tensor_t, init_6d) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* tensor = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, 10, 4, 2, 5, 3, 2);
+    mag_tensor_t* tensor = mag_tensor_create_6d(ctx, MAG_DTYPE_F32, 10, 4, 2, 5, 3, 2);
     ASSERT_NE(tensor, nullptr);
     ASSERT_EQ(mag_tensor_get_ctx(tensor), ctx);
-    ASSERT_EQ(mag_tensor_dtype(tensor), MAG_DTYPE_E8M23);
+    ASSERT_EQ(mag_tensor_dtype(tensor), MAG_DTYPE_F32);
     ASSERT_EQ(mag_tensor_rank(tensor), 6);
     ASSERT_EQ(mag_tensor_shape(tensor)[0], 10);
     ASSERT_EQ(mag_tensor_shape(tensor)[1], 4);
@@ -199,7 +199,7 @@ TEST(mag_tensor_t, init_6d) {
 TEST(mag_tensor_t, print) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 2, 2, 2, 2);
+    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 2, 2, 2, 2);
     mag_tensor_fill_random_uniform(tensor, 0.0f, 1.0f);
     mag_tensor_print(tensor, false, true);
 
@@ -211,7 +211,7 @@ TEST(mag_tensor_t, print) {
 TEST(mag_tensor_t, name) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 2, 2, 2, 2);
+    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 2, 2, 2, 2);
     mag_tensor_set_name(tensor, "Gradient Backup");
     ASSERT_STREQ(mag_tensor_get_name(tensor), "Gradient Backup");
 
@@ -222,7 +222,7 @@ TEST(mag_tensor_t, name) {
 TEST(mag_tensor_t, deep_clone) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* origin = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 10, 4, 2, 5);
+    mag_tensor_t* origin = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 10, 4, 2, 5);
     mag_tensor_fill_random_uniform(origin, -1.0f, 1.0f);
     mag_tensor_t* clone = mag_clone(origin);
     ASSERT_NE(origin, clone);
@@ -256,7 +256,7 @@ TEST(mag_tensor_t, deep_clone) {
 TEST(mag_tensor_t, equals) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* origin = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 10, 4, 2, 5);
+    mag_tensor_t* origin = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 10, 4, 2, 5);
     mag_tensor_fill_random_uniform(origin, -1.0f, 1.0f);
     mag_tensor_t* clone = mag_clone(origin);
     mag_tensor_t* clone2 = mag_clone(origin);
@@ -276,7 +276,7 @@ TEST(mag_tensor_t, equals) {
 TEST(mag_tensor_t, buffer_linearly) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* origin = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 1, 2, 3, 4);
+    mag_tensor_t* origin = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 1, 2, 3, 4);
     mag_tensor_fill(origin, 0.0f);
     auto* buf = static_cast<float*>(mag_tensor_data_ptr(origin));
     buf[0] = 1.0f;
@@ -294,7 +294,7 @@ TEST(mag_tensor_t, buffer_linearly) {
 TEST(mag_tensor_t, view) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* origin = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 10, 4, 2, 5);
+    mag_tensor_t* origin = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 10, 4, 2, 5);
     mag_tensor_fill(origin, 2.0f);
     int64_t slice_dims[] = {10, 4, 2, 5};
     mag_tensor_t* slice1 = mag_view(origin);
@@ -324,7 +324,7 @@ TEST(mag_tensor_t, view) {
 TEST(mag_tensor_t, transpose) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* origin = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, 4, 1);
+    mag_tensor_t* origin = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, 4, 1);
     mag_tensor_fill_random_uniform(origin, -1.0f, 1.0f);
     mag_tensor_t* transposed = mag_transpose(origin);
     ASSERT_FALSE(mag_tensor_is_transposed(origin));
@@ -346,7 +346,7 @@ TEST(mag_tensor_t, transpose) {
 
 TEST(mag_tensor_t, permute) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
-    mag_tensor_t* origin = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, 4, 1);
+    mag_tensor_t* origin = mag_tensor_create_2d(ctx, MAG_DTYPE_F32, 4, 1);
     mag_tensor_fill_random_uniform(origin, -1.0f, 1.0f);
     mag_tensor_t* permuted = mag_permute(origin, 5, 4, 3, 2, 1, 0);
     ASSERT_FALSE(mag_tensor_is_transposed(origin));
@@ -376,7 +376,7 @@ TEST(mag_tensor_t, permute) {
 TEST(mag_tensor_t, isclose) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* origin = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 10, 4, 2, 5);
+    mag_tensor_t* origin = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 10, 4, 2, 5);
     mag_tensor_fill_random_uniform(origin, -1.0f, 1.0f);
     mag_tensor_t* clone = mag_clone(origin);
     mag_tensor_t* clone2 = mag_clone(origin);
@@ -407,7 +407,7 @@ TEST(mag_tensor_t, copy_buffer_from) {
     std::array<float, 2*2*2*2> buf {};
     for (auto& x : buf) x = 2.5f;
 
-    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 2, 2, 2, 2);
+    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 2, 2, 2, 2);
     ASSERT_EQ(mag_tensor_data_size(tensor), sizeof(buf));
     ASSERT_EQ(mag_tensor_numel(tensor), buf.size());
     mag_tensor_copy_buffer_from(tensor, buf.data(), sizeof(buf));
@@ -425,7 +425,7 @@ TEST(mag_tensor_t, copy_buffer_from) {
 TEST(mag_tensor_t, fill) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 8, 10, 11, 2);
+    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 8, 10, 11, 2);
     float* buf = static_cast<float*>(mag_tensor_data_ptr(tensor));
 
     mag_tensor_fill(tensor, 0.0f);
@@ -455,7 +455,7 @@ TEST(mag_tensor_t, random_uniform_pcg) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     mag_ctx_set_prng_algorithm(ctx, MAG_PRNG_PCG, reinterpret_cast<std::uint64_t>(this));
 
-    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 32, 32, 32, 32);
+    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 32, 32, 32, 32);
     mag_tensor_fill_random_uniform(tensor, rmin, rmax);
 
     auto* buf = static_cast<float*>(mag_tensor_data_ptr(tensor));
@@ -478,7 +478,7 @@ TEST(mag_tensor_t, random_uniform_mersenne) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     mag_ctx_set_prng_algorithm(ctx, MAG_PRNG_MERSENNE_TWISTER, reinterpret_cast<std::uint64_t>(this));
 
-    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 32, 32, 32, 32);
+    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 32, 32, 32, 32);
     mag_tensor_fill_random_uniform(tensor, rmin, rmax);
 
     auto* buf = static_cast<float*>(mag_tensor_data_ptr(tensor));
@@ -501,7 +501,7 @@ TEST(mag_tensor_t, random_normal_mersenne) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     mag_ctx_set_prng_algorithm(ctx, MAG_PRNG_MERSENNE_TWISTER, reinterpret_cast<std::uint64_t>(this));
 
-    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 32, 32, 32, 32);
+    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 32, 32, 32, 32);
     mag_tensor_fill_random_normal(tensor, mean, stddev);
 
     auto* buf = static_cast<float*>(mag_tensor_data_ptr(tensor));
@@ -533,7 +533,7 @@ TEST(mag_tensor_t, random_normal_pcg) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     mag_ctx_set_prng_algorithm(ctx, MAG_PRNG_PCG, reinterpret_cast<std::uint64_t>(this));
 
-    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 32, 32, 32, 32);
+    mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_F32, 32, 32, 32, 32);
     mag_tensor_fill_random_normal(tensor, mean, stddev);
 
     auto* buf = static_cast<float*>(mag_tensor_data_ptr(tensor));
@@ -561,7 +561,7 @@ TEST(mag_tensor_t, random_normal_pcg) {
 TEST(mag_tensor_t, rc_init_strong) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* a = mag_tensor_create_1d(ctx, MAG_DTYPE_E8M23, 10);
+    mag_tensor_t* a = mag_tensor_create_1d(ctx, MAG_DTYPE_F32, 10);
     ASSERT_EQ(a->rcb.rc_strong, 1);
     ASSERT_EQ(a->rcb.rc_weak, 0);
 
@@ -574,7 +574,7 @@ TEST(mag_tensor_t, rc_init_strong) {
 TEST(mag_tensor_t, rc_ref_view_chain) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* a = mag_tensor_create_1d(ctx, MAG_DTYPE_E8M23, 10);
+    mag_tensor_t* a = mag_tensor_create_1d(ctx, MAG_DTYPE_F32, 10);
     ASSERT_EQ(a->rcb.rc_strong, 1);
     ASSERT_EQ(a->rcb.rc_weak, 0);
 
@@ -597,7 +597,7 @@ TEST(mag_tensor_t, rc_ref_view_chain) {
 TEST(mag_tensor_t, rc_ref_leak) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    mag_tensor_t* a = mag_tensor_create_1d(ctx, MAG_DTYPE_E8M23, 10);
+    mag_tensor_t* a = mag_tensor_create_1d(ctx, MAG_DTYPE_F32, 10);
     ASSERT_EQ(a->rcb.rc_strong, 1);
     ASSERT_EQ(a->rcb.rc_weak, 0);
 
@@ -616,7 +616,7 @@ TEST(mag_tensor_t, rc_ref_leak) {
 
 TEST(mag_tensor_t, rc_ref_inplace_op) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
-    mag_tensor_t* x = mag_tensor_create_1d(ctx, MAG_DTYPE_E8M23, 5);
+    mag_tensor_t* x = mag_tensor_create_1d(ctx, MAG_DTYPE_F32, 5);
     mag_tensor_fill_random_uniform(x, 0.0f, 1.0f);
     ASSERT_EQ(x->rcb.rc_strong, 1);
     mag_tensor_t* r = mag_abs_(x);
