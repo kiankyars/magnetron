@@ -394,10 +394,17 @@ static void MAG_HOTPROC mag_vadd_e5m10(
     const mag_e5m10_t* y
 ) {
     int64_t i=0;
-    #if MAG_APPROXMATH && (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
+    #if (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
         /* TODO */
-    #elif MAG_APPROXMATH && defined(__AVX512F__)
-        for (; i+15 < numel; i += 16) {
+    #elif defined(__AVX512F__) && defined(__AVX512FP16__)
+        for (; i+31 < numel; i += 32) { /* Compute 32 f16-values directly and store result. */
+            __m512h xph = _mm512_loadu_ph(x+i);
+            __m512h yph = _mm512_loadu_ph(y+i);
+            __m512h rph = _mm512_add_ph(xph, yph);
+            _mm512_storeu_ph(o+i, rph);
+        }
+    #elif defined(__AVX512F__)
+        for (; i+15 < numel; i += 16) { /* Compute 16 f16-values by upcasting from f16 to f32 and then converting result back to f16. */
             __m256i xph = _mm256_loadu_si256((const __m256i*)(x+i));
             __m256i yph = _mm256_loadu_si256((const __m256i*)(y+i));
             __m512 xps = _mm512_cvt_roundph_ps(xph, _MM_FROUND_CUR_DIRECTION);
@@ -405,8 +412,8 @@ static void MAG_HOTPROC mag_vadd_e5m10(
             __m512 rps = _mm512_add_ps(xps, yps);
             _mm256_storeu_si256((__m256i*)(o+i), _mm512_cvtps_ph(rps, _MM_FROUND_CUR_DIRECTION));
         }
-    #elif MAG_APPROXMATH && defined(__AVX__) && defined(__F16C__)
-        for (; i+7 < numel; i += 8) {
+    #elif defined(__AVX__) && defined(__F16C__)
+        for (; i+7 < numel; i += 8) { /* Compute 8 f16-values by upcasting from f16 to f32 and then converting result back to f16. */
             __m128i xph = _mm_loadu_si128((const __m128i*)(x+i));
             __m128i yph = _mm_loadu_si128((const __m128i*)(y+i));
             __m256 xps = _mm256_cvtph_ps(xph);

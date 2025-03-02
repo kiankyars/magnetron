@@ -23,14 +23,6 @@ set(MAG_BLAS_SPEC_ARM64_SOURCES
 )
 
 if(${IS_AMD64})  # x86-64 specific compilation options
-    include(CheckCCompilerFlag)
-    check_c_compiler_flag("-mavx512bf16" MAG_COMPILER_SUPPORTS_MAVX512BF16) # Check for support of -mavx512bf16, some older GCC versions don't support it
-    if(NOT MAG_COMPILER_SUPPORTS_MAVX512BF16)
-        message(WARNING "Compiler does NOT support -mavx512bf16. Please upgrade to a newer compiler. Some optimizations are disabled.")
-        set(MAG_AMD64_V45_AVX512_FLAGS "-mtune=generic -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx -mavx2 -mbmi -mbmi2 -mf16c -mfma -mlzcnt -mmovbe")
-    else()
-        set(MAG_AMD64_V45_AVX512_FLAGS "-mtune=generic -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mavx -mavx2 -mbmi -mbmi2 -mf16c -mfma -mlzcnt -mmovbe")
-    endif()
     set(MAGNETRON_SOURCES ${MAGNETRON_SOURCES} ${MAG_BLAS_SPEC_AMD64_SOURCES})
     set_blas_spec_arch("magnetron_cpu_blas_amd64_v2.c"
         "-mtune=nehalem -mcx16 -mpopcnt -msse3 -mssse3 -msse4.1 -msse4.2"
@@ -45,7 +37,7 @@ if(${IS_AMD64})  # x86-64 specific compilation options
         "-mtune=cannonlake -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx -mavx2 -mbmi -mbmi2 -mf16c -mfma -mlzcnt -mmovbe"
         "/arch:AVX512")
     set_blas_spec_arch("magnetron_cpu_blas_amd64_v4_5.c"
-        "${MAG_AMD64_V45_AVX512_FLAGS}"
+        "-mtune=generic -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mavx512fp16 -mavx -mavx2 -mbmi -mbmi2 -mf16c -mfma -mlzcnt -mmovbe"
         "/arch:AVX512")
 elseif(${IS_ARM64})
     set(MAGNETRON_SOURCES ${MAGNETRON_SOURCES} ${MAG_BLAS_SPEC_ARM64_SOURCES})
