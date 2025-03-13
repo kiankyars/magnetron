@@ -18,8 +18,8 @@ TEST(graph_dynamic, simple) {
 
     auto* WX = mag_mul(W, X);
     auto* buf = static_cast<float*>(mag_tensor_data_ptr(WX));
-    for (std::int64_t i=0; i < mag_tensor_numel(WX); ++i) { // op must already be executed
-        ASSERT_EQ(buf[i], 0.6f*2.11f);
+    for (std::int64_t i = 0; i < mag_tensor_numel(WX); ++i) { // op must already be executed
+        ASSERT_EQ(buf[i], 0.6f * 2.11f);
     }
 
     auto* B = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, 2, 2);
@@ -28,8 +28,8 @@ TEST(graph_dynamic, simple) {
 
     auto* WXB = mag_add(WX, B);
     buf = static_cast<float*>(mag_tensor_data_ptr(WXB));
-    for (std::int64_t i=0; i < mag_tensor_numel(WXB); ++i) { // op must already be executed
-        ASSERT_EQ(buf[i], 0.6f*2.11f + 0.1f);
+    for (std::int64_t i = 0; i < mag_tensor_numel(WXB); ++i) { // op must already be executed
+        ASSERT_EQ(buf[i], 0.6f * 2.11f + 0.1f);
     }
 
     mag_tensor_decref(WXB);

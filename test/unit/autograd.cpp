@@ -58,13 +58,13 @@ TEST(autograd, bin_ops1) {
 
 TEST(autograd, bin_ops2) {
     /*
-    * x = -4.0
-    * z = 2 * x + 2 + x
-    * q = z.relu() + z * x
-    * h = (z * z).relu()
-    * y = h + q + q * x
-    * y.backward()
-    */
+     * x = -4.0
+     * z = 2 * x + 2 + x
+     * q = z.relu() + z * x
+     * h = (z * z).relu()
+     * y = h + q + q * x
+     * y.backward()
+     */
 
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
@@ -83,7 +83,7 @@ TEST(autograd, bin_ops2) {
     mag_tensor_set_requires_grad(y, true);
     mag_tensor_backward(y);
 
-    //mag_tensor_export_graphviz(y, "autograd2.dot");
+    // mag_tensor_export_graphviz(y, "autograd2.dot");
 
     // check forward pass
     float vx = mag_tensor_get_scalar_virtual_index(x, 0);
@@ -101,8 +101,8 @@ TEST(autograd, bin_ops2) {
     float gx = mag_tensor_get_scalar_virtual_index(mag_tensor_grad(x), 0);
     float gy = mag_tensor_get_scalar_virtual_index(mag_tensor_grad(y), 0);
 
-    ASSERT_FLOAT_EQ(gx, 46.0f);  // ∂z/∂x = 46.0
-    ASSERT_FLOAT_EQ(gy, 1.0f); // ∂z/∂y = 1.0
+    ASSERT_FLOAT_EQ(gx, 46.0f); // ∂z/∂x = 46.0
+    ASSERT_FLOAT_EQ(gy, 1.0f);  // ∂z/∂y = 1.0
 
     mag_tensor_decref(x);
     mag_tensor_decref(y);

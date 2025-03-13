@@ -1,8 +1,8 @@
 // (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
-#include <thread>
 #include <atomic>
 #include <chrono>
+#include <thread>
 
 #include "prelude.hpp"
 

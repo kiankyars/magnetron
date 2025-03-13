@@ -2,8 +2,8 @@
 
 #include "prelude.hpp"
 #include <array>
-#include <cstring>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 
 TEST(mag_tensor_t, init_1d) {
@@ -54,8 +54,8 @@ TEST(mag_tensor_t, init_2d) {
     ASSERT_EQ(mag_tensor_num_rows(tensor), 4);
     ASSERT_EQ(mag_tensor_strides(tensor)[0], 1);
     ASSERT_EQ(mag_tensor_strides(tensor)[1], 10);
-    ASSERT_EQ(mag_tensor_strides(tensor)[2], 10*4);
-    ASSERT_EQ(mag_tensor_strides(tensor)[3], 10*4);
+    ASSERT_EQ(mag_tensor_strides(tensor)[2], 10 * 4);
+    ASSERT_EQ(mag_tensor_strides(tensor)[3], 10 * 4);
     ASSERT_FALSE(mag_tensor_is_scalar(tensor));
     ASSERT_FALSE(mag_tensor_is_vector(tensor));
     ASSERT_TRUE(mag_tensor_is_matrix(tensor));
@@ -84,8 +84,8 @@ TEST(mag_tensor_t, init_3d) {
     ASSERT_EQ(mag_tensor_num_rows(tensor), 8);
     ASSERT_EQ(mag_tensor_strides(tensor)[0], 1);
     ASSERT_EQ(mag_tensor_strides(tensor)[1], 10);
-    ASSERT_EQ(mag_tensor_strides(tensor)[2], 10*4);
-    ASSERT_EQ(mag_tensor_strides(tensor)[3], 10*4*2);
+    ASSERT_EQ(mag_tensor_strides(tensor)[2], 10 * 4);
+    ASSERT_EQ(mag_tensor_strides(tensor)[3], 10 * 4 * 2);
     ASSERT_FALSE(mag_tensor_is_scalar(tensor));
     ASSERT_FALSE(mag_tensor_is_vector(tensor));
     ASSERT_FALSE(mag_tensor_is_matrix(tensor));
@@ -114,8 +114,8 @@ TEST(mag_tensor_t, init_4d) {
     ASSERT_EQ(mag_tensor_num_rows(tensor), 40);
     ASSERT_EQ(mag_tensor_strides(tensor)[0], 1);
     ASSERT_EQ(mag_tensor_strides(tensor)[1], 10);
-    ASSERT_EQ(mag_tensor_strides(tensor)[2], 10*4);
-    ASSERT_EQ(mag_tensor_strides(tensor)[3], 10*4*2);
+    ASSERT_EQ(mag_tensor_strides(tensor)[2], 10 * 4);
+    ASSERT_EQ(mag_tensor_strides(tensor)[3], 10 * 4 * 2);
     ASSERT_FALSE(mag_tensor_is_scalar(tensor));
     ASSERT_FALSE(mag_tensor_is_vector(tensor));
     ASSERT_FALSE(mag_tensor_is_matrix(tensor));
@@ -143,13 +143,13 @@ TEST(mag_tensor_t, init_5d) {
     ASSERT_EQ(mag_tensor_data_size(tensor), 10 * 4 * 2 * 5 * 3 * sizeof(float));
     ASSERT_EQ(mag_tensor_numel(tensor), 10 * 4 * 2 * 5 * 3);
     ASSERT_EQ(mag_tensor_num_cols(tensor), 10);
-    ASSERT_EQ(mag_tensor_num_rows(tensor), 40*3);
+    ASSERT_EQ(mag_tensor_num_rows(tensor), 40 * 3);
     ASSERT_EQ(mag_tensor_strides(tensor)[0], 1);
     ASSERT_EQ(mag_tensor_strides(tensor)[1], 10);
-    ASSERT_EQ(mag_tensor_strides(tensor)[2], 10*4);
-    ASSERT_EQ(mag_tensor_strides(tensor)[3], 10*4*2);
-    ASSERT_EQ(mag_tensor_strides(tensor)[4], 10*4*2*5);
-    ASSERT_EQ(mag_tensor_strides(tensor)[5], 10*4*2*5*3);
+    ASSERT_EQ(mag_tensor_strides(tensor)[2], 10 * 4);
+    ASSERT_EQ(mag_tensor_strides(tensor)[3], 10 * 4 * 2);
+    ASSERT_EQ(mag_tensor_strides(tensor)[4], 10 * 4 * 2 * 5);
+    ASSERT_EQ(mag_tensor_strides(tensor)[5], 10 * 4 * 2 * 5 * 3);
 
     ASSERT_FALSE(mag_tensor_is_scalar(tensor));
     ASSERT_FALSE(mag_tensor_is_vector(tensor));
@@ -178,13 +178,13 @@ TEST(mag_tensor_t, init_6d) {
     ASSERT_EQ(mag_tensor_data_size(tensor), 10 * 4 * 2 * 5 * 3 * 2 * sizeof(float));
     ASSERT_EQ(mag_tensor_numel(tensor), 10 * 4 * 2 * 5 * 3 * 2);
     ASSERT_EQ(mag_tensor_num_cols(tensor), 10);
-    ASSERT_EQ(mag_tensor_num_rows(tensor), 40*3*2);
+    ASSERT_EQ(mag_tensor_num_rows(tensor), 40 * 3 * 2);
     ASSERT_EQ(mag_tensor_strides(tensor)[0], 1);
     ASSERT_EQ(mag_tensor_strides(tensor)[1], 10);
-    ASSERT_EQ(mag_tensor_strides(tensor)[2], 10*4);
-    ASSERT_EQ(mag_tensor_strides(tensor)[3], 10*4*2);
-    ASSERT_EQ(mag_tensor_strides(tensor)[4], 10*4*2*5);
-    ASSERT_EQ(mag_tensor_strides(tensor)[5], 10*4*2*5*3);
+    ASSERT_EQ(mag_tensor_strides(tensor)[2], 10 * 4);
+    ASSERT_EQ(mag_tensor_strides(tensor)[3], 10 * 4 * 2);
+    ASSERT_EQ(mag_tensor_strides(tensor)[4], 10 * 4 * 2 * 5);
+    ASSERT_EQ(mag_tensor_strides(tensor)[5], 10 * 4 * 2 * 5 * 3);
 
     ASSERT_FALSE(mag_tensor_is_scalar(tensor));
     ASSERT_FALSE(mag_tensor_is_vector(tensor));
@@ -281,7 +281,7 @@ TEST(mag_tensor_t, buffer_linearly) {
     auto* buf = static_cast<float*>(mag_tensor_data_ptr(origin));
     buf[0] = 1.0f;
     buf[mag_tensor_numel(origin) - 1] = -1.0f;
-    for (int64_t i=0; i < mag_tensor_numel(origin); ++i) {
+    for (int64_t i = 0; i < mag_tensor_numel(origin); ++i) {
         std::cout << buf[i] << " ";
     }
     std::cout << std::endl;
@@ -302,7 +302,7 @@ TEST(mag_tensor_t, view) {
     ASSERT_EQ(mag_tensor_data_size(slice1), mag_tensor_data_size(origin));
     ASSERT_EQ(mag_tensor_numel(slice1), mag_tensor_numel(origin));
     auto* buf = static_cast<float*>(mag_tensor_data_ptr(slice1));
-    for (int64_t i=0; i < mag_tensor_numel(slice1); ++i) {
+    for (int64_t i = 0; i < mag_tensor_numel(slice1); ++i) {
         ASSERT_FLOAT_EQ(buf[i], 2.0f);
     }
     mag_tensor_t* slice2 = mag_view(origin);
@@ -404,8 +404,9 @@ TEST(mag_tensor_t, isclose) {
 TEST(mag_tensor_t, copy_buffer_from) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    std::array<float, 2*2*2*2> buf {};
-    for (auto& x : buf) x = 2.5f;
+    std::array<float, 2 * 2 * 2 * 2> buf{};
+    for (auto& x : buf)
+        x = 2.5f;
 
     mag_tensor_t* tensor = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 2, 2, 2, 2);
     ASSERT_EQ(mag_tensor_data_size(tensor), sizeof(buf));
@@ -429,17 +430,17 @@ TEST(mag_tensor_t, fill) {
     float* buf = static_cast<float*>(mag_tensor_data_ptr(tensor));
 
     mag_tensor_fill(tensor, 0.0f);
-    for (std::int64_t i=0; i < mag_tensor_data_size(tensor); ++i) {
+    for (std::int64_t i = 0; i < mag_tensor_data_size(tensor); ++i) {
         ASSERT_FLOAT_EQ(buf[0], 0.0f);
     }
 
     mag_tensor_fill(tensor, 2.5f);
-    for (std::int64_t i=0; i < mag_tensor_data_size(tensor); ++i) {
+    for (std::int64_t i = 0; i < mag_tensor_data_size(tensor); ++i) {
         ASSERT_FLOAT_EQ(buf[0], 2.5f);
     }
 
     mag_tensor_fill(tensor, -1.0f);
-    for (std::int64_t i=0; i < mag_tensor_data_size(tensor); ++i) {
+    for (std::int64_t i = 0; i < mag_tensor_data_size(tensor); ++i) {
         ASSERT_FLOAT_EQ(buf[0], -1.0f);
     }
 
@@ -570,7 +571,7 @@ TEST(mag_tensor_t, rc_init_strong) {
     mag_ctx_destroy(ctx);
 }
 
-#if 0 //todo
+#if 0 // todo
 TEST(mag_tensor_t, rc_ref_view_chain) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 

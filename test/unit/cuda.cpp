@@ -19,11 +19,11 @@ TEST(cuda, simple_add) {
     clock_t begin = clock();
     mag_tensor_t* result = mag_add(a, b); /* Compute result = a + b */
     clock_t end = clock();
-    double secs = (double)(end - begin)/CLOCKS_PER_SEC;
+    double secs = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Computed in %f s\n", secs);
 
-    mag_storage_buffer_t& buf {result->storage};
-    std::vector<float> data {};
+    mag_storage_buffer_t& buf{result->storage};
+    std::vector<float> data{};
     data.resize(result->numel);
     (*buf.cpy_device_host)(&buf, 0, data.data(), buf.size);
     for (auto x : data) {

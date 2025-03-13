@@ -1,7 +1,7 @@
 #pragma once
 
-#include <magnetron_internal.h>
 #include <gtest/gtest.h>
+#include <magnetron_internal.h>
 
 #include <array>
 #include <cstdint>

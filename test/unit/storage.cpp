@@ -24,7 +24,7 @@ TEST(storage, load_store) {
     ASSERT_EQ(mag_tensor_shape(B)[4], 2);
     ASSERT_EQ(mag_tensor_shape(B)[5], 2);
     ASSERT_EQ(mag_tensor_data_size(B), 10 * 4 * 2 * 5 * 2 * 2 * sizeof(float));
-    //ASSERT_TRUE(mag_tensor_eq(A, B)); todo
+    // ASSERT_TRUE(mag_tensor_eq(A, B)); todo
 
     mag_tensor_decref(A);
     mag_tensor_decref(B);
@@ -45,8 +45,8 @@ TEST(storage, load_store_image) {
     ASSERT_EQ(mag_tensor_shape(B)[2], 1536);
     ASSERT_EQ(mag_tensor_shape(B)[1], 2048);
     ASSERT_EQ(mag_tensor_shape(B)[0], 3);
-    //ASSERT_TRUE(mag_tensor_eq(img, B)); todo
-    //mag_tensor_save_image(B, "test_data/car_from_magnetron.jpg");
+    // ASSERT_TRUE(mag_tensor_eq(img, B)); todo
+    // mag_tensor_save_image(B, "test_data/car_from_magnetron.jpg");
     mag_tensor_decref(img);
     mag_tensor_decref(B);
     mag_ctx_destroy(ctx);

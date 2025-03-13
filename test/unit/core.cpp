@@ -2,18 +2,17 @@
 
 #include "prelude.hpp"
 
-#include <numbers>
 #include <filesystem>
+#include <numbers>
 
 TEST(core, profiler_small_dims) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     mag_ctx_profiler_start(ctx);
-    for (int i=0; i < 10000; ++i) {
+    for (int i = 0; i < 10000; ++i) {
         mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, 3, 3);
-        mag_tensor_t* B =  mag_sin(A);
-        mag_tensor_t* C =  mag_cos(B);
-        [[maybe_unused]]
-        mag_tensor_t* D = mag_tanh(C);
+        mag_tensor_t* B = mag_sin(A);
+        mag_tensor_t* C = mag_cos(B);
+        [[maybe_unused]] mag_tensor_t* D = mag_tanh(C);
         mag_tensor_decref(A);
         mag_tensor_decref(B);
         mag_tensor_decref(C);
@@ -31,8 +30,7 @@ TEST(core, profiler_big_dims) {
     mag_tensor_t* A = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, 32, 32, 4, 4, 4, 4);
     mag_tensor_t* B = mag_sin(A);
     mag_tensor_t* C = mag_cos(B);
-    [[maybe_unused]]
-    mag_tensor_t* D = mag_tanh(C);
+    [[maybe_unused]] mag_tensor_t* D = mag_tanh(C);
     mag_ctx_profiler_end(ctx, nullptr);
     mag_tensor_decref(A);
     mag_tensor_decref(B);

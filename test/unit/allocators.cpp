@@ -3,7 +3,7 @@
 #include "prelude.hpp"
 
 TEST(allocators, fixed_intrusive_pool_alloc_free) {
-    mag_fixed_intrusive_pool pool {};
+    mag_fixed_intrusive_pool pool{};
     mag_fixed_intrusive_pool_init(&pool, sizeof(int), alignof(int), 8);
     ASSERT_EQ(pool.num_allocs, 0);
     ASSERT_EQ(pool.num_chunks, 1);
@@ -11,7 +11,7 @@ TEST(allocators, fixed_intrusive_pool_alloc_free) {
     ASSERT_EQ(pool.num_pool_hits, 0);
     for (int i = 0; i < 8192; ++i) {
         int* x = static_cast<int*>(mag_fixed_intrusive_pool_malloc(&pool));
-        ASSERT_EQ(pool.num_allocs, i+1);
+        ASSERT_EQ(pool.num_allocs, i + 1);
         if (i >= 1) {
             ASSERT_EQ(pool.num_freelist_hits, i);
         }
@@ -25,7 +25,7 @@ TEST(allocators, fixed_intrusive_pool_alloc_free) {
 }
 
 TEST(allocators, fixed_intrusive_pool_exhaust_pool) {
-    mag_fixed_intrusive_pool pool {};
+    mag_fixed_intrusive_pool pool{};
     mag_fixed_intrusive_pool_init(&pool, sizeof(int), alignof(int), 8);
     ASSERT_EQ(pool.num_allocs, 0);
     ASSERT_EQ(pool.num_chunks, 1);
@@ -34,8 +34,8 @@ TEST(allocators, fixed_intrusive_pool_exhaust_pool) {
     for (int i = 0; i < 8192; ++i) {
         [[maybe_unused]] int* volatile x = static_cast<int*>(mag_fixed_intrusive_pool_malloc(&pool));
     }
-    ASSERT_EQ(pool.num_chunks, 8192/8);
-    //ASSERT_EQ(pool.num_pool_hits, 1);
+    ASSERT_EQ(pool.num_chunks, 8192 / 8);
+    // ASSERT_EQ(pool.num_pool_hits, 1);
     ASSERT_EQ(pool.num_freelist_hits, 0);
     mag_fixed_intrusive_pool_destroy(&pool);
 }
@@ -51,9 +51,9 @@ TEST(allocators, alloc_small) {
 }
 
 TEST(allocators, alloc_large) {
-    void* i = (*mag_alloc)(nullptr, 1ull<<30);
+    void* i = (*mag_alloc)(nullptr, 1ull << 30);
     ASSERT_NE(i, nullptr);
-    std::memset(i, 5, 1ull<<30);
+    std::memset(i, 5, 1ull << 30);
     (*mag_alloc)(i, 0);
 }
 
