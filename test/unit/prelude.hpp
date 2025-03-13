@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cstdint>
 #include <cstring>
 
 inline auto mag_tensor_buf_e8m23_to_vec(const mag_tensor_t* tensor, std::vector<float>& out) -> void {
