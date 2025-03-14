@@ -52,6 +52,11 @@
 extern "C" {
 #endif
 
+#define mag_assert_name2(name, line) name ## line
+#define mag_assert_name(line) mag_assert_name2(_assert_, line)
+#define mag_static_assert(expr) extern void mag_assert_name(__LINE__)(bool STATIC_ASSERTION_FAILED[((expr)?1:-1)])
+#define MAG_SEP ,
+
 #define MAG_GELU_COEFF 0.044715f
 #define MAG_GRA_FWD MAG_GRAPH_EVAL_ORDER_FORWARD
 #define MAG_GRA_BWD MAG_GRAPH_EVAL_ORDER_REVERSE

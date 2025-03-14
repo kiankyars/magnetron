@@ -2741,18 +2741,18 @@ bool mag_tensor_is_volume(const mag_tensor_t* t) {
     return true;
 }
 
-bool mag_tensor_is_shape_eq(const mag_tensor_t* a, const mag_tensor_t* b) {
-    return memcmp(a->shape, b->shape, sizeof(a->shape)) == 0;
+bool mag_tensor_is_shape_eq(const mag_tensor_t* x, const mag_tensor_t* y) {
+    return memcmp(x->shape, y->shape, sizeof(x->shape)) == 0;
 }
 
-bool mag_tensor_are_strides_eq(const mag_tensor_t* a, const mag_tensor_t* b) {
-    return memcmp(a->strides, b->strides, sizeof(a->strides)) == 0;
+bool mag_tensor_are_strides_eq(const mag_tensor_t* x, const mag_tensor_t* y) {
+    return memcmp(x->strides, y->strides, sizeof(x->strides)) == 0;
 }
 
-bool mag_tensor_can_broadcast(const mag_tensor_t* a, const mag_tensor_t* b) {
+bool mag_tensor_can_broadcast(const mag_tensor_t* x, const mag_tensor_t* y) {
     #pragma GCC unroll 6
     for (uint32_t i=0; i < MAG_MAX_DIMS; ++i)
-        if ((b->shape[i] % a->shape[i]) != 0)
+        if ((y->shape[i] % x->shape[i]) != 0)
             return false;
     return true;
 }
@@ -3006,11 +3006,11 @@ void mag_tensor_set_scalar_virtual_index(mag_tensor_t* t, int64_t v_idx, mag_e8m
     }
 }
 
-bool mag_tensor_eq(const mag_tensor_t* a, const mag_tensor_t* b) {
-    if (a->dtype != b->dtype) return false;
-    if (a->rank != b->rank) return false;
-    if (memcmp(a->shape, b->shape, sizeof(a->shape)) != 0) return false;
-    if (a->numel != b->numel) return false;
+bool mag_tensor_eq(const mag_tensor_t* x, const mag_tensor_t* y) {
+    if (x->dtype != y->dtype) return false;
+    if (x->rank != y->rank) return false;
+    if (memcmp(x->shape, y->shape, sizeof(x->shape)) != 0) return false;
+    if (x->numel != y->numel) return false;
     /*int64_t n = mag_tensor_num_elements(a); TODO
     switch (a->dtype) {
         case MAG_DTYPE_E8M23: {
@@ -3027,11 +3027,11 @@ bool mag_tensor_eq(const mag_tensor_t* a, const mag_tensor_t* b) {
     return false;
 }
 
-bool mag_tensor_is_close(const mag_tensor_t* a, const mag_tensor_t* b, mag_e8m23_t eps, double* percent_eq) {
-    if (a->dtype != b->dtype) return false;
-    if (a->rank != b->rank) return false;
-    if (memcmp(a->shape, b->shape, sizeof(a->shape)) != 0) return false;
-    if (a->numel != b->numel) return false;
+bool mag_tensor_is_close(const mag_tensor_t* x, const mag_tensor_t* y, mag_e8m23_t eps, double* percent_eq) {
+    if (x->dtype != y->dtype) return false;
+    if (x->rank != y->rank) return false;
+    if (memcmp(x->shape, y->shape, sizeof(x->shape)) != 0) return false;
+    if (x->numel != y->numel) return false;
     /*eps = eps < 0.0f ? FLT_EPSILON : eps; TODO
     int64_t n = mag_tensor_num_elements(a);
     int64_t n_eq = 0;
