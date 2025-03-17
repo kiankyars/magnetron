@@ -560,73 +560,24 @@ static bool MAG_AINLINE mag_imull64_ov(int64_t a, int64_t b, int64_t* c) {
     #endif
 }
 
-/* Generate n uniform random floats within [min, max] with the selected algorithm. */
-static void mag_prng_generate_n(mag_ctx_t* ctx, mag_e8m23_t* out_gen, int64_t out_n, mag_e8m23_t min, mag_e8m23_t max) {
-    mag_e8m23_t rescale_uniform = max - min;
-    switch (ctx->prng_algorithm) {
-        case MAG_PRNG_MERSENNE_TWISTER: { /* Use Mersenne Twister. */
-            uint32_t* rem = &ctx->prng.mersenne.remaining;
-            uint32_t* next = &ctx->prng.mersenne.next;
-            uint32_t* state = ctx->prng.mersenne.state;
-            for (int64_t ii=0; ii < out_n; ++ii) {
-                if (--*rem <= 0) {
-                    *rem = 624;
-                    *next = 0;
-                    uint32_t y, i;
-                    for (i = 0; i < 624-397; ++i) {
-                        y = (state[i] & 0x80000000u) | (state[i+1] & 0x7fffffffu);
-                        state[i] = state[i+397] ^ (y>>1) ^ ((y&1) ? 0 : 0x9908b0dfu);
-                    }
-                    for (; i < 624-1; ++i) {
-                        y = (state[i] & 0x80000000u) | (state[i+1] & 0x7fffffffu);
-                        state[i] = state[i + (397-624)] ^ (y>>1) ^ ((y&1) ? 0 : 0x9908b0dfu);
-                    }
-                    y = (state[624-1] & 0x80000000u) | (*state & 0x7fffffffu);
-                    state[624-1] = state[397-1] ^ (y>>1) ^ ((y&1) ? 0 : 0x9908b0dfu);
-                }
-                uint32_t y = state[(*next)++];
-                y ^= y >> 11;
-                y ^= (y << 7) & 0x9d2c5680;
-                y ^= (y << 15) & 0xefc60000;
-                y ^= y >> 18;
-                out_gen[ii] = min + rescale_uniform * (1.f/(mag_e8m23_t)(1<<23)*((mag_e8m23_t)(y>>9) + 0.5f)); /* Generate canonical and rescale. */
-            }
-        } break;
-        case MAG_PRNG_PCG: { /* Use Permuted Congruential Generator. */
-            uint64_t* state = &ctx->prng.pcg.state;
-            uint64_t* inc = &ctx->prng.pcg.inc;
-            for (int64_t ii=0; ii < out_n; ++ii) {
-                uint64_t prev = *state;
-                *state = prev*6364136223846793005ull + *inc;
-                uint32_t mixed = ((prev>>18u) ^ prev) >> 27u;
-                uint32_t rot = prev >> 59u;
-                uint32_t y = (mixed>>rot) | (mixed << ((-rot)&31));
-                out_gen[ii] = min + rescale_uniform * (1.f/(mag_e8m23_t)(1<<23)*((mag_e8m23_t)(y>>9) + 0.5f)); /* Generate canonical and rescale. */
-            }
-        } break;
-        default:
-            mag_panic("Unknown PRNG algorithm: %d", ctx->prng_algorithm);
-    }
-}
-
 /* Initialize and reseed PRNG state. */
-static void mag_prng_init(mag_ctx_t* ctx, uint64_t seed) {
-    seed = seed ? seed : 0x853c49e6748fea9bull^ctx->tr_id^(uintptr_t)ctx^(uintptr_t)&ctx;
-    switch (ctx->prng_algorithm) {
+void mag_prng_init(mag_prng_state_t* prng, mag_prng_algorithm_t algo, uint64_t seed) {
+    seed = seed ? seed : 0x853c49e6748fea9bull;
+    switch ((prng->algo = algo)) {
         case MAG_PRNG_MERSENNE_TWISTER: {
-            uint32_t* state = ctx->prng.mersenne.state;
+            uint32_t* state = prng->mersenne.state;
             *state = (uint32_t)seed;
             for (size_t i=1; i < 624; ++i)
-                state[i] = ((state[i-1] ^ (state[i-1] >> 30))*1812433253 + i) & ~0u;
-            ctx->prng.mersenne.next = 0;
-            ctx->prng.mersenne.remaining = 1;
+                state[i] = ((state[i-1]^(state[i-1]>>30))*1812433253 + i)&~0u;
+            prng->mersenne.next = 0;
+            prng->mersenne.remaining = 1;
         } break;
         case MAG_PRNG_PCG: {
-            ctx->prng.pcg.state = seed ^ 0x853c49e6748fea9bull;
-            ctx->prng.pcg.inc = 0xda3e39cb94b95bdbull;
+            prng->pcg.state = seed^0x853c49e6748fea9bull;
+            prng->pcg.inc = 0xda3e39cb94b95bdbull;
         } break;
         default:
-            mag_panic("Unknown PRNG algorithm: %d", ctx->prng_algorithm);
+            mag_panic("invalid PRNG algorithm: %d", prng->algo);
     }
 }
 
@@ -713,14 +664,11 @@ mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
 
     ctx->tr_id = mag_thread_id(); /* Get thread ID. */
     ctx->flags |= MAG_CTX_FLAG_GRAD_RECORDER; /* Enable gradient recording by default. */
+    ctx->prng_algo = MAG_PRNG_MERSENNE_TWISTER;
 
     /* Query and print host system information. */
     mag_machine_probe(ctx);
     mag_system_host_info_dump(ctx);
-
-    /* Initialize PRNG state. */
-    ctx->prng_algorithm = MAG_PRNG_MERSENNE_TWISTER;
-    mag_prng_init(ctx, 0); /* Initialize PRNG state. */
 
     /* Create selected compute device. */
     ctx->exec_mode = MAG_EXEC_MODE_EAGER;
@@ -770,11 +718,12 @@ void mag_ctx_set_exec_mode(mag_ctx_t* ctx, mag_exec_mode_t mode) {
     mag_log_info("Execution mode set to: %s", mode == MAG_EXEC_MODE_EAGER ? "Eager" : "Deferred");
 }
 
-mag_prng_algorithm_t mag_ctx_get_prng_algorithm(const mag_ctx_t* ctx) { return ctx->prng_algorithm; }
+mag_prng_algorithm_t mag_ctx_get_prng_algorithm(const mag_ctx_t* ctx) {
+    return ctx->prng_algo;
+}
 
 void mag_ctx_set_prng_algorithm(mag_ctx_t* ctx, mag_prng_algorithm_t algorithm, uint64_t seed) {
-    ctx->prng_algorithm = algorithm;
-    mag_prng_init(ctx, seed); /* Reinitialize PRNG state with new seed. */
+    mag_log_warn("NYI");
 }
 
 mag_compute_device_type_t mag_ctx_get_compute_device_type(const mag_ctx_t* ctx) { return ctx->device_type; }
@@ -2073,6 +2022,8 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
         .op = MAG_OP_NOP,
         .op_inputs = {0},
         .op_params = {{0}},
+        .init_op = MAG_IOP_NOP,
+        .init_op_params = {{0}},
         .view_uplink = view,
         .view_offs = view_offs,
         .grad = NULL,
@@ -2175,12 +2126,14 @@ mag_tensor_t* mag_tensor_create_6d(mag_ctx_t* ctx, mag_dtype_t type, int64_t d1,
     return mag_tensor_create(ctx, type, (int64_t[]) {d1, d2, d3, d4, d5, d6}, 6, NULL, 0);
 }
 
-static void MAG_HOTPROC mag_op_exec(mag_tensor_t* R, mag_compute_device_t* dvc, mag_graph_eval_order_t ord) {
+/* Execute init/normal operator on R. */
+static void MAG_HOTPROC mag_op_exec(mag_tensor_t* R, mag_compute_device_t* dvc, mag_gra_eval_t ord) {
     mag_perf_mon_t* pmon = &R->pmon;
     mag_op_perf_info_t (*pmon_ops)[MAG_OP__NUM] = &R->ctx->op_perf_mons_total;
     mag_op_perf_info_t* pmon_op = *pmon_ops+R->op;
-    uint64_t start = R->ctx->flags & MAG_CTX_FLAG_PROFILER ? mag_hpc_clock_ns() : 0;    /* Profiling monitoring */
-    void (*exec)(mag_compute_device_t*, mag_tensor_t*) = ord == MAG_GRAPH_EVAL_ORDER_FORWARD ? dvc->eager_exec_fwd : dvc->eager_exec_bwd;
+    uint64_t start = R->ctx->flags & MAG_CTX_FLAG_PROFILER ? mag_hpc_clock_ns() : 0; /* Profiling monitoring */
+    void (*exec)(mag_compute_device_t*, mag_tensor_t*)
+        = ord == MAG_GRA_INIT ? dvc->eager_exec_init : ord == MAG_GRA_FWD ? dvc->eager_exec_fwd : dvc->eager_exec_bwd;
     (*exec)(dvc, R); /* Dispatch to backend. */
     if (!(R->ctx->flags & MAG_CTX_FLAG_PROFILER)) return; /* Profiling disabled. */
     pmon->elapsed_ns = mag_hpc_clock_elapsed_ns(start);
@@ -2198,7 +2151,7 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
     uint32_t numin,
     const mag_op_param_t* params,
     uint32_t numparams,
-    mag_graph_eval_order_t gra
+    mag_gra_eval_t gra
 ) {
     /* Validate inputs and params first */
     mag_assert2(op != MAG_OP_NOP);
@@ -2566,42 +2519,40 @@ void mag_tensor_copy_buffer_from(mag_tensor_t* t, const void* data, size_t size)
 }
 
 void mag_tensor_fill(mag_tensor_t* t, mag_e8m23_t x) {
-    mag_storage_buffer_t* sto = &t->storage;
-    (*sto->broadcast)(sto, 0, &x, sizeof(x)); /* Zero out the buffer. */
+    t->init_op = MAG_IOP_BROADCAST;
+    t->init_op_params[0] = (mag_op_param_t) {
+        .type = MAG_OP_TPARAM_F32,
+        .x.e8m23 = x
+    };
+    mag_op_exec(t, t->ctx->device, MAG_GRA_INIT);
 }
 
 void mag_tensor_fill_random_uniform(mag_tensor_t* t, mag_e8m23_t min, mag_e8m23_t max) {
     mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
-    switch (t->dtype) {
-        case MAG_DTYPE_E8M23: {
-            int64_t n = mag_tensor_numel(t);
-            mag_e8m23_t* buf = (mag_e8m23_t*)t->storage.base;
-            mag_prng_generate_n(t->ctx, buf, n, min, max); /* Generate uniform random numbers. */
-        } break;
-        default: mag_panic("Unsupported DType: %d", t->dtype);
-    }
+    t->init_op = MAG_IOP_RAND_UNIFORM;
+    t->init_op_params[0] = (mag_op_param_t) {
+        .type = MAG_OP_TPARAM_F32,
+        .x.e8m23 = min
+    };
+    t->init_op_params[1] = (mag_op_param_t) {
+        .type = MAG_OP_TPARAM_F32,
+        .x.e8m23 = max
+    };
+    mag_op_exec(t, t->ctx->device, MAG_GRA_INIT);
 }
 
 void mag_tensor_fill_random_normal(mag_tensor_t* t, mag_e8m23_t mean, mag_e8m23_t stddev) {
     mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
-    switch (t->dtype) {
-        case MAG_DTYPE_E8M23: {
-            int64_t n = mag_tensor_numel(t);
-            mag_assert((n & 1) == 0, "Number of elements must be even");
-            mag_e8m23_t* buf = (mag_e8m23_t*)t->storage.base;
-            mag_prng_generate_n(t->ctx, buf, n, 0.0f, 1.0f); /* Generate uniform random numbers. */
-            for (int64_t i=0; i < n; i += 2) { /* Map uniform to normal distribution using Box-Muller transform. */
-                mag_e8m23_t* u1 = buf+i;
-                mag_e8m23_t* u2 = buf+i+1;
-                mag_e8m23_t mag = stddev*sqrtf(-2.0f*logf(*u1));
-                mag_e8m23_t y0 = mag*cosf((mag_e8m23_t)(2.0*M_PI)*(*u2)) + mean;
-                mag_e8m23_t y1 = mag*sinf((mag_e8m23_t)(2.0*M_PI)*(*u2)) + mean;
-                *u1 = y0;
-                *u2 = y1;
-            }
-        } break;
-        default: mag_panic("Unsupported DType: %d", t->dtype);
-    }
+    t->init_op = MAG_IOP_RAND_NORMAL;
+    t->init_op_params[0] = (mag_op_param_t) {
+        .type = MAG_OP_TPARAM_F32,
+        .x.e8m23 = mean
+    };
+    t->init_op_params[1] = (mag_op_param_t) {
+        .type = MAG_OP_TPARAM_F32,
+        .x.e8m23 = stddev
+    };
+    mag_op_exec(t, t->ctx->device, MAG_GRA_INIT);
 }
 
 uint64_t mag_tensor_get_packed_refcounts(const mag_tensor_t* t) {

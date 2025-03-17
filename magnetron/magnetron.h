@@ -147,11 +147,6 @@ extern MAG_EXPORT const mag_dtype_meta_t* _Nonnull mag_dtype_meta_of(mag_dtype_t
 extern MAG_EXPORT uint32_t mag_pack_color_u8(uint8_t r, uint8_t g, uint8_t b);
 extern MAG_EXPORT uint32_t mag_pack_color_f32(float r, float g, float b);
 
-typedef enum mag_graph_eval_order_t {
-    MAG_GRAPH_EVAL_ORDER_FORWARD = 0,   /* Evaluate graph from left to right */
-    MAG_GRAPH_EVAL_ORDER_REVERSE = 1    /* Evaluate graph from right to left */
-} mag_graph_eval_order_t;
-
 /**
  * @brief Create a new 1-dimensional tensor.
  *      Data is uninitialized, should be filled with values before using it.

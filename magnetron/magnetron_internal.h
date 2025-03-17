@@ -58,8 +58,11 @@ extern "C" {
 #define MAG_SEP ,
 
 #define MAG_GELU_COEFF 0.044715f
-#define MAG_GRA_FWD MAG_GRAPH_EVAL_ORDER_FORWARD
-#define MAG_GRA_BWD MAG_GRAPH_EVAL_ORDER_REVERSE
+typedef enum mag_gra_eval_t {
+    MAG_GRA_FWD,
+    MAG_GRA_BWD,
+    MAG_GRA_INIT
+} mag_gra_eval_t;
 #define MAG_GRA_LEN 2
 #define MAG_MAX_CPUS 8192
 #define MAG_MAX_NUMA_NODES 64
@@ -515,6 +518,14 @@ mag_static_assert(MAG_OP_NOP == 0);
 mag_static_assert(MAG_OP_MATMUL+1 == MAG_OP__NUM);
 mag_static_assert(MAG_OP__NUM <= 0xff);
 
+typedef enum mag_init_op_t {
+    MAG_IOP_NOP,
+    MAG_IOP_BROADCAST,
+    MAG_IOP_RAND_UNIFORM,
+    MAG_IOP_RAND_NORMAL,
+    MAG_IOP__NUM
+} mag_init_op_t;
+
 typedef enum mag_op_param_type_t {
     MAG_OP_TPARAM_NONE  = 0,
     MAG_OP_TPARAM_F32   = 1,
@@ -594,6 +605,7 @@ struct mag_compute_device_t {
     void* impl;                                                                 /* Device specific implementation, if applicable. */
     bool is_async;                                                              /* If device is async. */
     mag_compute_device_type_t type;                                             /* Device type enum. */
+    void (*eager_exec_init)(mag_compute_device_t* dvc, mag_tensor_t* root);      /* Execute a single init op. */
     void (*eager_exec_fwd)(mag_compute_device_t* dvc, mag_tensor_t* root);      /* Execute a single op forward. */
     void (*eager_exec_bwd)(mag_compute_device_t* dvc, mag_tensor_t* root);      /* Execute a single op backwards. */
     void (*alloc_storage)(mag_compute_device_t* dvc, mag_storage_buffer_t* out, size_t size);
@@ -750,19 +762,8 @@ struct mag_ctx_t {
     mag_fixed_intrusive_pool tensor_pool;           /* Fixed-size memory pool for tensors. */
     mag_exec_mode_t exec_mode;                      /* Execution mode. */
     mag_ctx_flags_t flags;                          /* Context flags. */
+    mag_prng_algorithm_t prng_algo;
     mag_op_perf_info_t op_perf_mons_total[MAG_OP__NUM];
-    union {
-        struct {
-            uint64_t state;
-            uint64_t inc;
-        } pcg;
-        struct {
-            uint32_t remaining;
-            uint32_t next;
-            uint32_t state[624];
-        } mersenne;
-    } prng;
-    mag_prng_algorithm_t prng_algorithm;                /* PRNG algorithm. */
     uintptr_t tr_id;                                    /* Host thread ID. */
     size_t sh_len;                                      /* Number of shutdown hooks. */
     size_t sh_cap;                                      /* Maximum number of shutdown hooks. */
@@ -805,6 +806,8 @@ struct mag_tensor_t {
     mag_op_t op;                                     /* Opcode for operators. */
     mag_tensor_t* op_inputs[MAG_MAX_INPUT_TENSORS];   /* Input tensors for operators. */
     mag_op_param_t op_params[MAG_MAX_OP_PARAMS];      /* Operator parameters. */
+    mag_init_op_t init_op;                              /* Initialization op */
+    mag_op_param_t init_op_params[MAG_MAX_OP_PARAMS];      /* Init operator parameters */
     mag_tensor_t* view_uplink;                       /* View base tensor. */
     size_t view_offs;                               /* Offset in view tensor. */
     mag_tensor_t* grad;                              /* ∇f - Gradient tensor. */
@@ -827,11 +830,28 @@ struct mag_tensor_t {
     (void)prefix##4; \
     (void)prefix##5
 
+typedef struct mag_prng_state_t {
+    union { /* PRNG state of active algo. */
+        struct {
+            uint64_t state;
+            uint64_t inc;
+        } pcg;
+        struct {
+            uint32_t remaining;
+            uint32_t next;
+            uint32_t state[624];
+        } mersenne;
+    };
+    mag_prng_algorithm_t algo; /* PRNG algorithm. */
+} mag_prng_state_t;
+void mag_prng_init(mag_prng_state_t* prng, mag_prng_algorithm_t algo, uint64_t seed);
+
 typedef struct mag_compute_payload_t { /* Compute payload for kernel execution. */
     int64_t thread_num;
     int64_t thread_idx;
     mag_tensor_t* node;
-    bool is_fwd;
+    mag_gra_eval_t gra_eval;
+    mag_prng_state_t* local_prng;
 } mag_compute_payload_t;
 
 typedef struct mag_kctx_mm_t { /* Matmul kernel context. TODO: get rid of this */
@@ -847,6 +867,7 @@ typedef struct mag_kernel_context_t { /* General op kernel context. */
 } mag_kernel_context_t;
 
 typedef struct mag_kernel_registry_t { /* Kernel registry for operators. */
+    void (*init[MAG_IOP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
     uint32_t (*fwd_pre[MAG_OP__NUM])(mag_kernel_context_t*);
     void (*fwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
     void (*fwd_post[MAG_OP__NUM])(mag_kernel_context_t*);
