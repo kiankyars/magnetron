@@ -19,7 +19,7 @@ static auto mm_naive(const float* A, const float* B, float* C, const std::int64_
     }
 }
 
-TEST(compute_cpu, mm_naive_verify) {
+TEST(matmul_cpu, mm_naive_verify) {
     static constexpr float A[6] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
     static constexpr float B[2] = {0.5f, -1.0f};
     float C[3];
@@ -29,7 +29,7 @@ TEST(compute_cpu, mm_naive_verify) {
     ASSERT_FLOAT_EQ(C[2], -3.5f);
 }
 
-TEST(compute_cpu, mm_square_2x2) {
+TEST(matmul_cpu, mm_square_2x2) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
     constexpr std::size_t M = 2, N = 2;
@@ -58,7 +58,7 @@ TEST(compute_cpu, mm_square_2x2) {
     mag_ctx_destroy(ctx);
 }
 
-TEST(compute_cpu, mm_square_2x2_transpose_x) {
+TEST(matmul_cpu, mm_square_2x2_transpose_x) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
     constexpr std::size_t M = 2, N = 2;
@@ -87,7 +87,7 @@ TEST(compute_cpu, mm_square_2x2_transpose_x) {
 }
 
 #if 0
-TEST(compute_cpu, mm_square_2x2_transpose_y) {
+TEST(matmul_cpu, mm_square_2x2_transpose_y) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
     constexpr std::size_t M = 2, N = 2;
@@ -125,7 +125,7 @@ TEST(compute_cpu, mm_square_2x2_transpose_y) {
 }
 #endif
 
-TEST(compute_cpu, mm_rect_2x3_3x4) {
+TEST(matmul_cpu, mm_rect_2x3_3x4) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     constexpr std::size_t M = 2, K = 3, N = 4;
 
@@ -161,7 +161,7 @@ TEST(compute_cpu, mm_rect_2x3_3x4) {
     mag_ctx_destroy(ctx);
 }
 
-TEST(compute_cpu, mm_matrix_vector_2x3) {
+TEST(matmul_cpu, mm_matrix_vector_2x3) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
     constexpr std::size_t M = 2, K = 3;
@@ -193,7 +193,7 @@ TEST(compute_cpu, mm_matrix_vector_2x3) {
     mag_ctx_destroy(ctx);
 }
 
-TEST(compute_cpu, mm_vector_matrix_3x2) {
+TEST(matmul_cpu, mm_vector_matrix_3x2) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
     constexpr std::size_t K = 3, N = 2;

@@ -528,6 +528,7 @@ typedef struct mag_op_param_t {
     mag_op_param_type_t type : 8; /* Parameter type */
     union {
         mag_e8m23_t e8m23;
+        mag_e5m10_t e5m10;
         int32_t i32;
         uint32_t u32;
     } x;
@@ -847,10 +848,10 @@ typedef struct mag_kernel_context_t { /* General op kernel context. */
 
 typedef struct mag_kernel_registry_t { /* Kernel registry for operators. */
     uint32_t (*fwd_pre[MAG_OP__NUM])(mag_kernel_context_t*);
-    void (*fwd[MAG_OP__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
+    void (*fwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
     void (*fwd_post[MAG_OP__NUM])(mag_kernel_context_t*);
     uint32_t (*bwd_pre[MAG_OP__NUM])(mag_kernel_context_t*);
-    void (*bwd[MAG_OP__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
+    void (*bwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
     void (*bwd_post[MAG_OP__NUM])(mag_kernel_context_t*);
 } mag_kernel_registry_t;
 

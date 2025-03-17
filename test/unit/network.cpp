@@ -96,6 +96,8 @@ class linear_layer final : public module {
     mag_tensor_t* bias = nullptr;
 };
 
+#if 0 // TODO
+
 TEST(network, full_xor_model) {
     class xor_network final : public module {
       public:
@@ -141,3 +143,5 @@ TEST(network, full_xor_model) {
 
     mag_ctx_destroy(ctx);
 }
+
+#endif

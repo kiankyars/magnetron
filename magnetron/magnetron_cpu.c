@@ -211,7 +211,11 @@ static bool mag_worker_await_work(mag_worker_t* worker, mag_threadpool_t* pool) 
 static void mag_worker_exec_thread_local(const mag_kernel_registry_t* kernels, mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
     if (mag_likely(payload->node)) { /* Do the work 🦾 */
         mag_op_t op = payload->node->op;
-        void (*kernel)(const mag_compute_payload_t*, mag_kernel_context_t* ctx) = payload->is_fwd ? kernels->fwd[op] : kernels->bwd[op];
+        mag_dtype_t dtype = payload->node->dtype;
+        mag_assert2(op >= 0 && op < MAG_OP__NUM);
+        mag_assert2(dtype >= 0 && dtype < MAG_DTYPE__NUM);
+        void (*kernel)(const mag_compute_payload_t*, mag_kernel_context_t* ctx)
+            = payload->is_fwd ? kernels->fwd[op][dtype] : kernels->bwd[op][dtype];
         (*kernel)(payload, ctx);
         payload->node = NULL;
     }

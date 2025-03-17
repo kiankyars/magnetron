@@ -11,7 +11,7 @@ static constexpr std::int64_t k_lim_same_shape = 4;
 static constexpr std::int64_t k_lim_broadcast = 2;
 
 #define impl_test_unary_op(name, eps, op, scalar_op)                                                                   \
-    TEST(compute_cpu, name##_same_shape) {                                                                             \
+    TEST(operations_cpu, name##_same_shape) {                                                                             \
         mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);                                                  \
                                                                                                                        \
         for (std::int64_t i0 = 1; i0 <= k_lim_same_shape; ++i0)                                                        \
@@ -38,7 +38,7 @@ static constexpr std::int64_t k_lim_broadcast = 2;
                                                                                                                        \
         mag_ctx_destroy(ctx);                                                                                          \
     }                                                                                                                  \
-    TEST(compute_cpu, name##_same_shape_inplace) {                                                                     \
+    TEST(operations_cpu, name##_same_shape_inplace) {                                                                     \
         mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);                                                  \
                                                                                                                        \
         for (std::int64_t i0 = 1; i0 <= k_lim_same_shape; ++i0)                                                        \
@@ -72,7 +72,7 @@ static constexpr std::int64_t k_lim_broadcast = 2;
 
 impl_test_unary_op(abs, 1e-6, abs, [](float x) -> float { return std::abs(x); })
 
-    TEST(compute_cpu, neg_same_shape) {
+    TEST(operations_cpu, neg_same_shape) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     for (std::int64_t i0 = 1; i0 <= k_lim_same_shape; ++i0)
         for (std::int64_t i1 = 1; i1 <= k_lim_same_shape; ++i1)
@@ -152,7 +152,7 @@ impl_test_unary_op(cos, 1e-6, cos, [](float x) -> float {
     //     return x <= 0.0f ? 0.0f : 1.0f;
     // })
 
-    TEST(compute_cpu, clone_same_shape) {
+    TEST(operations_cpu, clone_same_shape) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     for (std::int64_t i0 = 1; i0 <= k_lim_same_shape; ++i0)
         for (std::int64_t i1 = 1; i1 <= k_lim_same_shape; ++i1)
@@ -175,7 +175,7 @@ impl_test_unary_op(cos, 1e-6, cos, [](float x) -> float {
     mag_ctx_destroy(ctx);
 }
 
-TEST(compute_cpu, clone_transpose) {
+TEST(operations_cpu, clone_transpose) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     for (std::int64_t i0 = 1; i0 <= k_lim_same_shape; ++i0)
         for (std::int64_t i1 = 1; i1 <= k_lim_same_shape; ++i1)
@@ -201,7 +201,7 @@ TEST(compute_cpu, clone_transpose) {
 #undef impl_test_unary_op
 
 #define impl_test_binary_op(name, op, scalar_op)                                                                       \
-    TEST(compute_cpu, name##_same_shape) {                                                                             \
+    TEST(operations_cpu, name##_same_shape) {                                                                             \
         mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);                                                  \
         for (std::int64_t i0 = 1; i0 <= k_lim_same_shape; ++i0)                                                        \
             for (std::int64_t i1 = 1; i1 <= k_lim_same_shape; ++i1)                                                    \
@@ -233,7 +233,7 @@ TEST(compute_cpu, clone_transpose) {
         mag_ctx_destroy(ctx);                                                                                          \
     }                                                                                                                  \
                                                                                                                        \
-    TEST(compute_cpu, name##_scalar_broadcast) {                                                                       \
+    TEST(operations_cpu, name##_scalar_broadcast) {                                                                       \
         mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);                                                  \
         for (std::int64_t factor = 2; factor <= 4; ++factor)                                                           \
             for (std::int64_t i0 = 1; i0 <= k_lim_broadcast; ++i0)                                                     \
@@ -267,7 +267,7 @@ TEST(compute_cpu, clone_transpose) {
                                                                                                                        \
         mag_ctx_destroy(ctx);                                                                                          \
     }                                                                                                                  \
-    TEST(compute_cpu, name##_same_shape_inplace) {                                                                     \
+    TEST(operations_cpu, name##_same_shape_inplace) {                                                                     \
         mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);                                                  \
         for (std::int64_t i0 = 1; i0 <= k_lim_same_shape; ++i0)                                                        \
             for (std::int64_t i1 = 1; i1 <= k_lim_same_shape; ++i1)                                                    \
@@ -303,7 +303,7 @@ TEST(compute_cpu, clone_transpose) {
         mag_ctx_destroy(ctx);                                                                                          \
     }                                                                                                                  \
                                                                                                                        \
-    TEST(compute_cpu, name##_scalar_broadcast_inplace) {                                                               \
+    TEST(operations_cpu, name##_scalar_broadcast_inplace) {                                                               \
         mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);                                                  \
         for (std::int64_t factor = 2; factor <= 4; ++factor)                                                           \
             for (std::int64_t i0 = 1; i0 <= k_lim_broadcast; ++i0)                                                     \
@@ -342,7 +342,7 @@ TEST(compute_cpu, clone_transpose) {
                                                                                                                        \
         mag_ctx_destroy(ctx);                                                                                          \
     }                                                                                                                  \
-    TEST(compute_cpu, name##_scalar) {                                                                                 \
+    TEST(operations_cpu, name##_scalar) {                                                                                 \
         mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);                                                  \
         for (std::int64_t i0 = 1; i0 <= k_lim_same_shape; ++i0)                                                        \
             for (std::int64_t i1 = 1; i1 <= k_lim_same_shape; ++i1)                                                    \
@@ -376,7 +376,7 @@ impl_test_binary_op(add_e8m23, add, +) impl_test_binary_op(sub_e8m23, sub, -) im
 
 #undef impl_test_binary_op
 
-        TEST(compute_cpu, pows) {
+        TEST(operations_cpu, pows) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     for (std::int64_t i0 = 1; i0 <= k_lim_same_shape; ++i0)
         for (std::int64_t i1 = 1; i1 <= k_lim_same_shape; ++i1)
@@ -401,7 +401,7 @@ impl_test_binary_op(add_e8m23, add, +) impl_test_binary_op(sub_e8m23, sub, -) im
     mag_ctx_destroy(ctx);
 }
 
-TEST(compute_cpu, arithmetic_mean) {
+TEST(operations_cpu, arithmetic_mean) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     mag_tensor_t* A = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 4, 1, 3, 2);
     mag_tensor_fill_random_uniform(A, -1.0f, 1.0f);
@@ -417,7 +417,7 @@ TEST(compute_cpu, arithmetic_mean) {
     mag_ctx_destroy(ctx);
 }
 
-TEST(compute_cpu, min) {
+TEST(operations_cpu, min) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     mag_tensor_t* A = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 4, 1, 3, 2);
     mag_tensor_fill_random_uniform(A, -1.0f, 1.0f);
@@ -431,7 +431,7 @@ TEST(compute_cpu, min) {
     mag_ctx_destroy(ctx);
 }
 
-TEST(compute_cpu, max) {
+TEST(operations_cpu, max) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     mag_tensor_t* A = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 4, 1, 3, 2);
     mag_tensor_fill_random_uniform(A, -1.0f, 1.0f);
@@ -445,7 +445,7 @@ TEST(compute_cpu, max) {
     mag_ctx_destroy(ctx);
 }
 
-TEST(compute_cpu, hsum) {
+TEST(operations_cpu, hsum) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     mag_tensor_t* A = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 4, 1, 3, 2);
     mag_tensor_fill_random_uniform(A, -1.0f, 1.0f);
@@ -460,7 +460,7 @@ TEST(compute_cpu, hsum) {
     mag_ctx_destroy(ctx);
 }
 
-TEST(compute_cpu, heavy_compute_single_op) {
+TEST(operations_cpu, heavy_compute_single_op) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     mag_tensor_t* A = mag_tensor_create_3d(ctx, MAG_DTYPE_E8M23, 8192, 8192, 3);
     mag_tensor_t* B = mag_clone(A);
@@ -473,7 +473,7 @@ TEST(compute_cpu, heavy_compute_single_op) {
     mag_ctx_destroy(ctx);
 }
 
-TEST(compute_cpu, heavy_compute_single_op_scalar) {
+TEST(operations_cpu, heavy_compute_single_op_scalar) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     mag_tensor_t* A = mag_tensor_create_1d(ctx, MAG_DTYPE_E8M23, 1);
     mag_tensor_t* B = mag_clone(A);
@@ -486,7 +486,7 @@ TEST(compute_cpu, heavy_compute_single_op_scalar) {
     mag_ctx_destroy(ctx);
 }
 
-TEST(compute_cpu, threaded_add) {
+TEST(operations_cpu, threaded_add) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
     mag_tensor_t* A = mag_tensor_create_3d(ctx, MAG_DTYPE_E8M23, 512, 512, 32);
     mag_tensor_fill(A, 1.0f);
