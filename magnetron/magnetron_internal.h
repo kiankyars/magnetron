@@ -3,7 +3,7 @@
 #ifndef MAGNETRON_INTERNAL_H
 #define MAGNETRON_INTERNAL_H
 
-#include "magnetron.h"
+#include <magnetron/magnetron.h>
 
 #include <math.h>
 #include <string.h>

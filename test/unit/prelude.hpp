@@ -1,6 +1,7 @@
 #pragma once
 
 #include <gtest/gtest.h>
+#include <magnetron/magnetron.hpp>
 #include <magnetron_internal.h>
 
 #include <bit>

@@ -138,7 +138,7 @@ void mag_tensor_save_image(const mag_tensor_t* t, const char* file) {
       for (int64_t i = 0; i < w*h; ++i)
          dst[i*c + k] = (uint8_t)(src[i + k*w*h]*255.0f);
    char ext[4+1] = {0};
-   const char *dot = strrchr(file, '.');
+   const char* dot = strrchr(file, '.');
    mag_assert(dot && *(dot+1) != '\0', "Invalid image file extension: %s", file);
    strncpy(ext, dot+1, 4);
    ext[4] = '\0';

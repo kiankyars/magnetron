@@ -1,4 +1,8 @@
-/* (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
+/*
+** (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+** Magnetron Machine Learning Framework, public C99 API. For a modern C++ API, see magnetron.hpp.
+** This header is also used from Python and by the modern C++ API.
+*/
 
 #ifndef MAGNETRON_H
 #define MAGNETRON_H
@@ -87,6 +91,8 @@ typedef enum mag_color_channels_t {
 extern MAG_EXPORT void* _Nonnull (*_Nonnull mag_get_alloc_fn(void))(void* _Nullable blk, size_t size); /* Get global allocator. */
 extern MAG_EXPORT void mag_set_alloc_fn(void* _Nonnull (*_Nonnull alloc)(void* _Nullable blk, size_t size)); /* Set global allocator. */
 extern MAG_EXPORT void mag_set_log_mode(bool enabled); /* Enable/disable logging. */
+extern MAG_EXPORT uint32_t mag_pack_color_u8(uint8_t r, uint8_t g, uint8_t b);
+extern MAG_EXPORT uint32_t mag_pack_color_f32(float r, float g, float b);
 
 typedef struct mag_ctx_t mag_ctx_t; /* Opaque context type for managing memory pools */
 
@@ -143,9 +149,6 @@ typedef struct mag_dtype_meta_t {
     const char* _Nonnull name;      /* Name of the data type */
 } mag_dtype_meta_t;
 extern MAG_EXPORT const mag_dtype_meta_t* _Nonnull mag_dtype_meta_of(mag_dtype_t type);
-
-extern MAG_EXPORT uint32_t mag_pack_color_u8(uint8_t r, uint8_t g, uint8_t b);
-extern MAG_EXPORT uint32_t mag_pack_color_f32(float r, float g, float b);
 
 /**
  * @brief Create a new 1-dimensional tensor.

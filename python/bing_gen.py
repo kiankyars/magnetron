@@ -3,7 +3,7 @@
 import datetime
 import re
 
-C_HDR_FILE: str = '../magnetron/magnetron.h'
+C_HDR_FILE: str = '../include/magnetron/magnetron.h'
 OUTPUT_FILE: str = 'src/magnetron/_ffi_cdecl_generated.py'
 
 print(f'Generating {OUTPUT_FILE} from {C_HDR_FILE}...')

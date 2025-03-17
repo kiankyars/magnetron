@@ -10,7 +10,7 @@
 **  - Hardware detection and system information.
 */
 
-#include "magnetron.h"
+#include <magnetron/magnetron.h>
 #include "magnetron_internal.h"
 
 #include <stdio.h>

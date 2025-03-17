@@ -1,7 +1,7 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
 set(MAGNETRON_SOURCES
-    magnetron/magnetron.h
+    include/magnetron/magnetron.h
     magnetron/magnetron.c
     magnetron/magnetron_aux.c
     magnetron/magnetron_cpu.c
@@ -19,4 +19,5 @@ else()
     add_library(magnetron STATIC ${MAGNETRON_SOURCES})
 endif()
 
+target_include_directories(magnetron PUBLIC include)
 target_include_directories(magnetron PRIVATE extern)
