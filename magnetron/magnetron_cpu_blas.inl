@@ -535,7 +535,6 @@ static void MAG_HOTPROC mag_vadd_e5m10(
     int64_t i=0;
     #if (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
         #ifdef __ARM_FEATURE_FP16_VECTOR_ARITHMETIC
-            printf("meow");
             for (; i+7 < numel; i += 8) {
                 float16x8_t va = vld1q_f16((const __fp16*)x+i);
                 float16x8_t vb = vld1q_f16((const __fp16*)y+i);
