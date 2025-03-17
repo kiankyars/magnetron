@@ -155,6 +155,32 @@ static MAG_AINLINE mag_e8m23_t mag_e5m10_cvt_e8m23(mag_e5m10_t x) {
 #define mag_e5m10p(t) ((const mag_e5m10_t*)(t)->storage.base)
 #define mag_e5m10p_mut(t) ((mag_e5m10_t*)(t)->storage.base)
 
+static void MAG_HOTPROC mag_vector_cast_mag_e8m23_cvt_e5m10(int64_t n, mag_e5m10_t* __restrict dst, const mag_e8m23_t* __restrict src) {
+    int64_t i=0;
+    #ifdef __ARM_NEON
+        for (; i+3 < n; i += 4) {
+            float32x4_t v = vld1q_f32(src+i);
+            vst1_u16((uint16_t*)dst+i, vcvt_f16_f32(v));
+        }
+    #endif
+    for (; i < n; ++i) {
+        dst[i] = mag_e8m23_cvt_e5m10(src[i]);
+    }
+}
+
+static void MAG_HOTPROC mag_vector_cast_mag_e5m10_cvt_e8m23(int64_t n, mag_e8m23_t* __restrict dst, const mag_e5m10_t* __restrict src) {
+    int64_t i=0;
+    #ifdef __ARM_NEON
+        for (; i+3 < n; i += 4) {
+            uint16x4_t v = vld1_u16((const uint16_t*)src+i);
+            vst1q_f32(dst+i, vcvt_f32_f16(v));
+        }
+    #endif
+    for (; i < n; ++i) {
+        dst[i] = mag_e5m10_cvt_e8m23(src[i]);
+    }
+}
+
 /* Generate N uniform canonical floats in [0, 1) using active algorithm and rescale to [min, max]. */
 static void MAG_AINLINE mag_prng_gen_uniform_vec_e8m23(mag_prng_state_t* prng, mag_e8m23_t* o, int64_t n, mag_e8m23_t min, mag_e8m23_t max) {
     mag_e8m23_t rescale_uniform = max - min;
@@ -255,9 +281,8 @@ static void MAG_AINLINE mag_prng_gen_uniform_vec_e5m10(mag_prng_state_t* prng, m
 
 /* Generate N normal (Gauss) distributed floats. */
 static void MAG_HOTPROC mag_prng_gen_normal_vec_e8m23(mag_prng_state_t* prng, mag_e8m23_t* o, int64_t n, mag_e8m23_t mean, mag_e8m23_t std) {
-    mag_assert2((n & 1) == 0);
     mag_prng_gen_uniform_vec_e8m23(prng, o, n, 0.0f, 1.0f); /* Generate uniform random numbers. */
-    for (int64_t i=0; i < n; i += 2) { /* Map uniform to normal dist with Box-Muller transform. */
+    for (int64_t i=0; i < n-1; i += 2) { /* Map uniform to normal dist with Box-Muller transform. TODO: Write SIMD sqrt and vectorize this. */
         mag_e8m23_t* u1 = o+i;
         mag_e8m23_t* u2 = o+i+1;
         mag_e8m23_t mag = std*sqrtf(-2.0f*logf(*u1));
@@ -266,13 +291,17 @@ static void MAG_HOTPROC mag_prng_gen_normal_vec_e8m23(mag_prng_state_t* prng, ma
         *u1 = y0;
         *u2 = y1;
     }
+    if (n & 1) {  /* Handle odd numel */
+        mag_e8m23_t u[2];
+        mag_prng_gen_uniform_vec_e8m23(prng, u, sizeof(u)/sizeof(*u), 0.0f, 1.0f);
+        o[n-1] = std*sqrtf(-2.0f*logf(u[0]))*cosf(MAG_TAU*u[1]) + mean;
+    }
 }
 
 /* Generate N normal (Gauss) distributed floats. */
 static void MAG_HOTPROC mag_prng_gen_normal_vec_e5m10(mag_prng_state_t* prng, mag_e5m10_t* o, int64_t n, mag_e8m23_t mean, mag_e8m23_t std) {
-    mag_assert2((n & 1) == 0);
     mag_prng_gen_uniform_vec_e5m10(prng, o, n, 0.0f, 1.0f); /* Generate uniform random numbers. */
-    for (int64_t i=0; i < n; i += 2) { /* Map uniform to normal dist with Box-Muller transform. */
+    for (int64_t i=0; i < n; i += 2) { /* Map uniform to normal dist with Box-Muller transform. TODO: Write SIMD sqrt and vectorize this. */
         mag_e8m23_t u1 = mag_e5m10_cvt_e8m23(o[i]);
         mag_e8m23_t u2 = mag_e5m10_cvt_e8m23(o[i+1]);
         mag_e8m23_t mag = std*sqrtf(-2.0f*logf(u1));
@@ -280,6 +309,11 @@ static void MAG_HOTPROC mag_prng_gen_normal_vec_e5m10(mag_prng_state_t* prng, ma
         mag_e8m23_t y1 = mag*sinf(MAG_TAU*u2) + mean;
         o[i] = mag_e8m23_cvt_e5m10(y0);
         o[i+1] = mag_e8m23_cvt_e5m10(y1);
+    }
+    if (n & 1) {  /* Handle odd numel */
+        mag_e8m23_t u[2];
+        mag_prng_gen_uniform_vec_e8m23(prng, u, sizeof(u)/sizeof(*u), 0.0f, 1.0f);
+        o[n-1] = mag_e8m23_cvt_e5m10(std*sqrtf(-2.0f*logf(u[0]))*cosf(MAG_TAU*u[1]) + mean);
     }
 }
 
@@ -2604,6 +2638,14 @@ static void MAG_HOTPROC mag_blas_matmul_e5m10(const mag_compute_payload_t* paylo
     }
 }
 
+static void mag_blas_vector_cast_e8m23_cvt_e5m10_stub(int64_t n, void* dst, const void* src) {
+    mag_vector_cast_mag_e8m23_cvt_e5m10(n, (mag_e5m10_t*)dst, (const mag_e8m23_t*)src);
+}
+
+static void mag_blas_vector_cast_e5m10_cvt_e8m23_stub(int64_t n, void* dst, const void* src) {
+    mag_vector_cast_mag_e5m10_cvt_e8m23(n, (mag_e8m23_t*)dst, (const mag_e5m10_t*)src);
+}
+
 #ifndef MAG_BLAS_SPECIALIZATION
 #error "BLAS specialization undefined"
 #endif
@@ -2767,7 +2809,7 @@ uint64_t MAG_BLAS_SPECIALIZATION_FEAT_REQUEST(void) {
 
 #endif
 
-static void (*const init_kernels[MAG_IOP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t* ctx) = {
+static void (*const mag_blas_lut_init_kernels[MAG_IOP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t* ctx) = {
     [MAG_IOP_NOP] = {
         [MAG_DTYPE_E8M23] = &mag_blas_nop,
         [MAG_DTYPE_E5M10] = &mag_blas_nop,
@@ -2786,7 +2828,7 @@ static void (*const init_kernels[MAG_IOP__NUM][MAG_DTYPE__NUM])(const mag_comput
     },
 };
 
-static void (*const forward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t* ctx) = {
+static void (*const mag_blas_lut_forward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t* ctx) = {
     [MAG_OP_NOP] = {
         [MAG_DTYPE_E8M23] = &mag_blas_nop,
         [MAG_DTYPE_E5M10] = &mag_blas_nop,
@@ -2953,7 +2995,7 @@ static void (*const forward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_comp
     },
 };
 
-static uint32_t (*const pre_forward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
+static uint32_t (*const mag_blas_lut_pre_forward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
     [MAG_OP_NOP] = NULL,
     [MAG_OP_CLONE] = NULL,
     [MAG_OP_VIEW] = NULL,
@@ -2997,7 +3039,7 @@ static uint32_t (*const pre_forward_kernels[MAG_OP__NUM])(mag_kernel_context_t*)
     [MAG_OP_MATMUL] = NULL,
 };
 
-static void (*const post_forward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
+static void (*const mag_blas_lut_post_forward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
     [MAG_OP_NOP] = NULL,
     [MAG_OP_CLONE] = NULL,
     [MAG_OP_VIEW] = NULL,
@@ -3041,7 +3083,7 @@ static void (*const post_forward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = 
     [MAG_OP_MATMUL] = NULL,
 };
 
-static void (*const backward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t* ctx) = {
+static void (*const mag_blas_lut_backward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t* ctx) = {
     [MAG_OP_NOP] = {
         [MAG_DTYPE_E8M23] = &mag_blas_nop,
         [MAG_DTYPE_E5M10] = &mag_blas_nop,
@@ -3208,7 +3250,7 @@ static void (*const backward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_com
     },
 };
 
-static uint32_t (*const pre_backward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
+static uint32_t (*const mag_blas_lut_pre_backward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
     [MAG_OP_NOP] = NULL,
     [MAG_OP_CLONE] = NULL,
     [MAG_OP_VIEW] = NULL,
@@ -3252,7 +3294,7 @@ static uint32_t (*const pre_backward_kernels[MAG_OP__NUM])(mag_kernel_context_t*
     [MAG_OP_MATMUL] = NULL,
 };
 
-static void (*const post_backward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
+static void (*const mag_blas_lut_post_backward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
     [MAG_OP_NOP] = NULL,
     [MAG_OP_CLONE] = NULL,
     [MAG_OP_VIEW] = NULL,
@@ -3294,21 +3336,29 @@ static void (*const post_backward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) =
     [MAG_OP_DIVS] = NULL,
     [MAG_OP_POWS] = NULL,
     [MAG_OP_MATMUL] = NULL,
+};
+
+static void (*const vector_cast[MAG_DTYPE__NUM])(int64_t, void*, const void*) = {
+    [MAG_DTYPE_E8M23] = &mag_blas_vector_cast_e8m23_cvt_e5m10_stub,
+    [MAG_DTYPE_E5M10] = &mag_blas_vector_cast_e5m10_cvt_e8m23_stub,
 };
 
 void MAG_BLAS_SPECIALIZATION(mag_kernel_registry_t* kernels) {
     for (unsigned i=0; i < MAG_IOP__NUM; ++i)
         for (unsigned j=0; j < MAG_DTYPE__NUM; ++j)
-            kernels->init[i][j] = init_kernels[i][j];
+            kernels->init[i][j] = mag_blas_lut_init_kernels[i][j];
 
     for (unsigned i=0; i < MAG_OP__NUM; ++i) {
         for (unsigned j=0; j < MAG_DTYPE__NUM; ++j) {
-            kernels->fwd[i][j] = forward_kernels[i][j];
-            kernels->bwd[i][j] = backward_kernels[i][j];
+            kernels->fwd[i][j] = mag_blas_lut_forward_kernels[i][j];
+            kernels->bwd[i][j] = mag_blas_lut_backward_kernels[i][j];
         }
-        kernels->fwd_pre[i] = pre_forward_kernels[i];
-        kernels->fwd_post[i] = post_forward_kernels[i];
-        kernels->bwd_pre[i] = pre_backward_kernels[i];
-        kernels->bwd_post[i] = post_backward_kernels[i];
+        kernels->fwd_pre[i] = mag_blas_lut_pre_forward_kernels[i];
+        kernels->fwd_post[i] = mag_blas_lut_post_forward_kernels[i];
+        kernels->bwd_pre[i] = mag_blas_lut_pre_backward_kernels[i];
+        kernels->bwd_post[i] = mag_blas_lut_post_backward_kernels[i];
     }
+
+    for (unsigned i=0; i < MAG_DTYPE__NUM; ++i)
+        kernels->vector_cast[i] = vector_cast[i];
 }

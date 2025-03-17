@@ -23,7 +23,6 @@ macro_substitutions: dict[str, str] = {
     '_Nullable': ' ',
 }
 
-
 def keep_line(line: str) -> bool:
     if line == '' or line.startswith('#'):
         return False

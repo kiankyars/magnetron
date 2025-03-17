@@ -22,7 +22,7 @@ int main(void) {
     clock_t begin = clock();
     mag_tensor_t* result = mag_add(a, b); /* Compute result = a + b */
     clock_t end = clock();
-    double secs = (double)(end - begin)/CLOCKS_PER_SEC;
+    mag_e11m52_t secs = (mag_e11m52_t)(end - begin)/CLOCKS_PER_SEC;
     printf("Computed in %f s\n", secs);
 
     /* Free tensors */

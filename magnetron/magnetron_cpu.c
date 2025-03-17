@@ -459,7 +459,7 @@ static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer
         .host = host,
         .broadcast = &mag_cpu_buf_broadcast,
         .cpy_host_device = &mag_cpu_buf_cpy_host_device,
-        .cpy_device_host = &mag_cpu_buf_cpy_device_host
+        .cpy_device_host = &mag_cpu_buf_cpy_device_host,
     };
 }
 
@@ -509,6 +509,17 @@ static void mag_cpu_destroy_device(mag_cpu_device_t* dvc) {
     (*mag_alloc)(dvc, 0);
 }
 
+static void mag_cpu_unpack_tensor_to_e8m23(mag_compute_device_t* dvc, mag_tensor_t* root, mag_e8m23_t* dst, size_t size) {
+    mag_cpu_device_t* cpu_dvc = dvc->impl;
+    mag_storage_buffer_t* src = &root->storage;
+    mag_assert2(size % sizeof(*dst) == 0);
+    if (root->dtype == MAG_DTYPE_E8M23) { /* If tensor is already f32, no cast is needed so just copy */
+        memcpy(dst, (const void*)src->base, size);
+        return;
+    }
+    (*cpu_dvc->kernels.vector_cast[root->dtype])(root->numel, (void*)dst, (const void*)src->base); /* Convert any other dtypes to f32 */
+}
+
 static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num_threads) {
     mag_cpu_device_t* cpu_dvc = mag_cpu_init_device(ctx, num_threads);
     mag_compute_device_t* dvc = (*mag_alloc)(NULL, sizeof(*dvc));
@@ -521,7 +532,8 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num
         .eager_exec_fwd = &mag_cpu_exec_fwd,
         .eager_exec_bwd = &mag_cpu_exec_bwd,
         .alloc_storage = &mag_cpu_alloc_storage,
-        .free_storage = &mag_cpu_free_storage
+        .free_storage = &mag_cpu_free_storage,
+        .unpack_tensor_to_e8m23 = &mag_cpu_unpack_tensor_to_e8m23
     };
     snprintf(dvc->name, sizeof(dvc->name), "%s", ctx->machine.cpu_name);
     return dvc;

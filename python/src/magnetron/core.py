@@ -468,13 +468,13 @@ class Tensor:
 
     def item(self) -> float:
         assert self.is_scalar, 'Tensor must be a scalar'
-        return self[0]
+        return self.tolist()[0]
 
     def tolist(self) -> list[float]:
-        assert self.dtype == DType.F32, 'Invalid data type'
-        return ffi.unpack(
-            ffi.cast('float*', C.mag_tensor_data_ptr(self._ptr)), self.numel
-        )
+        ptr: ffi.CData = C.mag_tensor_unpack_cloned_data(self._ptr) # Convert tensor dtype to float array
+        unpacked: list[float] = ffi.unpack(ptr, self.numel)
+        C.mag_tensor_free_cloned_data(ptr) # Free allocated native float array
+        return unpacked
 
     @property
     def data_size(self) -> int:

@@ -60,7 +60,7 @@ class optimizer {
 
 class sgd final : public optimizer {
   public:
-    explicit sgd(std::span<mag_tensor_t*> params, float lr) : optimizer{params}, lr{lr} {}
+    explicit sgd(std::span<mag_tensor_t*> params, mag_e8m23_t lr) : optimizer{params}, lr{lr} {}
 
     auto step() -> void override {
         for (auto*& param : params()) {
@@ -68,7 +68,7 @@ class sgd final : public optimizer {
         }
     }
 
-    float lr{};
+    mag_e8m23_t lr{};
 };
 
 class linear_layer final : public module {
@@ -76,7 +76,7 @@ class linear_layer final : public module {
     linear_layer(mag_ctx_t* ctx, std::int64_t in_features, std::int64_t out_features, bool has_bias = true) {
         weight = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, out_features, in_features);
         mag_tensor_fill_random_normal(weight, 0.0f, 1.0f);
-        weight = mag_divs_(weight, static_cast<float>(std::sqrt(in_features + out_features)));
+        weight = mag_divs_(weight, static_cast<mag_e8m23_t>(std::sqrt(in_features + out_features)));
         register_param(weight);
         if (has_bias) {
             bias = mag_tensor_create_1d(ctx, MAG_DTYPE_E8M23, out_features);
@@ -122,9 +122,9 @@ TEST(network, full_xor_model) {
     xor_network model{ctx};
     sgd optimizer{model.params(), 0.1f};
 
-    static constexpr std::array<std::array<float, 2>, 4> x_data = {
+    static constexpr std::array<std::array<mag_e8m23_t, 2>, 4> x_data = {
         {{0.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}}};
-    static constexpr std::array<std::array<float, 1>, 4> y_data = {{{0.0f}, {1.0f}, {1.0f}, {0.0f}}};
+    static constexpr std::array<std::array<mag_e8m23_t, 1>, 4> y_data = {{{0.0f}, {1.0f}, {1.0f}, {0.0f}}};
 
     mag_tensor_t* x = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, x_data.size(), x_data[0].size());
     mag_tensor_copy_buffer_from(x, x_data.data(), sizeof(x_data));

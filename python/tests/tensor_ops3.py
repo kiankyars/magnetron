@@ -5,7 +5,6 @@ import numpy as np
 
 EPS = 1e-4
 
-
 def tonumpy(t: Tensor) -> np.array:
     return np.array(t.tolist(), dtype=np.float32).reshape(t.shape)
 
@@ -160,5 +159,5 @@ def test_matmul_x_transposed() -> None:
     np_result = np.matmul(np_a.T, np_b)
     assert mag_result.shape == np_result.shape
     assert mag_result.shape == (2, 4)
-    np.testing.assert_allclose(tonumpy(mag_result), np_result, atol=EPS)
+    np.testing.assert_allclose(tonumpy(mag_result), np_result, atol=EPS_F32)
 """

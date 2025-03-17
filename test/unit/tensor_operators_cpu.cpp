@@ -25,8 +25,8 @@ static constexpr std::int64_t k_lim_broadcast = 2;
                                                                                                                        \
                                 mag_tensor_t* r = mag_##op(x);                                                         \
                                                                                                                        \
-                                const auto* b_x = static_cast<const float*>(mag_tensor_data_ptr(x));                   \
-                                const auto* b_r = static_cast<const float*>(mag_tensor_data_ptr(r));                   \
+                                const auto* b_x = static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(x));                   \
+                                const auto* b_r = static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(r));                   \
                                 ASSERT_EQ(mag_tensor_numel(x), mag_tensor_numel(r));                                   \
                                 ASSERT_NE(mag_tensor_data_ptr(r), mag_tensor_data_ptr(x));                             \
                                 for (std::int64_t i = 0; i < mag_tensor_numel(x); ++i) {                               \
@@ -49,7 +49,7 @@ static constexpr std::int64_t k_lim_broadcast = 2;
                             for (std::int64_t i5 = 1; i5 <= k_lim_same_shape; ++i5) {                                  \
                                 mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5);  \
                                 mag_tensor_fill_random_uniform(x, 0.0f, 1.0f);                                         \
-                                std::vector<float> x_origin{};                                                         \
+                                std::vector<mag_e8m23_t> x_origin{};                                                         \
                                 mag_tensor_buf_e8m23_to_vec(x, x_origin);                                              \
                                                                                                                        \
                                 mag_tensor_t* r = mag_##op##_(x);                                                      \
@@ -57,7 +57,7 @@ static constexpr std::int64_t k_lim_broadcast = 2;
                                                                                                                        \
                                 const auto* b_x = x_origin.data();                                                     \
                                 mag_tensor_set_name(x, "X");                                                           \
-                                const auto* b_r = static_cast<const float*>(mag_tensor_data_ptr(r));                   \
+                                const auto* b_r = static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(r));                   \
                                 ASSERT_EQ(mag_tensor_numel(x), mag_tensor_numel(r));                                   \
                                 ASSERT_EQ(mag_tensor_data_ptr(x), mag_tensor_data_ptr(r));                             \
                                 for (std::int64_t i = 0; i < mag_tensor_numel(x); ++i) {                               \
@@ -70,7 +70,7 @@ static constexpr std::int64_t k_lim_broadcast = 2;
         mag_ctx_destroy(ctx);                                                                                          \
     }
 
-impl_test_unary_op(abs, 1e-6, abs, [](float x) -> float { return std::abs(x); })
+impl_test_unary_op(abs, 1e-6, abs, [](mag_e8m23_t x) -> mag_e8m23_t { return std::abs(x); })
 
 TEST(operators_cpu, neg_same_shape) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
@@ -83,8 +83,8 @@ TEST(operators_cpu, neg_same_shape) {
                             mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5);
                             mag_tensor_fill_random_uniform(x, 0.0f, 1.0f);
                             mag_tensor_t* r = mag_neg(x);
-                            const auto* b_x = static_cast<const float*>(mag_tensor_data_ptr(x));
-                            const auto* b_r = static_cast<const float*>(mag_tensor_data_ptr(r));
+                            const auto* b_x = static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(x));
+                            const auto* b_r = static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(r));
                             ASSERT_EQ(mag_tensor_numel(x), mag_tensor_numel(r));
                             for (std::int64_t i = 0; i < mag_tensor_numel(x); ++i) {
                                 ASSERT_EQ(b_r[i], -b_x[i]);
@@ -95,51 +95,51 @@ TEST(operators_cpu, neg_same_shape) {
     mag_ctx_destroy(ctx);
 }
 
-impl_test_unary_op(log, 1e-6, log, [](float x) -> float { return std::log(x); })
+impl_test_unary_op(log, 1e-6, log, [](mag_e8m23_t x) -> mag_e8m23_t { return std::log(x); })
 
-impl_test_unary_op(sqr, 1e-9, sqr, [](float x) -> float { return x * x; })
+impl_test_unary_op(sqr, 1e-9, sqr, [](mag_e8m23_t x) -> mag_e8m23_t { return x * x; })
 
-impl_test_unary_op(sqrt, 1e-9, sqrt, [](float x) -> float { return std::sqrt(x); })
+impl_test_unary_op(sqrt, 1e-9, sqrt, [](mag_e8m23_t x) -> mag_e8m23_t { return std::sqrt(x); })
 
-impl_test_unary_op(sin, 1e-6, sin, [](float x) -> float { return std::sin(x); })
+impl_test_unary_op(sin, 1e-6, sin, [](mag_e8m23_t x) -> mag_e8m23_t { return std::sin(x); })
 
 #if 0 // TODO fix
-impl_test_unary_op(cos, 1e-6, cos, [](float x) -> float {
+impl_test_unary_op(cos, 1e-6, cos, [](mag_e8m23_t x) -> mag_e8m23_t {
 return std::cos(x);
 })
 #endif
 
-impl_test_unary_op(step, 1e-9, step, [](float x) -> float { return x >= 0.0f ? 1.0f : 0.0f; })
+impl_test_unary_op(step, 1e-9, step, [](mag_e8m23_t x) -> mag_e8m23_t { return x >= 0.0f ? 1.0f : 0.0f; })
 
-impl_test_unary_op(exp, 1e-6, exp, [](float x) -> float { return std::exp(x); })
+impl_test_unary_op(exp, 1e-6, exp, [](mag_e8m23_t x) -> mag_e8m23_t { return std::exp(x); })
 
-impl_test_unary_op(softmax, 1e-6, softmax, [](float x) -> float { return std::exp(x); })
+impl_test_unary_op(softmax, 1e-6, softmax, [](mag_e8m23_t x) -> mag_e8m23_t { return std::exp(x); })
 impl_test_unary_op(softmax_dv, 1e-6, softmax_dv,
-[](float x) -> float { return std::exp(x); })
+[](mag_e8m23_t x) -> mag_e8m23_t { return std::exp(x); })
 
-impl_test_unary_op(sigmoid, 1e-6, sigmoid, [](float x) -> float { return 1.0f / (1.0f + std::exp(-x)); })
-impl_test_unary_op(sigmoid_dv, 1e-6, sigmoid_dv, [](float x) -> float { return x * (1.0f - x); })
-impl_test_unary_op(hard_sigmoid, 1e-6, hard_sigmoid, [](float x) -> float {
+impl_test_unary_op(sigmoid, 1e-6, sigmoid, [](mag_e8m23_t x) -> mag_e8m23_t { return 1.0f / (1.0f + std::exp(-x)); })
+impl_test_unary_op(sigmoid_dv, 1e-6, sigmoid_dv, [](mag_e8m23_t x) -> mag_e8m23_t { return x * (1.0f - x); })
+impl_test_unary_op(hard_sigmoid, 1e-6, hard_sigmoid, [](mag_e8m23_t x) -> mag_e8m23_t {
    return std::min(1.0f, std::max(0.0f, (x + 3.0f) / 6.0f));
 })
-// impl_test_unary_op(hard_sigmoid_dv, HARD_SIGMOID_DV, [](float x) -> float {
+// impl_test_unary_op(hard_sigmoid_dv, HARD_SIGMOID_DV, [](mag_e8m23_t x) -> mag_e8m23_t {
 //     return -(std::exp(x) / ((std::exp(x)+1.0f)*(std::exp(x)+1.0f)));
 // })
 
-impl_test_unary_op(silu, 1e-6, silu, [](float x) -> float { return x / (1.0f + std::exp(-x)); })
-// impl_test_unary_op(silu_dv, SILU_DV, [](float x) -> float {
+impl_test_unary_op(silu, 1e-6, silu, [](mag_e8m23_t x) -> mag_e8m23_t { return x / (1.0f + std::exp(-x)); })
+// impl_test_unary_op(silu_dv, SILU_DV, [](mag_e8m23_t x) -> mag_e8m23_t {
 //     return -(std::exp(x) / ((std::exp(x)+1.0f)*(std::exp(x)+1.0f)));
 // })
 
-impl_test_unary_op(tanh, 1e-3, tanh, [](float x) -> float { return std::tanh(x); })
-impl_test_unary_op(tanh_dv, 1e-4, tanh_dv, [](float x) -> float { return 1.0f - (std::tanh(x) * std::tanh(x)); })
+impl_test_unary_op(tanh, 1e-3, tanh, [](mag_e8m23_t x) -> mag_e8m23_t { return std::tanh(x); })
+impl_test_unary_op(tanh_dv, 1e-4, tanh_dv, [](mag_e8m23_t x) -> mag_e8m23_t { return 1.0f - (std::tanh(x) * std::tanh(x)); })
 
-impl_test_unary_op(relu, 1e-9, relu, [](float x) -> float { return std::max(x, 0.0f); })
-impl_test_unary_op(relu_dv, 1e-9, relu_dv, [](float x) -> float { return x <= 0.0f ? 0.0f : 1.0f; })
+impl_test_unary_op(relu, 1e-9, relu, [](mag_e8m23_t x) -> mag_e8m23_t { return std::max(x, 0.0f); })
+impl_test_unary_op(relu_dv, 1e-9, relu_dv, [](mag_e8m23_t x) -> mag_e8m23_t { return x <= 0.0f ? 0.0f : 1.0f; })
 
-impl_test_unary_op(gelu, 1e-3, gelu, [](float x) -> float { return 0.5f * x * (1.0f + std::tanh(0.79788456080286535587989211986876f * x * (1.0f + 0.044715f * x * x)));
+impl_test_unary_op(gelu, 1e-3, gelu, [](mag_e8m23_t x) -> mag_e8m23_t { return 0.5f * x * (1.0f + std::tanh(0.79788456080286535587989211986876f * x * (1.0f + 0.044715f * x * x)));
                                        })
-    // impl_test_unary_op(gelu_dv, GELU_DV, [](float x) -> float {
+    // impl_test_unary_op(gelu_dv, GELU_DV, [](mag_e8m23_t x) -> mag_e8m23_t {
     //     return x <= 0.0f ? 0.0f : 1.0f;
     // })
 
@@ -154,8 +154,8 @@ TEST(operators_cpu, clone_same_shape) {
         mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5);
         mag_tensor_fill_random_uniform(x, 0.0f, 1.0f);
         mag_tensor_t* r = mag_clone(x);
-        const auto* b_x = static_cast<const float*>(mag_tensor_data_ptr(x));
-        const auto* b_r = static_cast<const float*>(mag_tensor_data_ptr(r));
+        const auto* b_x = static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(x));
+        const auto* b_r = static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(r));
         ASSERT_EQ(mag_tensor_numel(x), mag_tensor_numel(r));
         for (std::int64_t i = 0; i < mag_tensor_numel(x); ++i) {
             ASSERT_EQ(b_r[i], b_x[i]);
@@ -177,8 +177,8 @@ TEST(operators_cpu, clone_transpose) {
         mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5);
         mag_tensor_fill_random_uniform(x, 0.0f, 1.0f);
         mag_tensor_t* r = mag_clone(mag_transpose(x));
-        const auto* b_x = static_cast<const float*>(mag_tensor_data_ptr(x));
-        const auto* b_r = static_cast<const float*>(mag_tensor_data_ptr(r));
+        const auto* b_x = static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(x));
+        const auto* b_r = static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(r));
         ASSERT_EQ(mag_tensor_numel(x), mag_tensor_numel(r));
         for (std::int64_t i = 0; i < mag_tensor_numel(x); ++i) {
             ASSERT_EQ(b_r[i], b_x[i]);
@@ -202,7 +202,7 @@ TEST(operators_cpu, clone_transpose) {
                             for (std::int64_t i5 = 1; i5 <= k_lim_same_shape; ++i5) {                                  \
                                 mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_##dtype, i0, i1, i2, i3, i4, i5);\
                                 mag_tensor_t* y = mag_clone(x);                                                        \
-                                mag_tensor_fill_random_uniform(x, 0.0f, 1.0f);                                         \
+                                mag_tensor_fill_random_uniform(x, -5.0f, 5.0f);                                         \
                                 mag_tensor_fill_random_uniform(y, -5.0f, 5.0f);                                        \
                                                                                                                        \
                                 mag_tensor_t* r = mag_##name(x, y);                                                    \
@@ -345,7 +345,7 @@ TEST(operators_cpu, clone_transpose) {
                                 mag_tensor_fill_random_uniform(x, 0.0f, 1.0f);                                         \
                                                                                                                        \
                                 mag_tensor_t* r =                                                                      \
-                                    mag_##name##s(x, static_cast<float>(i0 + i1 + i2 + i3 + i4 + i5) * 0.221f);          \
+                                    mag_##name##s(x, static_cast<mag_e8m23_t>(i0 + i1 + i2 + i3 + i4 + i5) * 0.221f);          \
                                                                                                                        \
                                 const auto* b_x = static_cast<const mag_##dtype_T##_t*>(mag_tensor_data_ptr(x));                   \
                                 const auto* b_r = static_cast<const mag_##dtype_T##_t*>(mag_tensor_data_ptr(r));                   \
@@ -353,7 +353,7 @@ TEST(operators_cpu, clone_transpose) {
                                 for (std::int64_t i = 0; i < mag_tensor_numel(x); ++i) {                               \
                                     ASSERT_NEAR(                                                                   \
                                         castor(b_r[i]),                                                                        \
-                                        scalar_op(b_x[i], contor(static_cast<float>(i0 + i1 + i2 + i3 + i4 + i5) * 0.221f)), eps);   \
+                                        scalar_op(b_x[i], contor(static_cast<mag_e8m23_t>(i0 + i1 + i2 + i3 + i4 + i5) * 0.221f)), eps);   \
                                 }                                                                                      \
                                 mag_tensor_decref(r);                                                                  \
                                 mag_tensor_decref(x);                                                                  \
@@ -407,14 +407,14 @@ TEST(operators_cpu, pows) {
     for (std::int64_t i5 = 1; i5 <= k_lim_same_shape; ++i5) {
         mag_tensor_t* x = mag_tensor_create_6d(ctx, MAG_DTYPE_E8M23, i0, i1, i2, i3, i4, i5);
         mag_tensor_fill_random_uniform(x, 0.0f, 1.0f);
-        mag_tensor_t* r = mag_pows(x, static_cast<float>(i0 + i1 + i2 + i3 + i4 + i5) * 0.221f);
-        const auto* b_x = static_cast<const float*>(mag_tensor_data_ptr(x));
-        const auto* b_r = static_cast<const float*>(mag_tensor_data_ptr(r));
+        mag_tensor_t* r = mag_pows(x, static_cast<mag_e8m23_t>(i0 + i1 + i2 + i3 + i4 + i5) * 0.221f);
+        const auto* b_x = static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(x));
+        const auto* b_r = static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(r));
         ASSERT_NE(mag_tensor_data_ptr(r), mag_tensor_data_ptr(x));
         for (std::int64_t i = 0; i < mag_tensor_numel(x); ++i) {
             ASSERT_FLOAT_EQ(
                 b_r[i],
-                std::pow(b_x[i], (static_cast<float>(i0 + i1 + i2 + i3 + i4 + i5) * 0.221f)));
+                std::pow(b_x[i], (static_cast<mag_e8m23_t>(i0 + i1 + i2 + i3 + i4 + i5) * 0.221f)));
         }
         mag_tensor_decref(r);
         mag_tensor_decref(x);
@@ -428,11 +428,7 @@ TEST(operators_cpu, arithmetic_mean) {
     mag_tensor_fill_random_uniform(A, -1.0f, 1.0f);
     mag_tensor_t* R = mag_mean(A);
     ASSERT_NE(R, nullptr);
-    double a_mean = 0.0;
-    for (std::int64_t i = 0; i < mag_tensor_numel(A); ++i)
-        a_mean += static_cast<double>(static_cast<const float*>(mag_tensor_data_ptr(A))[i]);
-    a_mean /= static_cast<double>(mag_tensor_numel(A));
-    ASSERT_NEAR(static_cast<float>(a_mean), *static_cast<const float*>(mag_tensor_data_ptr(R)), 1e-9);
+    ASSERT_NEAR(static_cast<mag_e8m23_t>(compute_mean<mag_e8m23_t>(R)), *static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(R)), 1e-9);
     mag_tensor_decref(A);
     mag_tensor_decref(R);
     mag_ctx_destroy(ctx);
@@ -444,9 +440,9 @@ TEST(operators_cpu, min) {
     mag_tensor_fill_random_uniform(A, -1.0f, 1.0f);
     mag_tensor_t* R = mag_min(A);
     ASSERT_NE(R, nullptr);
-    float a_min = *std::min_element(static_cast<const float*>(mag_tensor_data_ptr(A)),
-                                    static_cast<const float*>(mag_tensor_data_ptr(A)) + mag_tensor_numel(A));
-    ASSERT_FLOAT_EQ(a_min, *static_cast<const float*>(mag_tensor_data_ptr(R)));
+    mag_e8m23_t a_min = *std::min_element(static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(A)),
+                                    static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(A)) + mag_tensor_numel(A));
+    ASSERT_FLOAT_EQ(a_min, *static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(R)));
     mag_tensor_decref(A);
     mag_tensor_decref(R);
     mag_ctx_destroy(ctx);
@@ -458,9 +454,9 @@ TEST(operators_cpu, max) {
     mag_tensor_fill_random_uniform(A, -1.0f, 1.0f);
     mag_tensor_t* R = mag_max(A);
     ASSERT_NE(R, nullptr);
-    float a_min = *std::max_element(static_cast<const float*>(mag_tensor_data_ptr(A)),
-                                    static_cast<const float*>(mag_tensor_data_ptr(A)) + mag_tensor_numel(A));
-    ASSERT_FLOAT_EQ(a_min, *static_cast<const float*>(mag_tensor_data_ptr(R)));
+    mag_e8m23_t a_min = *std::max_element(static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(A)),
+                                    static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(A)) + mag_tensor_numel(A));
+    ASSERT_FLOAT_EQ(a_min, *static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(R)));
     mag_tensor_decref(A);
     mag_tensor_decref(R);
     mag_ctx_destroy(ctx);
@@ -472,10 +468,10 @@ TEST(operators_cpu, hsum) {
     mag_tensor_fill_random_uniform(A, -1.0f, 1.0f);
     mag_tensor_t* R = mag_sum(A);
     ASSERT_NE(R, nullptr);
-    double a_sum = 0.0;
+    mag_e11m52_t a_sum = 0.0;
     for (std::int64_t i = 0; i < mag_tensor_numel(A); ++i)
-        a_sum += static_cast<double>(static_cast<const float*>(mag_tensor_data_ptr(A))[i]);
-    ASSERT_NEAR(static_cast<float>(a_sum), *static_cast<const float*>(mag_tensor_data_ptr(R)), 1e-9);
+        a_sum += static_cast<mag_e11m52_t>(static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(A))[i]);
+    ASSERT_NEAR(static_cast<mag_e8m23_t>(a_sum), *static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(R)), 1e-9);
     mag_tensor_decref(A);
     mag_tensor_decref(R);
     mag_ctx_destroy(ctx);
@@ -520,9 +516,9 @@ TEST(operators_cpu, threaded_add) {
     mag_tensor_t* R = mag_add(A, B);
     ASSERT_NE(R, nullptr);
 
-    const auto* a = static_cast<const float*>(mag_tensor_data_ptr(A));
-    const auto* b = static_cast<const float*>(mag_tensor_data_ptr(B));
-    const auto* r = static_cast<const float*>(mag_tensor_data_ptr(R));
+    const auto* a = static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(A));
+    const auto* b = static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(B));
+    const auto* r = static_cast<const mag_e8m23_t*>(mag_tensor_data_ptr(R));
     const auto numel = mag_tensor_numel(R);
     for (std::int64_t i = 0; i < numel; ++i) {
         ASSERT_FLOAT_EQ(r[i], a[i] + b[i]);

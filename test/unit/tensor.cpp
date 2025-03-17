@@ -18,7 +18,7 @@ TEST(mag_tensor_t, init_1d) {
     ASSERT_EQ(mag_tensor_shape(tensor)[1], 1);
     ASSERT_EQ(mag_tensor_shape(tensor)[2], 1);
     ASSERT_EQ(mag_tensor_shape(tensor)[3], 1);
-    ASSERT_EQ(mag_tensor_data_size(tensor), 10 * sizeof(float));
+    ASSERT_EQ(mag_tensor_data_size(tensor), 10 * sizeof(mag_e8m23_t));
     ASSERT_EQ(mag_tensor_numel(tensor), 10);
     ASSERT_EQ(mag_tensor_num_cols(tensor), 10);
     ASSERT_EQ(mag_tensor_num_rows(tensor), 1);
@@ -48,7 +48,7 @@ TEST(mag_tensor_t, init_2d) {
     ASSERT_EQ(mag_tensor_shape(tensor)[1], 4);
     ASSERT_EQ(mag_tensor_shape(tensor)[2], 1);
     ASSERT_EQ(mag_tensor_shape(tensor)[3], 1);
-    ASSERT_EQ(mag_tensor_data_size(tensor), 10 * 4 * sizeof(float));
+    ASSERT_EQ(mag_tensor_data_size(tensor), 10 * 4 * sizeof(mag_e8m23_t));
     ASSERT_EQ(mag_tensor_numel(tensor), 10 * 4);
     ASSERT_EQ(mag_tensor_num_cols(tensor), 10);
     ASSERT_EQ(mag_tensor_num_rows(tensor), 4);
@@ -78,7 +78,7 @@ TEST(mag_tensor_t, init_3d) {
     ASSERT_EQ(mag_tensor_shape(tensor)[1], 4);
     ASSERT_EQ(mag_tensor_shape(tensor)[2], 2);
     ASSERT_EQ(mag_tensor_shape(tensor)[3], 1);
-    ASSERT_EQ(mag_tensor_data_size(tensor), 10 * 4 * 2 * sizeof(float));
+    ASSERT_EQ(mag_tensor_data_size(tensor), 10 * 4 * 2 * sizeof(mag_e8m23_t));
     ASSERT_EQ(mag_tensor_numel(tensor), 10 * 4 * 2);
     ASSERT_EQ(mag_tensor_num_cols(tensor), 10);
     ASSERT_EQ(mag_tensor_num_rows(tensor), 8);
@@ -108,7 +108,7 @@ TEST(mag_tensor_t, init_4d) {
     ASSERT_EQ(mag_tensor_shape(tensor)[1], 4);
     ASSERT_EQ(mag_tensor_shape(tensor)[2], 2);
     ASSERT_EQ(mag_tensor_shape(tensor)[3], 5);
-    ASSERT_EQ(mag_tensor_data_size(tensor), 10 * 4 * 2 * 5 * sizeof(float));
+    ASSERT_EQ(mag_tensor_data_size(tensor), 10 * 4 * 2 * 5 * sizeof(mag_e8m23_t));
     ASSERT_EQ(mag_tensor_numel(tensor), 10 * 4 * 2 * 5);
     ASSERT_EQ(mag_tensor_num_cols(tensor), 10);
     ASSERT_EQ(mag_tensor_num_rows(tensor), 40);
@@ -140,7 +140,7 @@ TEST(mag_tensor_t, init_5d) {
     ASSERT_EQ(mag_tensor_shape(tensor)[3], 5);
     ASSERT_EQ(mag_tensor_shape(tensor)[4], 3);
     ASSERT_EQ(mag_tensor_shape(tensor)[5], 1);
-    ASSERT_EQ(mag_tensor_data_size(tensor), 10 * 4 * 2 * 5 * 3 * sizeof(float));
+    ASSERT_EQ(mag_tensor_data_size(tensor), 10 * 4 * 2 * 5 * 3 * sizeof(mag_e8m23_t));
     ASSERT_EQ(mag_tensor_numel(tensor), 10 * 4 * 2 * 5 * 3);
     ASSERT_EQ(mag_tensor_num_cols(tensor), 10);
     ASSERT_EQ(mag_tensor_num_rows(tensor), 40 * 3);
@@ -175,7 +175,7 @@ TEST(mag_tensor_t, init_6d) {
     ASSERT_EQ(mag_tensor_shape(tensor)[3], 5);
     ASSERT_EQ(mag_tensor_shape(tensor)[4], 3);
     ASSERT_EQ(mag_tensor_shape(tensor)[5], 2);
-    ASSERT_EQ(mag_tensor_data_size(tensor), 10 * 4 * 2 * 5 * 3 * 2 * sizeof(float));
+    ASSERT_EQ(mag_tensor_data_size(tensor), 10 * 4 * 2 * 5 * 3 * 2 * sizeof(mag_e8m23_t));
     ASSERT_EQ(mag_tensor_numel(tensor), 10 * 4 * 2 * 5 * 3 * 2);
     ASSERT_EQ(mag_tensor_num_cols(tensor), 10);
     ASSERT_EQ(mag_tensor_num_rows(tensor), 40 * 3 * 2);
@@ -278,7 +278,7 @@ TEST(mag_tensor_t, buffer_linearly) {
 
     mag_tensor_t* origin = mag_tensor_create_4d(ctx, MAG_DTYPE_E8M23, 1, 2, 3, 4);
     mag_tensor_fill(origin, 0.0f);
-    auto* buf = static_cast<float*>(mag_tensor_data_ptr(origin));
+    auto* buf = static_cast<mag_e8m23_t*>(mag_tensor_data_ptr(origin));
     buf[0] = 1.0f;
     buf[mag_tensor_numel(origin) - 1] = -1.0f;
     for (int64_t i = 0; i < mag_tensor_numel(origin); ++i) {
@@ -301,15 +301,15 @@ TEST(mag_tensor_t, view) {
     ASSERT_EQ(mag_tensor_data_ptr(slice1), mag_tensor_data_ptr(origin));
     ASSERT_EQ(mag_tensor_data_size(slice1), mag_tensor_data_size(origin));
     ASSERT_EQ(mag_tensor_numel(slice1), mag_tensor_numel(origin));
-    auto* buf = static_cast<float*>(mag_tensor_data_ptr(slice1));
+    auto* buf = static_cast<mag_e8m23_t*>(mag_tensor_data_ptr(slice1));
     for (int64_t i = 0; i < mag_tensor_numel(slice1); ++i) {
         ASSERT_FLOAT_EQ(buf[i], 2.0f);
     }
     mag_tensor_t* slice2 = mag_view(origin);
     ASSERT_EQ(mag_tensor_data_ptr(slice2), mag_tensor_data_ptr(origin));
-    ASSERT_EQ(mag_tensor_data_size(slice2), 10 * 4 * 2 * 5 * sizeof(float));
+    ASSERT_EQ(mag_tensor_data_size(slice2), 10 * 4 * 2 * 5 * sizeof(mag_e8m23_t));
     ASSERT_EQ(mag_tensor_numel(slice2), 10 * 4 * 2 * 5);
-    auto* buf_slice2 = static_cast<float*>(mag_tensor_data_ptr(slice2));
+    auto* buf_slice2 = static_cast<mag_e8m23_t*>(mag_tensor_data_ptr(slice2));
     for (int64_t i = 0; i < mag_tensor_numel(slice2); ++i) {
         ASSERT_FLOAT_EQ(buf_slice2[i], 2.0f);
     }
@@ -386,7 +386,7 @@ TEST(mag_tensor_t, isclose) {
     ASSERT_FALSE(mag_tensor_is_close(clone, clone2, FLT_EPSILON, nullptr));
     mag_tensor_fill(clone, 0.0f);
     mag_tensor_fill(clone2, 0.0f);
-    double percent = 0.0;
+    mag_e11m52_t percent = 0.0;
     ASSERT_TRUE(mag_tensor_is_close(clone, clone2, FLT_EPSILON, & percent));
     ASSERT_DOUBLE_EQ(percent, 100.0);
     mag_tensor_fill(clone2, 1.0f);
@@ -404,7 +404,7 @@ TEST(mag_tensor_t, isclose) {
 TEST(mag_tensor_t, copy_buffer_from) {
     mag_ctx_t* ctx = mag_ctx_create(MAG_COMPUTE_DEVICE_TYPE_CPU);
 
-    std::array<float, 2 * 2 * 2 * 2> buf{};
+    std::array<mag_e8m23_t, 2 * 2 * 2 * 2> buf{};
     for (auto& x : buf)
         x = 2.5f;
 

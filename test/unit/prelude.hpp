@@ -21,6 +21,7 @@ inline auto mag_tensor_buf_e5m10_to_vec(const mag_tensor_t* tensor, std::vector<
     std::memcpy(out.data(), mag_tensor_data_ptr(tensor), mag_tensor_data_size(tensor));
 }
 
+// Emulated (softfp) reference impl of f16 -> f32
 [[nodiscard]] constexpr auto mag_e5m10_to_e8m23_ref(const mag_e5m10_t x) noexcept -> mag_e8m23_t {
     std::uint32_t w = static_cast<std::uint32_t>(x.bits)<<16;
     std::uint32_t sign = w & 0x80000000u;
@@ -37,6 +38,7 @@ inline auto mag_tensor_buf_e5m10_to_vec(const mag_tensor_t* tensor, std::vector<
     return std::bit_cast<mag_e8m23_t>(r);
 }
 
+// Emulated (softfp) reference impl of f32 -> f16
 [[nodiscard]] constexpr auto mag_e8m23_to_e5m10_ref(const mag_e8m23_t x) noexcept -> mag_e5m10_t {
     mag_e8m23_t base = fabs(x)*0x1.0p+112f*0x1.0p-110f;
     std::uint32_t shl1_w = std::bit_cast<std::uint32_t>(x)+std::bit_cast<std::uint32_t>(x);
@@ -46,4 +48,31 @@ inline auto mag_tensor_buf_e5m10_to_vec(const mag_tensor_t* tensor, std::vector<
     std::uint32_t mant_bits = std::bit_cast<std::uint32_t>(flex) & 0x00000fffu;
     std::uint32_t nonsign = exp_bits + mant_bits;
     return mag_e5m10_t{.bits=static_cast<std::uint16_t>((sign>>16)|(shl1_w > 0xff000000 ? 0x7e00 : nonsign))};
+}
+
+template <typename T>
+[[nodiscard]] auto compute_mean(std::span<const T> data) -> mag_e11m52_t {
+    mag_e11m52_t sum = 0.0;
+    for (const T x : data) sum += x;
+    return sum / static_cast<mag_e11m52_t>(data.size());
+}
+
+template <typename T>
+[[nodiscard]] auto compute_mean(const mag_tensor_t* tensor) -> mag_e11m52_t {
+    return compute_mean(std::span<const T>{reinterpret_cast<const T*>(mag_tensor_data_ptr(tensor)), static_cast<std::size_t>(tensor->numel)});
+}
+
+template <typename T>
+[[nodiscard]] auto compute_std(std::span<const T> data) -> mag_e11m52_t {
+    mag_e11m52_t sum = 0.0;
+    mag_e11m52_t mean = compute_mean(data);
+    for (const T x : data) {
+        sum += std::pow((x - mean), 2.0);
+    }
+    return std::sqrt(sum / static_cast<mag_e11m52_t>(data.size()));
+}
+
+template <typename T>
+[[nodiscard]] auto compute_std(const mag_tensor_t* tensor) -> mag_e11m52_t {
+    return compute_std(std::span<const T>{reinterpret_cast<const T*>(mag_tensor_data_ptr(tensor)), static_cast<std::size_t>(tensor->numel)});
 }

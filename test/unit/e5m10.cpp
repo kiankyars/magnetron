@@ -9,8 +9,8 @@
 #include <numbers>
 
 TEST(e5m10, e5m10_to_e8m23) {
-    ASSERT_NEAR(mag_e5m10_cvt_e8m23(MAG_E5M10_E), std::numbers::e_v<float>, 1e-3);
-    ASSERT_NEAR(mag_e5m10_cvt_e8m23(MAG_E5M10_PI), std::numbers::pi_v<float>, 1e-3);
+    ASSERT_NEAR(mag_e5m10_cvt_e8m23(MAG_E5M10_E), std::numbers::e_v<mag_e8m23_t>, 1e-3);
+    ASSERT_NEAR(mag_e5m10_cvt_e8m23(MAG_E5M10_PI), std::numbers::pi_v<mag_e8m23_t>, 1e-3);
     ASSERT_NEAR(mag_e5m10_cvt_e8m23(MAG_E5M10_ONE), 1.0f, 1e-3);
     ASSERT_NEAR(mag_e5m10_cvt_e8m23(MAG_E5M10_NEG_ONE), -1.0f, 1e-3);
     ASSERT_NEAR(mag_e5m10_cvt_e8m23(MAG_E5M10_ZERO), 0.0f, 1e-3);
@@ -19,11 +19,11 @@ TEST(e5m10, e5m10_to_e8m23) {
     ASSERT_NEAR(mag_e5m10_cvt_e8m23(MAG_E5M10_ONE), mag_e5m10_to_e8m23_ref(MAG_E5M10_ONE), 1e-3);
     ASSERT_NEAR(mag_e5m10_cvt_e8m23(MAG_E5M10_NEG_ONE), mag_e5m10_to_e8m23_ref(MAG_E5M10_NEG_ONE), 1e-3);
     ASSERT_NEAR(mag_e5m10_cvt_e8m23(MAG_E5M10_ZERO), mag_e5m10_to_e8m23_ref(MAG_E5M10_ZERO), 1e-3);
-    ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(MAG_E5M10_E) - std::numbers::e_v<float>) <
+    ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(MAG_E5M10_E) - std::numbers::e_v<mag_e8m23_t>) <
                 mag_e5m10_cvt_e8m23(MAG_E5M10_EPS));
-    ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(MAG_E5M10_PI) - std::numbers::pi_v<float>) <
+    ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(MAG_E5M10_PI) - std::numbers::pi_v<mag_e8m23_t>) <
                 mag_e5m10_cvt_e8m23(MAG_E5M10_EPS));
-    ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(MAG_E5M10_LN2) - std::numbers::ln2_v<float>) <
+    ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(MAG_E5M10_LN2) - std::numbers::ln2_v<mag_e8m23_t>) <
                 mag_e5m10_cvt_e8m23(MAG_E5M10_EPS));
     ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(MAG_E5M10_ONE) - 1.0f) < mag_e5m10_cvt_e8m23(MAG_E5M10_EPS));
     ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(MAG_E5M10_ZERO) - 0.0f) < mag_e5m10_cvt_e8m23(MAG_E5M10_EPS));
@@ -33,31 +33,31 @@ TEST(e5m10, e5m10_to_e8m23) {
 }
 
 TEST(e5m10, e8m23_to_e5m10) {
-    ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::e_v<float>).bits, MAG_E5M10_E.bits);
-    ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::pi_v<float>).bits, MAG_E5M10_PI.bits);
+    ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::e_v<mag_e8m23_t>).bits, MAG_E5M10_E.bits);
+    ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::pi_v<mag_e8m23_t>).bits, MAG_E5M10_PI.bits);
     ASSERT_EQ(mag_e8m23_cvt_e5m10(1.0f).bits, MAG_E5M10_ONE.bits);
     ASSERT_EQ(mag_e8m23_cvt_e5m10(-1.0f).bits, MAG_E5M10_NEG_ONE.bits);
     ASSERT_EQ(mag_e8m23_cvt_e5m10(0.0f).bits, MAG_E5M10_ZERO.bits);
 
-    ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::e_v<float>).bits, mag_e8m23_to_e5m10_ref(std::numbers::e_v<float>).bits);
-    ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::pi_v<float>).bits, mag_e8m23_to_e5m10_ref(std::numbers::pi_v<float>).bits);
+    ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::e_v<mag_e8m23_t>).bits, mag_e8m23_to_e5m10_ref(std::numbers::e_v<mag_e8m23_t>).bits);
+    ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::pi_v<mag_e8m23_t>).bits, mag_e8m23_to_e5m10_ref(std::numbers::pi_v<mag_e8m23_t>).bits);
     ASSERT_EQ(mag_e8m23_cvt_e5m10(1.0f).bits, mag_e8m23_to_e5m10_ref(1.0f).bits);
     ASSERT_EQ(mag_e8m23_cvt_e5m10(-1.0f).bits, mag_e8m23_to_e5m10_ref(-1.0f).bits);
     ASSERT_EQ(mag_e8m23_cvt_e5m10(0.0f).bits, mag_e8m23_to_e5m10_ref(0.0f).bits);
 
-    ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(mag_e8m23_cvt_e5m10(std::numbers::e_v<float>)) -
-                         std::numbers::e_v<float>) < mag_e5m10_cvt_e8m23(MAG_E5M10_EPS));
-    ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(mag_e8m23_cvt_e5m10(std::numbers::pi_v<float>)) -
-                         std::numbers::pi_v<float>) < mag_e5m10_cvt_e8m23(MAG_E5M10_EPS));
-    ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(mag_e8m23_cvt_e5m10(std::numbers::ln2_v<float>)) -
-                         std::numbers::ln2_v<float>) < mag_e5m10_cvt_e8m23(MAG_E5M10_EPS));
+    ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(mag_e8m23_cvt_e5m10(std::numbers::e_v<mag_e8m23_t>)) -
+                         std::numbers::e_v<mag_e8m23_t>) < mag_e5m10_cvt_e8m23(MAG_E5M10_EPS));
+    ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(mag_e8m23_cvt_e5m10(std::numbers::pi_v<mag_e8m23_t>)) -
+                         std::numbers::pi_v<mag_e8m23_t>) < mag_e5m10_cvt_e8m23(MAG_E5M10_EPS));
+    ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(mag_e8m23_cvt_e5m10(std::numbers::ln2_v<mag_e8m23_t>)) -
+                         std::numbers::ln2_v<mag_e8m23_t>) < mag_e5m10_cvt_e8m23(MAG_E5M10_EPS));
     ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(mag_e8m23_cvt_e5m10(1.0f)) - 1.0f) <
                 mag_e5m10_cvt_e8m23(MAG_E5M10_EPS));
     ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(mag_e8m23_cvt_e5m10(0.0f)) - 0.0f) <
                 mag_e5m10_cvt_e8m23(MAG_E5M10_EPS));
     ASSERT_EQ(mag_e8m23_cvt_e5m10(1.0f).bits, MAG_E5M10_ONE.bits);
     ASSERT_EQ(mag_e8m23_cvt_e5m10(0.0f).bits, MAG_E5M10_ZERO.bits);
-    ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::e_v<float>).bits, MAG_E5M10_E.bits);
+    ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::e_v<mag_e8m23_t>).bits, MAG_E5M10_E.bits);
     for (std::uint16_t i = 0; i < 0xfff; ++i) {
         ASSERT_EQ(i, mag_e8m23_cvt_e5m10(mag_e5m10_cvt_e8m23(mag_e5m10_t{.bits = i})).bits);
     }

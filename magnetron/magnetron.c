@@ -2661,6 +2661,18 @@ void* mag_tensor_data_ptr(const mag_tensor_t* t) {
     return (void*)t->storage.base;
 }
 
+mag_e8m23_t* mag_tensor_unpack_cloned_data(const mag_tensor_t* t) {
+    mag_compute_device_t* device = t->ctx->device;
+    size_t size = t->numel*sizeof(mag_e8m23_t);
+    mag_e8m23_t* dst = (*mag_alloc)(NULL, size); /* TODO: Use dynamic scratch buffer */
+    (*device->unpack_tensor_to_e8m23)(device, (mag_tensor_t*)t, dst, size);
+    return dst;
+}
+
+void mag_tensor_free_cloned_data(mag_e8m23_t* ret_val) {
+    (*mag_alloc)(ret_val, 0);
+}
+
 bool mag_tensor_is_scalar(const mag_tensor_t* t) {
     #pragma GCC unroll 6
     for (uint32_t i=0; i < MAG_MAX_DIMS; ++i)

@@ -23,7 +23,7 @@ TEST(storage, load_store) {
     ASSERT_EQ(mag_tensor_shape(B)[3], 5);
     ASSERT_EQ(mag_tensor_shape(B)[4], 2);
     ASSERT_EQ(mag_tensor_shape(B)[5], 2);
-    ASSERT_EQ(mag_tensor_data_size(B), 10 * 4 * 2 * 5 * 2 * 2 * sizeof(float));
+    ASSERT_EQ(mag_tensor_data_size(B), 10 * 4 * 2 * 5 * 2 * 2 * sizeof(mag_e8m23_t));
     // ASSERT_TRUE(mag_tensor_eq(A, B)); todo
 
     mag_tensor_decref(A);

@@ -34,17 +34,17 @@ TEST(autograd, bin_ops1) {
     ASSERT_NE(mag_tensor_grad(z), nullptr);
 
     // check forward pass
-    float vx = mag_tensor_get_scalar_virtual_index(x, 0);
-    float vy = mag_tensor_get_scalar_virtual_index(y, 0);
-    float vz = mag_tensor_get_scalar_virtual_index(z, 0);
+    mag_e8m23_t vx = mag_tensor_get_scalar_virtual_index(x, 0);
+    mag_e8m23_t vy = mag_tensor_get_scalar_virtual_index(y, 0);
+    mag_e8m23_t vz = mag_tensor_get_scalar_virtual_index(z, 0);
     ASSERT_FLOAT_EQ(vx, 3.0f);
     ASSERT_FLOAT_EQ(vy, 2.0f);
     ASSERT_EQ(vz, 0.5f);
 
     // check backward pass
-    float gx = mag_tensor_get_scalar_virtual_index(mag_tensor_grad(x), 0);
-    float gy = mag_tensor_get_scalar_virtual_index(mag_tensor_grad(y), 0);
-    float gz = mag_tensor_get_scalar_virtual_index(mag_tensor_grad(z), 0);
+    mag_e8m23_t gx = mag_tensor_get_scalar_virtual_index(mag_tensor_grad(x), 0);
+    mag_e8m23_t gy = mag_tensor_get_scalar_virtual_index(mag_tensor_grad(y), 0);
+    mag_e8m23_t gz = mag_tensor_get_scalar_virtual_index(mag_tensor_grad(z), 0);
 
     ASSERT_FLOAT_EQ(gx, 0.6f);  // ∂z/∂x = 0.6
     ASSERT_FLOAT_EQ(gy, -0.4f); // ∂z/∂y = -0.4
@@ -86,8 +86,8 @@ TEST(autograd, bin_ops2) {
     // mag_tensor_export_graphviz(y, "autograd2.dot");
 
     // check forward pass
-    float vx = mag_tensor_get_scalar_virtual_index(x, 0);
-    float vy = mag_tensor_get_scalar_virtual_index(y, 0);
+    mag_e8m23_t vx = mag_tensor_get_scalar_virtual_index(x, 0);
+    mag_e8m23_t vy = mag_tensor_get_scalar_virtual_index(y, 0);
     ASSERT_FLOAT_EQ(vx, -4.0f);
     ASSERT_FLOAT_EQ(vy, -20.0f);
 
@@ -98,8 +98,8 @@ TEST(autograd, bin_ops2) {
     ASSERT_NE(mag_tensor_grad(h), nullptr);
 
     // check backward pass
-    float gx = mag_tensor_get_scalar_virtual_index(mag_tensor_grad(x), 0);
-    float gy = mag_tensor_get_scalar_virtual_index(mag_tensor_grad(y), 0);
+    mag_e8m23_t gx = mag_tensor_get_scalar_virtual_index(mag_tensor_grad(x), 0);
+    mag_e8m23_t gy = mag_tensor_get_scalar_virtual_index(mag_tensor_grad(y), 0);
 
     ASSERT_FLOAT_EQ(gx, 46.0f); // ∂z/∂x = 46.0
     ASSERT_FLOAT_EQ(gy, 1.0f);  // ∂z/∂y = 1.0

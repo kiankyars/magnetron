@@ -334,6 +334,8 @@ extern MAG_EXPORT const int64_t* _Nonnull mag_tensor_shape(const mag_tensor_t* _
 extern MAG_EXPORT const int64_t* _Nonnull mag_tensor_strides(const mag_tensor_t* _Nonnull t);                           /* Get the strides of the tensor */
 extern MAG_EXPORT mag_dtype_t mag_tensor_dtype(const mag_tensor_t* _Nonnull t);                                         /* Get the data type of the tensor */
 extern MAG_EXPORT void* _Nonnull mag_tensor_data_ptr(const mag_tensor_t* _Nonnull t);                                   /* Get the tensor raw buffer pointer. Might pointer to GPU or any other device memory. */
+extern MAG_EXPORT float* _Nonnull mag_tensor_unpack_cloned_data(const mag_tensor_t* _Nonnull t);                        /* Return value must be freed manually with mag_tensor_free_cloned_data. Convert tensor data to float and return allocated float array. Array length is tensor.numel. */
+extern MAG_EXPORT void mag_tensor_free_cloned_data(float* _Nonnull ret_val);                                            /* Free cloned, allocated data. */
 extern MAG_EXPORT int64_t mag_tensor_data_size(const mag_tensor_t* _Nonnull );                                          /* Get the size of the tensor buffer in bytes. */
 extern MAG_EXPORT int64_t mag_tensor_numel(const mag_tensor_t* _Nonnull t);                                             /* Get the total amount of elements in the tensor. */
 extern MAG_EXPORT int64_t mag_tensor_num_rows(const mag_tensor_t* _Nonnull t);                                          /* Get the number of rows (for 2D tensors) */

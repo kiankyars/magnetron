@@ -16,8 +16,8 @@ TEST(image, load) {
 
     auto* buf = mag_tensor_data_ptr(img);
     for (int64_t i = 0; i < mag_tensor_numel(img); ++i) {
-        ASSERT_GE(static_cast<float*>(buf)[i], 0.0f);
-        ASSERT_LE(static_cast<float*>(buf)[i], 1.0f);
+        ASSERT_GE(static_cast<mag_e8m23_t*>(buf)[i], 0.0f);
+        ASSERT_LE(static_cast<mag_e8m23_t*>(buf)[i], 1.0f);
     }
 
     // TODO: check data
@@ -39,7 +39,7 @@ TEST(image, load_resize) {
 
     // mag_tensor_save_image(img, "test_data/car_resized.jpg");
 
-    auto* buf = static_cast<float*>(mag_tensor_data_ptr(img));
+    auto* buf = static_cast<mag_e8m23_t*>(mag_tensor_data_ptr(img));
     for (int64_t i = 0; i < mag_tensor_numel(img); ++i) {
         ASSERT_GE(buf[i], 0.0f);
         ASSERT_LE(buf[i], 1.0f);

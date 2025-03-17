@@ -600,15 +600,16 @@ struct mag_storage_buffer_t {
 
 /* Device interface to any compute backend device (CPU, GPU, TPU etc..) */
 struct mag_compute_device_t {
-    char name[128];                                                             /* Device name. */
-    void* impl;                                                                 /* Device specific implementation, if applicable. */
-    bool is_async;                                                              /* If device is async. */
-    mag_compute_device_type_t type;                                             /* Device type enum. */
-    void (*eager_exec_init)(mag_compute_device_t* dvc, mag_tensor_t* root);      /* Execute a single init op. */
-    void (*eager_exec_fwd)(mag_compute_device_t* dvc, mag_tensor_t* root);      /* Execute a single op forward. */
-    void (*eager_exec_bwd)(mag_compute_device_t* dvc, mag_tensor_t* root);      /* Execute a single op backwards. */
-    void (*alloc_storage)(mag_compute_device_t* dvc, mag_storage_buffer_t* out, size_t size);
-    void (*free_storage)(mag_compute_device_t* dvc, mag_storage_buffer_t* buf);
+    char name[128];                                                                                                 /* Device name. */
+    void* impl;                                                                                                     /* Device specific implementation, if applicable. */
+    bool is_async;                                                                                                  /* If device is async. */
+    mag_compute_device_type_t type;                                                                                 /* Device type enum. */
+    void (*eager_exec_init)(mag_compute_device_t* dvc, mag_tensor_t* root);                                         /* Execute a single init op. */
+    void (*eager_exec_fwd)(mag_compute_device_t* dvc, mag_tensor_t* root);                                          /* Execute a single op forward. */
+    void (*eager_exec_bwd)(mag_compute_device_t* dvc, mag_tensor_t* root);                                          /* Execute a single op backwards. */
+    void (*alloc_storage)(mag_compute_device_t* dvc, mag_storage_buffer_t* out, size_t size);                       /* Allocate storage buffer in device memory */
+    void (*free_storage)(mag_compute_device_t* dvc, mag_storage_buffer_t* buf);                                     /* Free storage buffer in device memory */
+    void (*unpack_tensor_to_e8m23)(mag_compute_device_t* dvc, mag_tensor_t* root, mag_e8m23_t* dst, size_t size);   /* Convert all data in tensor storage buffer to f32 and store in dst. */
 };
 
 /* Device creation and destruction. */
@@ -873,6 +874,7 @@ typedef struct mag_kernel_registry_t { /* Kernel registry for operators. */
     uint32_t (*bwd_pre[MAG_OP__NUM])(mag_kernel_context_t*);
     void (*bwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
     void (*bwd_post[MAG_OP__NUM])(mag_kernel_context_t*);
+    void (*vector_cast[MAG_DTYPE__NUM])(int64_t n, void* dst, const void* src);
 } mag_kernel_registry_t;
 
 #define mag_load_local_storage_group(xk, prefix, var) mag_load_local_storage_group_arr((xk)->var, prefix)
