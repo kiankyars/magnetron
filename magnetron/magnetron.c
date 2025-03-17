@@ -2127,13 +2127,13 @@ mag_tensor_t* mag_tensor_create_6d(mag_ctx_t* ctx, mag_dtype_t type, int64_t d1,
 }
 
 /* Execute init/normal operator on R. */
-static void MAG_HOTPROC mag_op_exec(mag_tensor_t* R, mag_compute_device_t* dvc, mag_gra_eval_t ord) {
+static void MAG_HOTPROC mag_op_exec(mag_tensor_t* R, mag_compute_device_t* dvc, mag_gra_eval_t gra) {
     mag_perf_mon_t* pmon = &R->pmon;
     mag_op_perf_info_t (*pmon_ops)[MAG_OP__NUM] = &R->ctx->op_perf_mons_total;
     mag_op_perf_info_t* pmon_op = *pmon_ops+R->op;
     uint64_t start = R->ctx->flags & MAG_CTX_FLAG_PROFILER ? mag_hpc_clock_ns() : 0; /* Profiling monitoring */
     void (*exec)(mag_compute_device_t*, mag_tensor_t*)
-        = ord == MAG_GRA_INIT ? dvc->eager_exec_init : ord == MAG_GRA_FWD ? dvc->eager_exec_fwd : dvc->eager_exec_bwd;
+        = gra == MAG_GRA_INIT ? dvc->eager_exec_init : gra == MAG_GRA_FWD ? dvc->eager_exec_fwd : dvc->eager_exec_bwd;
     (*exec)(dvc, R); /* Dispatch to backend. */
     if (!(R->ctx->flags & MAG_CTX_FLAG_PROFILER)) return; /* Profiling disabled. */
     pmon->elapsed_ns = mag_hpc_clock_elapsed_ns(start);
@@ -2514,6 +2514,7 @@ void mag_tensor_set_arg(mag_tensor_t* t, size_t slot, mag_tensor_t* arg) {
 
 void mag_tensor_copy_buffer_from(mag_tensor_t* t, const void* data, size_t size) {
     mag_assert(size == (size_t) mag_tensor_data_size(t), "Buffer size mismatch: %zu != %lld", size, mag_tensor_data_size(t));
+    mag_assert2(t->dtype == MAG_DTYPE_E8M23); /* TODO */
     mag_storage_buffer_t* sto = &t->storage;
     (*sto->cpy_host_device)(sto, 0, data, size);
 }
@@ -2600,7 +2601,7 @@ static void mag_print_tensor_recursive(FILE* f, const mag_tensor_t* t, int64_t (
 
 
 void mag_tensor_print(const mag_tensor_t* t, bool with_header, bool with_data) {
-    mag_assert(t->dtype == MAG_DTYPE_E8M23, "Tensor must be F32");
+    mag_assert2(t->dtype == MAG_DTYPE_E8M23); /* TODO */
     mag_assert2(with_header || with_data);
     mag_load_local_storage_group(t, x_d, shape);
     mag_load_local_storage_group(t, x_s, strides);

@@ -3,9 +3,6 @@
 from magnetron import Tensor, Module, Linear
 from magnetron.optim import SGD, mse_loss
 
-from src.magnetron import no_grad
-
-
 class XOR(Module):
     def __init__(self) -> None:
         super().__init__()

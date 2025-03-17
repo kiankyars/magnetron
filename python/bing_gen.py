@@ -17,7 +17,11 @@ def comment_replacer(match: re.Match[str]) -> str:
         return s
 
 
-macro_substitutions: dict[str, str] = {'MAG_EXPORT': ' '}
+macro_substitutions: dict[str, str] = {
+    'MAG_EXPORT': ' ',
+    '_Nonnull': ' ',
+    '_Nullable': ' ',
+}
 
 
 def keep_line(line: str) -> bool:

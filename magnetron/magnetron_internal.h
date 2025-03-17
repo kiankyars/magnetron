@@ -539,7 +539,6 @@ typedef struct mag_op_param_t {
     mag_op_param_type_t type : 8; /* Parameter type */
     union {
         mag_e8m23_t e8m23;
-        mag_e5m10_t e5m10;
         int32_t i32;
         uint32_t u32;
     } x;

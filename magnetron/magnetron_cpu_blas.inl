@@ -535,6 +535,7 @@ static void MAG_HOTPROC mag_vadd_e5m10(
     int64_t i=0;
     #if (defined(__aarch64__) && defined(__ARM_NEON)) || defined(_M_ARM64)
         #ifdef __ARM_FEATURE_FP16_VECTOR_ARITHMETIC
+            printf("meow");
             for (; i+7 < numel; i += 8) {
                 float16x8_t va = vld1q_f16((const __fp16*)x+i);
                 float16x8_t vb = vld1q_f16((const __fp16*)y+i);
@@ -826,11 +827,10 @@ static void MAG_HOTPROC mag_vadds_e5m10(
     int64_t numel,
     mag_e5m10_t* o,
     const mag_e5m10_t* x,
-    mag_e5m10_t y
+    const mag_e8m23_t y
 ) {
-    mag_e8m23_t ys =  mag_e5m10_cvt_e8m23(y);
     for (int64_t i=0; i < numel; ++i) {
-        o[i] = mag_e8m23_cvt_e5m10(mag_e5m10_cvt_e8m23(x[i]) + ys);
+        o[i] = mag_e8m23_cvt_e5m10(mag_e5m10_cvt_e8m23(x[i]) + y);
     }
 }
 
@@ -849,11 +849,10 @@ static void MAG_HOTPROC mag_vsubs_e5m10(
     int64_t numel,
     mag_e5m10_t* o,
     const mag_e5m10_t* x,
-    mag_e5m10_t y
+    const mag_e8m23_t y
 ) {
-    mag_e8m23_t ys =  mag_e5m10_cvt_e8m23(y);
     for (int64_t i=0; i < numel; ++i) {
-        o[i] = mag_e8m23_cvt_e5m10(mag_e5m10_cvt_e8m23(x[i]) - ys);
+        o[i] = mag_e8m23_cvt_e5m10(mag_e5m10_cvt_e8m23(x[i]) - y);
     }
 }
 
@@ -872,11 +871,10 @@ static void MAG_HOTPROC mag_vmuls_e5m10(
     int64_t numel,
     mag_e5m10_t* o,
     const mag_e5m10_t* x,
-    mag_e5m10_t y
+    const mag_e8m23_t y
 ) {
-    mag_e8m23_t ys =  mag_e5m10_cvt_e8m23(y);
     for (int64_t i=0; i < numel; ++i) {
-        o[i] = mag_e8m23_cvt_e5m10(mag_e5m10_cvt_e8m23(x[i]) * ys);
+        o[i] = mag_e8m23_cvt_e5m10(mag_e5m10_cvt_e8m23(x[i]) * y);
     }
 }
 
@@ -895,11 +893,10 @@ static void MAG_HOTPROC mag_vdivs_e5m10(
     int64_t numel,
     mag_e5m10_t* o,
     const mag_e5m10_t* x,
-    mag_e5m10_t y
+    const mag_e8m23_t y
 ) {
-    mag_e8m23_t ys =  mag_e5m10_cvt_e8m23(y);
     for (int64_t i=0; i < numel; ++i) {
-        o[i] = mag_e8m23_cvt_e5m10(mag_e5m10_cvt_e8m23(x[i]) / ys);
+        o[i] = mag_e8m23_cvt_e5m10(mag_e5m10_cvt_e8m23(x[i]) / y);
     }
 }
 
@@ -918,11 +915,10 @@ static void MAG_HOTPROC mag_vpows_e5m10(
     int64_t numel,
     mag_e5m10_t* o,
     const mag_e5m10_t* x,
-    mag_e5m10_t y
+    const mag_e8m23_t y
 ) {
-    mag_e8m23_t ys =  mag_e5m10_cvt_e8m23(y);
     for (int64_t i=0; i < numel; ++i) {
-        o[i] = mag_e8m23_cvt_e5m10(powf(mag_e5m10_cvt_e8m23(x[i]), ys));
+        o[i] = mag_e8m23_cvt_e5m10(powf(mag_e5m10_cvt_e8m23(x[i]), y));
     }
 }
 
@@ -2180,7 +2176,7 @@ static void MAG_HOTPROC mag_blas_sum_e5m10(const mag_compute_payload_t* payload,
         (void)ctx; \
         mag_tensor_t* r = payload->node; \
         const mag_tensor_t* x = r->op_inputs[0]; \
-        mag_##T##_t xi = r->op_params->x.T; \
+        mag_e8m23_t xi = r->op_params->x.e8m23; \
         mag_##T##_t* br = mag_##T##p_mut(r); \
         const mag_##T##_t* bx = mag_##T##p(x); \
         mag_load_local_storage_group(r, r_s, strides); \

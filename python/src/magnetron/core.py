@@ -31,14 +31,15 @@ class ComputeDevice:
 
 @unique
 class PRNGAlgorithm(Enum):
-    MERSENNE_TWISTER = 0
-    PCG = auto()
+    MERSENNE_TWISTER = C.MAG_PRNG_MERSENNE_TWISTER
+    PCG = C.MAG_PRNG_PCG
 
 
-@unique
 class DType(Enum):
-    F32 = 0
-
+    E8M23 = C.MAG_DTYPE_E8M23
+    E5M10 = C.MAG_DTYPE_E5M10
+    F32 = E8M23
+    F16 = E5M10
 
 @unique
 class ColorChannels(Enum):
@@ -81,6 +82,7 @@ class ExecutionMode(Enum):
 class GlobalConfig:
     verbose: bool = getenv('MAG_VERBOSE', '0') == '1'
     compute_device: ComputeDevice.CPU | ComputeDevice.CUDA = ComputeDevice.CPU()
+    default_dtype: DType = DType.F32
 
 
 @typing.final
@@ -109,6 +111,7 @@ class Context:
             descriptor.cuda_device_id = abs(device.device_id)
         self._ptr = C.mag_ctx_create2(descriptor)
         self.execution_mode = execution_mode
+        self.default_dtype = GlobalConfig.default_dtype
 
     @property
     def compute_device_name(self) -> str:
@@ -233,8 +236,7 @@ class Tensor:
 
     def __del__(self) -> None:
         if (
-            hasattr(self, '_ptr')
-            and isinstance(self._ptr, ffi.CData)
+            isinstance(self._ptr, ffi.CData)
             and self._ptr != ffi.NULL
         ):
             C.mag_tensor_decref(self._ptr)
@@ -255,7 +257,7 @@ class Tensor:
         ctx: Context,
         *,
         shape: tuple[int, ...],
-        dtype: DType = DType.F32,
+        dtype: DType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> None:
@@ -272,7 +274,7 @@ class Tensor:
         cls,
         shape: tuple[int, ...],
         *,
-        dtype: DType = DType.F32,
+        dtype: DType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
@@ -292,7 +294,7 @@ class Tensor:
         shape: tuple[int, ...],
         *,
         fill_value: float,
-        dtype: DType = DType.F32,
+        dtype: DType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
@@ -312,7 +314,7 @@ class Tensor:
         cls,
         data: list[float, ...],
         *,
-        dtype: DType = DType.F32,
+        dtype: DType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
@@ -353,7 +355,7 @@ class Tensor:
         cls,
         shape: tuple[int, ...],
         *,
-        dtype: DType = DType.F32,
+        dtype: DType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
@@ -367,7 +369,7 @@ class Tensor:
         shape: tuple[int, ...],
         *,
         interval: (float, float) = (-1.0, 1.0),
-        dtype: DType = DType.F32,
+        dtype: DType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
