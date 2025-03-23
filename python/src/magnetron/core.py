@@ -471,9 +471,9 @@ class Tensor:
         return self.tolist()[0]
 
     def tolist(self) -> list[float]:
-        ptr: ffi.CData = C.mag_tensor_unpack_cloned_data(self._ptr) # Convert tensor dtype to float array
+        ptr: ffi.CData = C.mag_tensor_transfer_clone_data(self._ptr) # Convert tensor dtype to float array
         unpacked: list[float] = ffi.unpack(ptr, self.numel)
-        C.mag_tensor_free_cloned_data(ptr) # Free allocated native float array
+        C.mag_tensor_free_transfer_cloned_data(ptr) # Free allocated native float array
         return unpacked
 
     @property
@@ -483,30 +483,6 @@ class Tensor:
     @property
     def numel(self) -> int:
         return C.mag_tensor_numel(self._ptr)
-
-    @property
-    def num_rows(self) -> int:
-        return C.mag_tensor_num_rows(self._ptr)
-
-    @property
-    def num_cols(self) -> int:
-        return C.mag_tensor_num_cols(self._ptr)
-
-    @property
-    def is_scalar(self) -> bool:
-        return C.mag_tensor_is_scalar(self._ptr)
-
-    @property
-    def is_vector(self) -> bool:
-        return C.mag_tensor_is_vector(self._ptr)
-
-    @property
-    def is_matrix(self) -> bool:
-        return C.mag_tensor_is_matrix(self._ptr)
-
-    @property
-    def is_volume(self) -> bool:
-        return C.mag_tensor_is_volume(self._ptr)
 
     @property
     def is_transposed(self) -> bool:

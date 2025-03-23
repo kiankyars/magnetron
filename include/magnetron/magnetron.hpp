@@ -5,9 +5,12 @@
 
 #include "magnetron.h"
 
+#include <array>
 #include <string_view>
 #include <thread>
 #include <variant>
+#include <optional>
+#include <span>
 
 #include "magnetron_internal.h"
 
@@ -25,7 +28,7 @@ namespace magnetron {
     /**
      * Enumerates compute device types.
      */
-    enum class compute_device : std::underlying_type_t<mag_compute_device_t> {
+    enum class compute_device : std::underlying_type_t<mag_compute_device_type_t> {
         cpu = MAG_COMPUTE_DEVICE_TYPE_CPU,
         gpu_cuda = MAG_COMPUTE_DEVICE_TYPE_GPU_CUDA
     };
@@ -108,7 +111,7 @@ namespace magnetron {
      * Set the global allocator function.
      * @param alloc Allocator function to set.
      */
-    inline auto set_allocator(alloc_fn* alloc) noexcept -> void {
+    inline auto allocator(alloc_fn* alloc) noexcept -> void {
         mag_set_alloc_fn(alloc);
     }
 
@@ -172,6 +175,7 @@ namespace magnetron {
             } else {
                 throw std::invalid_argument("Invalid device type");
             }
+            m_ctx = mag_ctx_create2(&desc);
         }
 
         context(context&&) = default;
@@ -201,7 +205,7 @@ namespace magnetron {
         [[nodiscard]] auto is_numa_system() const noexcept -> bool { return mag_ctx_is_numa_system(m_ctx); }
         [[nodiscard]] auto total_tensors_created() const noexcept -> std::size_t { return mag_ctx_get_total_tensors_created(m_ctx); }
         auto start_profiler() noexcept -> void { mag_ctx_profiler_start(m_ctx); }
-        auto end_profiler(const char* export_csv_file = nullptr) noexcept -> void { mag_ctx_profiler_end(m_ctx, export_csv_file); }
+        auto stop_profiler(const char* export_csv_file = nullptr) noexcept -> void { mag_ctx_profiler_end(m_ctx, export_csv_file); }
         [[nodiscard]] auto is_profiling() const noexcept -> bool { return mag_ctx_profiler_is_running(m_ctx); }
         auto start_grad_recorder() noexcept -> void { mag_ctx_grad_recorder_start(m_ctx); }
         auto stop_grad_recorder() noexcept -> void { mag_ctx_grad_recorder_stop(m_ctx); }
@@ -231,7 +235,7 @@ namespace magnetron {
      */
     class tensor final {
     public:
-        tensor(context& ctx, dtype type, const std::span<std::int64_t> shape) {
+        tensor(context& ctx, dtype type, std::span<const std::int64_t> shape) {
             switch (shape.size()) {
                 case 1: m_tensor = mag_tensor_create_1d(&*ctx, static_cast<mag_dtype_t>(type), shape[0]); break;
                 case 2: m_tensor = mag_tensor_create_2d(&*ctx, static_cast<mag_dtype_t>(type), shape[0], shape[1]); break;
@@ -243,8 +247,12 @@ namespace magnetron {
             }
         }
 
+        tensor(context& ctx, std::span<const std::int64_t> shape, std::span<const float> data) : tensor{ctx, dtype::f32, shape} {
+            copy_buffer_from(data);
+        }
+
         tensor(const tensor& other) {
-            mag_tensor_retain(other.m_tensor);
+            mag_tensor_incref(other.m_tensor);
             m_tensor = other.m_tensor;
         }
 
@@ -257,7 +265,7 @@ namespace magnetron {
 
         auto operator = (const tensor& other) -> tensor& {
             if (this != &other) {
-                mag_tensor_retain(other.m_tensor);
+                mag_tensor_incref(other.m_tensor);
                 mag_tensor_decref(m_tensor);
                 m_tensor = other.m_tensor;
             }
@@ -282,7 +290,158 @@ namespace magnetron {
         [[nodiscard]] auto operator * () noexcept -> mag_tensor_t& { return *m_tensor; }
         [[nodiscard]] auto operator * () const noexcept -> const mag_tensor_t& { return *m_tensor; }
 
+        [[nodiscard]] auto clone() const noexcept -> tensor { return tensor{mag_clone(m_tensor)}; }
+        [[nodiscard]] auto view() const noexcept -> tensor { return tensor{mag_view(m_tensor)}; }
+        [[nodiscard]] auto transpose() const noexcept -> tensor { return tensor{mag_transpose(m_tensor)}; }
+        [[nodiscard]] auto permute(const std::array<std::int64_t, k_max_dims>& axes) const noexcept -> tensor { return tensor{mag_permute(m_tensor, axes[0], axes[1], axes[2], axes[3], axes[4], axes[5])}; }
+        [[nodiscard]] auto mean() const noexcept -> tensor { return tensor{mag_mean(m_tensor)}; }
+        [[nodiscard]] auto min() const noexcept -> tensor { return tensor{mag_min(m_tensor)}; }
+        [[nodiscard]] auto max() const noexcept -> tensor { return tensor{mag_max(m_tensor)}; }
+        [[nodiscard]] auto sum() const noexcept -> tensor { return tensor{mag_sum(m_tensor)}; }
+        [[nodiscard]] auto abs() const noexcept -> tensor { return tensor{mag_abs(m_tensor)}; }
+        [[nodiscard]] auto abs_() const noexcept -> tensor { return tensor{mag_abs_(m_tensor)}; }
+        [[nodiscard]] auto neg() const noexcept -> tensor { return tensor{mag_neg(m_tensor)}; }
+        [[nodiscard]] auto neg_() const noexcept -> tensor { return tensor{mag_neg_(m_tensor)}; }
+        [[nodiscard]] auto log() const noexcept -> tensor { return tensor{mag_log(m_tensor)}; }
+        [[nodiscard]] auto log_() const noexcept -> tensor { return tensor{mag_log_(m_tensor)}; }
+        [[nodiscard]] auto sqr() const noexcept -> tensor { return tensor{mag_sqr(m_tensor)}; }
+        [[nodiscard]] auto sqr_() const noexcept -> tensor { return tensor{mag_sqr_(m_tensor)}; }
+        [[nodiscard]] auto sqrt() const noexcept -> tensor { return tensor{mag_sqrt(m_tensor)}; }
+        [[nodiscard]] auto sqrt_() const noexcept -> tensor { return tensor{mag_sqrt_(m_tensor)}; }
+        [[nodiscard]] auto sin() const noexcept -> tensor { return tensor{mag_sin(m_tensor)}; }
+        [[nodiscard]] auto sin_() const noexcept -> tensor { return tensor{mag_sin_(m_tensor)}; }
+        [[nodiscard]] auto cos() const noexcept -> tensor { return tensor{mag_cos(m_tensor)}; }
+        [[nodiscard]] auto cos_() const noexcept -> tensor { return tensor{mag_cos_(m_tensor)}; }
+        [[nodiscard]] auto step() const noexcept -> tensor { return tensor{mag_step(m_tensor)}; }
+        [[nodiscard]] auto step_() const noexcept -> tensor { return tensor{mag_step_(m_tensor)}; }
+        [[nodiscard]] auto exp() const noexcept -> tensor { return tensor{mag_exp(m_tensor)}; }
+        [[nodiscard]] auto exp_() const noexcept -> tensor { return tensor{mag_exp_(m_tensor)}; }
+        [[nodiscard]] auto softmax() const noexcept -> tensor { return tensor{mag_softmax(m_tensor)}; }
+        [[nodiscard]] auto softmax_() const noexcept -> tensor { return tensor{mag_softmax_(m_tensor)}; }
+        [[nodiscard]] auto sigmoid() const noexcept -> tensor { return tensor{mag_sigmoid(m_tensor)}; }
+        [[nodiscard]] auto sigmoid_() const noexcept -> tensor { return tensor{mag_sigmoid_(m_tensor)}; }
+        [[nodiscard]] auto hard_sigmoid() const noexcept -> tensor { return tensor{mag_hard_sigmoid(m_tensor)}; }
+        [[nodiscard]] auto hard_sigmoid_() const noexcept -> tensor { return tensor{mag_hard_sigmoid_(m_tensor)}; }
+        [[nodiscard]] auto silu() const noexcept -> tensor { return tensor{mag_silu(m_tensor)}; }
+        [[nodiscard]] auto silu_() const noexcept -> tensor { return tensor{mag_silu_(m_tensor)}; }
+        [[nodiscard]] auto tanh() const noexcept -> tensor { return tensor{mag_tanh(m_tensor)}; }
+        [[nodiscard]] auto tanh_() const noexcept -> tensor { return tensor{mag_tanh_(m_tensor)}; }
+        [[nodiscard]] auto relu() const noexcept -> tensor { return tensor{mag_relu(m_tensor)}; }
+        [[nodiscard]] auto relu_() const noexcept -> tensor { return tensor{mag_relu_(m_tensor)}; }
+        [[nodiscard]] auto gelu() const noexcept -> tensor { return tensor{mag_gelu(m_tensor)}; }
+        [[nodiscard]] auto gelu_() const noexcept -> tensor { return tensor{mag_gelu_(m_tensor)}; }
+        [[nodiscard]] auto add(tensor other) const noexcept -> tensor { return tensor{mag_add(m_tensor, &*other)}; }
+        [[nodiscard]] auto add_(tensor other) const noexcept -> tensor { return tensor{mag_add_(m_tensor, &*other)}; }
+        [[nodiscard]] auto add(float other) const noexcept -> tensor { return tensor{mag_adds(m_tensor, other)}; }
+        [[nodiscard]] auto add_(float other) const noexcept -> tensor { return tensor{mag_adds_(m_tensor, other)}; }
+        [[nodiscard]] auto sub(tensor other) const noexcept -> tensor { return tensor{mag_sub(m_tensor, &*other)}; }
+        [[nodiscard]] auto sub_(tensor other) const noexcept -> tensor { return tensor{mag_sub_(m_tensor, &*other)}; }
+        [[nodiscard]] auto sub(float other) const noexcept -> tensor { return tensor{mag_subs(m_tensor, other)}; }
+        [[nodiscard]] auto sub_(float other) const noexcept -> tensor { return tensor{mag_subs_(m_tensor, other)}; }
+        [[nodiscard]] auto mul(tensor other) const noexcept -> tensor { return tensor{mag_mul(m_tensor, &*other)}; }
+        [[nodiscard]] auto mul_(tensor other) const noexcept -> tensor { return tensor{mag_mul_(m_tensor, &*other)}; }
+        [[nodiscard]] auto mul(float other) const noexcept -> tensor { return tensor{mag_muls(m_tensor, other)}; }
+        [[nodiscard]] auto mul_(float other) const noexcept -> tensor { return tensor{mag_muls_(m_tensor, other)}; }
+        [[nodiscard]] auto div(tensor other) const noexcept -> tensor { return tensor{mag_div(m_tensor, &*other)}; }
+        [[nodiscard]] auto div_(tensor other) const noexcept -> tensor { return tensor{mag_div_(m_tensor, &*other)}; }
+        [[nodiscard]] auto div(float other) const noexcept -> tensor { return tensor{mag_divs(m_tensor, other)}; }
+        [[nodiscard]] auto div_(float other) const noexcept -> tensor { return tensor{mag_divs_(m_tensor, other)}; }
+        [[nodiscard]] auto pow(float other) const noexcept -> tensor { return tensor{mag_pows(m_tensor, other)}; }
+        [[nodiscard]] auto pow_(float other) const noexcept -> tensor { return tensor{mag_pows_(m_tensor, other)}; }
+        [[nodiscard]] auto matmul(tensor other) const noexcept -> tensor { return tensor{mag_matmul(m_tensor, &*other)}; }
+
+        [[nodiscard]] auto operator + (tensor other) const noexcept -> tensor { return add(other); }
+        [[nodiscard]] auto operator + (float other) const noexcept -> tensor { return add(other); }
+        [[nodiscard]] auto operator += (tensor other) const noexcept -> tensor { return add_(other); }
+        [[nodiscard]] auto operator += (float other) const noexcept -> tensor { return add_(other); }
+        [[nodiscard]] auto operator - (tensor other) const noexcept -> tensor { return sub(other); }
+        [[nodiscard]] auto operator - (float other) const noexcept -> tensor { return sub(other); }
+        [[nodiscard]] auto operator -= (tensor other) const noexcept -> tensor { return sub_(other); }
+        [[nodiscard]] auto operator -= (float other) const noexcept -> tensor { return sub_(other); }
+        [[nodiscard]] auto operator * (tensor other) const noexcept -> tensor { return mul(other); }
+        [[nodiscard]] auto operator * (float other) const noexcept -> tensor { return mul(other); }
+        [[nodiscard]] auto operator *= (tensor other) const noexcept -> tensor { return mul_(other); }
+        [[nodiscard]] auto operator *= (float other) const noexcept -> tensor { return mul_(other); }
+        [[nodiscard]] auto operator / (tensor other) const noexcept -> tensor { return div(other); }
+        [[nodiscard]] auto operator / (float other) const noexcept -> tensor { return div(other); }
+        [[nodiscard]] auto operator /= (tensor other) const noexcept -> tensor { return div_(other); }
+        [[nodiscard]] auto operator /= (float other) const noexcept -> tensor { return div_(other); }
+
+        template <typename T> requires std::is_arithmetic_v<T>
+        auto copy_buffer_from(std::span<const T> buf) -> void {
+            mag_tensor_copy_buffer_from(m_tensor, buf.data(), buf.size_bytes());
+        }
+
+        auto fill(float val) -> void {
+            mag_tensor_fill(m_tensor, val);
+        }
+
+        auto fill_rand_uniform(float min, float max) -> void {
+            mag_tensor_fill_random_uniform(m_tensor, min, max);
+        }
+
+        auto fill_rand_normal(float mean, float stddev) -> void {
+            mag_tensor_fill_random_normal(m_tensor, mean, stddev);
+        }
+
+        [[nodiscard]] auto packed_refcounts() const noexcept -> std::uint64_t { return mag_tensor_get_packed_refcounts(m_tensor); }
+        [[nodiscard]] auto memory_usage() const noexcept -> std::size_t { return mag_tensor_get_memory_usage(m_tensor); }
+        auto print(bool with_header = false, bool with_data = true) const noexcept -> void { mag_tensor_print(m_tensor, with_header, with_data); }
+        auto set_name(const std::string& name) -> void { mag_tensor_set_name(m_tensor, name.c_str()); }
+        [[nodiscard]] auto get_name() const noexcept -> std::string_view { return mag_tensor_get_name(m_tensor); }
+        [[nodiscard]] auto rank() const noexcept -> std::int64_t { return mag_tensor_rank(m_tensor); }
+        [[nodiscard]] auto shape() const noexcept -> std::span<const std::int64_t> {
+            return {mag_tensor_shape(m_tensor), static_cast<std::size_t>(rank())};
+        }
+        [[nodiscard]] auto strides() const noexcept -> std::span<const std::int64_t> {
+            return {mag_tensor_strides(m_tensor), static_cast<std::size_t>(rank())};
+        }
+        [[nodiscard]] auto dtype() const noexcept -> dtype { return static_cast<enum dtype>(mag_tensor_dtype(m_tensor)); }
+        [[nodiscard]] auto data_ptr() const noexcept -> void* { return mag_tensor_data_ptr(m_tensor); }
+        [[nodiscard]] auto to_vector() const -> std::vector<float> {
+            auto* data {mag_tensor_transfer_clone_data(m_tensor)};
+            std::vector<float> result {};
+            result.resize(numel());
+            std::memcpy(result.data(), data, data_size());
+            mag_tensor_free_transfer_cloned_data(data);
+            return result;
+        }
+        [[nodiscard]] auto data_size() const noexcept -> std::int64_t { return mag_tensor_data_size(m_tensor); }
+        [[nodiscard]] auto numel() const noexcept -> std::int64_t { return mag_tensor_numel(m_tensor); }
+        [[nodiscard]] auto is_shape_eq(tensor other) const noexcept -> bool { return mag_tensor_is_shape_eq(m_tensor, &*other); }
+        [[nodiscard]] auto can_broadcast(tensor other) const noexcept -> bool { return mag_tensor_can_broadcast(m_tensor, &*other); }
+        [[nodiscard]] auto is_transposed() const noexcept -> bool { return mag_tensor_is_transposed(m_tensor); }
+        [[nodiscard]] auto is_permuted() const noexcept -> bool { return mag_tensor_is_permuted(m_tensor); }
+        [[nodiscard]] auto is_contiguous() const noexcept -> bool { return mag_tensor_is_contiguous(m_tensor); }
+
+        [[nodiscard]] auto grad() const noexcept -> std::optional<tensor> {
+            auto* grad {mag_tensor_grad(m_tensor)};
+            if (!grad) return std::nullopt;
+            return tensor{grad};
+        }
+        [[nodiscard]] auto requires_grad() const noexcept -> bool { return mag_tensor_requires_grad(m_tensor); }
+        auto requires_grad(bool yes) noexcept -> void { mag_tensor_set_requires_grad(m_tensor, yes); }
+        auto backward() -> void { mag_tensor_backward(m_tensor); }
+        auto zero_grad() -> void { mag_tensor_zero_grad(m_tensor); }
+
+        [[nodiscard]] auto index(const std::array<std::int64_t, k_max_dims>& idx) const noexcept -> float {
+            return mag_tensor_get_scalar_physical_index(m_tensor, idx[0], idx[1], idx[2], idx[3], idx[4], idx[5]);
+        }
+        auto index(const std::array<std::int64_t, k_max_dims>& idx, float x) const noexcept -> void {
+            mag_tensor_set_scalar_physical_index(m_tensor, idx[0], idx[1], idx[2], idx[3], idx[4], idx[5], x);
+        }
+        [[nodiscard]] auto index(std::int64_t idx) const noexcept -> float {
+            return mag_tensor_get_scalar_virtual_index(m_tensor, idx);
+        }
+        auto index(std::int64_t idx, float x) const noexcept -> void {
+            mag_tensor_set_scalar_virtual_index(m_tensor, idx, idx);
+        }
+
+        // TODO: Add other utility functions
+
     private:
+        explicit tensor(mag_tensor_t* ptr) noexcept : m_tensor{ptr} {}
+
         mag_tensor_t* m_tensor {};
     };
 }
