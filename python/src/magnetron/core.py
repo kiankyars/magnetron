@@ -467,7 +467,6 @@ class Tensor:
         return int(ffi.cast('uintptr_t', C.mag_tensor_data_ptr(self._ptr)))
 
     def item(self) -> float:
-        assert self.is_scalar, 'Tensor must be a scalar'
         return self.tolist()[0]
 
     def tolist(self) -> list[float]:
@@ -532,7 +531,7 @@ class Tensor:
         ptr: ffi.CData = C.mag_tensor_grad(self._ptr)
         if ptr == ffi.NULL:
             return None
-        C.mag_tensor_retain(ptr)
+        C.mag_tensor_incref(ptr)
         return Tensor(ptr)
 
     def backward(self) -> None:

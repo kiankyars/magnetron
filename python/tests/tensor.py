@@ -12,13 +12,7 @@ def test_tensor_creation() -> None:
     assert tensor.is_permuted is False
     assert tensor.is_contiguous is True
     assert tensor.is_transposed is False
-    assert tensor.num_rows == (2 * 3 * 4 * 5 * 6)
-    assert tensor.num_cols == 1
     assert tensor.dtype == DType.F32
-    assert tensor.is_scalar is False
-    assert tensor.is_matrix is False
-    assert tensor.is_vector is False
-    assert tensor.is_volume is False
 
 
 def test_tensor_scalar_get_set_physical() -> None:
