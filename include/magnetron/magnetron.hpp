@@ -12,8 +12,6 @@
 #include <optional>
 #include <span>
 
-#include "magnetron_internal.h"
-
 namespace magnetron {
     constexpr std::size_t k_default_chunk_size {MAG_DEFAULT_CHUNK_SIZE};
     constexpr std::size_t k_default_chunk_cap {MAG_DEFAULT_CHUNK_CAP};
@@ -246,6 +244,9 @@ namespace magnetron {
                 default: throw std::invalid_argument("Invalid tensor shape: " + std::to_string(shape.size()));
             }
         }
+
+        template <typename... S> requires std::is_same_v<std::common_type_t<S...>, std::int64_t>
+        tensor(context& ctx, dtype type, S... shape) : tensor{ctx, type, std::array{shape...}} {}
 
         tensor(context& ctx, std::span<const std::int64_t> shape, std::span<const float> data) : tensor{ctx, dtype::f32, shape} {
             copy_buffer_from(data);

@@ -2,30 +2,26 @@
 
 // ON LINUX: Before running the benchmark, execute: prepare_system.sh to setup the system for performance measurements.
 
-#include <magnetron.h>
+#include <magnetron/magnetron.hpp>
+
 #define ANKERL_NANOBENCH_IMPLEMENT
 #include <nanobench.h>
 
-#include "magnetron_internal.h"
+using namespace magnetron;
 
 static auto bench_op(ankerl::nanobench::Bench& bench, std::int64_t numel_per_dim) -> void {
-    mag_device_descriptor_t desc {};
-    desc.type = MAG_COMPUTE_DEVICE_TYPE_CPU;
-    mag_ctx_t* ctx = mag_ctx_create2(&desc);
-    mag_tensor_t* A = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, numel_per_dim, numel_per_dim);
-    mag_tensor_fill(A, 1.0f);
-    mag_tensor_t* B = mag_tensor_create_2d(ctx, MAG_DTYPE_E8M23, numel_per_dim, numel_per_dim);
-    mag_tensor_fill(A, 3.0f);
-    bench.run("Parallel Elems = " + std::to_string(A->numel), [&] {
-        mag_tensor_t* R = mag_add(A, B);
-        ankerl::nanobench::doNotOptimizeAway(R);
-        mag_tensor_decref(R);
+    context ctx {compute_device::cpu};
+    tensor x {ctx, dtype::e8m23, numel_per_dim, numel_per_dim};
+    x.fill(1.0f);
+    tensor y {ctx, dtype::e8m23, numel_per_dim, numel_per_dim};
+    y.fill(3.0f);
+
+    bench.run("Parallel Elems", [&] {
+        tensor r {x + y};
+        ankerl::nanobench::doNotOptimizeAway(r);
     });
 
     ankerl::nanobench::doNotOptimizeAway(ctx);
-    mag_tensor_decref(B);
-    mag_tensor_decref(A);
-    mag_ctx_destroy(ctx);
 }
 
 auto main() -> int {

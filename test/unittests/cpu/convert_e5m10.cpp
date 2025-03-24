@@ -42,11 +42,11 @@ TEST(cpu_convert_e5m10, e8m23_to_e5m10) {
     ASSERT_EQ(mag_e8m23_cvt_e5m10(-1.0f).bits, MAG_E5M10_NEG_ONE.bits);
     ASSERT_EQ(mag_e8m23_cvt_e5m10(0.0f).bits, MAG_E5M10_ZERO.bits);
 
-    ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::e_v<e8m23_t>).bits, *test::e5m10_t{std::numbers::e_v<e8m23_t>});
-    ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::pi_v<e8m23_t>).bits, *test::e5m10_t{std::numbers::pi_v<e8m23_t>});
-    ASSERT_EQ(mag_e8m23_cvt_e5m10(1.0f).bits, *test::e5m10_t{1.0f});
-    ASSERT_EQ(mag_e8m23_cvt_e5m10(-1.0f).bits, *test::e5m10_t{-1.0f});
-    ASSERT_EQ(mag_e8m23_cvt_e5m10(0.0f).bits, *test::e5m10_t{0.0f});
+    ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::e_v<e8m23_t>).bits, std::bit_cast<std::uint16_t>(test::e5m10_t{std::numbers::e_v<e8m23_t>}));
+    ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::pi_v<e8m23_t>).bits, std::bit_cast<std::uint16_t>(test::e5m10_t{std::numbers::pi_v<e8m23_t>}));
+    ASSERT_EQ(mag_e8m23_cvt_e5m10(1.0f).bits, std::bit_cast<std::uint16_t>(test::e5m10_t{1.0f}));
+    ASSERT_EQ(mag_e8m23_cvt_e5m10(-1.0f).bits, std::bit_cast<std::uint16_t>(test::e5m10_t{-1.0f}));
+    ASSERT_EQ(mag_e8m23_cvt_e5m10(0.0f).bits, std::bit_cast<std::uint16_t>(test::e5m10_t{0.0f}));
 
     ASSERT_TRUE(std::abs(mag_e5m10_cvt_e8m23(mag_e8m23_cvt_e5m10(std::numbers::e_v<e8m23_t>)) -
                          std::numbers::e_v<e8m23_t>) < mag_e5m10_cvt_e8m23(MAG_E5M10_EPS));

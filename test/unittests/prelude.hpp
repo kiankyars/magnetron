@@ -2,92 +2,26 @@
 
 #pragma once
 
-#include <gtest/gtest.h>
-#include <magnetron/magnetron.hpp>
-#include <magnetron_internal.h>
-
 #include <bit>
 #include <cstdint>
 #include <random>
 
+#include <magnetron/magnetron.hpp>
+#include <magnetron_internal.h>
+
+#include <gtest/gtest.h>
+#include <half.hpp>
+
 namespace magnetron::test {
     using e8m23_t = float;
-    
-    struct e5m10_t final {
-        constexpr e5m10_t(decltype(0) bits) noexcept : m_bits{static_cast<std::uint16_t>(bits)}{}
-        constexpr e5m10_t(e8m23_t x) noexcept {
-            e8m23_t base = std::abs(x)*0x1.0p+112f*0x1.0p-110f;
-            std::uint32_t shl1_w = std::bit_cast<std::uint32_t>(x)+std::bit_cast<std::uint32_t>(x);
-            std::uint32_t sign = std::bit_cast<std::uint32_t>(x) & 0x80000000u;
-            e8m23_t flex = base + std::bit_cast<e8m23_t>(0x07800000u+(std::max(0x71000000u, shl1_w&0xff000000u)>>1));
-            std::uint32_t exp_bits = std::bit_cast<std::uint32_t>(flex)>>13 & 0x00007c00u;
-            std::uint32_t mant_bits = std::bit_cast<std::uint32_t>(flex) & 0x00000fffu;
-            std::uint32_t nonsign = exp_bits + mant_bits;
-            m_bits=static_cast<std::uint16_t>((sign>>16)|(shl1_w > 0xff000000 ? 0x7e00 : nonsign));
-        }
-        constexpr e5m10_t(const e5m10_t&) noexcept = default;
-        constexpr e5m10_t(e5m10_t&&) noexcept = default;
-        constexpr auto operator=(const e5m10_t&) noexcept -> e5m10_t& = default;
-        constexpr auto operator=(e5m10_t&&) noexcept -> e5m10_t& = default;
-        ~e5m10_t() = default;
-        constexpr explicit operator e8m23_t() const noexcept {
-            std::uint32_t w = static_cast<std::uint32_t>(m_bits)<<16;
-            std::uint32_t sign = w & 0x80000000u;
-            std::uint32_t two_w = w+w;
-            std::uint32_t offs = 0xe0u<<23;
-            std::uint32_t t1 = (two_w>>4) + offs;
-            std::uint32_t t2 = (two_w>>17) | (126u<<23);
-            e8m23_t norm_x = std::bit_cast<e8m23_t>(t1)*0x1.0p-112f;
-            e8m23_t denorm_x = std::bit_cast<e8m23_t>(t2)-0.5f;
-            std::uint32_t denorm_cutoff = 1u<<27;
-            std::uint32_t r = sign | (two_w < denorm_cutoff
-                ? std::bit_cast<std::uint32_t>(denorm_x)
-                : std::bit_cast<std::uint32_t>(norm_x));
-            return std::bit_cast<e8m23_t>(r);
-        }
-        constexpr auto operator * () const noexcept -> std::uint16_t {
-            return m_bits;
-        }
-        constexpr auto operator + (e5m10_t other) const noexcept -> e5m10_t {
-            return e5m10_t{static_cast<e8m23_t>(*this) + static_cast<e8m23_t>(other)};
-        }
-        constexpr auto operator - (e5m10_t other) const noexcept -> e5m10_t {
-            return e5m10_t{static_cast<e8m23_t>(*this) - static_cast<e8m23_t>(other)};
-        }
-        constexpr auto operator * (e5m10_t other) const noexcept -> e5m10_t {
-            return e5m10_t{static_cast<e8m23_t>(*this) * static_cast<e8m23_t>(other)};
-        }
-        constexpr auto operator / (e5m10_t other) const noexcept -> e5m10_t {
-            return e5m10_t{static_cast<e8m23_t>(*this) / static_cast<e8m23_t>(other)};
-        }
-        [[nodiscard]] static constexpr auto min() noexcept -> e5m10_t {
-            return e5m10_t{0xfbff};
-        }
-        [[nodiscard]] static constexpr auto max() noexcept -> e5m10_t {
-            return e5m10_t{0x7bff};
-        }
-        [[nodiscard]] static constexpr auto eps() noexcept -> e5m10_t {
-            return e5m10_t{0x1400};
-        }
-
-    private:
-        std::uint16_t m_bits {};
-    };
+    using e5m10_t = half_float::half;
 
     template <typename T>
     struct dtype_traits final {
         static constexpr T min {std::numeric_limits<T>::min()};
         static constexpr T max {std::numeric_limits<T>::min()};
         static constexpr e8m23_t eps {std::numeric_limits<T>::epsilon()};
-        static constexpr e8m23_t test_eps {std::numeric_limits<T>::epsilon()};
-    };
-
-    template <>
-    struct dtype_traits<e5m10_t> final {
-        static constexpr e5m10_t min {e5m10_t::min()};
-        static constexpr e5m10_t max {e5m10_t::max()};
-        static constexpr e8m23_t eps {static_cast<e8m23_t>(e5m10_t::eps())};
-        static constexpr e8m23_t test_eps {1e-1f};
+        static inline const e8m23_t test_eps {std::numeric_limits<T>::epsilon()};
     };
 
     [[nodiscard]] inline auto shape_to_string(std::span<const std::int64_t> shape) -> std::string {

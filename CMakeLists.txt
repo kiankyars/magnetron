@@ -25,11 +25,6 @@ option(MAGNETRON_ENABLE_MIMALLOC "Use mimalloc as memory allocator" ON)         
 set(MAGNETRON_CUDA_COMPILER "/usr/local/cuda-12.6/bin/nvcc" CACHE STRING "Path to the CUDA compiler") # Set to your CUDA compiler path
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-if (${MAGNETRON_BUILD_TESTS})
-    enable_testing()
-    add_subdirectory(extern/googletest)
-endif()
-
 if (${MAGNETRON_BUILD_TESTS} OR ${MAGNETRON_BUILD_BENCHMARKS} OR ${MAGNETRON_BUILD_FUZZERS})
     enable_language(CXX)
     set(CMAKE_CXX_STANDARD 20)
@@ -57,6 +52,7 @@ if (${MAGNETRON_ENABLE_MIMALLOC})
 endif()
 
 if (${MAGNETRON_BUILD_TESTS})
+    enable_testing()
     add_subdirectory(test)
 endif()
 
