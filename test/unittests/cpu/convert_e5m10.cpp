@@ -35,6 +35,19 @@ TEST(cpu_convert_e5m10, e5m10_to_e8m23) {
     }
 }
 
+TEST(cpu_convert_e5m10, e8m23_to_e5m10_full_bit_range) {
+    for (std::uint16_t i {}; i < 0xffff; ++i) {
+        e8m23_t x {mag_e5m10_cvt_e8m23(mag_e5m10_t{.bits=i})};
+        e8m23_t y {static_cast<e8m23_t>(std::bit_cast<half_float::half>(i))};
+        if (std::isnan(x) || std::isnan(y)) {
+            ASSERT_TRUE(std::isnan(x));
+            ASSERT_TRUE(std::isnan(y));
+        } else {
+            ASSERT_EQ(x, y);
+        }
+    }
+}
+
 TEST(cpu_convert_e5m10, e8m23_to_e5m10) {
     ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::e_v<e8m23_t>).bits, MAG_E5M10_E.bits);
     ASSERT_EQ(mag_e8m23_cvt_e5m10(std::numbers::pi_v<e8m23_t>).bits, MAG_E5M10_PI.bits);

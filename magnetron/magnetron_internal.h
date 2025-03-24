@@ -777,10 +777,9 @@ typedef enum mag_tensor_flags_t {
     MAG_TFLAG_OWNER = 1<<0,             /* Tensor is the owner of the buffer. */
     MAG_TFLAG_VIEW = 1<<1,              /* Tensor is a view. */
     MAG_TFLAG_IS_GRAD = 1<<2,           /* Tensor is a gradient. */
-    MAG_TFLAG_EXEC_EAGER = 1<<3,        /* Tensor is executed eagerly. */
-    MAG_TFLAG_REQUIRES_GRAD = 1<<4,     /* Tensor requires gradient. */
+    MAG_TFLAG_REQUIRES_GRAD = 1<<3,     /* Tensor requires gradient. */
 
-    MAG_TFLAG_LEN = 5                   /* Number of flags. */
+    MAG_TFLAG_LEN = 4                   /* Number of flags. */
 } mag_tensor_flags_t;
 mag_static_assert(MAG_TFLAG_LEN <= 0xff);
 
@@ -789,31 +788,30 @@ mag_static_assert(MAG_TFLAG_LEN <= 0xff);
 */
 struct mag_tensor_t {
     struct {
-        uint32_t rc_strong;                         /* Strong reference count. */
-        uint32_t rc_weak;                           /* Weak reference count. */
+        uint32_t rc_strong;                             /* Strong reference count. */
 #ifdef MAG_DEBUG
-        void (*dtor)(mag_tensor_t*);                 /* Debug destructor. */
+        void (*dtor)(mag_tensor_t*);                    /* Debug destructor. */
 #endif
-    } rcb;                                          /* Reference count control block. */
-    mag_ctx_t* ctx;                                  /* Host context. */
-    int64_t rank;                                   /* Number of active dimensions. [1, MAX_DIMS] */
-    int64_t shape[MAG_MAX_DIMS];                     /* Shape of the tensor. */
-    int64_t strides[MAG_MAX_DIMS];                   /* Strides of the tensor. We store the strides in element counts and NOT in bytes. */
-    mag_dtype_t dtype;                               /* Data type of the tensor. */
-    mag_storage_buffer_t storage;                      /* Storage buffer. */
-    int64_t numel;                                  /* Number of elements in the tensor. */
-    mag_tensor_flags_t flags;                        /* Tensor flags. */
-    mag_op_t op;                                     /* Opcode for operators. */
-    mag_tensor_t* op_inputs[MAG_MAX_INPUT_TENSORS];   /* Input tensors for operators. */
-    mag_op_param_t op_params[MAG_MAX_OP_PARAMS];      /* Operator parameters. */
+    } rcb;                                              /* Reference count control block. */
+    mag_ctx_t* ctx;                                     /* Host context. */
+    int64_t rank;                                       /* Number of active dimensions. [1, MAX_DIMS] */
+    int64_t shape[MAG_MAX_DIMS];                        /* Shape of the tensor. */
+    int64_t strides[MAG_MAX_DIMS];                      /* Strides of the tensor. We store the strides in element counts and NOT in bytes. */
+    mag_dtype_t dtype;                                  /* Data type of the tensor. */
+    mag_storage_buffer_t storage;                       /* Storage buffer. */
+    int64_t numel;                                      /* Number of elements in the tensor. */
+    mag_tensor_flags_t flags;                           /* Tensor flags. */
+    mag_op_t op;                                        /* Opcode for operators. */
+    mag_tensor_t* op_inputs[MAG_MAX_INPUT_TENSORS];     /* Input tensors for operators. */
+    mag_op_param_t op_params[MAG_MAX_OP_PARAMS];        /* Operator parameters. */
     mag_init_op_t init_op;                              /* Initialization op */
-    mag_op_param_t init_op_params[MAG_MAX_OP_PARAMS];      /* Init operator parameters */
-    mag_tensor_t* view_uplink;                       /* View base tensor. */
-    size_t view_offs;                               /* Offset in view tensor. */
-    mag_tensor_t* grad;                              /* ∇f - Gradient tensor. */
-    mag_perf_mon_t pmon;                             /* Performance monitor. */
-    char name[MAG_MAX_TENSOR_NAME_LEN];              /* Tensor debug name. */
-    void* ud;                                       /* User data. */
+    mag_op_param_t init_op_params[MAG_MAX_OP_PARAMS];   /* Init operator parameters */
+    mag_tensor_t* view_uplink;                          /* View base tensor. */
+    size_t view_offs;                                   /* Offset in view tensor. */
+    mag_tensor_t* grad;                                 /* ∇f - Gradient tensor. */
+    mag_perf_mon_t pmon;                                /* Performance monitor. */
+    char name[MAG_MAX_TENSOR_NAME_LEN];                 /* Tensor debug name. */
+    void* ud;                                           /* User data. */
 };
 
 #define mag_load_local_storage_group_arr(arr, prefix) \

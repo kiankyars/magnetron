@@ -2000,7 +2000,6 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
     *t = (mag_tensor_t) {
         .rcb = {
             .rc_strong = 0,
-            .rc_weak = 0,
             #ifdef MAG_DEBUG
                 .dtor = &mag_tensor_sanitize_dtor
             #endif
@@ -2012,7 +2011,7 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
         .dtype = type,
         .storage = {0},
         .numel = numel,
-        .flags = (view ? (MAG_TFLAG_VIEW | (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER ? view->flags & MAG_TFLAG_REQUIRES_GRAD : 0)) : MAG_TFLAG_OWNER),
+        .flags = (view ? MAG_TFLAG_VIEW : MAG_TFLAG_OWNER) | (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER ? MAG_TFLAG_REQUIRES_GRAD : 0),
         .op = MAG_OP_NOP,
         .op_inputs = {0},
         .op_params = {{0}},
@@ -2550,8 +2549,8 @@ void mag_tensor_fill_random_normal(mag_tensor_t* t, mag_e8m23_t mean, mag_e8m23_
     mag_op_exec(t, t->ctx->device, MAG_GRA_INIT);
 }
 
-uint64_t mag_tensor_get_packed_refcounts(const mag_tensor_t* t) {
-    return (uint64_t)t->rcb.rc_strong|((uint64_t)t->rcb.rc_weak << 32);
+uint32_t mag_tensor_get_refcount(const mag_tensor_t* t) {
+    return t->rcb.rc_strong;
 }
 
 void mag_tensor_retain(mag_tensor_t* t) {

@@ -245,8 +245,8 @@ namespace magnetron {
             }
         }
 
-        template <typename... S> requires std::is_same_v<std::common_type_t<S...>, std::int64_t>
-        tensor(context& ctx, dtype type, S... shape) : tensor{ctx, type, std::array{shape...}} {}
+        template <typename... S> requires std::is_integral_v<std::common_type_t<S...>>
+        tensor(context& ctx, dtype type, S&&... shape) : tensor{ctx, type, std::array{static_cast<std::int64_t>(shape)...}} {}
 
         tensor(context& ctx, std::span<const std::int64_t> shape, std::span<const float> data) : tensor{ctx, dtype::f32, shape} {
             copy_buffer_from(data);
@@ -385,7 +385,7 @@ namespace magnetron {
             mag_tensor_fill_random_normal(m_tensor, mean, stddev);
         }
 
-        [[nodiscard]] auto packed_refcounts() const noexcept -> std::uint64_t { return mag_tensor_get_packed_refcounts(m_tensor); }
+        [[nodiscard]] auto refcount() const noexcept -> std::uint64_t { return mag_tensor_get_refcount(m_tensor); }
         [[nodiscard]] auto memory_usage() const noexcept -> std::size_t { return mag_tensor_get_memory_usage(m_tensor); }
         auto print(bool with_header = false, bool with_data = true) const noexcept -> void { mag_tensor_print(m_tensor, with_header, with_data); }
         auto set_name(const std::string& name) -> void { mag_tensor_set_name(m_tensor, name.c_str()); }

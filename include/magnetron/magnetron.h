@@ -325,7 +325,7 @@ extern MAG_EXPORT void mag_tensor_fill(mag_tensor_t* _Nonnull t, float x);      
 extern MAG_EXPORT void mag_tensor_fill_random_uniform(mag_tensor_t* _Nonnull t, float min, float max);                  /* Fill tensor with random values from uniform distribution within [min, max] */
 extern MAG_EXPORT void mag_tensor_fill_random_normal(mag_tensor_t* _Nonnull t, float mean, float stddev);               /* Fill tensor with random values from the normal distribution. */
 
-extern MAG_EXPORT uint64_t mag_tensor_get_packed_refcounts(const mag_tensor_t* _Nonnull t);                             /* Return strong refcount is loword, weak refcount is hiword. */
+extern MAG_EXPORT uint32_t mag_tensor_get_refcount(const mag_tensor_t* _Nonnull t);                                     /* Return strong refcount is loword, weak refcount is hiword. */
 extern MAG_EXPORT size_t mag_tensor_get_memory_usage(const mag_tensor_t* _Nonnull t);                                   /* Return memory used by this tensor in bytes. */
 extern MAG_EXPORT void mag_tensor_print(const mag_tensor_t* _Nonnull t, bool with_header, bool with_data);              /* Print tensor info (with or without data) */
 extern MAG_EXPORT void mag_tensor_set_name(mag_tensor_t* _Nonnull t, const char* _Nonnull name);                        /* Set the name of the tensor */
@@ -336,10 +336,11 @@ extern MAG_EXPORT const int64_t* _Nonnull mag_tensor_shape(const mag_tensor_t* _
 extern MAG_EXPORT const int64_t* _Nonnull mag_tensor_strides(const mag_tensor_t* _Nonnull t);                           /* Get the strides of the tensor */
 extern MAG_EXPORT mag_dtype_t mag_tensor_dtype(const mag_tensor_t* _Nonnull t);                                         /* Get the data type of the tensor */
 extern MAG_EXPORT void* _Nonnull mag_tensor_data_ptr(const mag_tensor_t* _Nonnull t);                                   /* Get the tensor raw buffer pointer. Might pointer to GPU or any other device memory. */
-extern MAG_EXPORT float* _Nonnull mag_tensor_transfer_clone_data(const mag_tensor_t* _Nonnull t);                        /* Return value must be freed manually with mag_tensor_free_cloned_data. Convert tensor data to float and return allocated float array. Array length is tensor.numel. */
-extern MAG_EXPORT void mag_tensor_free_transfer_cloned_data(float* _Nonnull ret_val);                                            /* Free cloned, allocated data. */
+extern MAG_EXPORT float* _Nonnull mag_tensor_transfer_clone_data(const mag_tensor_t* _Nonnull t);                       /* Return value must be freed manually with mag_tensor_free_cloned_data. Convert tensor data to float and return allocated float array. Array length is tensor.numel. */
+extern MAG_EXPORT void mag_tensor_free_transfer_cloned_data(float* _Nonnull ret_val);                                   /* Free cloned, allocated data. */
 extern MAG_EXPORT int64_t mag_tensor_data_size(const mag_tensor_t* _Nonnull );                                          /* Get the size of the tensor buffer in bytes. */
 extern MAG_EXPORT int64_t mag_tensor_numel(const mag_tensor_t* _Nonnull t);                                             /* Get the total amount of elements in the tensor. */
+
 extern MAG_EXPORT bool mag_tensor_is_shape_eq(const mag_tensor_t* _Nonnull x, const mag_tensor_t* _Nonnull y);          /* Checks if a and b have the same shape. */
 extern MAG_EXPORT bool mag_tensor_are_strides_eq(const mag_tensor_t* _Nonnull x, const mag_tensor_t* _Nonnull y);       /* Checks if a and b have the same strides. */
 extern MAG_EXPORT bool mag_tensor_can_broadcast(const mag_tensor_t* _Nonnull x, const mag_tensor_t* _Nonnull y);        /* Checks if b can be broadcasted into a. */

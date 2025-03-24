@@ -27,16 +27,16 @@ function ChebyshevState(f::Function, xMin::BigFloat, xMax::BigFloat, steps::Int,
         dd = BigFloat(0)
         for j in steps:-1:2
             temp = d
-            d = xr2 * d - dd + coeffs[j]
+            d = xr2*d - dd + coeffs[j]
             dd = temp
         end
-        BigFloat(0.5) * xr2 * d - dd + BigFloat(0.5) * coeffs[1]
+        BigFloat(0.5)*xr2*d - dd + BigFloat(0.5) * coeffs[1]
     end
     if steps > 1
         xMinOffs = matchLeft ? BigFloat(f(xMin)) - evaluate_local(xMin) : BigFloat(0)
         xMaxOffs = matchRight ? BigFloat(f(xMax)) - evaluate_local(xMax) : BigFloat(0)
-        a = BigFloat(0.5) * (xMaxOffs + xMinOffs)
-        b = BigFloat(0.5) * (xMaxOffs - xMinOffs)
+        a = BigFloat(0.5)*(xMaxOffs + xMinOffs)
+        b = BigFloat(0.5)*(xMaxOffs - xMinOffs)
         coeffs[1] += BigFloat(2) * a
         if steps >= 2
             coeffs[2] += b
@@ -53,16 +53,16 @@ end
 function evaluate(expansion::ChebyshevState, x::Real) :: BigFloat
     x_big = BigFloat(x)
     scale = BigFloat(4) / (expansion.xMax - expansion.xMin)
-    xr2 = -BigFloat(2) + (x_big - expansion.xMin) * scale
+    xr2 = -BigFloat(2) + (x_big - expansion.xMin)*scale
     d = BigFloat(0)
     dd = BigFloat(0)
     n = length(expansion.coeffs)
     for j in n:-1:2
         temp = d
-        d = xr2 * d - dd + expansion.coeffs[j]
+        d = xr2*d - dd + expansion.coeffs[j]
         dd = temp
     end
-    BigFloat(0.5) * xr2 * d - dd + BigFloat(0.5) * expansion.coeffs[1]
+    BigFloat(0.5)*xr2*d - dd + BigFloat(0.5)*expansion.coeffs[1]
 end
 
 f(x) = exp(x)
