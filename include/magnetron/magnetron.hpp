@@ -397,9 +397,6 @@ namespace magnetron {
         [[nodiscard]] auto dtype() const noexcept -> dtype { return static_cast<enum dtype>(mag_tensor_get_dtype(m_tensor)); }
         [[nodiscard]] auto data_ptr() const noexcept -> void* { return mag_tensor_get_data_ptr(m_tensor); }
         [[nodiscard]] auto to_vector() const -> std::vector<float> {
-            if (mag_tensor_get_dtype(m_tensor) == MAG_DTYPE_E5M10) {
-                int k;
-            }
             auto* data {mag_tensor_transfer_clone_data(m_tensor)};
             std::vector<float> result {};
             result.resize(numel());
@@ -425,20 +422,19 @@ namespace magnetron {
         auto backward() -> void { mag_tensor_backward(m_tensor); }
         auto zero_grad() -> void { mag_tensor_zero_grad(m_tensor); }
 
-        [[nodiscard]] auto index(const std::array<std::int64_t, k_max_dims>& idx) const noexcept -> float {
+        [[nodiscard]] auto operator ()(const std::array<std::int64_t, k_max_dims>& idx) const noexcept -> float {
             return mag_tensor_subscript_get_phys(m_tensor, idx[0], idx[1], idx[2], idx[3], idx[4], idx[5]);
         }
-        auto index(const std::array<std::int64_t, k_max_dims>& idx, float x) const noexcept -> void {
+        auto operator ()(const std::array<std::int64_t, k_max_dims>& idx, float x) const noexcept -> void {
             mag_tensor_subscript_set_phys(m_tensor, idx[0], idx[1], idx[2], idx[3], idx[4], idx[5], x);
         }
-        [[nodiscard]] auto index(std::int64_t idx) const noexcept -> float {
+        [[nodiscard]] auto operator ()(std::int64_t idx) const noexcept -> float {
             return mag_tensor_subscript_get_lin(m_tensor, idx);
         }
-        auto index(std::int64_t idx, float x) const noexcept -> void {
-            mag_tensor_subscript_set_lin(m_tensor, idx, idx);
+        auto operator ()(std::int64_t idx, float x) const noexcept -> void {
+            mag_tensor_subscript_set_lin(m_tensor, idx, x);
         }
 
-        // TODO: Add other utility functions
 
     private:
         explicit tensor(mag_tensor_t* ptr) noexcept : m_tensor{ptr} {}

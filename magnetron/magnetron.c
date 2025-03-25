@@ -911,11 +911,11 @@ const mag_dtype_meta_t* mag_dtype_meta_of(mag_dtype_t type) {
     static const mag_dtype_meta_t infos[MAG_DTYPE__NUM] = {
         [MAG_DTYPE_E8M23] = {
             sizeof(mag_e8m23_t),
-            "e8m23 (f32)"
+            "e8m23"
         },
         [MAG_DTYPE_E5M10] = {
             sizeof(mag_e5m10_t),
-            "e5m10 (f16)"
+            "e5m10"
         },
     };
     return &infos[type];
@@ -1202,7 +1202,7 @@ static mag_tensor_t* mag_result_constructor_routine_matmul(mag_tensor_t** inputs
         *rd1 = inputs[1]->shape[1];
         rank = 2;
     }
-    return mag_tensor_create(inputs[0]->ctx, MAG_DTYPE_E8M23, shape, rank, NULL, 0);
+    return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, shape, rank, NULL, 0);
 }
 
 static void mag_op_backward_nop(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -2406,8 +2406,6 @@ void mag_tensor_set_arg(mag_tensor_t* t, size_t slot, mag_tensor_t* arg) {
 }
 
 void mag_tensor_copy_buffer_from(mag_tensor_t* t, const void* data, size_t size) {
-    mag_assert(size == (size_t) mag_tensor_get_data_size(t), "Buffer size mismatch: %zu != %lld", size, mag_tensor_get_data_size(t));
-    mag_assert2(t->dtype == MAG_DTYPE_E8M23); /* TODO */
     mag_storage_buffer_t* sto = &t->storage;
     (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CPY, 0, (void*)data, size);
 }
@@ -2491,7 +2489,6 @@ static void mag_print_tensor_recursive(FILE* f, const mag_tensor_t* t, int64_t (
         fprintf(f, "%*s]\n", indent, "");
     }
 }
-
 
 void mag_tensor_print(const mag_tensor_t* t, bool with_header, bool with_data) {
     mag_assert2(t->dtype == MAG_DTYPE_E8M23); /* TODO */

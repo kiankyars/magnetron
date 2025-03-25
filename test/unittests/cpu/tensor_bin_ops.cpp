@@ -7,7 +7,7 @@ using namespace magnetron;
 static constexpr std::int64_t lim {4};
 
 #if 0
-TEST(cpu_binary_operators, print_test_info) {
+TEST(cpu_tensor_bin_ops, print_test_info) {
     std::cout << "=== Binary Operators ===" << std::endl;
     std::set<std::vector<std::int64_t>> perms {};
     test::for_all_shape_perms(lim, 1, [&](std::span<const std::int64_t> shape) {
@@ -24,25 +24,25 @@ TEST(cpu_binary_operators, print_test_info) {
 #endif
 
 #define impl_binary_operator_test_group(name, op, data_type) \
-    TEST(cpu_binary_operators, name##_same_shape_##data_type) { \
+    TEST(cpu_tensor_bin_ops, name##_same_shape_##data_type) { \
         test::test_binary_operator<false, false>(lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op b; }, \
             [](float a, float b) -> float { return a op b; } \
         ); \
     } \
-    TEST(cpu_binary_operators, name##_broadcast_##data_type) { \
+    TEST(cpu_tensor_bin_ops, name##_broadcast_##data_type) { \
         test::test_binary_operator<true, false>(lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op b; }, \
             [](float a, float b) -> float { return a op b; } \
         ); \
     } \
-    TEST(cpu_binary_operators, name##_inplace_same_shape_##data_type) { \
+    TEST(cpu_tensor_bin_ops, name##_inplace_same_shape_##data_type) { \
         test::test_binary_operator<false, true>(lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op##= b; }, \
             [](float a, float b) -> float { return a op b; } \
         ); \
     } \
-    TEST(cpu_binary_operators, name##_inplace_broadcast_##data_type) { \
+    TEST(cpu_tensor_bin_ops, name##_inplace_broadcast_##data_type) { \
         test::test_binary_operator<true, true>(lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op##= b; }, \
             [](float a, float b) -> float { return a op b; } \

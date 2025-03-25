@@ -81,6 +81,7 @@ namespace magnetron::test {
                         for (std::int64_t i4 = 0; i4 < lim; ++i4) {
                             for (std::int64_t i5 = 0; i5 < lim; ++i5) {
                                 shape.clear();
+                                shape.reserve(k_max_dims);
                                 if (i0 > 0) shape.emplace_back(i0*fac);
                                 if (i1 > 0) shape.emplace_back(i1*fac);
                                 if (i2 > 0) shape.emplace_back(i2*fac);
@@ -124,25 +125,25 @@ namespace magnetron::test {
     }
 
     template <typename T>
-    [[nodiscard]] auto compute_mean(std::span<const T> data) -> mag_e11m52_t {
-        mag_e11m52_t sum = 0.0;
+    [[nodiscard]] auto compute_mean(std::span<const T> data) -> mag_e8m23_t {
+        mag_e8m23_t sum {};
         for (const T x : data) sum += x;
-        return sum / static_cast<mag_e11m52_t>(data.size());
+        return sum / static_cast<mag_e8m23_t>(data.size());
     }
 
     template <typename T>
-    [[nodiscard]] auto compute_mean(const mag_tensor_t* tensor) -> mag_e11m52_t {
+    [[nodiscard]] auto compute_mean(const mag_tensor_t* tensor) -> mag_e8m23_t {
         return compute_mean(std::span<const T>{reinterpret_cast<const T*>(mag_tensor_get_data_ptr(tensor)), static_cast<std::size_t>(tensor->numel)});
     }
 
     template <typename T>
     [[nodiscard]] auto compute_std(std::span<const T> data) -> mag_e11m52_t {
-        mag_e11m52_t sum = 0.0;
-        mag_e11m52_t mean = compute_mean(data);
+        mag_e8m23_t sum {};
+        mag_e8m23_t mean {compute_mean(data)};
         for (const T x : data) {
-            sum += std::pow((x - mean), 2.0);
+            sum += std::pow(x-mean, 2.0f);
         }
-        return std::sqrt(sum / static_cast<mag_e11m52_t>(data.size()));
+        return std::sqrt(sum / static_cast<mag_e8m23_t>(data.size()));
     }
 
     template <typename T>
