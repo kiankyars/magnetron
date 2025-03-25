@@ -30,13 +30,13 @@ TEST(cpu_tensor_init_ops, copy_e5m10) {
         tensor t {ctx, dtype::e5m10, shape};
         std::vector<e8m23_t> fill_data {};
         fill_data.resize(t.numel());
-        std::uniform_real_distribution<e8m23_t> dist {dtype_traits<e8m23_t>::min, dtype_traits<e8m23_t>::max};
+        std::uniform_real_distribution<e8m23_t> dist {-1.0f, 1.0f};
         std::ranges::generate(fill_data, [&] { return dist(gen); });
         t.copy_buffer_from<e8m23_t>(fill_data);
         std::vector<e8m23_t> data {t.to_vector()};
         ASSERT_EQ(data.size(), t.numel());
         for (std::size_t i {}; i < data.size(); ++i) {
-            ASSERT_EQ(data[i], fill_data[i]);
+            ASSERT_NEAR(data[i], fill_data[i], dtype_traits<e5m10_t>::test_eps);
         }
     });
 }
@@ -91,17 +91,19 @@ TEST(cpu_tensor_init_ops, fill_random_uniform_e8m23) {
 TEST(cpu_tensor_init_ops, fill_random_uniform_e5m10) {
     context ctx {compute_device::cpu};
     for_all_shape_perms(lim, 1, [&](std::span<const std::int64_t> shape) {
-        std::uniform_real_distribution dist {dtype_traits<e8m23_t>::min, dtype_traits<e8m23_t>::max};
-        e8m23_t min {dist(gen)};
-        e8m23_t max {std::uniform_real_distribution{min, dtype_traits<e8m23_t>::max}(gen)};
-        tensor t {ctx, dtype::e5m10, shape};
-        t.fill_rand_uniform(min, max);
-        std::vector<e8m23_t> data {t.to_vector()};
-        ASSERT_EQ(data.size(), t.numel());
-        for (auto x : data) {
-            ASSERT_GE(x, min);
-            ASSERT_LE(x, max);
-        }
+        std::uniform_real_distribution dist {-1.0f, 1.0f};
+         e8m23_t min {dist(gen)};
+         e8m23_t max {std::uniform_real_distribution{min, dtype_traits<e8m23_t>::max}(gen)};
+         e8m23_t qmin {static_cast<e8m23_t>(e5m10_t{min})};
+         e8m23_t qmax {static_cast<e8m23_t>(e5m10_t{max})};
+         tensor t {ctx, dtype::e5m10, shape};
+         t.fill_rand_uniform(qmin, qmax);
+         std::vector<e8m23_t> data {t.to_vector()};
+         ASSERT_EQ(data.size(), t.numel());
+         for (auto x : data) {
+             ASSERT_GE(x, qmin);
+             ASSERT_LE(x, qmax);
+         }
     });
 }
 

@@ -3332,17 +3332,17 @@ static void (*const mag_blas_lut_post_backward_kernels[MAG_OP__NUM])(mag_kernel_
 
 mag_static_assert(MAG_DTYPE__NUM <= 255);
 #define mag_dt_perm(x,y) ((((x)&255)<<8)+((y)&255))
-static void MAG_HOTPROC mag_blas_vector_cast(int64_t nb, const void* src, mag_dtype_t src_t, void* dst, mag_dtype_t dst_t) {
+static void MAG_HOTPROC mag_blas_vector_cast(size_t nb, const void* src, mag_dtype_t src_t, void* dst, mag_dtype_t dst_t) {
     mag_assert2(dst_t != src_t); /* src and dst types must differ */
     int64_t nbs = mag_dtype_meta_of(src_t)->size;
     int64_t nbd = mag_dtype_meta_of(dst_t)->size;
-    mag_assert2(((uintptr_t)src & nbs-1) == 0);     /* src must be aligned */
-    mag_assert2(((uintptr_t)dst & nbd-1) == 0);     /* dst must be aligned */
-    mag_assert2((nb & nbs-1) == 0);                 /* size must be aligned */
-    nb /= nbs; /* Convert from byte size to src numel */
+    mag_assert2(((uintptr_t)src & (nbs-1)) == 0);     /* src must be aligned */
+    mag_assert2(((uintptr_t)dst & (nbd-1)) == 0);     /* dst must be aligned */
+    mag_assert2((nb & (nbs-1)) == 0);                 /* size must be aligned */
+    int64_t n = (int64_t)nb/nbs; /* Byte to elem granularity. */
     switch (mag_dt_perm(src_t, dst_t)) {
-        case mag_dt_perm(MAG_DTYPE_E8M23, MAG_DTYPE_E5M10): mag_vector_cast_mag_e8m23_cvt_e5m10(nb, src, dst); return;
-        case mag_dt_perm(MAG_DTYPE_E5M10, MAG_DTYPE_E8M23): mag_vector_cast_mag_e5m10_cvt_e8m23(nb, src, dst); return;
+        case mag_dt_perm(MAG_DTYPE_E8M23, MAG_DTYPE_E5M10): mag_vector_cast_mag_e8m23_cvt_e5m10(n, src, dst); return;
+        case mag_dt_perm(MAG_DTYPE_E5M10, MAG_DTYPE_E8M23): mag_vector_cast_mag_e5m10_cvt_e8m23(n, src, dst); return;
         default: mag_panic("invalid vector cast dtypes %s -> %s", mag_dtype_meta_of(src_t)->name, mag_dtype_meta_of(dst_t)->name);
     }
 }

@@ -878,7 +878,7 @@ typedef struct mag_kernel_registry_t { /* Kernel registry for operators. */
     uint32_t (*bwd_pre[MAG_OP__NUM])(mag_kernel_context_t*);
     void (*bwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
     void (*bwd_post[MAG_OP__NUM])(mag_kernel_context_t*);
-    void (*vector_cast)(int64_t nb, const void* src, mag_dtype_t src_t, void* dst, mag_dtype_t dst_t);
+    void (*vector_cast)(size_t nb, const void* src, mag_dtype_t src_t, void* dst, mag_dtype_t dst_t);
 } mag_kernel_registry_t;
 
 #define mag_load_local_storage_group(xk, prefix, var) mag_load_local_storage_group_arr((xk)->var, prefix)

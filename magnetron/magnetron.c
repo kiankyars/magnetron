@@ -2389,7 +2389,7 @@ void mag_tensor_set_arg(mag_tensor_t* t, size_t slot, mag_tensor_t* arg) {
 
 void mag_tensor_copy_buffer_from(mag_tensor_t* t, const void* data, size_t size) {
     mag_storage_buffer_t* sto = &t->storage;
-    (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CPY, 0, (void*)data, size);
+    (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CVT_E8M23, 0, (void*)data, size);
 }
 
 void mag_tensor_fill(mag_tensor_t* t, mag_e8m23_t x) {

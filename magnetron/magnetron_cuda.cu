@@ -141,10 +141,11 @@ namespace mag::cuda {
             .base = reinterpret_cast<std::uintptr_t>(base),
             .size = sz,
             .alignment = 256,
+            .granularity = 0, // TODO
+            .dtype = MAG_DTYPE_E8M23, // TODO
             .host = dvc,
             .broadcast = &broadcast_storage_buffer,
-            .cpy_host_device = &cpy_host_device,
-            .cpy_device_host = &cpy_device_host,
+            .transfer = nullptr // TODO
         };
     }
 
@@ -203,8 +204,8 @@ namespace mag::cuda {
             .type = MAG_COMPUTE_DEVICE_TYPE_GPU_CUDA,
             .eager_exec_fwd = &exec_fwd,
             .eager_exec_bwd = nullptr,
-            .alloc_storage = &alloc_storage_buffer,
-            .free_storage = &free_tensor_buffer
+            .alloc_storage = nullptr, // todo
+            .free_storage = nullptr // todo
         };
         double vram;
         const char* unit;

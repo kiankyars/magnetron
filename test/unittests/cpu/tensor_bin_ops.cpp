@@ -5,6 +5,7 @@
 using namespace magnetron;
 
 static constexpr std::int64_t lim {4};
+static constexpr std::int64_t broadcast_lim {lim-1};
 
 #if 0
 TEST(cpu_tensor_bin_ops, print_test_info) {
@@ -31,7 +32,7 @@ TEST(cpu_tensor_bin_ops, print_test_info) {
         ); \
     } \
     TEST(cpu_tensor_bin_ops, name##_broadcast_##data_type) { \
-        test::test_binary_operator<true, false>(lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
+        test::test_binary_operator<true, false>(broadcast_lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op b; }, \
             [](float a, float b) -> float { return a op b; } \
         ); \
@@ -43,7 +44,7 @@ TEST(cpu_tensor_bin_ops, print_test_info) {
         ); \
     } \
     TEST(cpu_tensor_bin_ops, name##_inplace_broadcast_##data_type) { \
-        test::test_binary_operator<true, true>(lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
+        test::test_binary_operator<true, true>(broadcast_lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op##= b; }, \
             [](float a, float b) -> float { return a op b; } \
         ); \

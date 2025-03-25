@@ -453,19 +453,16 @@ static void mag_cpu_transfer(mag_storage_buffer_t* sto, mag_transfer_dir_t dir, 
         case MAG_TRANSFER_OP_CVT_E8M23: {                       /* Convert to/from float. */
             mag_assert2((inout_size&3) == 0);                   /* Must be float array byte size (rem 4). */
             mag_assert2(((uintptr_t)inout&3) == 0);             /* Must be aligned to 4. */
-            int64_t nf32 = (int64_t)inout_size>>2;              /* Number of inout f32s */
-            int64_t nb = nf32*(int64_t)sto->granularity;        /* Number of bytes on device */
-            mag_assert2(nb && offs + nb <= sto->size);          /* At least 1 byte must be transferred + bounds check. */
+            size_t host_nb = inout_size;                        /* Total host bytes (4 bytes per element) */
+            size_t device_nb = (host_nb>>2)*sto->granularity;   /* Total device bytes (e.g. 2 bytes per element for fp16) */
+            mag_assert2(device_nb && offs+device_nb <= sto->size);
             uintptr_t pa = base + offs;
-            uintptr_t pb = pa + nb;
-            mag_assert2(pa >= base);                            /* Bounds check memory interval */
-            mag_assert2(pb <= base + sto->size);
-            uint8_t* dev_ptr = (uint8_t*)pa;
+            void* inout2 = (void*)pa;
             mag_cpu_device_t* cpu_dvc = sto->host->impl;
-            void (*vcast)(int64_t, const void*, mag_dtype_t, void*, mag_dtype_t) = cpu_dvc->kernels.vector_cast;
+            void (*vcast)(size_t, const void*, mag_dtype_t, void*, mag_dtype_t) = cpu_dvc->kernels.vector_cast;
             switch (dir) { /* Vector cast ranges */
-                case MAG_TRANSFER_DIR_H2D: (*vcast)(nb, inout, MAG_DTYPE_E8M23, dev_ptr, sto->dtype); return;
-                case MAG_TRANSFER_DIR_D2H: (*vcast)(nb, dev_ptr, sto->dtype, inout, MAG_DTYPE_E8M23); return;
+                case MAG_TRANSFER_DIR_H2D: (*vcast)(host_nb, inout, MAG_DTYPE_E8M23, inout2, sto->dtype); return;
+                case MAG_TRANSFER_DIR_D2H: (*vcast)(device_nb, inout2, sto->dtype, inout, MAG_DTYPE_E8M23); return;
                 default: mag_panic("invalid transfer dir"); return;
             }
         } return;

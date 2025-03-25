@@ -405,7 +405,7 @@ namespace magnetron {
             auto* data {mag_tensor_to_float_array(m_tensor)};
             std::vector<float> result {};
             result.resize(numel());
-            std::memcpy(result.data(), data, data_size());
+            std::copy(data, data+numel(), result.begin());
             mag_tensor_to_float_array_free_data(data);
             return result;
         }
