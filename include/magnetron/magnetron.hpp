@@ -11,6 +11,7 @@
 #include <variant>
 #include <optional>
 #include <span>
+#include <vector>
 
 namespace magnetron {
     constexpr std::size_t k_default_chunk_size {MAG_DEFAULT_CHUNK_SIZE};
