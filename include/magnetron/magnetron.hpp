@@ -364,10 +364,15 @@ namespace magnetron {
         [[nodiscard]] auto operator / (float other) const noexcept -> tensor { return div(other); }
         [[nodiscard]] auto operator /= (tensor other) const noexcept -> tensor { return div_(other); }
         [[nodiscard]] auto operator /= (float other) const noexcept -> tensor { return div_(other); }
+        [[nodiscard]] auto operator & (tensor other) const noexcept -> tensor { return matmul(other); } // we use the & operator for matmul in C++, as @ is not allowed
 
         template <typename T> requires std::is_arithmetic_v<T>
         auto copy_buffer_from(std::span<const T> buf) -> void {
             mag_tensor_copy_buffer_from(m_tensor, buf.data(), buf.size_bytes());
+        }
+
+        auto copy_buffer_from(const void* buf, std::size_t nb) -> void {
+            mag_tensor_copy_buffer_from(m_tensor, buf, nb);
         }
 
         auto fill(float val) -> void {

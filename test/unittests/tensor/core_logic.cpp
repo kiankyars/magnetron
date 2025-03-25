@@ -5,6 +5,137 @@
 using namespace magnetron;
 using namespace magnetron::test;
 
+TEST(core_tensor_logic, dynamic_graph_complex) {
+    context ctx {compute_device::cpu};
+    tensor a {ctx, dtype::e8m23, 10};
+    a.fill(2.5f);
+
+    tensor b {a.clone()};
+    tensor c {a*b};
+    tensor d {c.tanh()};
+
+    mag_tensor_t* ta {&*a};
+    ASSERT_EQ(ta->op, MAG_OP_NOP);
+    ASSERT_EQ(ta->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    for (std::size_t i {}; i < k_max_input_tensors; ++i) {
+        ASSERT_EQ(ta->op_inputs[i], nullptr);
+    }
+    for (std::size_t i {}; i < k_max_op_params; ++i) {
+        ASSERT_EQ(ta->op_params[i].type, MAG_OP_TPARAM_NONE);
+    }
+    ASSERT_EQ(ta->init_op, MAG_IOP_BROADCAST);
+    ASSERT_EQ(ta->init_op_params[0].type, MAG_OP_TPARAM_F32);
+    ASSERT_FLOAT_EQ(ta->init_op_params[0].x.e8m23, 2.5f);
+
+    mag_tensor_t* tb {&*b};
+    ASSERT_EQ(tb->op, MAG_OP_CLONE);
+    ASSERT_EQ(tb->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    ASSERT_EQ(tb->op_inputs[0], ta);
+    ASSERT_EQ(tb->op_inputs[1], nullptr);
+    for (std::size_t i {}; i < k_max_op_params; ++i) {
+        ASSERT_EQ(tb->op_params[i].type, MAG_OP_TPARAM_NONE);
+    }
+    ASSERT_EQ(tb->init_op, MAG_IOP_NOP);
+    for (std::size_t i {}; i < k_max_op_params; ++i) {
+        ASSERT_EQ(tb->init_op_params[i].type, MAG_OP_TPARAM_NONE);
+    }
+
+    mag_tensor_t* tc {&*c};
+    ASSERT_EQ(tc->op, MAG_OP_MUL);
+    ASSERT_EQ(tc->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    ASSERT_EQ(tc->op_inputs[0], ta);
+    ASSERT_EQ(tc->op_inputs[1], tb);
+    for (std::size_t i {}; i < k_max_op_params; ++i) {
+        ASSERT_EQ(tc->op_params[i].type, MAG_OP_TPARAM_NONE);
+    }
+    ASSERT_EQ(tc->init_op, MAG_IOP_NOP);
+    for (std::size_t i {}; i < k_max_op_params; ++i) {
+        ASSERT_EQ(tc->init_op_params[i].type, MAG_OP_TPARAM_NONE);
+    }
+
+    mag_tensor_t* td {&*d};
+    ASSERT_EQ(td->op, MAG_OP_TANH);
+    ASSERT_EQ(td->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    ASSERT_EQ(td->op_inputs[0], tc);
+    ASSERT_EQ(td->op_inputs[1], nullptr);
+    for (std::size_t i {}; i < k_max_op_params; ++i) {
+        ASSERT_EQ(td->op_params[i].type, MAG_OP_TPARAM_NONE);
+    }
+    ASSERT_EQ(td->init_op, MAG_IOP_NOP);
+    for (std::size_t i {}; i < k_max_op_params; ++i) {
+        ASSERT_EQ(td->init_op_params[i].type, MAG_OP_TPARAM_NONE);
+    }
+}
+
+TEST(core_tensor_logic, dynamic_graph_init_op) {
+    context ctx {compute_device::cpu};
+    tensor a {ctx, dtype::e8m23, 10};
+    a.fill_rand_uniform(0.0f, 1.0f);
+
+    mag_tensor_t* ta {&*a};
+    ASSERT_EQ(ta->op, MAG_OP_NOP);
+    ASSERT_EQ(ta->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    for (std::size_t i {}; i < k_max_input_tensors; ++i) {
+        ASSERT_EQ(ta->op_inputs[i], nullptr);
+    }
+    for (std::size_t i {}; i < k_max_op_params; ++i) {
+        ASSERT_EQ(ta->op_params[i].type, MAG_OP_TPARAM_NONE);
+    }
+    ASSERT_EQ(ta->init_op, MAG_IOP_RAND_UNIFORM);
+    ASSERT_EQ(ta->init_op_params[0].type, MAG_OP_TPARAM_F32);
+    ASSERT_FLOAT_EQ(ta->init_op_params[0].x.e8m23, 0.0f);
+    ASSERT_EQ(ta->init_op_params[1].type, MAG_OP_TPARAM_F32);
+    ASSERT_FLOAT_EQ(ta->init_op_params[1].x.e8m23, 1.0f);
+}
+
+TEST(core_tensor_logic, dynamic_graph_binary_op) {
+    context ctx {compute_device::cpu};
+    tensor a {ctx, dtype::e8m23, 10};
+    tensor b {ctx, dtype::e8m23, 10};
+    tensor c {a + b};
+
+    mag_tensor_t* ta {&*a};
+    ASSERT_EQ(ta->op, MAG_OP_NOP);
+    ASSERT_EQ(ta->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    for (std::size_t i {}; i < k_max_input_tensors; ++i) {
+        ASSERT_EQ(ta->op_inputs[i], nullptr);
+    }
+    for (std::size_t i {}; i < k_max_op_params; ++i) {
+        ASSERT_EQ(ta->op_params[i].type, MAG_OP_TPARAM_NONE);
+    }
+    ASSERT_EQ(ta->init_op, MAG_IOP_NOP);
+    for (std::size_t i {}; i < k_max_op_params; ++i) {
+        ASSERT_EQ(ta->init_op_params[i].type, MAG_OP_TPARAM_NONE);
+    }
+
+    mag_tensor_t* tb {&*b};
+    ASSERT_EQ(tb->op, MAG_OP_NOP);
+    ASSERT_EQ(tb->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    for (std::size_t i {}; i < k_max_input_tensors; ++i) {
+        ASSERT_EQ(tb->op_inputs[i], nullptr);
+    }
+    for (std::size_t i {}; i < k_max_op_params; ++i) {
+        ASSERT_EQ(tb->op_params[i].type, MAG_OP_TPARAM_NONE);
+    }
+    ASSERT_EQ(tb->init_op, MAG_IOP_NOP);
+    for (std::size_t i {}; i < k_max_op_params; ++i) {
+        ASSERT_EQ(tb->init_op_params[i].type, MAG_OP_TPARAM_NONE);
+    }
+
+    mag_tensor_t* tc {&*c};
+    ASSERT_EQ(tc->op, MAG_OP_ADD);
+    ASSERT_EQ(tc->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    ASSERT_EQ(tc->op_inputs[0], ta);
+    ASSERT_EQ(tc->op_inputs[1], tb);
+    for (std::size_t i {}; i < k_max_op_params; ++i) {
+        ASSERT_EQ(tc->op_params[i].type, MAG_OP_TPARAM_NONE);
+    }
+    ASSERT_EQ(tc->init_op, MAG_IOP_NOP);
+    for (std::size_t i {}; i < k_max_op_params; ++i) {
+        ASSERT_EQ(tc->init_op_params[i].type, MAG_OP_TPARAM_NONE);
+    }
+}
+
 TEST(core_tensor_logic, dynamic_graph_unary_op) {
     context ctx {compute_device::cpu};
     tensor a {ctx, dtype::e8m23, 10};

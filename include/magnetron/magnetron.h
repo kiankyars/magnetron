@@ -34,11 +34,13 @@ extern "C" {
 #define MAG_EXPORT
 #endif
 #endif
+#ifndef __clang__
 #ifndef _Nonnull
 #define _Nonnull
 #endif
 #ifndef _Nullable
 #define _Nullable
+#endif
 #endif
 
 #define mag_version_pack(maj, mi) ((uint32_t)((((maj)&255)<<8)+((mi)&255)))
