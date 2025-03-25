@@ -9,6 +9,7 @@ target_include_directories(magnetron_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(
     magnetron_test
     GTest::gtest_main
+    GTest::gmock
 )
 add_test(NAME magnetron_test COMMAND magnetron_test)
 

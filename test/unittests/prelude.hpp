@@ -10,6 +10,9 @@
 #include <magnetron_internal.h>
 
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
+using namespace testing;
+
 #include <half.hpp>
 
 namespace magnetron::test {
@@ -23,6 +26,31 @@ namespace magnetron::test {
         static constexpr e8m23_t eps {std::numeric_limits<T>::epsilon()};
         static inline const e8m23_t test_eps {std::numeric_limits<T>::epsilon()};
     };
+
+    [[nodiscard]] inline auto shape_as_vec(tensor t) -> std::vector<std::int64_t> {
+        mag_tensor_t* internal {&*t};
+        return {std::begin(internal->shape), std::end(internal->shape)};
+    }
+
+    [[nodiscard]] inline auto strides_as_vec(tensor t) -> std::vector<std::int64_t> {
+        mag_tensor_t* internal {&*t};
+        return {std::begin(internal->strides), std::end(internal->strides)};
+    }
+
+    [[nodiscard]] inline auto op_inputs_as_vec(tensor t) -> std::vector<mag_tensor_t*> {
+        mag_tensor_t* internal {&*t};
+        return {std::begin(internal->op_inputs), std::end(internal->op_inputs)};
+    }
+
+    [[nodiscard]] inline auto op_params_as_vec(tensor t) -> std::vector<mag_op_param_t> {
+        mag_tensor_t* internal {&*t};
+        return {std::begin(internal->op_params), std::end(internal->op_params)};
+    }
+
+    [[nodiscard]] inline auto init_op_params_as_vec(tensor t) -> std::vector<mag_op_param_t> {
+        mag_tensor_t* internal {&*t};
+        return {std::begin(internal->init_op_params), std::end(internal->init_op_params)};
+    }
 
     [[nodiscard]] inline auto shape_to_string(std::span<const std::int64_t> shape) -> std::string {
         std::stringstream ss {};
@@ -104,7 +132,7 @@ namespace magnetron::test {
 
     template <typename T>
     [[nodiscard]] auto compute_mean(const mag_tensor_t* tensor) -> mag_e11m52_t {
-        return compute_mean(std::span<const T>{reinterpret_cast<const T*>(mag_tensor_data_ptr(tensor)), static_cast<std::size_t>(tensor->numel)});
+        return compute_mean(std::span<const T>{reinterpret_cast<const T*>(mag_tensor_get_data_ptr(tensor)), static_cast<std::size_t>(tensor->numel)});
     }
 
     template <typename T>
@@ -119,6 +147,6 @@ namespace magnetron::test {
 
     template <typename T>
     [[nodiscard]] auto compute_std(const mag_tensor_t* tensor) -> mag_e11m52_t {
-        return compute_std(std::span<const T>{reinterpret_cast<const T*>(mag_tensor_data_ptr(tensor)), static_cast<std::size_t>(tensor->numel)});
+        return compute_std(std::span<const T>{reinterpret_cast<const T*>(mag_tensor_get_data_ptr(tensor)), static_cast<std::size_t>(tensor->numel)});
     }
 }

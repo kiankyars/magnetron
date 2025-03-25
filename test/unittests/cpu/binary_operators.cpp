@@ -6,6 +6,7 @@ using namespace magnetron;
 
 static constexpr std::int64_t lim {4};
 
+#if 0
 TEST(cpu_binary_operators, print_test_info) {
     std::cout << "=== Binary Operators ===" << std::endl;
     std::set<std::vector<std::int64_t>> perms {};
@@ -20,6 +21,7 @@ TEST(cpu_binary_operators, print_test_info) {
         std::cout << test::shape_to_string(shape) << std::endl;
     }
 }
+#endif
 
 #define impl_binary_operator_test_group(name, op, data_type) \
     TEST(cpu_binary_operators, name##_same_shape_##data_type) { \

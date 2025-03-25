@@ -202,9 +202,6 @@ namespace magnetron {
         [[nodiscard]] auto physical_memory_free() const noexcept -> std::uint64_t { return mag_ctx_get_physical_memory_free(m_ctx); }
         [[nodiscard]] auto is_numa_system() const noexcept -> bool { return mag_ctx_is_numa_system(m_ctx); }
         [[nodiscard]] auto total_tensors_created() const noexcept -> std::size_t { return mag_ctx_get_total_tensors_created(m_ctx); }
-        auto start_profiler() noexcept -> void { mag_ctx_profiler_start(m_ctx); }
-        auto stop_profiler(const char* export_csv_file = nullptr) noexcept -> void { mag_ctx_profiler_end(m_ctx, export_csv_file); }
-        [[nodiscard]] auto is_profiling() const noexcept -> bool { return mag_ctx_profiler_is_running(m_ctx); }
         auto start_grad_recorder() noexcept -> void { mag_ctx_grad_recorder_start(m_ctx); }
         auto stop_grad_recorder() noexcept -> void { mag_ctx_grad_recorder_stop(m_ctx); }
         [[nodiscard]] auto is_recording_gradients() const noexcept -> bool { return mag_ctx_grad_recorder_is_running(m_ctx); }
@@ -390,16 +387,19 @@ namespace magnetron {
         auto print(bool with_header = false, bool with_data = true) const noexcept -> void { mag_tensor_print(m_tensor, with_header, with_data); }
         auto set_name(const std::string& name) -> void { mag_tensor_set_name(m_tensor, name.c_str()); }
         [[nodiscard]] auto get_name() const noexcept -> std::string_view { return mag_tensor_get_name(m_tensor); }
-        [[nodiscard]] auto rank() const noexcept -> std::int64_t { return mag_tensor_rank(m_tensor); }
+        [[nodiscard]] auto rank() const noexcept -> std::int64_t { return mag_tensor_get_rank(m_tensor); }
         [[nodiscard]] auto shape() const noexcept -> std::span<const std::int64_t> {
-            return {mag_tensor_shape(m_tensor), static_cast<std::size_t>(rank())};
+            return {mag_tensor_get_shape(m_tensor), static_cast<std::size_t>(rank())};
         }
         [[nodiscard]] auto strides() const noexcept -> std::span<const std::int64_t> {
-            return {mag_tensor_strides(m_tensor), static_cast<std::size_t>(rank())};
+            return {mag_tensor_get_strides(m_tensor), static_cast<std::size_t>(rank())};
         }
-        [[nodiscard]] auto dtype() const noexcept -> dtype { return static_cast<enum dtype>(mag_tensor_dtype(m_tensor)); }
-        [[nodiscard]] auto data_ptr() const noexcept -> void* { return mag_tensor_data_ptr(m_tensor); }
+        [[nodiscard]] auto dtype() const noexcept -> dtype { return static_cast<enum dtype>(mag_tensor_get_dtype(m_tensor)); }
+        [[nodiscard]] auto data_ptr() const noexcept -> void* { return mag_tensor_get_data_ptr(m_tensor); }
         [[nodiscard]] auto to_vector() const -> std::vector<float> {
+            if (mag_tensor_get_dtype(m_tensor) == MAG_DTYPE_E5M10) {
+                int k;
+            }
             auto* data {mag_tensor_transfer_clone_data(m_tensor)};
             std::vector<float> result {};
             result.resize(numel());
@@ -407,8 +407,8 @@ namespace magnetron {
             mag_tensor_free_transfer_cloned_data(data);
             return result;
         }
-        [[nodiscard]] auto data_size() const noexcept -> std::int64_t { return mag_tensor_data_size(m_tensor); }
-        [[nodiscard]] auto numel() const noexcept -> std::int64_t { return mag_tensor_numel(m_tensor); }
+        [[nodiscard]] auto data_size() const noexcept -> std::int64_t { return mag_tensor_get_data_size(m_tensor); }
+        [[nodiscard]] auto numel() const noexcept -> std::int64_t { return mag_tensor_get_numel(m_tensor); }
         [[nodiscard]] auto is_shape_eq(tensor other) const noexcept -> bool { return mag_tensor_is_shape_eq(m_tensor, &*other); }
         [[nodiscard]] auto can_broadcast(tensor other) const noexcept -> bool { return mag_tensor_can_broadcast(m_tensor, &*other); }
         [[nodiscard]] auto is_transposed() const noexcept -> bool { return mag_tensor_is_transposed(m_tensor); }
@@ -416,7 +416,7 @@ namespace magnetron {
         [[nodiscard]] auto is_contiguous() const noexcept -> bool { return mag_tensor_is_contiguous(m_tensor); }
 
         [[nodiscard]] auto grad() const noexcept -> std::optional<tensor> {
-            auto* grad {mag_tensor_grad(m_tensor)};
+            auto* grad {mag_tensor_get_grad(m_tensor)};
             if (!grad) return std::nullopt;
             return tensor{grad};
         }
@@ -426,16 +426,16 @@ namespace magnetron {
         auto zero_grad() -> void { mag_tensor_zero_grad(m_tensor); }
 
         [[nodiscard]] auto index(const std::array<std::int64_t, k_max_dims>& idx) const noexcept -> float {
-            return mag_tensor_get_scalar_physical_index(m_tensor, idx[0], idx[1], idx[2], idx[3], idx[4], idx[5]);
+            return mag_tensor_subscript_get_phys(m_tensor, idx[0], idx[1], idx[2], idx[3], idx[4], idx[5]);
         }
         auto index(const std::array<std::int64_t, k_max_dims>& idx, float x) const noexcept -> void {
-            mag_tensor_set_scalar_physical_index(m_tensor, idx[0], idx[1], idx[2], idx[3], idx[4], idx[5], x);
+            mag_tensor_subscript_set_phys(m_tensor, idx[0], idx[1], idx[2], idx[3], idx[4], idx[5], x);
         }
         [[nodiscard]] auto index(std::int64_t idx) const noexcept -> float {
-            return mag_tensor_get_scalar_virtual_index(m_tensor, idx);
+            return mag_tensor_subscript_get_lin(m_tensor, idx);
         }
         auto index(std::int64_t idx, float x) const noexcept -> void {
-            mag_tensor_set_scalar_virtual_index(m_tensor, idx, idx);
+            mag_tensor_subscript_set_lin(m_tensor, idx, idx);
         }
 
         // TODO: Add other utility functions

@@ -68,7 +68,7 @@ mag_tensor_t* mag_tensor_load_image(mag_ctx_t* ctx, const char* file, mag_color_
              for (int64_t i=0; i < whc[0]; ++i)
                  ori[i + whc[0]*j + whc[0]*whc[1]*k] = (mag_e8m23_t)buf[k + whc[2]*i + whc[2]*whc[0]*j] / 255.0f;
         mag_tensor_t* t = mag_tensor_create_3d(ctx, MAG_DTYPE_E8M23, whc[2], rh, rw);
-        mag_e8m23_t* dst = mag_tensor_data_ptr(t);
+        mag_e8m23_t* dst = mag_tensor_get_data_ptr(t);
         mag_e8m23_t* part = (*mag_alloc)(NULL, whc[2] * whc[1] * rw * sizeof(*part));
         mag_e8m23_t ws = (mag_e8m23_t)(whc[0] - 1)/(mag_e8m23_t)(rw - 1);
         mag_e8m23_t hs = (mag_e8m23_t)(whc[1] - 1)/(mag_e8m23_t)(rh - 1);
@@ -103,14 +103,14 @@ mag_tensor_t* mag_tensor_load_image(mag_ctx_t* ctx, const char* file, mag_color_
          }
         (*mag_alloc)(ori, 0);
         (*mag_alloc)(part, 0);
-        mag_assert(rw*rh*whc[2] == mag_tensor_numel(t), "Buffer size mismatch: %zu != %zu", rw*rh*whc[2], (size_t)mag_tensor_numel(t));
+        mag_assert(rw*rh*whc[2] == mag_tensor_get_numel(t), "Buffer size mismatch: %zu != %zu", rw*rh*whc[2], (size_t)mag_tensor_get_numel(t));
         stbi_image_free(buf);
        mag_log_info("Loaded and resized tensor from image: %s, %u x %u x %u", file, rw, rh, whc[2]);
        return t;
     #endif
    }
    mag_tensor_t* t = mag_tensor_create_3d(ctx, MAG_DTYPE_E8M23, whc[2], whc[1], whc[0]);
-   mag_e8m23_t* dst = mag_tensor_data_ptr(t);
+   mag_e8m23_t* dst = mag_tensor_get_data_ptr(t);
    for (int64_t k = 0; k < whc[2]; ++k) { /* Convert from interleaved to planar representation. */
      for (int64_t j = 0; j < whc[1]; ++j) {
          for (int64_t i = 0; i < whc[0]; ++i) {
@@ -118,22 +118,22 @@ mag_tensor_t* mag_tensor_load_image(mag_ctx_t* ctx, const char* file, mag_color_
          }
      }
    }
-   mag_assert(whc[0]*whc[1]*whc[2] == mag_tensor_numel(t), "Buffer size mismatch: %zu != %zu", whc[0]*whc[1]*whc[2], (size_t)mag_tensor_numel(t));
+   mag_assert(whc[0]*whc[1]*whc[2] == mag_tensor_get_numel(t), "Buffer size mismatch: %zu != %zu", whc[0]*whc[1]*whc[2], (size_t)mag_tensor_get_numel(t));
    stbi_image_free(buf);
    mag_log_info("Loaded tensor from image: %s, %u x %u x %u", file, whc[0], whc[1], whc[2]);
    return t;
 }
 
 void mag_tensor_save_image(const mag_tensor_t* t, const char* file) {
-   int64_t rank = mag_tensor_rank(t);
+   int64_t rank = mag_tensor_get_rank(t);
    mag_assert(rank == 3, "Tensor rank must be 3, but is: %" PRIi64, (size_t)rank);
-   int64_t w = mag_tensor_width(t);
-   int64_t h = mag_tensor_height(t);
-   int64_t c = mag_tensor_channels(t);
+   int64_t w = mag_tensor_get_width(t);
+   int64_t h = mag_tensor_get_height(t);
+   int64_t c = mag_tensor_get_channels(t);
    mag_assert(c == 1 || c == 3 || c == 4, "Invalid number of channels: %zu", (size_t)c);
-   mag_assert(w*h*c == mag_tensor_numel(t), "Buffer size mismatch: %zu != %zu", w*h*c, (size_t)mag_tensor_numel(t));
+   mag_assert(w*h*c == mag_tensor_get_numel(t), "Buffer size mismatch: %zu != %zu", w*h*c, (size_t)mag_tensor_get_numel(t));
    uint8_t* dst = (*mag_alloc)(NULL, w*h*c); /* Allocate memory for image data */
-   const mag_e8m23_t* src = mag_tensor_data_ptr(t);
+   const mag_e8m23_t* src = mag_tensor_get_data_ptr(t);
    for (int64_t k = 0; k < c; ++k) /* Convert from planar to interleaved format. */
       for (int64_t i = 0; i < w*h; ++i)
          dst[i*c + k] = (uint8_t)(src[i + k*w*h]*255.0f);

@@ -19,9 +19,6 @@ TEST(context, create_cpu) {
     ASSERT_NE(ctx.physical_memory_free(), 0);
     ASSERT_EQ(ctx.total_tensors_created(), 0);
     ASSERT_TRUE(ctx.is_recording_gradients());
-    ASSERT_FALSE(ctx.is_profiling());
-    ctx.start_profiler();
-    ctx.stop_profiler();
     ctx.start_grad_recorder();
     ctx.stop_grad_recorder();
     enable_logging(false);

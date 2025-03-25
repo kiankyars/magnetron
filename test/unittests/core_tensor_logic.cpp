@@ -154,8 +154,7 @@ TEST(core_tensor_logic, init_1d) {
     ASSERT_NE(internal->storage.size, 0);
     ASSERT_NE(internal->storage.host, nullptr);
     ASSERT_NE(internal->storage.broadcast, nullptr);
-    ASSERT_NE(internal->storage.cpy_device_host, nullptr);
-    ASSERT_NE(internal->storage.cpy_host_device, nullptr);
+    ASSERT_NE(internal->storage.transfer, nullptr);
     ASSERT_EQ(internal->view_offs, 0);
     ASSERT_EQ(internal->view_uplink, nullptr);
     ASSERT_EQ(internal->op, MAG_OP_NOP);
@@ -203,8 +202,7 @@ TEST(core_tensor_logic, init_2d) {
     ASSERT_NE(internal->storage.size, 0);
     ASSERT_NE(internal->storage.host, nullptr);
     ASSERT_NE(internal->storage.broadcast, nullptr);
-    ASSERT_NE(internal->storage.cpy_device_host, nullptr);
-    ASSERT_NE(internal->storage.cpy_host_device, nullptr);
+    ASSERT_NE(internal->storage.transfer, nullptr);
     ASSERT_EQ(internal->view_offs, 0);
     ASSERT_EQ(internal->view_uplink, nullptr);
     ASSERT_EQ(internal->op, MAG_OP_NOP);
@@ -252,8 +250,7 @@ TEST(core_tensor_logic, init_3d) {
     ASSERT_NE(internal->storage.size, 0);
     ASSERT_NE(internal->storage.host, nullptr);
     ASSERT_NE(internal->storage.broadcast, nullptr);
-    ASSERT_NE(internal->storage.cpy_device_host, nullptr);
-    ASSERT_NE(internal->storage.cpy_host_device, nullptr);
+    ASSERT_NE(internal->storage.transfer, nullptr);
     ASSERT_EQ(internal->view_offs, 0);
     ASSERT_EQ(internal->view_uplink, nullptr);
     ASSERT_EQ(internal->op, MAG_OP_NOP);
@@ -301,8 +298,7 @@ TEST(core_tensor_logic, init_4d) {
     ASSERT_NE(internal->storage.size, 0);
     ASSERT_NE(internal->storage.host, nullptr);
     ASSERT_NE(internal->storage.broadcast, nullptr);
-    ASSERT_NE(internal->storage.cpy_device_host, nullptr);
-    ASSERT_NE(internal->storage.cpy_host_device, nullptr);
+    ASSERT_NE(internal->storage.transfer, nullptr);
     ASSERT_EQ(internal->view_offs, 0);
     ASSERT_EQ(internal->view_uplink, nullptr);
     ASSERT_EQ(internal->op, MAG_OP_NOP);
@@ -350,8 +346,7 @@ TEST(core_tensor_logic, init_5d) {
     ASSERT_NE(internal->storage.size, 0);
     ASSERT_NE(internal->storage.host, nullptr);
     ASSERT_NE(internal->storage.broadcast, nullptr);
-    ASSERT_NE(internal->storage.cpy_device_host, nullptr);
-    ASSERT_NE(internal->storage.cpy_host_device, nullptr);
+    ASSERT_NE(internal->storage.transfer, nullptr);
     ASSERT_EQ(internal->view_offs, 0);
     ASSERT_EQ(internal->view_uplink, nullptr);
     ASSERT_EQ(internal->op, MAG_OP_NOP);
@@ -399,8 +394,7 @@ TEST(core_tensor_logic, init_6d) {
     ASSERT_NE(internal->storage.size, 0);
     ASSERT_NE(internal->storage.host, nullptr);
     ASSERT_NE(internal->storage.broadcast, nullptr);
-    ASSERT_NE(internal->storage.cpy_device_host, nullptr);
-    ASSERT_NE(internal->storage.cpy_host_device, nullptr);
+    ASSERT_NE(internal->storage.transfer, nullptr);
     ASSERT_EQ(internal->view_offs, 0);
     ASSERT_EQ(internal->view_uplink, nullptr);
     ASSERT_EQ(internal->op, MAG_OP_NOP);

@@ -409,19 +409,19 @@ static void mag_cpu_buf_broadcast(mag_storage_buffer_t* sto, size_t offs, const 
         case 1: {
             uint8_t* p = (uint8_t*)(sto->base+offs);
             memset(p, *(uint8_t*)src, sto->size);
-        } break;
+        } return;
         case 2: {
             uint16_t* p = (uint16_t*)(sto->base+offs);
             const uint16_t* end = p+(sto->size/sizeof(*p));
             uint16_t x = *(uint16_t*)src;
             for (; p < end; ++p) *p = x;
-        } break;
+        } return;
         case 4: {
             uint32_t* p = (uint32_t*)(sto->base+offs);
             const uint32_t* end = p+(sto->size/sizeof(*p));
             uint32_t x = *(uint32_t*)src;
             for (; p < end; ++p) *p = x;
-        } break;
+        } return;
         default: {
             uint8_t* p = (uint8_t*)(sto->base+offs);
             const uint8_t* end = p+sto->size;
@@ -429,37 +429,68 @@ static void mag_cpu_buf_broadcast(mag_storage_buffer_t* sto, size_t offs, const 
                 memcpy(p, src, stride);
                 p += stride;
             }
-        } break;
+        }  return;
     }
 }
 
-static void mag_cpu_buf_cpy_host_device(mag_storage_buffer_t* sto, size_t offs, const void* src, size_t n) {
-    mag_assert2(sto->base+offs+n <= sto->base+sto->size);
-    memcpy((void*)(sto->base+offs), src, n); /* On CPU just plain old memcpy with offset. */
-}
+mag_static_assert(sizeof(mag_e8m23_t) == 4);
 
-static void mag_cpu_buf_cpy_device_host(mag_storage_buffer_t* sto, size_t offs, void* dst, size_t n) {
-    mag_assert2(sto->base+offs+n <= sto->base+sto->size);
-    memcpy(dst, (void*)(sto->base+offs), n); /* On CPU just plain old memcpy with offset. */
+static void mag_cpu_transfer(mag_storage_buffer_t* sto, mag_transfer_dir_t dir, mag_transfer_op_t op, size_t offs, void* inout, size_t inout_size) {
+    mag_assert2(inout && inout_size);
+    uintptr_t base = sto->base;
+    mag_assert2(offs <= sto->size);     /* Validate that range is within device memory. */
+    if (sto->dtype == MAG_DTYPE_E8M23 && op == MAG_TRANSFER_OP_CVT_E8M23)   /* If both are same dtype already, no conversion is needed. */
+        goto direct_memcpy;
+    switch (op) {
+        case MAG_TRANSFER_OP_CPY: direct_memcpy: {      /* Copy raw bytes. */
+            mag_assert2(inout_size <= sto->size-offs);  /* Check that byte range is valid. */
+            switch (dir) {
+                case MAG_TRANSFER_DIR_H2D: memcpy((void*)(base+offs), inout, inout_size); return; /* Host -> Device */
+                case MAG_TRANSFER_DIR_D2H: memcpy(inout, (void*)(base+offs), inout_size); return; /* Device -> Host */
+                default: mag_panic("invalid transfer dir"); return;
+            }
+        } return;
+        case MAG_TRANSFER_OP_CVT_E8M23: {                       /* Convert to/from float. */
+            mag_assert2((inout_size&3) == 0);                   /* Must be float array byte size (rem 4). */
+            mag_assert2(((uintptr_t)inout&3) == 0);             /* Must be aligned to 4. */
+            int64_t nf32 = (int64_t)inout_size>>2;              /* Number of inout f32s */
+            int64_t nb = nf32*(int64_t)sto->granularity;        /* Number of bytes on device */
+            mag_assert2(nb && offs + nb <= sto->size);          /* At least 1 byte must be transferred + bounds check. */
+            uintptr_t pa = base + offs;
+            uintptr_t pb = pa + nb;
+            mag_assert2(pa >= base);                            /* Bounds check memory interval */
+            mag_assert2(pb <= base + sto->size);
+            uint8_t* dev_ptr = (uint8_t*)pa;
+            mag_cpu_device_t* cpu_dvc = sto->host->impl;
+            void (*vcast)(int64_t, const void*, mag_dtype_t, void*, mag_dtype_t) = cpu_dvc->kernels.vector_cast;
+            switch (dir) { /* Vector cast ranges */
+                case MAG_TRANSFER_DIR_H2D: (*vcast)(nb, inout, MAG_DTYPE_E8M23, dev_ptr, sto->dtype); return;
+                case MAG_TRANSFER_DIR_D2H: (*vcast)(nb, dev_ptr, sto->dtype, inout, MAG_DTYPE_E8M23); return;
+                default: mag_panic("invalid transfer dir"); return;
+            }
+        } return;
+        default: mag_panic("invalid transfer op"); return;
+    }
 }
 
 /* Align CPU buffer to cache line size, which should also be satisfy alignment requirements for SSE, AVX and AVX512 on x86-64. */
 #define MAG_CPU_BUF_ALIGN MAG_DESTRUCTIVE_INTERFERENCE_SIZE
-mag_static_assert((MAG_CPU_BUF_ALIGN & 15) == 0);
-mag_static_assert((MAG_CPU_BUF_ALIGN & 31) == 0);
-mag_static_assert((MAG_CPU_BUF_ALIGN & 63) == 0);
+mag_static_assert((MAG_CPU_BUF_ALIGN & 15)==0);
+mag_static_assert((MAG_CPU_BUF_ALIGN & 31)==0);
+mag_static_assert((MAG_CPU_BUF_ALIGN & 63)==0);
 
-static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer_t* out, size_t size) {
+static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer_t* out, size_t size, mag_dtype_t dtype) {
     mag_assert2(size);
     void* block = mag_alloc_aligned(size, MAG_CPU_BUF_ALIGN);
     *out = (mag_storage_buffer_t){ /* Set up storage buffer. */
         .base = (uintptr_t)block,
         .size = size,
         .alignment = MAG_CPU_BUF_ALIGN,
+        .dtype = dtype,
+        .granularity = mag_dtype_meta_of(dtype)->size,
         .host = host,
         .broadcast = &mag_cpu_buf_broadcast,
-        .cpy_host_device = &mag_cpu_buf_cpy_host_device,
-        .cpy_device_host = &mag_cpu_buf_cpy_device_host,
+        .transfer = &mag_cpu_transfer
     };
 }
 
@@ -509,17 +540,6 @@ static void mag_cpu_destroy_device(mag_cpu_device_t* dvc) {
     (*mag_alloc)(dvc, 0);
 }
 
-static void mag_cpu_unpack_tensor_to_e8m23(mag_compute_device_t* dvc, mag_tensor_t* root, mag_e8m23_t* dst, size_t size) {
-    mag_cpu_device_t* cpu_dvc = dvc->impl;
-    mag_storage_buffer_t* src = &root->storage;
-    mag_assert2(size % sizeof(*dst) == 0);
-    if (root->dtype == MAG_DTYPE_E8M23) { /* If tensor is already f32, no cast is needed so just copy */
-        memcpy(dst, (const void*)src->base, size);
-        return;
-    }
-    (*cpu_dvc->kernels.vector_cast[root->dtype])(root->numel, (void*)dst, (const void*)src->base); /* Convert any other dtypes to f32 */
-}
-
 static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num_threads) {
     mag_cpu_device_t* cpu_dvc = mag_cpu_init_device(ctx, num_threads);
     mag_compute_device_t* dvc = (*mag_alloc)(NULL, sizeof(*dvc));
@@ -533,7 +553,6 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num
         .eager_exec_bwd = &mag_cpu_exec_bwd,
         .alloc_storage = &mag_cpu_alloc_storage,
         .free_storage = &mag_cpu_free_storage,
-        .unpack_tensor_to_e8m23 = &mag_cpu_unpack_tensor_to_e8m23
     };
     snprintf(dvc->name, sizeof(dvc->name), "%s", ctx->machine.cpu_name);
     return dvc;
