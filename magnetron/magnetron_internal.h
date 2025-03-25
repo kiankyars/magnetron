@@ -836,6 +836,8 @@ struct mag_tensor_t {
     (void)prefix##4; \
     (void)prefix##5
 
+#define mag_address_dotprod6(x,y) ((x##0*y##0)+(x##1*y##1)+(x##2*y##2)+(x##3*y##3)+(x##4*y##4)+(x##5*y##5))
+
 typedef struct mag_prng_state_t {
     union { /* PRNG state of active algo. */
         struct {

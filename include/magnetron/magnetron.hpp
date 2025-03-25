@@ -384,8 +384,13 @@ namespace magnetron {
 
         [[nodiscard]] auto refcount() const noexcept -> std::uint64_t { return mag_tensor_get_refcount(m_tensor); }
         [[nodiscard]] auto memory_usage() const noexcept -> std::size_t { return mag_tensor_get_memory_usage(m_tensor); }
-        auto print(bool with_header = false, bool with_data = true) const noexcept -> void { mag_tensor_print(m_tensor, with_header, with_data); }
         auto set_name(const std::string& name) -> void { mag_tensor_set_name(m_tensor, name.c_str()); }
+        [[nodiscard]] auto to_string(bool with_data = true, std::size_t from_start = 100, std::size_t from_end = 100) const -> std::string {
+            char* fmt {mag_tensor_to_string(m_tensor, with_data, from_start, from_end)};
+            std::string str {fmt};
+            mag_tensor_to_string_free_data(fmt);
+            return str;
+        }
         [[nodiscard]] auto get_name() const noexcept -> std::string_view { return mag_tensor_get_name(m_tensor); }
         [[nodiscard]] auto rank() const noexcept -> std::int64_t { return mag_tensor_get_rank(m_tensor); }
         [[nodiscard]] auto shape() const noexcept -> std::span<const std::int64_t> {
@@ -397,11 +402,11 @@ namespace magnetron {
         [[nodiscard]] auto dtype() const noexcept -> dtype { return static_cast<enum dtype>(mag_tensor_get_dtype(m_tensor)); }
         [[nodiscard]] auto data_ptr() const noexcept -> void* { return mag_tensor_get_data_ptr(m_tensor); }
         [[nodiscard]] auto to_vector() const -> std::vector<float> {
-            auto* data {mag_tensor_transfer_clone_data(m_tensor)};
+            auto* data {mag_tensor_to_float_array(m_tensor)};
             std::vector<float> result {};
             result.resize(numel());
             std::memcpy(result.data(), data, data_size());
-            mag_tensor_free_transfer_cloned_data(data);
+            mag_tensor_to_float_array_free_data(data);
             return result;
         }
         [[nodiscard]] auto data_size() const noexcept -> std::int64_t { return mag_tensor_get_data_size(m_tensor); }
@@ -423,16 +428,16 @@ namespace magnetron {
         auto zero_grad() -> void { mag_tensor_zero_grad(m_tensor); }
 
         [[nodiscard]] auto operator ()(const std::array<std::int64_t, k_max_dims>& idx) const noexcept -> float {
-            return mag_tensor_subscript_get_phys(m_tensor, idx[0], idx[1], idx[2], idx[3], idx[4], idx[5]);
+            return mag_tensor_subscript_get_multi(m_tensor, idx[0], idx[1], idx[2], idx[3], idx[4], idx[5]);
         }
         auto operator ()(const std::array<std::int64_t, k_max_dims>& idx, float x) const noexcept -> void {
-            mag_tensor_subscript_set_phys(m_tensor, idx[0], idx[1], idx[2], idx[3], idx[4], idx[5], x);
+            mag_tensor_subscript_set_multi(m_tensor, idx[0], idx[1], idx[2], idx[3], idx[4], idx[5], x);
         }
         [[nodiscard]] auto operator ()(std::int64_t idx) const noexcept -> float {
-            return mag_tensor_subscript_get_lin(m_tensor, idx);
+            return mag_tensor_subscript_get_flattened(m_tensor, idx);
         }
         auto operator ()(std::int64_t idx, float x) const noexcept -> void {
-            mag_tensor_subscript_set_lin(m_tensor, idx, x);
+            mag_tensor_subscript_set_flattened(m_tensor, idx, x);
         }
 
 

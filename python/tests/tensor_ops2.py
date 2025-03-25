@@ -1,8 +1,8 @@
-# (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+# (c) 2025 Mario 'Neo' Sieg. <mario.sieg.64@gmail.com>
 import random
 
 import pytest
-from magnetron import Tensor, DType
+from magnetron import Tensor, DType, no_grad
 import numpy as np
 
 DTYPE_TO_NUMPY: dict[DType, np.dtype] = {
@@ -81,82 +81,90 @@ def scalar_op(dtype: DType, f: callable, rhs: bool = True, lim: int = 4) -> None
     square_shape_permutations(compute, lim)
 
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_unary_op_abs(dtype: DType) -> None:
     unary_op(dtype, lambda x: x.abs(), lambda x: np.abs(x))
-    unary_op(dtype, lambda x: x.abs_(), lambda x: np.abs(x))
+    with no_grad():
+        unary_op(dtype, lambda x: x.abs_(), lambda x: np.abs(x))
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_unary_op_neg(dtype: DType) -> None:
     unary_op(dtype, lambda x: -x, lambda x: -x)
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_unary_op_log(dtype: DType) -> None:
     unary_op(dtype, lambda x: x.log(), lambda x: np.log(x))
-    unary_op(dtype, lambda x: x.log_(), lambda x: np.log(x))
+    with no_grad():
+        unary_op(dtype, lambda x: x.log_(), lambda x: np.log(x))
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_unary_op_sqr(dtype: DType) -> None:
     unary_op(dtype, lambda x: x.sqr(), lambda x: x * x)
-    unary_op(dtype, lambda x: x.sqr_(), lambda x: x * x)
+    with no_grad():
+        unary_op(dtype, lambda x: x.sqr_(), lambda x: x * x)
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_unary_op_sqrt(dtype: DType) -> None:
     unary_op(dtype, lambda x: x.sqrt(), lambda x: np.sqrt(x))
-    unary_op(dtype, lambda x: x.sqrt_(), lambda x: np.sqrt(x))
+    with no_grad():
+        unary_op(dtype, lambda x: x.sqrt_(), lambda x: np.sqrt(x))
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_unary_op_sin(dtype: DType) -> None:
     unary_op(dtype, lambda x: x.sin(), lambda x: np.sin(x))
-    unary_op(dtype, lambda x: x.sin_(), lambda x: np.sin(x))
+    with no_grad():
+        unary_op(dtype, lambda x: x.sin_(), lambda x: np.sin(x))
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_unary_op_cos(dtype: DType) -> None:
     unary_op(dtype, lambda x: x.cos(), lambda x: np.cos(x))
-    unary_op(dtype, lambda x: x.cos_(), lambda x: np.cos(x))
+    with no_grad():
+        unary_op(dtype, lambda x: x.cos_(), lambda x: np.cos(x))
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_unary_op_step(dtype: DType) -> None:
     unary_op(dtype, lambda x: x.step(), lambda x: np.heaviside(x, 0))
-    unary_op(dtype, lambda x: x.step_(), lambda x: np.heaviside(x, 0))
+    with no_grad():
+        unary_op(dtype, lambda x: x.step_(), lambda x: np.heaviside(x, 0))
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_unary_op_exp(dtype: DType) -> None:
     unary_op(dtype, lambda x: x.exp(), lambda x: np.exp(x))
-    unary_op(dtype, lambda x: x.exp_(), lambda x: np.exp(x))
+    with no_grad():
+        unary_op(dtype, lambda x: x.exp_(), lambda x: np.exp(x))
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_binary_op_add(dtype: DType) -> None:
     binary_op_square(dtype, lambda x, y: x + y)
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_binary_op_sub(dtype: DType) -> None:
     binary_op_square(dtype, lambda x, y: x + y)
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_binary_op_mul(dtype: DType) -> None:
     binary_op_square(dtype, lambda x, y: x * y)
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_binary_op_div(dtype: DType) -> None:
     binary_op_square(dtype, lambda x, y: x / y)
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_scalar_op_add(dtype: DType) -> None:
     scalar_op(dtype, lambda x, xi: x + xi)
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_scalar_op_sub(dtype: DType) -> None:
     scalar_op(dtype, lambda x, xi: x + xi)
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_scalar_op_mul(dtype: DType) -> None:
     scalar_op(dtype, lambda x, xi: x * xi)
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_scalar_op_div(dtype: DType) -> None:
     scalar_op(dtype, lambda x, xi: x / xi)
 
-@pytest.mark.parametrize("dtype", [DType.F16, DType.F32])
+@pytest.mark.parametrize('dtype', [DType.F16, DType.F32])
 def test_scalar_op_pow(dtype: DType) -> None:
     scalar_op(dtype, lambda x, xi: x**xi, rhs=False)

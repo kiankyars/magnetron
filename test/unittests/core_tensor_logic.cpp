@@ -145,6 +145,8 @@ TEST(core_tensor_logic, init_1d) {
     ASSERT_EQ(t.strides()[5], 10);
     ASSERT_NE(t.data_ptr(), nullptr);
     ASSERT_EQ(t.data_size(), 10 * sizeof(e8m23_t));
+    ASSERT_EQ(t.numel(), 10);
+    ASSERT_EQ(t.data_size(), t.numel() * sizeof(e8m23_t));
     ASSERT_EQ(t.refcount(), 1);
 
     // now check some internal data
@@ -192,6 +194,8 @@ TEST(core_tensor_logic, init_2d) {
     ASSERT_EQ(t.strides()[4], 100);
     ASSERT_EQ(t.strides()[5], 100);
     ASSERT_NE(t.data_ptr(), nullptr);
+    ASSERT_EQ(t.numel(), 10*10);
+    ASSERT_EQ(t.data_size(), t.numel() * sizeof(e8m23_t));
     ASSERT_EQ(t.data_size(), 10*10 * sizeof(e8m23_t));
     ASSERT_EQ(t.refcount(), 1);
 
@@ -241,6 +245,8 @@ TEST(core_tensor_logic, init_3d) {
     ASSERT_EQ(t.strides()[5], 1000);
     ASSERT_NE(t.data_ptr(), nullptr);
     ASSERT_EQ(t.data_size(), 10*10*10 * sizeof(e8m23_t));
+    ASSERT_EQ(t.numel(), 10*10*10);
+    ASSERT_EQ(t.data_size(), t.numel() * sizeof(e8m23_t));
     ASSERT_EQ(t.refcount(), 1);
 
     // now check some internal data
@@ -289,6 +295,8 @@ TEST(core_tensor_logic, init_4d) {
     ASSERT_EQ(t.strides()[5], 10000);
     ASSERT_NE(t.data_ptr(), nullptr);
     ASSERT_EQ(t.data_size(), 10*10*10*10 * sizeof(e8m23_t));
+    ASSERT_EQ(t.numel(), 10*10*10*10);
+    ASSERT_EQ(t.data_size(), t.numel() * sizeof(e8m23_t));
     ASSERT_EQ(t.refcount(), 1);
 
     // now check some internal data
@@ -337,6 +345,8 @@ TEST(core_tensor_logic, init_5d) {
     ASSERT_EQ(t.strides()[5], 100000);
     ASSERT_NE(t.data_ptr(), nullptr);
     ASSERT_EQ(t.data_size(), 10*10*10*10*10 * sizeof(e8m23_t));
+    ASSERT_EQ(t.numel(), 10*10*10*10*10);
+    ASSERT_EQ(t.data_size(), t.numel() * sizeof(e8m23_t));
     ASSERT_EQ(t.refcount(), 1);
 
     // now check some internal data
@@ -384,6 +394,8 @@ TEST(core_tensor_logic, init_6d) {
     ASSERT_EQ(t.strides()[4], 10000);
     ASSERT_EQ(t.strides()[5], 100000);
     ASSERT_NE(t.data_ptr(), nullptr);
+    ASSERT_EQ(t.numel(), 10*10*10*10*10*10);
+    ASSERT_EQ(t.data_size(), t.numel() * sizeof(e8m23_t));
     ASSERT_EQ(t.data_size(), 10*10*10*10*10*10 * sizeof(e8m23_t));
     ASSERT_EQ(t.refcount(), 1);
 

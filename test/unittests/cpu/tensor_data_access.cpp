@@ -20,7 +20,6 @@ TEST(cpu_tensor_data_access_subscript, flattened_e8m23) {
     });
 }
 
-
 TEST(cpu_tensor_data_access_subscript, flattened_e5m10) {
     auto ctx = context{compute_device::cpu};
     for_all_shape_perms(lim, 1, [&](std::span<const std::int64_t> shape) {

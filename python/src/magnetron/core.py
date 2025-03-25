@@ -448,40 +448,40 @@ class Tensor:
 
     @property
     def rank(self) -> int:
-        return C.mag_tensor_rank(self._ptr)
+        return C.mag_tensor_get_rank(self._ptr)
 
     @property
     def shape(self) -> tuple[int, ...]:
-        return tuple(ffi.unpack(C.mag_tensor_shape(self._ptr), self.rank))
+        return tuple(ffi.unpack(C.mag_tensor_get_shape(self._ptr), self.rank))
 
     @property
     def strides(self) -> tuple[int, ...]:
-        return tuple(ffi.unpack(C.mag_tensor_strides(self._ptr), self.rank))
+        return tuple(ffi.unpack(C.mag_tensor_get_strides(self._ptr), self.rank))
 
     @property
     def dtype(self) -> DType:
-        return DType(C.mag_tensor_dtype(self._ptr))
+        return DType(C.mag_tensor_get_dtype(self._ptr))
 
     @property
     def data_ptr(self) -> int:
-        return int(ffi.cast('uintptr_t', C.mag_tensor_data_ptr(self._ptr)))
+        return int(ffi.cast('uintptr_t', C.mag_tensor_get_data_ptr(self._ptr)))
 
     def item(self) -> float:
         return self.tolist()[0]
 
     def tolist(self) -> list[float]:
-        ptr: ffi.CData = C.mag_tensor_transfer_clone_data(self._ptr) # Convert tensor dtype to float array
+        ptr: ffi.CData = C.mag_tensor_to_float_array(self._ptr) # Convert tensor dtype to float array
         unpacked: list[float] = ffi.unpack(ptr, self.numel)
-        C.mag_tensor_free_transfer_cloned_data(ptr) # Free allocated native float array
+        C.mag_tensor_to_float_array_free_data(ptr) # Free allocated native float array
         return unpacked
 
     @property
     def data_size(self) -> int:
-        return C.mag_tensor_data_size(self._ptr)
+        return C.mag_tensor_get_data_size(self._ptr)
 
     @property
     def numel(self) -> int:
-        return C.mag_tensor_numel(self._ptr)
+        return C.mag_tensor_get_numel(self._ptr)
 
     @property
     def is_transposed(self) -> bool:
@@ -528,7 +528,7 @@ class Tensor:
     def grad(self) -> 'Tensor':
         if not self.requires_grad:
             return None
-        ptr: ffi.CData = C.mag_tensor_grad(self._ptr)
+        ptr: ffi.CData = C.mag_tensor_get_grad(self._ptr)
         if ptr == ffi.NULL:
             return None
         C.mag_tensor_incref(ptr)
@@ -889,18 +889,18 @@ class Tensor:
 
     def __getitem__(self, indices: int | tuple[int, ...]) -> float:
         if isinstance(indices, int):
-            return C.mag_tensor_get_scalar_virtual_index(self._ptr, indices)
+            return C.mag_tensor_subscript_get_flattened(self._ptr, indices)
         elif isinstance(indices, tuple):
             idx = indices + (0,) * (MAX_DIMS - len(indices))
-            return C.mag_tensor_get_scalar_physical_index(self._ptr, *idx)
+            return C.mag_tensor_subscript_get_multi(self._ptr, *idx)
         else:
             raise TypeError('Indices must be an int or a tuple of ints.')
 
     def __setitem__(self, indices: int | tuple[int, ...], value: float) -> None:
         if isinstance(indices, int):
-            C.mag_tensor_set_scalar_virtual_index(self._ptr, indices, float(value))
+            C.mag_tensor_subscript_set_flattened(self._ptr, indices, float(value))
         elif isinstance(indices, tuple):
             idx = indices + (0,) * (MAX_DIMS - len(indices))
-            C.mag_tensor_set_scalar_physical_index(self._ptr, *idx, float(value))
+            C.mag_tensor_subscript_set_multi(self._ptr, *idx, float(value))
         else:
             raise TypeError('Indices must be an int or a tuple of ints.')

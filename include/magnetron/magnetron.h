@@ -358,7 +358,7 @@ extern MAG_EXPORT void mag_tensor_zero_grad(mag_tensor_t* _Nonnull t);          
  * @param i5  Index along the sixth dimension.
  * @return    The float value of the tensor element at the given indices.
  */
-extern MAG_EXPORT float mag_tensor_subscript_get_phys(mag_tensor_t* _Nonnull t, int64_t i0, int64_t i1, int64_t i2, int64_t i3, int64_t i4, int64_t i5);
+extern MAG_EXPORT float mag_tensor_subscript_get_multi(mag_tensor_t* _Nonnull t, int64_t i0, int64_t i1, int64_t i2, int64_t i3, int64_t i4, int64_t i5);
 
 /**
  * Sets the value of a tensor element at the specified multidimensional index.
@@ -373,7 +373,7 @@ extern MAG_EXPORT float mag_tensor_subscript_get_phys(mag_tensor_t* _Nonnull t, 
  * @param i5    Index along the sixth dimension.
  * @param val   The float value to set at the specified index.
  */
-extern MAG_EXPORT void mag_tensor_subscript_set_phys(mag_tensor_t* _Nonnull t, int64_t i0, int64_t i1, int64_t i2, int64_t i3, int64_t i4, int64_t i5, float val);
+extern MAG_EXPORT void mag_tensor_subscript_set_multi(mag_tensor_t* _Nonnull t, int64_t i0, int64_t i1, int64_t i2, int64_t i3, int64_t i4, int64_t i5, float val);
 
 /**
  * Retrieves the value of a tensor element at the specified linear (flattened) index.
@@ -383,7 +383,7 @@ extern MAG_EXPORT void mag_tensor_subscript_set_phys(mag_tensor_t* _Nonnull t, i
  * @param idx  The linear index of the element.
  * @return       The float value of the tensor element at the given index.
  */
-extern MAG_EXPORT float mag_tensor_subscript_get_lin(mag_tensor_t* _Nonnull t, int64_t idx);
+extern MAG_EXPORT float mag_tensor_subscript_get_flattened(mag_tensor_t* _Nonnull t, int64_t idx);
 
 /**
  * Sets the value of a tensor element at the specified linear (flattened) index.
@@ -393,16 +393,17 @@ extern MAG_EXPORT float mag_tensor_subscript_get_lin(mag_tensor_t* _Nonnull t, i
  * @param idx  The linear index of the element.
  * @param val      The float value to set at the specified index.
  */
-extern MAG_EXPORT void mag_tensor_subscript_set_lin(mag_tensor_t* _Nonnull t, int64_t idx, float val);
+extern MAG_EXPORT void mag_tensor_subscript_set_flattened(mag_tensor_t* _Nonnull t, int64_t idx, float val);
 
-extern MAG_EXPORT float* _Nonnull mag_tensor_transfer_clone_data(mag_tensor_t* _Nonnull t);
-extern MAG_EXPORT void mag_tensor_free_transfer_cloned_data(float* _Nonnull ret_val);
+extern MAG_EXPORT float* _Nonnull mag_tensor_to_float_array(mag_tensor_t* _Nonnull t);
+extern MAG_EXPORT void mag_tensor_to_float_array_free_data(float* _Nonnull ret_val);
 
 /* ============ Tensor Misc API ============ */
 
 extern MAG_EXPORT void mag_tensor_incref(mag_tensor_t* _Nonnull t);
 extern MAG_EXPORT bool mag_tensor_decref(mag_tensor_t* _Nonnull t);
-extern MAG_EXPORT void mag_tensor_print(const mag_tensor_t* _Nonnull t, bool with_header, bool with_data);              /* Print tensor info (with or without data) */
+extern MAG_EXPORT char* _Nonnull mag_tensor_to_string(const mag_tensor_t* _Nonnull t, bool with_header, size_t from_start_count, size_t from_end_count);
+extern MAG_EXPORT void mag_tensor_to_string_free_data(char* _Nonnull ret_val);
 extern MAG_EXPORT void mag_tensor_img_draw_box(mag_tensor_t* _Nonnull t, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t wi, uint32_t rgb);
 extern MAG_EXPORT void mag_tensor_img_draw_text(mag_tensor_t* _Nonnull t, int32_t x, int32_t y, int32_t size, uint32_t rgb, const char* _Nonnull txt);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_load_image(mag_ctx_t* _Nonnull ctx, const char* _Nonnull file, mag_color_channels_t channels, uint32_t resize_w, uint32_t resize_h);    /* Create a tensor from an image file. */
