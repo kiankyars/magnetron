@@ -1133,9 +1133,11 @@ static bool mag_validate_op_scalar(mag_op_t op, mag_tensor_t* result, mag_tensor
 
 /* Validation function for the matmul operation. */
 static bool mag_validate_op_matmul(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
-    bool valid = true;
-    valid = valid && mag_check_is_shape_matmulable(op, inputs[0], inputs[1]);
-    return valid;
+    return mag_check_is_shape_matmulable(op, inputs[0], inputs[1]);
+}
+
+static bool mag_validate_op_repeat_rev(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
+    return mag_check_is_shape_broadcastable(op, inputs[0], inputs[1]);
 }
 
 static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const int64_t* dims, int64_t rank, mag_tensor_t* view, size_t view_offs);
@@ -1203,6 +1205,10 @@ static mag_tensor_t* mag_result_constructor_routine_matmul(mag_tensor_t** inputs
         rank = 2;
     }
     return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, shape, rank, NULL, 0);
+}
+
+static mag_tensor_t* mag_result_constructor_routine_repeat_rev(mag_tensor_t** inputs,  const mag_op_param_t* params) {
+    return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, inputs[1]->shape, 4, NULL, 0); /* TODO: use MAG_MAX_DIMS here when backward kernel is fixed */
 }
 
 static void mag_op_backward_nop(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1422,17 +1428,11 @@ static void mag_op_backward_muls(mag_tensor_t* node, mag_tensor_t** grads) {
 
 static void mag_op_backward_divs(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
-    mag_tensor_t* c = node->op_inputs[1];
-    grads[0] = mag_div(node->grad, c);
+    mag_e8m23_t xi = node->op_params[0].x.e8m23;
+    grads[0] = mag_muls(node->grad, 1.0f / xi);
     mag_tensor_t* tmp = mag_mul(node->grad, x);
-    mag_tensor_t* c2  = mag_mul(c, c);
-    mag_tensor_t* tmp2 = mag_div(tmp, c2);
-    mag_tensor_t* neg_tmp2 = mag_neg(tmp2);
-    grads[1] = mag_sum(neg_tmp2);
+    grads[1] = mag_muls(mag_sum(tmp), -1.0f / (xi * xi));
     mag_tensor_decref(tmp);
-    mag_tensor_decref(c2);
-    mag_tensor_decref(tmp2);
-    mag_tensor_decref(neg_tmp2);
 }
 
 static void mag_op_backward_pows(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1872,6 +1872,16 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .backward = &mag_op_backward_matmul,
             .r_alloc = &mag_result_constructor_routine_matmul,
             .validator = &mag_validate_op_matmul
+        },
+        [MAG_OP_REPEAT_REV] = {
+            .mnemonic = "repeat_rev",
+            .argcount = 2,
+            .paramcount = 0,
+            .param_types = {},
+            .inplace = true,
+            .backward = NULL,
+            .r_alloc = &mag_result_constructor_routine_repeat_rev,
+            .validator = mag_validate_op_repeat_rev
         }
     };
     return infos+type;
@@ -1996,7 +2006,7 @@ void mag_tensor_incref(mag_tensor_t* t) {
 }
 
 bool mag_tensor_decref(mag_tensor_t* t) {
-    //TODO if (t->view_uplink) mag_tensor_decref(t->view_uplink);  /* If tensor is a view, decrement base RC and free tensor chain */
+    //TODO  if (t->view_uplink) mag_tensor_decref(t->view_uplink);  /* If tensor is a view, decrement base RC and free tensor chain */
     //TODO if (t->grad) mag_tensor_decref(t->grad);                /* Decrement gradient tensor RC */
     if (!--t->rcb.rc_strong) {                              /* Strong RC reaches zero, destroy. */
         //mag_tensor_destroy(t);
@@ -2119,6 +2129,7 @@ mag_tensor_t* mag_abs(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_abs_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_ABS, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2127,6 +2138,7 @@ mag_tensor_t* mag_neg(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_neg_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_NEG, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2135,6 +2147,7 @@ mag_tensor_t* mag_log(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_log_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_LOG, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2143,6 +2156,7 @@ mag_tensor_t* mag_sqr(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sqr_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SQR, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2151,6 +2165,7 @@ mag_tensor_t* mag_sqrt(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sqrt_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SQRT, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2159,6 +2174,7 @@ mag_tensor_t* mag_sin(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sin_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SIN, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2167,6 +2183,7 @@ mag_tensor_t* mag_cos(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_cos_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_COS, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2175,6 +2192,7 @@ mag_tensor_t* mag_step(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_step_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_STEP, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2183,6 +2201,7 @@ mag_tensor_t* mag_exp(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_exp_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_EXP, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2191,6 +2210,7 @@ mag_tensor_t* mag_softmax(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_softmax_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2199,6 +2219,7 @@ mag_tensor_t* mag_softmax_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_softmax_dv_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2207,6 +2228,7 @@ mag_tensor_t* mag_sigmoid(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sigmoid_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SIGMOID, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2215,6 +2237,7 @@ mag_tensor_t* mag_sigmoid_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sigmoid_dv_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SIGMOID_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2223,6 +2246,7 @@ mag_tensor_t* mag_hard_sigmoid(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_hard_sigmoid_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_HARD_SIGMOID, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2231,6 +2255,7 @@ mag_tensor_t* mag_silu(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_silu_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SILU, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2239,6 +2264,7 @@ mag_tensor_t* mag_silu_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_silu_dv_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SILU_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2247,6 +2273,7 @@ mag_tensor_t* mag_tanh(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_tanh_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_TANH, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2255,6 +2282,7 @@ mag_tensor_t* mag_tanh_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_tanh_dv_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_TANH_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2263,6 +2291,7 @@ mag_tensor_t* mag_relu(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_relu_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_RELU, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2271,6 +2300,7 @@ mag_tensor_t* mag_relu_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_relu_dv_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_RELU_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2279,6 +2309,7 @@ mag_tensor_t* mag_gelu(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_gelu_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_GELU, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2287,6 +2318,7 @@ mag_tensor_t* mag_gelu_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_gelu_dv_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_GELU_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2295,6 +2327,7 @@ mag_tensor_t* mag_add(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_add_(mag_tensor_t* x, mag_tensor_t* y) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_ADD, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2303,6 +2336,7 @@ mag_tensor_t* mag_sub(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_sub_(mag_tensor_t* x, mag_tensor_t* y) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SUB, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2311,6 +2345,7 @@ mag_tensor_t* mag_mul(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_mul_(mag_tensor_t* x, mag_tensor_t* y) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_MUL, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2319,6 +2354,7 @@ mag_tensor_t* mag_div(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_div_(mag_tensor_t* x, mag_tensor_t* y) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_DIV, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2328,6 +2364,7 @@ mag_tensor_t* mag_adds(mag_tensor_t* x, mag_e8m23_t xi) {
 }
 
 mag_tensor_t* mag_adds_(mag_tensor_t* x, mag_e8m23_t xi) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_ADDS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
@@ -2338,6 +2375,7 @@ mag_tensor_t* mag_subs(mag_tensor_t* x, mag_e8m23_t xi) {
 }
 
 mag_tensor_t* mag_subs_(mag_tensor_t* x, mag_e8m23_t xi) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_SUBS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
@@ -2348,6 +2386,7 @@ mag_tensor_t* mag_muls(mag_tensor_t* x, mag_e8m23_t xi) {
 }
 
 mag_tensor_t* mag_muls_(mag_tensor_t* x, mag_e8m23_t xi) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_MULS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
@@ -2358,6 +2397,7 @@ mag_tensor_t* mag_divs(mag_tensor_t* x, mag_e8m23_t xi) {
 }
 
 mag_tensor_t* mag_divs_(mag_tensor_t* x, mag_e8m23_t xi) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_DIVS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
@@ -2368,12 +2408,17 @@ mag_tensor_t* mag_pows(mag_tensor_t* x, mag_e8m23_t xi) {
 }
 
 mag_tensor_t* mag_pows_(mag_tensor_t* x, mag_e8m23_t xi) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
     mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
     return mag_tensor_operator(x->ctx, MAG_OP_POWS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
 mag_tensor_t* mag_matmul(mag_tensor_t* x, mag_tensor_t* y) {
     return mag_tensor_operator(x->ctx, MAG_OP_MATMUL, false, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
+}
+
+mag_tensor_t* mag_repeat_reversed(mag_tensor_t* x, mag_tensor_t* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_REPEAT_REV, false, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
 }
 
 mag_tensor_t* mag_tensor_get_arg(const mag_tensor_t* t, size_t slot) {
@@ -2610,20 +2655,15 @@ static void mag_collect_topo_iterative(mag_tensor_t* root, mag_tensor_array_t* o
     (*mag_alloc)(visited, 0);
 }
 
-static void mag_tensor_patch_grad(const mag_tensor_t* root, mag_tensor_t* dst, mag_tensor_t* new_grad, const char* stage) {
-    if (!mag_tensor_is_shape_eq(dst, new_grad)) {
-        char shape_dst[MAG_FMT_DIM_BUF_SIZE];
-        char shape_grad[MAG_FMT_DIM_BUF_SIZE];
-        mag_fmt_dims(&shape_dst, &dst->shape, dst->rank);
-        mag_fmt_dims(&shape_grad, &new_grad->shape, new_grad->rank);
-        const char* dst_op = mag_op_meta_of(dst->op)->mnemonic;
-        const char* grad_op = mag_op_meta_of(new_grad->op)->mnemonic;
-        const char* root_op = mag_op_meta_of(root->op)->mnemonic;
-        mag_panic("Shape mismatch: %s (%s) != %s (%s) Stage: %s, Root Op: %s\n", shape_dst, dst_op, shape_grad, grad_op, stage, root_op);
+static void mag_tensor_patch_grad(const mag_tensor_t* root, mag_tensor_t* dst, mag_tensor_t* grad, const char* stage) {
+    if (!mag_tensor_is_shape_eq(grad, dst)) { /* Undo broadcasting done in forward pass. */
+        mag_tensor_t* undo_broadcast = mag_repeat_reversed(grad, dst);
+        mag_tensor_decref(grad);
+        grad = undo_broadcast;
     }
-    mag_tensor_fmt_name(new_grad, "%s (grad)", dst->name);
-    new_grad->flags = (new_grad->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
-    dst->grad = new_grad;
+    mag_tensor_fmt_name(grad, "%s (grad)", dst->name);
+    grad->flags = (grad->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
+    dst->grad = grad;
 }
 
 void mag_tensor_backward(mag_tensor_t* root) {
@@ -2632,12 +2672,11 @@ void mag_tensor_backward(mag_tensor_t* root) {
     mag_tensor_array_t post_order;
     mag_tensor_array_init(&post_order);
     mag_collect_topo_iterative(root, &post_order);
-    printf("Num: %zu\n", post_order.size);
     fflush(stdout);
     if (mag_unlikely(!post_order.size)) goto end;
-    for (size_t i = 0, j = post_order.size-1; i < j; ++i, --j)
+    for (size_t i=0, j = post_order.size-1; i < j; ++i, --j)
         mag_swap(mag_tensor_t*, post_order.data[i], post_order.data[j]);
-    for (size_t id = 0; id < post_order.size; ++id) {
+    for (size_t id=0; id < post_order.size; ++id) {
         mag_tensor_t* child = post_order.data[id];
         mag_assert2(child);
         const mag_op_meta_t* meta = mag_op_meta_of(child->op);
@@ -2652,6 +2691,7 @@ void mag_tensor_backward(mag_tensor_t* root) {
         mag_assert2(op_bwd);
         (*op_bwd)(child, grads);
         uint32_t numin = meta->argcount;
+        mag_assert2(numin <= MAG_MAX_OP_PARAMS);
         for (uint32_t i = 0; i < numin; ++i) {
             mag_tensor_t* input = child->op_inputs[i];
             mag_assert2(input);
@@ -2659,11 +2699,11 @@ void mag_tensor_backward(mag_tensor_t* root) {
             mag_tensor_t* gri = grads[i];
             mag_assert(gri, "Gradient for op %s, input #%d is not computed", meta->mnemonic, i);
             if (!input->grad) {
-                mag_tensor_patch_grad(child, input, gri, "patch");
+                mag_tensor_patch_grad(child, input, gri, "init");
             } else {
                 mag_tensor_t* acc = mag_add_(gri, input->grad);
                 mag_tensor_decref(input->grad);
-                mag_tensor_patch_grad(child, input, acc, "acc");
+                mag_tensor_patch_grad(child, input, acc, "accumulate");
                 mag_tensor_decref(gri);
             }
         }
@@ -3402,7 +3442,7 @@ static MAG_COLDPROC void mag_graphviz_dump(const mag_tensor_t* node, FILE *fp, m
     }
 }
 
-MAG_COLDPROC void mag_tensor_export_graphviz(const mag_tensor_t* t, const char* file) {
+MAG_COLDPROC void mag_tensor_export_forward_graph_graphviz(mag_tensor_t* t, const char* file) {
     mag_assert2(t && file && *file);
     FILE* f = mag_fopen(file, "w");
     fprintf(f, "digraph computation_graph {\n");
@@ -3414,4 +3454,45 @@ MAG_COLDPROC void mag_tensor_export_graphviz(const mag_tensor_t* t, const char* 
     mag_hashset_free(&visited);
     fprintf(f, "}\n");
     fclose(f);
+}
+
+MAG_COLDPROC void mag_tensor_export_backward_graph_graphviz(mag_tensor_t* t, const char* file) {
+    mag_tensor_array_t post_order;
+    mag_tensor_array_init(&post_order);
+    mag_collect_topo_iterative(t, &post_order);
+    for (size_t i=0, j=post_order.size - 1; i < j; ++i, --j) {
+        mag_swap(mag_tensor_t*, post_order.data[i], post_order.data[j]);
+    }
+    FILE* fp = mag_fopen(file, "wt");
+    if (!fp) {
+        fprintf(stderr, "Failed to open file for writing the graphviz output.\n");
+        return;
+    }
+    fprintf(fp, "digraph backward_graph {\n");
+    fprintf(fp, "    rankdir=TD;\n");
+    fprintf(fp, "    node [shape=record, style=\"rounded,filled\", fontname=\"Helvetica\"];\n");
+    for (size_t i=0; i < post_order.size; ++i) {
+        mag_tensor_t* node = post_order.data[i];
+        const mag_op_meta_t* meta = mag_op_meta_of(node->op);
+        fprintf(fp, "    \"%p\" [label=\"%s\\nShape: (", node, meta->mnemonic);
+        for (int r = 0; r < node->rank; ++r) {
+            fprintf(fp, "%lld", node->shape[r]);
+            if (r < node->rank - 1)
+                fprintf(fp, ", ");
+        }
+        fprintf(fp, ")\\nGrad: %s\"];\n", node->grad ? "set" : "none");
+    }
+    for (size_t i=0; i < post_order.size; ++i) {
+        mag_tensor_t* node = post_order.data[i];
+        const mag_op_meta_t* meta = mag_op_meta_of(node->op);
+        for (uint32_t j = 0; j < meta->argcount; ++j) {
+            mag_tensor_t* input = node->op_inputs[j];
+            if (input) {
+                fprintf(fp, "    \"%p\" -> \"%p\" [label=\"input %u\"];\n", node, input, j);
+            }
+        }
+    }
+    fprintf(fp, "}\n");
+    fclose(fp);
+    mag_tensor_array_free(&post_order);
 }

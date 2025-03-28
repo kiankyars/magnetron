@@ -351,20 +351,20 @@ namespace magnetron {
 
         [[nodiscard]] auto operator + (tensor other) const noexcept -> tensor { return add(other); }
         [[nodiscard]] auto operator + (float other) const noexcept -> tensor { return add(other); }
-        [[nodiscard]] auto operator += (tensor other) const noexcept -> tensor { return add_(other); }
-        [[nodiscard]] auto operator += (float other) const noexcept -> tensor { return add_(other); }
+        auto operator += (tensor other) const noexcept -> tensor { return add_(other); }
+        auto operator += (float other) const noexcept -> tensor { return add_(other); }
         [[nodiscard]] auto operator - (tensor other) const noexcept -> tensor { return sub(other); }
         [[nodiscard]] auto operator - (float other) const noexcept -> tensor { return sub(other); }
-        [[nodiscard]] auto operator -= (tensor other) const noexcept -> tensor { return sub_(other); }
-        [[nodiscard]] auto operator -= (float other) const noexcept -> tensor { return sub_(other); }
+        auto operator -= (tensor other) const noexcept -> tensor { return sub_(other); }
+        auto operator -= (float other) const noexcept -> tensor { return sub_(other); }
         [[nodiscard]] auto operator * (tensor other) const noexcept -> tensor { return mul(other); }
         [[nodiscard]] auto operator * (float other) const noexcept -> tensor { return mul(other); }
-        [[nodiscard]] auto operator *= (tensor other) const noexcept -> tensor { return mul_(other); }
-        [[nodiscard]] auto operator *= (float other) const noexcept -> tensor { return mul_(other); }
+        auto operator *= (tensor other) const noexcept -> tensor { return mul_(other); }
+        auto operator *= (float other) const noexcept -> tensor { return mul_(other); }
         [[nodiscard]] auto operator / (tensor other) const noexcept -> tensor { return div(other); }
         [[nodiscard]] auto operator / (float other) const noexcept -> tensor { return div(other); }
-        [[nodiscard]] auto operator /= (tensor other) const noexcept -> tensor { return div_(other); }
-        [[nodiscard]] auto operator /= (float other) const noexcept -> tensor { return div_(other); }
+        auto operator /= (tensor other) const noexcept -> tensor { return div_(other); }
+        auto operator /= (float other) const noexcept -> tensor { return div_(other); }
         [[nodiscard]] auto operator & (tensor other) const noexcept -> tensor { return matmul(other); } // we use the & operator for matmul in C++, as @ is not allowed
 
         template <typename T> requires std::is_arithmetic_v<T>
@@ -411,7 +411,7 @@ namespace magnetron {
             auto* data {mag_tensor_to_float_array(m_tensor)};
             std::vector<float> result {};
             result.resize(numel());
-            std::copy(data, data+numel(), result.begin());
+            std::copy_n(data, numel(), result.begin());
             mag_tensor_to_float_array_free_data(data);
             return result;
         }
@@ -432,6 +432,12 @@ namespace magnetron {
         auto requires_grad(bool yes) noexcept -> void { mag_tensor_set_requires_grad(m_tensor, yes); }
         auto backward() -> void { mag_tensor_backward(m_tensor); }
         auto zero_grad() -> void { mag_tensor_zero_grad(m_tensor); }
+        auto export_graphviz_forward(const std::string& filename) const -> void {
+            mag_tensor_export_forward_graph_graphviz(m_tensor, filename.c_str());
+        }
+        auto export_graphviz_backward(const std::string& filename) const -> void {
+            mag_tensor_export_backward_graph_graphviz(m_tensor, filename.c_str());
+        }
 
         [[nodiscard]] auto operator ()(const std::array<std::int64_t, k_max_dims>& idx) const noexcept -> float {
             return mag_tensor_subscript_get_multi(m_tensor, idx[0], idx[1], idx[2], idx[3], idx[4], idx[5]);

@@ -512,10 +512,11 @@ typedef enum mag_op_t {
     MAG_OP_DIVS,
     MAG_OP_POWS,
     MAG_OP_MATMUL,
+    MAG_OP_REPEAT_REV,
     MAG_OP__NUM
 } mag_op_t;
 mag_static_assert(MAG_OP_NOP == 0);
-mag_static_assert(MAG_OP_MATMUL+1 == MAG_OP__NUM);
+mag_static_assert(MAG_OP_REPEAT_REV+1 == MAG_OP__NUM);
 mag_static_assert(MAG_OP__NUM <= 0xff);
 
 typedef enum mag_init_op_t {
@@ -751,27 +752,27 @@ typedef enum mag_ctx_flags_t {
 */
 struct mag_ctx_t {
     struct {
-        char os_name[128];                          /* OS name. */
-        char cpu_name[128];                         /* CPU name. */
-        uint32_t cpu_virtual_cores;                 /* Virtual CPUs. */
-        uint32_t cpu_physical_cores;                /* Physical CPU cores. */
-        uint32_t cpu_sockets;                       /* CPU sockets. */
-        uint64_t phys_mem_total;                    /* Total physical memory in bytes. */
-        uint64_t phys_mem_free;                     /* Free physical memory in bytes. */
+        char os_name[128];                              /* OS name. */
+        char cpu_name[128];                             /* CPU name. */
+        uint32_t cpu_virtual_cores;                     /* Virtual CPUs. */
+        uint32_t cpu_physical_cores;                    /* Physical CPU cores. */
+        uint32_t cpu_sockets;                           /* CPU sockets. */
+        uint64_t phys_mem_total;                        /* Total physical memory in bytes. */
+        uint64_t phys_mem_free;                         /* Free physical memory in bytes. */
 #if defined(__x86_64__) || defined(_M_X64)
-        uint64_t amd64_cpu_caps;                    /* x86-64 CPU features. Bitset of 1ull<<MAG_AMD64_CAP_* */
-        bool is_amd;                                /* Is AMD CPU? */
+        uint64_t amd64_cpu_caps;                        /* x86-64 CPU features. Bitset of 1ull<<MAG_AMD64_CAP_* */
+        bool is_amd;                                    /* Is AMD CPU? */
 #elif defined (__aarch64__)
-        uint64_t arm64_cpu_caps;                    /* ARM64 CPU features. */
-        int64_t arm64_cpu_sve_width;                /* ARM64 SVE vector register width. */
+        uint64_t arm64_cpu_caps;                        /* ARM64 CPU features. */
+        int64_t arm64_cpu_sve_width;                    /* ARM64 SVE vector register width. */
 #endif
     } machine;
 #ifdef MAG_DEBUG
-    mag_tensor_node_t* rc_tracked;                  /* Linked list of RC tensors for sanitize. */
+    mag_tensor_node_t* rc_tracked;                      /* Linked list of RC tensors for sanitize. */
 #endif
-    mag_fixed_intrusive_pool tensor_pool;           /* Fixed-size memory pool for tensors. */
-    mag_exec_mode_t exec_mode;                      /* Execution mode. */
-    mag_ctx_flags_t flags;                          /* Context flags. */
+    mag_fixed_intrusive_pool tensor_pool;               /* Fixed-size memory pool for tensors. */
+    mag_exec_mode_t exec_mode;                          /* Execution mode. */
+    mag_ctx_flags_t flags;                              /* Context flags. */
     mag_prng_algorithm_t prng_algo;
     uintptr_t tr_id;                                    /* Host thread ID. */
     size_t sh_len;                                      /* Number of shutdown hooks. */

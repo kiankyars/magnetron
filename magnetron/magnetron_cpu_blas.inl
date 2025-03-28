@@ -545,6 +545,26 @@ static void mag_simd_sincos(__m128 x, __m128 *osin, __m128 *ocos) {
 
 #endif
 
+static void MAG_HOTPROC mag_vfill_e8m23(
+    int64_t numel,
+    mag_e8m23_t* o,
+    mag_e8m23_t x
+) {
+    for (int64_t i=0; i < numel; ++i) {
+        o[i] = x;
+    }
+}
+
+static void MAG_HOTPROC mag_vacc_e8m23(
+    int64_t numel,
+    mag_e8m23_t* o,
+    const mag_e8m23_t* x
+) {
+    for (int64_t i=0; i < numel; ++i) {
+        o[i] += x[i];
+    }
+}
+
 static void MAG_HOTPROC mag_vadd_e8m23(
     int64_t numel,
     mag_e8m23_t* o,
@@ -2638,6 +2658,58 @@ static void MAG_HOTPROC mag_blas_matmul_e5m10(const mag_compute_payload_t* paylo
     }
 }
 
+static void MAG_HOTPROC mag_blas_repeat_rev_e8m23(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
+    mag_tensor_t* r = payload->node;
+    const mag_tensor_t* x = r->op_inputs[0];
+    mag_e8m23_t* br = mag_e8m23p_mut(r);
+    const mag_e8m23_t* bx = mag_e8m23p(x);
+    mag_load_local_storage_group(r, rd, shape);
+    mag_load_local_storage_group(r, rs, strides);
+    mag_load_local_storage_group(x, xd, shape);
+    mag_load_local_storage_group(x, xs, strides);
+    /* TODO: support transposed tensors and expand to 6d */
+    mag_assert2(rs0 == 1);
+    mag_assert2(xs0 == 1)
+    mag_assert2(x->rank <= 4);
+    mag_assert2(r->rank <= 4);
+    const int64_t rc0 = xd0/rd0;
+    const int64_t rc1 = xd1/rd1;
+    const int64_t rc2 = xd2/rd2;
+    const int64_t rc3 = xd3/rd3;
+    if (mag_tensor_is_contiguous(r)) {
+        mag_vfill_e8m23(rd0*rd1*rd2*rd3, br, 0);
+    } else {
+        for (int64_t k3 = 0; k3 < rd3; ++k3) {
+            for (int64_t k2 = 0; k2 < rd2; ++k2) {
+                for (int64_t k1 = 0; k1 < rd1; ++k1) {
+                    mag_vfill_e8m23(
+                        rd0,
+                        br + k1*rs1 + k2*rs2 + k3*rs3,
+                        0
+                    );
+                }
+            }
+        }
+    }
+    for (int64_t i3=0; i3 < rc3; ++i3)
+    for (int64_t k3=0; k3 < rd3; ++k3)
+    for (int64_t i2=0; i2 < rc2; ++i2)
+    for (int64_t k2=0; k2 < rd2; ++k2)
+    for (int64_t i1=0; i1 < rc1; ++i1)
+    for (int64_t k1=0; k1 < rd1; ++k1)
+    for (int64_t i0=0; i0 < rc0; ++i0) {
+        mag_vacc_e8m23(
+            rd0,
+            br + k3*rs3 + k2*rs2 + k1*rs1,
+            bx + (i3*rd3 + k3)*xs3 + (i2*rd2 + k2)*xs2 + (i1*rd1 + k1)*xs1 + (i0*rd0)*xs0
+        );
+    }
+}
+
+static void MAG_HOTPROC mag_blas_repeat_rev_e5m10(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
+    mag_panic("NYI");
+}
+
 #ifndef MAG_BLAS_SPECIALIZATION
 #error "BLAS specialization undefined"
 #endif
@@ -2985,6 +3057,10 @@ static void (*const mag_blas_lut_forward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(c
         [MAG_DTYPE_E8M23] = &mag_blas_matmul_e8m23,
         [MAG_DTYPE_E5M10] = &mag_blas_matmul_e5m10,
     },
+    [MAG_OP_REPEAT_REV] = {
+        [MAG_DTYPE_E8M23] = &mag_blas_repeat_rev_e8m23,
+        [MAG_DTYPE_E5M10] = &mag_blas_repeat_rev_e5m10,
+    },
 };
 
 static uint32_t (*const mag_blas_lut_pre_forward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
@@ -3029,6 +3105,7 @@ static uint32_t (*const mag_blas_lut_pre_forward_kernels[MAG_OP__NUM])(mag_kerne
     [MAG_OP_DIVS] = NULL,
     [MAG_OP_POWS] = NULL,
     [MAG_OP_MATMUL] = NULL,
+    [MAG_OP_REPEAT_REV] = NULL
 };
 
 static void (*const mag_blas_lut_post_forward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
@@ -3073,6 +3150,7 @@ static void (*const mag_blas_lut_post_forward_kernels[MAG_OP__NUM])(mag_kernel_c
     [MAG_OP_DIVS] = NULL,
     [MAG_OP_POWS] = NULL,
     [MAG_OP_MATMUL] = NULL,
+    [MAG_OP_REPEAT_REV] = NULL
 };
 
 static void (*const mag_blas_lut_backward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t* ctx) = {
@@ -3240,6 +3318,10 @@ static void (*const mag_blas_lut_backward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(
         [MAG_DTYPE_E8M23] = &mag_blas_matmul_e8m23,
         [MAG_DTYPE_E5M10] = &mag_blas_matmul_e5m10,
     },
+    [MAG_OP_REPEAT_REV] = {
+        [MAG_DTYPE_E8M23] = &mag_blas_repeat_rev_e8m23,
+        [MAG_DTYPE_E5M10] = &mag_blas_repeat_rev_e5m10,
+    },
 };
 
 static uint32_t (*const mag_blas_lut_pre_backward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
@@ -3284,6 +3366,7 @@ static uint32_t (*const mag_blas_lut_pre_backward_kernels[MAG_OP__NUM])(mag_kern
     [MAG_OP_DIVS] = NULL,
     [MAG_OP_POWS] = NULL,
     [MAG_OP_MATMUL] = NULL,
+    [MAG_OP_REPEAT_REV] = NULL
 };
 
 static void (*const mag_blas_lut_post_backward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
@@ -3328,6 +3411,7 @@ static void (*const mag_blas_lut_post_backward_kernels[MAG_OP__NUM])(mag_kernel_
     [MAG_OP_DIVS] = NULL,
     [MAG_OP_POWS] = NULL,
     [MAG_OP_MATMUL] = NULL,
+    [MAG_OP_REPEAT_REV] = NULL
 };
 
 mag_static_assert(MAG_DTYPE__NUM <= 255);
