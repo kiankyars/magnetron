@@ -42,25 +42,28 @@ TEST(models, xor) {
     tensor y {ctx, dtype::e8m23, y_data.size(), y_data[0].size()};
     y.copy_buffer_from(&y_data, sizeof(y_data));
 
-    constexpr std::int64_t epochs {2};
+    constexpr std::int64_t epochs {2000};
     for (std::int64_t epoch = 0; epoch < epochs; ++epoch) {
         tensor y_hat {model(x)};
         tensor loss {nn::optimizer::mse(y_hat, y)};
         loss.backward();
-        loss.export_graphviz_forward("fwd_" + std::to_string(epoch) + ".dot");
-        loss.export_graphviz_backward("bwd_" + std::to_string(epoch) + ".dot");
+        //loss.export_graphviz_forward("fwd_" + std::to_string(epoch) + ".dot");
+        //loss.export_graphviz_backward("bwd_" + std::to_string(epoch) + ".dot");
         if (epoch % 100 == 0) {
             std::cout << "Epoch: " << epoch << ", Loss: " << loss(0) << std::endl;
         }
         optimizer.step();
         optimizer.zero_grad();
-
     }
 
     tensor y_hat {model(x)};
 
     std::vector<e8m23_t> output {y_hat.to_vector()};
-    for (std::size_t i = 0; i < output.size(); ++i) {
-        std::cout << i << ", " << output[i];
+    for (auto r : output) {
+        std::cout << r << " ";
+    }
+    std::cout << std::endl;
+    for (auto r : y_data) {
+        std::cout << r[0] << " ";
     }
 }
