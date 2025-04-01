@@ -101,6 +101,7 @@ namespace magnetron::test {
         requires std::is_invocable_r_v<tensor, A, tensor, tensor> && std::is_invocable_v<B, e8m23_t, e8m23_t>
     auto test_binary_operator(std::int64_t lim, e8m23_t eps, dtype ty, A&& a, B&& b, e8m23_t min = -10.0, e8m23_t max = 10.0) -> decltype(auto) {
         auto ctx = context{compute_device::cpu};
+        ctx.stop_grad_recorder();
         for_all_shape_perms(lim, BROADCAST ? 2 : 1, [&](std::span<const std::int64_t> shape) {
             tensor t_a {ctx, ty, shape};
             t_a.fill_rand_uniform(min, max);
