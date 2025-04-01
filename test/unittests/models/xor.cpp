@@ -47,8 +47,6 @@ TEST(models, xor) {
         tensor y_hat {model(x)};
         tensor loss {nn::optimizer::mse(y_hat, y)};
         loss.backward();
-        //loss.export_graphviz_forward("fwd_" + std::to_string(epoch) + ".dot");
-        //loss.export_graphviz_backward("bwd_" + std::to_string(epoch) + ".dot");
         if (epoch % 100 == 0) {
             std::cout << "Epoch: " << epoch << ", Loss: " << loss(0) << std::endl;
         }
