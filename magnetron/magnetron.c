@@ -3478,7 +3478,7 @@ MAG_COLDPROC void mag_tensor_export_backward_graph_graphviz(mag_tensor_t* t, con
         const mag_op_meta_t* meta = mag_op_meta_of(node->op);
         fprintf(fp, "    \"%p\" [label=\"%s\\nShape: (", node, meta->mnemonic);
         for (int r = 0; r < node->rank; ++r) {
-            fprintf(fp, "%lld", node->shape[r]);
+            fprintf(fp, "%zu", (size_t)node->shape[r]);
             if (r < node->rank - 1)
                 fprintf(fp, ", ");
         }

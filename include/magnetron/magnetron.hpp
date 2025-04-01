@@ -5,6 +5,7 @@
 
 #include "magnetron.h"
 
+#include <algorithm>
 #include <array>
 #include <string_view>
 #include <thread>
