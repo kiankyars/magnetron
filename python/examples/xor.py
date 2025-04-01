@@ -1,38 +1,105 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
-from magnetron import Tensor, Module, Linear
-from magnetron.optim import SGD, mse_loss
+epochs: int = 8
 
-class XOR(Module):
-    def __init__(self) -> None:
-        super().__init__()
-        self.l1 = Linear(2, 2)
-        self.l2 = Linear(2, 1)
+def xor_magnetron():
+    import magnetron as mag
 
-    def forward(self, x: Tensor) -> Tensor:
-        x = self.l1(x).tanh()
-        x = self.l2(x).tanh()
-        return x
+    class XOR(mag.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.l1 = mag.Linear(2, 2)
+            self.l2 = mag.Linear(2, 1)
 
+        def forward(self, x: mag.Tensor) -> mag.Tensor:
+            x = self.l1(x).tanh()
+            x = self.l2(x).tanh()
+            return x
 
-model = XOR()
-optim = SGD(model.parameters(), lr=1e-1)
+    model = XOR()
+    params = [
+        model.l1.weight,
+        model.l1.bias,
+        model.l2.weight,
+        model.l2.bias,
+    ]
+    optimizer = mag.optim.SGD(params, lr=1e-1)
+    for param in params:
+        print(param.x.tolist())
+    criterion = mag.optim.mse_loss
 
-x = Tensor.const([[0, 0], [0, 1], [1, 0], [1, 1]], name='x')
+    x = mag.Tensor.const([[0, 0], [0, 1], [1, 0], [1, 1]], name='x')
+    y = mag.Tensor.const([[0], [1], [1], [0]], name='y')
 
-y = Tensor.const([[0], [1], [1], [0]], name='y')
+    for epoch in range(epochs):
+        y_hat = model(x)
+        loss = criterion(y_hat, y)
+        loss.backward()
+        for param in params:
+            print(f"grad Magnetron:", param.x.grad.tolist())
+        optimizer.step()
+        optimizer.zero_grad()
+        #if epoch % 100 == 0:
+         #   print(f'Epoch: {epoch}, Loss: {loss.item()}')
 
-epochs: int = 2000
+    with mag.no_grad():
+        y_hat = model(x)
+        return y_hat
 
-y_hat = model(x)
-for epoch in range(epochs):
-    y_hat = model(x)
-    loss = mse_loss(y_hat, y)
-    loss.backward()
-    optim.step()
-    optim.zero_grad()
-    if epoch % 100 == 0:
-        print(f'Epoch: {epoch}, Loss: {loss.item()}')
+def xor_torch():
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
 
-y_hat = model(x)
-print(y_hat.tolist())
+    class XOR(nn.Module):
+        def __init__(self):
+            super(XOR, self).__init__()
+            self.l1 = nn.Linear(2, 2)
+            self.l1.weight = nn.Parameter(torch.full_like(self.l1.weight, fill_value=0.5))
+            self.l1.bias = nn.Parameter(torch.full_like(self.l1.bias, fill_value=0.0))
+            self.l2 = nn.Linear(2, 1)
+            self.l2.weight = nn.Parameter(torch.full_like(self.l2.weight, fill_value=0.5))
+            self.l2.bias = nn.Parameter(torch.full_like(self.l2.bias, fill_value=0.0))
+
+        def forward(self, x):
+            x = torch.tanh(self.l1(x))
+            x = torch.tanh(self.l2(x))
+            return x
+
+    model = XOR()
+    for param in model.parameters():
+        print(torch.flatten(param).tolist())
+    optimizer = optim.SGD(model.parameters(), lr=0.1)
+    criterion = nn.MSELoss()
+
+    x = torch.tensor([[0, 0],
+                      [0, 1],
+                      [1, 0],
+                      [1, 1]], dtype=torch.float32)
+    y = torch.tensor([[0],
+                      [1],
+                      [1],
+                      [0]], dtype=torch.float32)
+
+    print(model.forward(x))
+
+    for epoch in range(epochs):
+        optimizer.zero_grad()
+        y_hat = model(x)
+        loss = criterion(y_hat, y)
+        loss.backward()
+        for name, param in model.named_parameters():
+            print(f"grad Torch:", torch.flatten(param.grad).tolist())
+        optimizer.step()
+        #if epoch % 100 == 0:
+         #   print(f'Epoch: {epoch}, Loss: {loss.item()}')
+
+    with torch.no_grad():
+        y_hat = model(x)
+        return y_hat
+
+a = xor_magnetron()
+b = xor_torch()
+
+print('Magnetron: ' + str(a.tolist()))
+print('PyTorch: ' + str(b.numpy()))
