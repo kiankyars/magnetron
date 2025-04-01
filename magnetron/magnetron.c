@@ -1243,8 +1243,10 @@ static void mag_op_backward_permute(mag_tensor_t* node, mag_tensor_t** grads) {
 static void mag_op_backward_mean(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
     double scale = 1.0/(double)x->numel;
-    *grads = mag_tensor_create(x->ctx, x->dtype, x->shape, x->rank, NULL, 0);
-    mag_tensor_fill(*grads, scale);
+    mag_tensor_t* scale_tensor = mag_tensor_create(x->ctx, x->dtype, x->shape, x->rank, NULL, 0);
+    mag_tensor_fill(scale_tensor, scale);
+    *grads = mag_mul(scale_tensor, node->grad);
+    mag_tensor_decref(scale_tensor);
 }
 
 static void mag_op_backward_min(mag_tensor_t* node, mag_tensor_t** grads) {
