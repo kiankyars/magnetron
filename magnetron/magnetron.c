@@ -986,7 +986,7 @@ static bool mag_check_are_op_params_valid(mag_op_t op, const mag_opp_t* params, 
         return false;
     }
     for (uint32_t i=0; i < meta->paramcount; ++i) {
-        if (mag_unlikely(mag_opp_is_type(params[i], meta->opp_types[i]))) {
+        if (mag_unlikely(!mag_opp_is_type(params[i], meta->opp_types[i]))) {
             mag_print_separator(stderr);
             fprintf(stderr,
                 "Failed to execute operation: %s.\n"
