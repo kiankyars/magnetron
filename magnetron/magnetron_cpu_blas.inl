@@ -2658,7 +2658,7 @@ static void MAG_HOTPROC mag_blas_matmul_e5m10(const mag_compute_payload_t* paylo
     }
 }
 
-static void MAG_HOTPROC mag_blas_repeat_rev_e8m23(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
+static void MAG_HOTPROC mag_blas_repeat_back_e8m23(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
     mag_tensor_t* r = payload->node;
     const mag_tensor_t* x = r->op_inputs[0];
     mag_e8m23_t* br = mag_e8m23p_mut(r);
@@ -2725,7 +2725,7 @@ static void MAG_HOTPROC mag_blas_repeat_rev_e8m23(const mag_compute_payload_t* p
     }
 }
 
-static void MAG_HOTPROC mag_blas_repeat_rev_e5m10(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
+static void MAG_HOTPROC mag_blas_repeat_back_e5m10(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
     mag_panic("NYI");
 }
 
@@ -3076,9 +3076,9 @@ static void (*const mag_blas_lut_forward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(c
         [MAG_DTYPE_E8M23] = &mag_blas_matmul_e8m23,
         [MAG_DTYPE_E5M10] = &mag_blas_matmul_e5m10,
     },
-    [MAG_OP_REPEAT_REV] = {
-        [MAG_DTYPE_E8M23] = &mag_blas_repeat_rev_e8m23,
-        [MAG_DTYPE_E5M10] = &mag_blas_repeat_rev_e5m10,
+    [MAG_OP_REPEAT_BACK] = {
+        [MAG_DTYPE_E8M23] = &mag_blas_repeat_back_e8m23,
+        [MAG_DTYPE_E5M10] = &mag_blas_repeat_back_e5m10,
     },
 };
 
@@ -3124,7 +3124,7 @@ static uint32_t (*const mag_blas_lut_pre_forward_kernels[MAG_OP__NUM])(mag_kerne
     [MAG_OP_DIVS] = NULL,
     [MAG_OP_POWS] = NULL,
     [MAG_OP_MATMUL] = NULL,
-    [MAG_OP_REPEAT_REV] = NULL
+    [MAG_OP_REPEAT_BACK] = NULL
 };
 
 static void (*const mag_blas_lut_post_forward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
@@ -3169,7 +3169,7 @@ static void (*const mag_blas_lut_post_forward_kernels[MAG_OP__NUM])(mag_kernel_c
     [MAG_OP_DIVS] = NULL,
     [MAG_OP_POWS] = NULL,
     [MAG_OP_MATMUL] = NULL,
-    [MAG_OP_REPEAT_REV] = NULL
+    [MAG_OP_REPEAT_BACK] = NULL
 };
 
 static void (*const mag_blas_lut_backward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t* ctx) = {
@@ -3337,9 +3337,9 @@ static void (*const mag_blas_lut_backward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(
         [MAG_DTYPE_E8M23] = &mag_blas_matmul_e8m23,
         [MAG_DTYPE_E5M10] = &mag_blas_matmul_e5m10,
     },
-    [MAG_OP_REPEAT_REV] = {
-        [MAG_DTYPE_E8M23] = &mag_blas_repeat_rev_e8m23,
-        [MAG_DTYPE_E5M10] = &mag_blas_repeat_rev_e5m10,
+    [MAG_OP_REPEAT_BACK] = {
+        [MAG_DTYPE_E8M23] = &mag_blas_repeat_back_e8m23,
+        [MAG_DTYPE_E5M10] = &mag_blas_repeat_back_e5m10,
     },
 };
 
@@ -3385,7 +3385,7 @@ static uint32_t (*const mag_blas_lut_pre_backward_kernels[MAG_OP__NUM])(mag_kern
     [MAG_OP_DIVS] = NULL,
     [MAG_OP_POWS] = NULL,
     [MAG_OP_MATMUL] = NULL,
-    [MAG_OP_REPEAT_REV] = NULL
+    [MAG_OP_REPEAT_BACK] = NULL
 };
 
 static void (*const mag_blas_lut_post_backward_kernels[MAG_OP__NUM])(mag_kernel_context_t*) = {
@@ -3430,7 +3430,7 @@ static void (*const mag_blas_lut_post_backward_kernels[MAG_OP__NUM])(mag_kernel_
     [MAG_OP_DIVS] = NULL,
     [MAG_OP_POWS] = NULL,
     [MAG_OP_MATMUL] = NULL,
-    [MAG_OP_REPEAT_REV] = NULL
+    [MAG_OP_REPEAT_BACK] = NULL
 };
 
 mag_static_assert(MAG_DTYPE__NUM <= 255);

@@ -1208,7 +1208,7 @@ static mag_tensor_t* mag_result_constructor_routine_matmul(mag_tensor_t** inputs
 }
 
 static mag_tensor_t* mag_result_constructor_routine_repeat_rev(mag_tensor_t** inputs,  const mag_opp_t* params) {
-    return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, inputs[1]->shape, 4, NULL, 0); /* TODO: use MAG_MAX_DIMS here when backward kernel is fixed */
+    return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, inputs[1]->shape, MAG_MAX_DIMS, NULL, 0);
 }
 
 static void mag_op_backward_nop(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1875,7 +1875,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .r_alloc = &mag_result_constructor_routine_matmul,
             .validator = &mag_validate_op_matmul
         },
-        [MAG_OP_REPEAT_REV] = {
+        [MAG_OP_REPEAT_BACK] = {
             .mnemonic = "repeat_rev",
             .argcount = 2,
             .paramcount = 0,
@@ -2419,8 +2419,8 @@ mag_tensor_t* mag_matmul(mag_tensor_t* x, mag_tensor_t* y) {
     return mag_tensor_operator(x->ctx, MAG_OP_MATMUL, false, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
 }
 
-mag_tensor_t* mag_repeat_reversed(mag_tensor_t* x, mag_tensor_t* y) {
-    return mag_tensor_operator(x->ctx, MAG_OP_REPEAT_REV, false, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
+mag_tensor_t* mag_repeat_back(mag_tensor_t* x, mag_tensor_t* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_REPEAT_BACK, false, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
 }
 
 mag_tensor_t* mag_tensor_get_arg(const mag_tensor_t* t, size_t slot) {
@@ -2642,14 +2642,14 @@ static void mag_collect_topo_iterative(mag_tensor_t* root, mag_tensor_array_t* o
     (*mag_alloc)(visited, 0);
 }
 
-static void mag_tensor_patch_grad(const mag_tensor_t* root, mag_tensor_t* dst, mag_tensor_t* grad, const char* stage) {
+static void mag_tensor_patch_grad(mag_tensor_t* dst, mag_tensor_t* grad) {
     if (!mag_tensor_is_shape_eq(grad, dst)) { /* Undo broadcasting done in forward pass. */
-        mag_tensor_t* undo_broadcast = mag_repeat_reversed(grad, dst);
+        mag_tensor_t* undo_broadcast = mag_repeat_back(grad, dst);
         mag_tensor_decref(grad);
         grad = undo_broadcast;
     }
     mag_tensor_fmt_name(grad, "%s (grad)", dst->name);
-    grad->flags = (grad->flags | MAG_TFLAG_IS_GRAD) & ~MAG_TFLAG_REQUIRES_GRAD;
+    grad->flags = (grad->flags|MAG_TFLAG_IS_GRAD)&~MAG_TFLAG_REQUIRES_GRAD;
     dst->grad = grad;
 }
 
@@ -2670,7 +2670,7 @@ void mag_tensor_backward(mag_tensor_t* root) {
         if (!child->grad) {
             mag_tensor_t* grad = mag_tensor_create(child->ctx, child->dtype, child->shape, child->rank, NULL, 0);
             mag_tensor_fill(grad, 1.0f);
-            mag_tensor_patch_grad(child, child, grad, "init");
+            mag_tensor_patch_grad(child, grad);
         }
         if (mag_unlikely(child->op == MAG_OP_NOP)) continue;
         mag_tensor_t* grads[MAG_MAX_OP_PARAMS] = {0};
@@ -2686,11 +2686,11 @@ void mag_tensor_backward(mag_tensor_t* root) {
             mag_tensor_t* gri = grads[i];
             mag_assert(gri, "Gradient for op %s, input #%d is not computed", meta->mnemonic, i);
             if (!input->grad) {
-                mag_tensor_patch_grad(child, input, gri, "init");
+                mag_tensor_patch_grad(input, gri);
             } else {
                 mag_tensor_t* acc = mag_add_(gri, input->grad);
                 mag_tensor_decref(input->grad);
-                mag_tensor_patch_grad(child, input, acc, "accumulate");
+                mag_tensor_patch_grad(input, acc);
                 mag_tensor_decref(gri);
             }
         }

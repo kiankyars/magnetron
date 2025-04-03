@@ -297,7 +297,7 @@ extern MAG_EXPORT mag_tensor_t* _Nonnull mag_divs_(mag_tensor_t* _Nonnull x, flo
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_pows(mag_tensor_t* _Nonnull x, float xi);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_pows_(mag_tensor_t* _Nonnull x, float xi);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_matmul(mag_tensor_t* _Nonnull x, mag_tensor_t* _Nonnull y);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_repeat_reversed(mag_tensor_t* _Nonnull x, mag_tensor_t* _Nonnull y);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_repeat_back(mag_tensor_t* _Nonnull x, mag_tensor_t* _Nonnull y);
 
 /* ============ Tensor Init Operators ============ */
 

@@ -512,11 +512,11 @@ typedef enum mag_op_t {
     MAG_OP_DIVS,
     MAG_OP_POWS,
     MAG_OP_MATMUL,
-    MAG_OP_REPEAT_REV,
+    MAG_OP_REPEAT_BACK,
     MAG_OP__NUM
 } mag_op_t;
 mag_static_assert(MAG_OP_NOP == 0);
-mag_static_assert(MAG_OP_REPEAT_REV+1 == MAG_OP__NUM);
+mag_static_assert(MAG_OP_REPEAT_BACK+1 == MAG_OP__NUM);
 mag_static_assert(MAG_OP__NUM <= 0xff);
 
 typedef enum mag_init_op_t {
