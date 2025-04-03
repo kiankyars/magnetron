@@ -2667,42 +2667,61 @@ static void MAG_HOTPROC mag_blas_repeat_rev_e8m23(const mag_compute_payload_t* p
     mag_load_local_storage_group(r, rs, strides);
     mag_load_local_storage_group(x, xd, shape);
     mag_load_local_storage_group(x, xs, strides);
-    /* TODO: support transposed tensors and expand to 6d */
+    /* TODO: support transposed tensors */
     mag_assert2(rs0 == 1);
     mag_assert2(xs0 == 1)
-    mag_assert2(x->rank <= 4);
-    mag_assert2(r->rank <= 4);
     const int64_t rc0 = xd0/rd0;
     const int64_t rc1 = xd1/rd1;
     const int64_t rc2 = xd2/rd2;
     const int64_t rc3 = xd3/rd3;
+    const int64_t rc4 = xd4/rd4;
+    const int64_t rc5 = xd5/rd5;
     if (mag_tensor_is_contiguous(r)) {
-        mag_vfill_e8m23(rd0*rd1*rd2*rd3, br, 0);
+        mag_vfill_e8m23(r->numel, br, 0);
     } else {
-        for (int64_t k3 = 0; k3 < rd3; ++k3) {
-            for (int64_t k2 = 0; k2 < rd2; ++k2) {
-                for (int64_t k1 = 0; k1 < rd1; ++k1) {
-                    mag_vfill_e8m23(
-                        rd0,
-                        br + k1*rs1 + k2*rs2 + k3*rs3,
-                        0
-                    );
+        for (int64_t i5=0; i5 < rd5; ++i5) {
+            for (int64_t i4=0; i4 < rd4; ++i4) {
+                for (int64_t i3=0; i3 < rd3; ++i3) {
+                    for (int64_t i2=0; i2 < rd2; ++i2) {
+                        for (int64_t i1=0; i1 < rd1; ++i1) {
+                            mag_e8m23_t* p_r = br + i5*rs5 + i4*rs4 + i3*rs3 + i2*rs2 + i1*rs1;
+                            mag_bnd_chk(p_r, br, mag_tensor_get_data_size(r));
+                            mag_vfill_e8m23(rd0, p_r, 0);
+                        }
+                    }
                 }
             }
         }
     }
-    for (int64_t i3=0; i3 < rc3; ++i3)
-    for (int64_t k3=0; k3 < rd3; ++k3)
-    for (int64_t i2=0; i2 < rc2; ++i2)
-    for (int64_t k2=0; k2 < rd2; ++k2)
-    for (int64_t i1=0; i1 < rc1; ++i1)
-    for (int64_t k1=0; k1 < rd1; ++k1)
-    for (int64_t i0=0; i0 < rc0; ++i0) {
-        mag_vacc_e8m23(
-            rd0,
-            br + k3*rs3 + k2*rs2 + k1*rs1,
-            bx + (i3*rd3 + k3)*xs3 + (i2*rd2 + k2)*xs2 + (i1*rd1 + k1)*xs1 + (i0*rd0)*xs0
-        );
+    for (int64_t i5=0; i5 < rc5; ++i5) {
+        for (int64_t k5=0; k5 < rd5; ++k5) {
+            for (int64_t i4=0; i4 < rc4; ++i4) {
+                for (int64_t k4=0; k4 < rd4; ++k4) {
+                    for (int64_t i3=0; i3 < rc3; ++i3) {
+                        for (int64_t k3=0; k3 < rd3; ++k3) {
+                            for (int64_t i2=0; i2 < rc2; ++i2) {
+                                for (int64_t k2=0; k2 < rd2; ++k2) {
+                                    for (int64_t i1=0; i1 < rc1; ++i1) {
+                                        for (int64_t k1=0; k1 < rd1; ++k1) {
+                                            for (int64_t i0=0; i0 < rc0; ++i0) {
+                                                mag_e8m23_t* p_r = br + k5*rs5+ k4*rs4 + k3*rs3 + k2*rs2 + k1*rs1;
+                                                const mag_e8m23_t* p_x = bx
+                                                + (i5*rd5 + k5)*xs5 + (i4*rd4 + k4)*xs4
+                                                + (i3*rd3 + k3)*xs3 + (i2*rd2 + k2)*xs2
+                                                + (i1*rd1 + k1)*xs1 + (i0*rd0)     *xs0;
+                                                mag_bnd_chk(p_r, br, mag_tensor_get_data_size(r));
+                                                mag_bnd_chk(p_x, bx, mag_tensor_get_data_size(x));
+                                                mag_vacc_e8m23(rd0, p_r, p_x);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -3416,14 +3435,14 @@ static void (*const mag_blas_lut_post_backward_kernels[MAG_OP__NUM])(mag_kernel_
 
 mag_static_assert(MAG_DTYPE__NUM <= 255);
 #define mag_dt_perm(x,y) ((((x)&255)<<8)+((y)&255))
-static void MAG_HOTPROC mag_blas_vector_cast(size_t nb, const void* src, mag_dtype_t src_t, void* dst, mag_dtype_t dst_t) {
+static void MAG_HOTPROC mag_blas_vector_cast_stub(size_t nb, const void* src, mag_dtype_t src_t, void* dst, mag_dtype_t dst_t) {
     mag_assert2(dst_t != src_t); /* src and dst types must differ */
     int64_t nbs = mag_dtype_meta_of(src_t)->size;
     int64_t nbd = mag_dtype_meta_of(dst_t)->size;
-    mag_assert2(((uintptr_t)src & (nbs-1)) == 0);     /* src must be aligned */
-    mag_assert2(((uintptr_t)dst & (nbd-1)) == 0);     /* dst must be aligned */
-    mag_assert2((nb & (nbs-1)) == 0);                 /* size must be aligned */
-    int64_t n = (int64_t)nb/nbs; /* Byte to elem granularity. */
+    mag_assert2(((uintptr_t)src&(nbs-1)) == 0);     /* src must be aligned */
+    mag_assert2(((uintptr_t)dst&(nbd-1)) == 0);     /* dst must be aligned */
+    mag_assert2((nb&(nbs-1)) == 0);                 /* size must be aligned */
+    int64_t n = (int64_t)nb/nbs;                    /* Byte to elem granularity. */
     switch (mag_dt_perm(src_t, dst_t)) {
         case mag_dt_perm(MAG_DTYPE_E8M23, MAG_DTYPE_E5M10): mag_vector_cast_mag_e8m23_cvt_e5m10(n, src, dst); return;
         case mag_dt_perm(MAG_DTYPE_E5M10, MAG_DTYPE_E8M23): mag_vector_cast_mag_e5m10_cvt_e8m23(n, src, dst); return;
@@ -3448,5 +3467,5 @@ void MAG_BLAS_SPECIALIZATION(mag_kernel_registry_t* kernels) {
         kernels->bwd_post[i] = mag_blas_lut_post_backward_kernels[i];
     }
 
-    kernels->vector_cast = &mag_blas_vector_cast;
+    kernels->vector_cast = &mag_blas_vector_cast_stub;
 }
