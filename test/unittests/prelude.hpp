@@ -42,12 +42,12 @@ namespace magnetron::test {
         return {std::begin(internal->op_inputs), std::end(internal->op_inputs)};
     }
 
-    [[nodiscard]] inline auto op_params_as_vec(tensor t) -> std::vector<mag_op_param_t> {
+    [[nodiscard]] inline auto op_params_as_vec(tensor t) -> std::vector<mag_opp_t> {
         mag_tensor_t* internal {&*t};
         return {std::begin(internal->op_params), std::end(internal->op_params)};
     }
 
-    [[nodiscard]] inline auto init_op_params_as_vec(tensor t) -> std::vector<mag_op_param_t> {
+    [[nodiscard]] inline auto init_op_params_as_vec(tensor t) -> std::vector<mag_opp_t> {
         mag_tensor_t* internal {&*t};
         return {std::begin(internal->init_op_params), std::end(internal->init_op_params)};
     }

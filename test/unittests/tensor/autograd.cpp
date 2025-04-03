@@ -4,13 +4,13 @@
 
 using namespace magnetron;
 
-TEST(cpu_autograd, scalar_simple) {
+TEST(cpu_autograd, simple) {
     context ctx {compute_device::cpu};
-    tensor x {ctx, dtype::e8m23, 1};
+    tensor x {ctx, dtype::e8m23, 4, 4, 4, 4};
     x.fill(3.0f);
-    tensor y {ctx, dtype::e8m23, 1};
+    tensor y {ctx, dtype::e8m23, 4, 4, 4, 4};
     y.fill(2.0f);
-    tensor k {ctx, dtype::e8m23, 1};
+    tensor k {ctx, dtype::e8m23, 4, 4, 4, 4};
     k.fill(10.0f);
 
     tensor z {(x + y)*(x - y)/k};
@@ -21,22 +21,33 @@ TEST(cpu_autograd, scalar_simple) {
     ASSERT_TRUE(k.grad().has_value());
     ASSERT_TRUE(z.grad().has_value());
 
+    ASSERT_EQ(x.numel(), y.numel());
+    ASSERT_EQ(x.numel(), z.numel());
+
     // check forward pass
-    ASSERT_FLOAT_EQ(x(0), 3.0f);
-    ASSERT_FLOAT_EQ(y(0), 2.0f);
-    ASSERT_FLOAT_EQ(z(0), 0.5f);
+    for (std::int64_t i {}; i < x.numel(); ++i) {
+        ASSERT_FLOAT_EQ(x(0), 3.0f);
+        ASSERT_FLOAT_EQ(y(0), 2.0f);
+        ASSERT_FLOAT_EQ(z(0), 0.5f);
+    }
 
     // check backward pass
-    ASSERT_FLOAT_EQ(x.grad().value()(0), 0.6f);     // ∂z/∂x = 0.6
-    ASSERT_FLOAT_EQ(y.grad().value()(0), -0.4f);    // ∂z/∂y = -0.4
-    ASSERT_FLOAT_EQ(z.grad().value()(0), 1.0f);     // ∂z/∂z = 1.0
+    for (std::int64_t i {}; i < x.grad().value().numel(); ++i) { // ∂z/∂x = 0.6
+        ASSERT_FLOAT_EQ(x.grad().value()(i), 0.6f);
+    }
+    for (std::int64_t i {}; i < y.grad().value().numel(); ++i) { // ∂z/∂x = -0.4
+        ASSERT_FLOAT_EQ(y.grad().value()(i), -0.4f);
+    }
+    for (std::int64_t i {}; i < z.grad().value().numel(); ++i) { // ∂z/∂x = 1
+        ASSERT_FLOAT_EQ(z.grad().value()(i), 1.0f);
+    }
 }
 
 TEST(cpu_autograd, scalar_complex) {
     context ctx {compute_device::cpu};
-    tensor two {ctx, dtype::e8m23, 1};
+    tensor two {ctx, dtype::e8m23, 5, 5, 3, 9};
     two.fill(2.0f);
-    tensor x {ctx, dtype::e8m23, 1};
+    tensor x {ctx, dtype::e8m23, 5, 5, 3, 9};
     x.fill(-4.0f);
     tensor z {two*x+two+x};
     tensor q {z.relu()+z*x};
@@ -51,11 +62,59 @@ TEST(cpu_autograd, scalar_complex) {
     ASSERT_TRUE(h.grad().has_value());
     ASSERT_TRUE(y.grad().has_value());
 
+    ASSERT_EQ(x.numel(), y.numel());
+
     // check forward pass
-    ASSERT_FLOAT_EQ(x(0), -4.0f);
-    ASSERT_FLOAT_EQ(y(0), -20.0f);
+    for (std::int64_t i {}; i < x.numel(); ++i) {
+        ASSERT_FLOAT_EQ(x(i), -4.0f);
+        ASSERT_FLOAT_EQ(y(i), -20.0f);
+    }
 
     // check backward pass
-    ASSERT_FLOAT_EQ(x.grad().value()(0), 46.0f);    // ∂z/∂x = 46.0
-    ASSERT_FLOAT_EQ(y.grad().value()(0), 1.0f);     // ∂z/∂y = 1.0
+    for (std::int64_t i {}; i < x.grad().value().numel(); ++i) { // ∂z/∂x = 46.0
+        ASSERT_FLOAT_EQ(x.grad().value()(i), 46.0f);
+    }
+    for (std::int64_t i {}; i < y.grad().value().numel(); ++i) { // ∂z/∂y = 1.0
+        ASSERT_FLOAT_EQ(y.grad().value()(i), 1.0f);
+    }
+}
+
+TEST(cpu_autograd, broadcast) {
+    context ctx {compute_device::cpu};
+    tensor x {ctx, dtype::e8m23, 3, 3, 3, 3};
+    x.fill(3.0f);
+    tensor y {ctx, dtype::e8m23, 3, 3, };
+    y.fill(2.0f);
+    tensor k {ctx, dtype::e8m23, 1};
+    k.fill(10.0f);
+
+    tensor z {((x + y)*(x - y)/k).sum()};
+    z.backward();
+
+    ASSERT_TRUE(x.grad().has_value());
+    ASSERT_TRUE(y.grad().has_value());
+    ASSERT_TRUE(k.grad().has_value());
+    ASSERT_TRUE(z.grad().has_value());
+
+    // check forward pass
+    for (std::int64_t i {}; i < x.numel(); ++i) {
+        ASSERT_FLOAT_EQ(x(0), 3.0f);
+    }
+    for (std::int64_t i {}; i < y.numel(); ++i) {
+        ASSERT_FLOAT_EQ(y(0), 2.0f);
+    }
+    for (std::int64_t i {}; i < z.numel(); ++i) {
+        ASSERT_FLOAT_EQ(z(0), 40.5f);
+    }
+
+    // check backward pass
+    for (std::int64_t i {}; i < x.grad().value().numel(); ++i) { // ∂z/∂x = 0.6
+        ASSERT_FLOAT_EQ(x.grad().value()(i), 0.6f);
+    }
+    for (std::int64_t i {}; i < y.grad().value().numel(); ++i) { // ∂z/∂x = -0.4
+        ASSERT_FLOAT_EQ(y.grad().value()(i), -3.6f);
+    }
+    for (std::int64_t i {}; i < z.grad().value().numel(); ++i) { // ∂z/∂x = 1
+        ASSERT_FLOAT_EQ(z.grad().value()(i), 1.0f);
+    }
 }

@@ -527,33 +527,66 @@ typedef enum mag_init_op_t {
     MAG_IOP__NUM
 } mag_init_op_t;
 
-typedef enum mag_op_param_type_t {
-    MAG_OP_TPARAM_NONE  = 0,
-    MAG_OP_TPARAM_F32   = 1,
-    MAG_OP_TPARAM_I32   = 2,
-    MAG_OP_TPARAM_U32   = 3,
+typedef enum mag_opp_type_t {
+    MAG_OPP_NONE  = 0,
+    MAG_OPP_E8M23 = 1,    /* fp32 */
+    MAG_OPP_I62   = 2,    /* 62-bit signed integer. Top 2-bits (MSB) will be truncated and must be 0. */
+    MAG_OPP_U62   = 3,    /* 62-bit unsigned integer. Top 2-bits (MSB) will be truncated and must be 0. */
 
-    MAG_OP_TPARAM__NUM
-} mag_op_param_type_t;
+    MAG_OPP__NUM
+} mag_opp_type_t;
+mag_static_assert(MAG_OPP__NUM-1 <= 3); /* Must fit in 2 bits */
 
-typedef struct mag_op_param_t {
-    mag_op_param_type_t type : 8; /* Parameter type */
-    union {
-        mag_e8m23_t e8m23;
-        int32_t i32;
-        uint32_t u32;
-    } x;
-} mag_op_param_t;
+/* Operation parameter.
+** Contains a variant of e8m23, int62 and uint62 and contains different data for a specific op.
+*/
+typedef uint64_t mag_opp_t;
+static MAG_AINLINE mag_opp_t mag_opp_pack(uint64_t dat, mag_opp_type_t t) {
+    mag_assert(dat>>(64-2)==0, "contained value must be a 2-bit integer: %" PRIx64, dat);
+    return (dat<<2)|(3&t);
+}
+static MAG_AINLINE mag_opp_t mag_opp_pack_none(void) { return 0; }
+static MAG_AINLINE mag_opp_t mag_opp_pack_e8m23(mag_e8m23_t x) {
+    union { uint32_t u32; mag_e8m23_t e8m23; } castor = {.e8m23=x};
+    return mag_opp_pack(castor.u32, MAG_OPP_E8M23);
+}
+static MAG_AINLINE mag_opp_t mag_opp_pack_i62(int64_t x) { return mag_opp_pack(x, MAG_OPP_I62); }
+static MAG_AINLINE mag_opp_t mag_opp_pack_u62(uint64_t x) { return mag_opp_pack(x, MAG_OPP_U62); }
+static MAG_AINLINE mag_opp_type_t mag_opp_unpack_type(mag_opp_t pa) { return (mag_opp_type_t)(3&pa); }
+static MAG_AINLINE uint64_t mag_opp_unpack_value(mag_opp_t pa) { return pa>>2; }
+static MAG_AINLINE bool mag_opp_is_type(mag_opp_t pa, mag_opp_type_t type) { return (3&pa) == type; }
+static MAG_AINLINE mag_e8m23_t mag_opp_unpack_e8m23_or_panic(mag_opp_t pa) {
+    mag_assert(mag_opp_is_type(pa, MAG_OPP_E8M23), "invalid op param type: %d", mag_opp_unpack_type(pa))
+    union { uint32_t u32; mag_e8m23_t e8m23; } castor = {.u32=(uint32_t)mag_opp_unpack_value(pa)};
+    return castor.e8m23;
+}
+static MAG_AINLINE int64_t mag_opp_unpack_i62_or_panic(mag_opp_t pa) {
+    mag_assert(mag_opp_is_type(pa, MAG_OPP_I62), "invalid op param type: %d", mag_opp_unpack_type(pa))
+    return (int64_t)mag_opp_unpack_value(pa);
+}
+static MAG_AINLINE uint64_t mag_opp_unpack_u62_or_panic(mag_opp_t pa) {
+    mag_assert(mag_opp_is_type(pa, MAG_OPP_U62), "invalid op param type: %d", mag_opp_unpack_type(pa))
+    return mag_opp_unpack_value(pa);
+}
+static MAG_AINLINE mag_e8m23_t mag_opp_unpack_e8m23_or(mag_opp_t pa, mag_e8m23_t fallback) {
+    return mag_opp_is_type(pa, MAG_OPP_E8M23) ? mag_opp_unpack_e8m23_or_panic(pa) : fallback;
+}
+static MAG_AINLINE int64_t mag_opp_unpack_i62_or(mag_opp_t pa, int64_t fallback) {
+    return mag_opp_is_type(pa, MAG_OPP_I62) ? mag_opp_unpack_i62_or_panic(pa) : fallback;
+}
+static MAG_AINLINE uint64_t mag_opp_unpack_u62_or(mag_opp_t pa, uint64_t fallback) {
+    return mag_opp_is_type(pa, MAG_OPP_U62) ? mag_opp_unpack_u62_or_panic(pa) : fallback;
+}
 
 typedef struct mag_op_meta_t {
     const char* mnemonic;                                   /* Operation mnemonic */
     uint8_t argcount;                                       /* Number of arguments */
     uint8_t paramcount;                                     /* Number of parameters */
-    mag_op_param_type_t param_types[MAG_MAX_OP_PARAMS];     /* Parameter types */
+    mag_opp_type_t opp_types[MAG_MAX_OP_PARAMS];            /* Parameter types */
     bool inplace;                                           /* Supports inplace execution */
     void (*backward)(mag_tensor_t*, mag_tensor_t**);        /* Backward pass */
-    mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_op_param_t*);
-    bool (*validator)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_op_param_t*);
+    mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_opp_t*);
+    bool (*validator)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_opp_t*);
 } mag_op_meta_t;
 extern MAG_EXPORT const mag_op_meta_t* mag_op_meta_of(mag_op_t type);
 
@@ -813,9 +846,9 @@ struct mag_tensor_t {
     mag_tensor_flags_t flags;                           /* Tensor flags. */
     mag_op_t op;                                        /* Opcode for operators. */
     mag_tensor_t* op_inputs[MAG_MAX_INPUT_TENSORS];     /* Input tensors for operators. */
-    mag_op_param_t op_params[MAG_MAX_OP_PARAMS];        /* Operator parameters. */
+    mag_opp_t op_params[MAG_MAX_OP_PARAMS];        /* Operator parameters. */
     mag_init_op_t init_op;                              /* Initialization op */
-    mag_op_param_t init_op_params[MAG_MAX_OP_PARAMS];   /* Init operator parameters */
+    mag_opp_t init_op_params[MAG_MAX_OP_PARAMS];   /* Init operator parameters */
     mag_tensor_t* view_uplink;                          /* View base tensor. */
     size_t view_offs;                                   /* Offset in view tensor. */
     mag_tensor_t* grad;                                 /* ∇f - Gradient tensor. */

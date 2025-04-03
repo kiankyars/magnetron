@@ -956,7 +956,7 @@ static bool mag_check_are_inputs_valid(mag_op_t op, mag_tensor_t** inputs, uint3
 }
 
 /* Check if the op parameters exist and have valid types. Return true if valid, else false. */
-static bool mag_check_are_op_params_valid(mag_op_t op, const mag_op_param_t* params, uint32_t numparams) {
+static bool mag_check_are_op_params_valid(mag_op_t op, const mag_opp_t* params, uint32_t numparams) {
     const mag_op_meta_t* meta = mag_op_meta_of(op);
     if (!meta->paramcount) return true; /* No parameters to validate. */
     if (mag_unlikely(meta->paramcount != numparams || numparams > MAG_MAX_OP_PARAMS)) {
@@ -986,7 +986,7 @@ static bool mag_check_are_op_params_valid(mag_op_t op, const mag_op_param_t* par
         return false;
     }
     for (uint32_t i=0; i < meta->paramcount; ++i) {
-        if (mag_unlikely(params[i].type != meta->param_types[i])) {
+        if (mag_unlikely(mag_opp_is_type(params[i], meta->opp_types[i]))) {
             mag_print_separator(stderr);
             fprintf(stderr,
                 "Failed to execute operation: %s.\n"
@@ -994,7 +994,7 @@ static bool mag_check_are_op_params_valid(mag_op_t op, const mag_op_param_t* par
                 "    - Expected type id: %d\n"
                 "    - Provided type id: %d\n"
                 "    Hint: Ensure the correct parameter types are provided.\n",
-                meta->mnemonic, i, meta->param_types[i], params[i].type
+                meta->mnemonic, i, meta->opp_types[i], mag_opp_unpack_type(params[i])
             );
         }
     }
@@ -1108,12 +1108,12 @@ static bool mag_check_is_contiguous(mag_op_t op, const mag_tensor_t* a) {
 }
 
 /* Generic function which validates the tensors for common unary operations such as abs, neg, etc. */
-static bool mag_validate_op_unary(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
+static bool mag_validate_op_unary(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_opp_t* params) {
    return mag_check_is_shape_eq(op, result, inputs[0]);
 }
 
 /* Generic function which validates the tensors for common binary operations such as add, sub, etc. */
-static bool mag_validate_op_binary(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
+static bool mag_validate_op_binary(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_opp_t* params) {
     bool valid = true;
     valid = valid && mag_check_is_shape_eq(op, result, inputs[0]);
     valid = valid && mag_check_is_shape_broadcastable(op, inputs[0], inputs[1]);
@@ -1122,58 +1122,58 @@ static bool mag_validate_op_binary(mag_op_t op, mag_tensor_t* result, mag_tensor
 }
 
 /* Validation function for the transpose operation. */
-static bool mag_validate_op_transpose(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
+static bool mag_validate_op_transpose(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_opp_t* params) {
     return true;
 }
 
 /* Generic function which validates scalar operations such as adds, subs etc. */
-static bool mag_validate_op_scalar(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
+static bool mag_validate_op_scalar(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_opp_t* params) {
     return mag_check_is_contiguous(op, inputs[0]);
 }
 
 /* Validation function for the matmul operation. */
-static bool mag_validate_op_matmul(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
+static bool mag_validate_op_matmul(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_opp_t* params) {
     return mag_check_is_shape_matmulable(op, inputs[0], inputs[1]);
 }
 
-static bool mag_validate_op_repeat_rev(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
+static bool mag_validate_op_repeat_rev(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_opp_t* params) {
     return mag_check_is_shape_broadcastable(op, inputs[0], inputs[1]);
 }
 
 static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const int64_t* dims, int64_t rank, mag_tensor_t* view, size_t view_offs);
 
-static mag_tensor_t* mag_result_constructor_routine_isomorph(mag_tensor_t** inputs, const mag_op_param_t* params) {
+static mag_tensor_t* mag_result_constructor_routine_isomorph(mag_tensor_t** inputs, const mag_opp_t* params) {
     (void)params;
     mag_tensor_t* base = *inputs;
     return mag_tensor_create(base->ctx, base->dtype, base->shape, base->rank, NULL, 0);
 }
 
-static mag_tensor_t* mag_result_constructor_routine_view(mag_tensor_t** inputs,  const mag_op_param_t* params) {
+static mag_tensor_t* mag_result_constructor_routine_view(mag_tensor_t** inputs,  const mag_opp_t* params) {
     (void)params;
     mag_tensor_t* base = *inputs;
     return mag_tensor_create(base->ctx, base->dtype, base->shape, base->rank, base, 0);
 }
 
-static mag_tensor_t* mag_result_constructor_routine_scalar(mag_tensor_t** inputs,  const mag_op_param_t* params) {
+static mag_tensor_t* mag_result_constructor_routine_scalar(mag_tensor_t** inputs,  const mag_opp_t* params) {
     mag_tensor_t* base = *inputs;
     int64_t shape = 1;
     return mag_tensor_create(base->ctx, base->dtype, &shape, shape, NULL, 0);
 }
 
-static mag_tensor_t* mag_result_constructor_routine_transposed(mag_tensor_t** inputs,  const mag_op_param_t* params) {
+static mag_tensor_t* mag_result_constructor_routine_transposed(mag_tensor_t** inputs,  const mag_opp_t* params) {
     mag_tensor_t* transposed = mag_result_constructor_routine_view(inputs, params);
     mag_swap(int64_t, transposed->shape[0], transposed->shape[1]);
     mag_swap(int64_t, transposed->strides[0], transposed->strides[1]);
     return transposed;
 }
 
-static mag_tensor_t* mag_result_constructor_routine_permuted(mag_tensor_t** inputs,  const mag_op_param_t* params) {
+static mag_tensor_t* mag_result_constructor_routine_permuted(mag_tensor_t** inputs,  const mag_opp_t* params) {
     mag_assert2(params != NULL); /* TODO */
     mag_tensor_t* permuted = mag_result_constructor_routine_view(inputs, params);
-    uint32_t axes[MAG_MAX_DIMS];
-    for (uint32_t i = 0; i < MAG_MAX_DIMS; ++i) /* Unpack axes */
-        axes[i] = params[i].x.u32;
-    for (uint32_t i = 0; i < MAG_MAX_DIMS; ++i) /* Check that all axes are unique */
+    uint64_t axes[MAG_MAX_DIMS];
+    for (uint32_t i=0; i < MAG_MAX_DIMS; ++i) /* Unpack axes */
+        axes[i] = mag_opp_unpack_u62_or_panic(params[i]);
+    for (uint32_t i=0; i < MAG_MAX_DIMS; ++i) /* Check that all axes are unique */
         for (uint32_t j = i+1; j < MAG_MAX_DIMS; ++j)
             mag_assert(axes[i] != axes[j], "Axes must be unique: %zu != %zu", axes[i], axes[j]);
     for (uint32_t i=0; i < MAG_MAX_DIMS; ++i) { /* Permute shape and strides */
@@ -1184,7 +1184,7 @@ static mag_tensor_t* mag_result_constructor_routine_permuted(mag_tensor_t** inpu
     return permuted;
 }
 
-static mag_tensor_t* mag_result_constructor_routine_matmul(mag_tensor_t** inputs,  const mag_op_param_t* params) { /* MxR = MxN * NxR */
+static mag_tensor_t* mag_result_constructor_routine_matmul(mag_tensor_t** inputs,  const mag_opp_t* params) { /* MxR = MxN * NxR */
     (void)params;
     int64_t shape[MAG_MAX_DIMS] = {0};
     int64_t* rd0 = shape;
@@ -1207,7 +1207,7 @@ static mag_tensor_t* mag_result_constructor_routine_matmul(mag_tensor_t** inputs
     return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, shape, rank, NULL, 0);
 }
 
-static mag_tensor_t* mag_result_constructor_routine_repeat_rev(mag_tensor_t** inputs,  const mag_op_param_t* params) {
+static mag_tensor_t* mag_result_constructor_routine_repeat_rev(mag_tensor_t** inputs,  const mag_opp_t* params) {
     return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, inputs[1]->shape, 4, NULL, 0); /* TODO: use MAG_MAX_DIMS here when backward kernel is fixed */
 }
 
@@ -1421,7 +1421,7 @@ static void mag_op_backward_subs(mag_tensor_t* node, mag_tensor_t** grads) {
 
 static void mag_op_backward_muls(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
-    mag_e8m23_t xi = node->op_params[0].x.e8m23;
+    mag_e8m23_t xi = mag_opp_unpack_e8m23_or_panic(node->op_params[0]);
     grads[0] = mag_muls(node->grad, xi);
     mag_tensor_t* tmp = mag_mul(node->grad, x);
     grads[1] = mag_sum(tmp);
@@ -1430,7 +1430,7 @@ static void mag_op_backward_muls(mag_tensor_t* node, mag_tensor_t** grads) {
 
 static void mag_op_backward_divs(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
-    mag_e8m23_t xi = node->op_params[0].x.e8m23;
+    mag_e8m23_t xi = mag_opp_unpack_e8m23_or_panic(node->op_params[0]);
     grads[0] = mag_muls(node->grad, 1.0f / xi);
     mag_tensor_t* tmp = mag_mul(node->grad, x);
     grads[1] = mag_muls(mag_sum(tmp), -1.0f / (xi * xi));
@@ -1462,7 +1462,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "nop",
             .argcount = 0,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = false,
             .backward = &mag_op_backward_nop,
             .r_alloc = NULL,
@@ -1472,7 +1472,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "clone",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = false,
             .backward = &mag_op_backward_clone,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1482,7 +1482,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "view",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = false,
             .backward = &mag_op_backward_view,
             .r_alloc = &mag_result_constructor_routine_view,
@@ -1492,7 +1492,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "transpose",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = false,
             .backward = &mag_op_backward_transpose,
             .r_alloc = &mag_result_constructor_routine_transposed,
@@ -1502,13 +1502,13 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "permute",
             .argcount = 1,
             .paramcount = MAG_MAX_DIMS,
-            .param_types = {
-                MAG_OP_TPARAM_U32,
-                MAG_OP_TPARAM_U32,
-                MAG_OP_TPARAM_U32,
-                MAG_OP_TPARAM_U32,
-                MAG_OP_TPARAM_U32,
-                MAG_OP_TPARAM_U32,
+            .opp_types = {
+                MAG_OPP_U62,
+                MAG_OPP_U62,
+                MAG_OPP_U62,
+                MAG_OPP_U62,
+                MAG_OPP_U62,
+                MAG_OPP_U62,
             },
             .inplace = false,
             .backward = &mag_op_backward_permute,
@@ -1519,7 +1519,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "mean",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = false,
             .backward = &mag_op_backward_mean,
             .r_alloc = &mag_result_constructor_routine_scalar,
@@ -1529,7 +1529,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "min",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = false,
             .backward = &mag_op_backward_min,
             .r_alloc = &mag_result_constructor_routine_scalar,
@@ -1539,7 +1539,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "max",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = false,
             .backward = &mag_op_backward_max,
             .r_alloc = &mag_result_constructor_routine_scalar,
@@ -1549,7 +1549,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "sum",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = false,
             .backward = &mag_op_backward_sum,
             .r_alloc = &mag_result_constructor_routine_scalar,
@@ -1559,7 +1559,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "abs",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_abs,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1569,7 +1569,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "neg",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_neg,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1579,7 +1579,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "log",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_log,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1589,7 +1589,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "sqr",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_sqr,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1599,7 +1599,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "sqrt",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_sqrt,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1609,7 +1609,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "sin",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_sin,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1619,7 +1619,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "cos",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_cos,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1629,7 +1629,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "step",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_step,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1639,7 +1639,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "exp",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_exp,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1649,7 +1649,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "softmax",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_softmax,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1659,7 +1659,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "softmax_dv",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1669,7 +1669,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "sigmoid",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = mag_op_backward_sigmoid,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1679,7 +1679,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "sigmoid_dv",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1689,7 +1689,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "hard_sigmoid",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1699,7 +1699,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "silu",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_silu,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1709,7 +1709,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "silu_dv",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1719,7 +1719,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "tanh",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_tanh,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1729,7 +1729,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "tanh_dv",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1739,7 +1739,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "relu",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_relu,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1749,7 +1749,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "relu_dv",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1759,7 +1759,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "gelu",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_gelu,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1769,7 +1769,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "gelu_dv",
             .argcount = 1,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1779,7 +1779,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "add",
             .argcount = 2,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_add,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1789,7 +1789,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "sub",
             .argcount = 2,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_sub,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1799,7 +1799,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "mul",
             .argcount = 2,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_mul,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1809,7 +1809,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "div",
             .argcount = 2,
             .paramcount = 0,
-            .param_types = {MAG_OP_TPARAM_NONE},
+            .opp_types = {MAG_OPP_NONE},
             .inplace = true,
             .backward = &mag_op_backward_div,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1819,7 +1819,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "adds",
             .argcount = 1,
             .paramcount = 1,
-            .param_types = {MAG_OP_TPARAM_F32},
+            .opp_types = {MAG_OPP_E8M23},
             .inplace = true,
             .backward = &mag_op_backward_adds,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1829,7 +1829,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "subs",
             .argcount = 1,
             .paramcount = 1,
-            .param_types = {MAG_OP_TPARAM_F32},
+            .opp_types = {MAG_OPP_E8M23},
             .inplace = true,
             .backward = &mag_op_backward_subs,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1839,7 +1839,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "muls",
             .argcount = 1,
             .paramcount = 1,
-            .param_types = {MAG_OP_TPARAM_F32},
+            .opp_types = {MAG_OPP_E8M23},
             .inplace = true,
             .backward = &mag_op_backward_muls,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1849,7 +1849,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "divs",
             .argcount = 1,
             .paramcount = 1,
-            .param_types = {MAG_OP_TPARAM_F32},
+            .opp_types = {MAG_OPP_E8M23},
             .inplace = true,
             .backward = &mag_op_backward_divs,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1859,7 +1859,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "pows",
             .argcount = 1,
             .paramcount = 1,
-            .param_types = {MAG_OP_TPARAM_F32},
+            .opp_types = {MAG_OPP_E8M23},
             .inplace = true,
             .backward = &mag_op_backward_pows,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1869,7 +1869,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "matmul",
             .argcount = 2,
             .paramcount = 0,
-            .param_types = {},
+            .opp_types = {},
             .inplace = true,
             .backward = &mag_op_backward_matmul,
             .r_alloc = &mag_result_constructor_routine_matmul,
@@ -1879,7 +1879,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .mnemonic = "repeat_rev",
             .argcount = 2,
             .paramcount = 0,
-            .param_types = {},
+            .opp_types = {},
             .inplace = true,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_repeat_rev,
@@ -1937,9 +1937,9 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
         .flags = (view ? MAG_TFLAG_VIEW : MAG_TFLAG_OWNER) | (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER ? MAG_TFLAG_REQUIRES_GRAD : 0),
         .op = MAG_OP_NOP,
         .op_inputs = {0},
-        .op_params = {{0}},
+        .op_params = {mag_opp_pack_none()},
         .init_op = MAG_IOP_NOP,
-        .init_op_params = {{0}},
+        .init_op_params = {mag_opp_pack_none()},
         .view_uplink = view,
         .view_offs = view_offs,
         .grad = NULL,
@@ -2054,21 +2054,21 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
     bool inplace,
     mag_tensor_t** inputs,
     uint32_t numin,
-    const mag_op_param_t* params,
-    uint32_t numparams,
+    const mag_opp_t* opps,
+    uint32_t numopps,
     mag_gra_eval_t gra
 ) {
     /* Validate inputs and params first */
     mag_assert2(op != MAG_OP_NOP);
     mag_assert(inputs && mag_check_are_inputs_valid(op, inputs, numin), "Invalid input tensors for operation %s.", mag_op_meta_of(op)->mnemonic);
-    mag_assert(mag_check_are_op_params_valid(op, params, numparams), "Invalid parameters for operation %s.", mag_op_meta_of(op)->mnemonic);
+    mag_assert(mag_check_are_op_params_valid(op, opps, numopps), "Invalid parameters for operation %s.", mag_op_meta_of(op)->mnemonic);
     const mag_op_meta_t* meta = mag_op_meta_of(op);
-    mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_op_param_t*) = meta->r_alloc;
-    bool (*validate_op)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_op_param_t*) = meta->validator;
+    mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_opp_t*) = meta->r_alloc;
+    bool (*validate_op)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_opp_t*) = meta->validator;
     mag_tensor_t* R = (inplace && numin && meta->inplace)                                                       /* Inplace requested? */
         ? mag_tensor_create(ctx, (*inputs)->dtype, (*inputs)->shape, (*inputs)->rank, *inputs, 0)       /* View R <- X for inplace aliasing op. */
-        : (*r_alloc)(inputs, params);                                                                           /* Construct new result tensor. */
-    mag_assert((*validate_op)(op, R, inputs, params), "Invalid operation %s.", meta->mnemonic);                 /* Validate operation */
+        : (*r_alloc)(inputs, opps);                                                                           /* Construct new result tensor. */
+    mag_assert((*validate_op)(op, R, inputs, opps), "Invalid operation %s.", meta->mnemonic);                 /* Validate operation */
     R->op = op;                                                                                                 /* Set operation for deferred execution mode. */
     for (uint32_t i=0; i < numin; ++i) {                                                                        /* Set input tensors and flags. */
         mag_tensor_t* input = inputs[i];
@@ -2076,7 +2076,7 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
         if (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)
             R->flags |= input->flags & MAG_TFLAG_REQUIRES_GRAD;
     }
-    if (params) memcpy(R->op_params, params, sizeof(*params));      /* Copy operation parameters */
+    if (opps) memcpy(R->op_params, opps, sizeof(*opps));      /* Copy operation parameters */
     if (mag_likely(ctx->exec_mode == MAG_EXEC_MODE_EAGER)) {        /* In eager execution mode, we execute immediately. */
         mag_op_exec(R, ctx->device, gra);                           /* Execute the operation immediately. */
         if (!(ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER))             /* If not recording gradients, free graph tensors. */
@@ -2099,13 +2099,13 @@ mag_tensor_t* mag_transpose(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_permute(mag_tensor_t* x, uint32_t d0, uint32_t d1, uint32_t d2, uint32_t d3, uint32_t d4, uint32_t d5) {
-    mag_op_param_t params[MAG_MAX_OP_PARAMS] = {
-        {.type=MAG_OP_TPARAM_U32, .x.u32=d0},
-        {.type=MAG_OP_TPARAM_U32, .x.u32=d1},
-        {.type=MAG_OP_TPARAM_U32, .x.u32=d2},
-        {.type=MAG_OP_TPARAM_U32, .x.u32=d3},
-        {.type=MAG_OP_TPARAM_U32, .x.u32=d4},
-        {.type=MAG_OP_TPARAM_U32, .x.u32=d5}
+    mag_opp_t params[MAG_MAX_OP_PARAMS] = {
+        mag_opp_pack_u62(d0),
+        mag_opp_pack_u62(d1),
+        mag_opp_pack_u62(d2),
+        mag_opp_pack_u62(d3),
+        mag_opp_pack_u62(d4),
+        mag_opp_pack_u62(d5),
     };
     return mag_tensor_operator(x->ctx, MAG_OP_PERMUTE, false, &x, 1, params, sizeof(params)/sizeof(*params), MAG_GRA_FWD);
 }
@@ -2361,57 +2361,57 @@ mag_tensor_t* mag_div_(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_adds(mag_tensor_t* x, mag_e8m23_t xi) {
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
+    mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_ADDS, false, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
 mag_tensor_t* mag_adds_(mag_tensor_t* x, mag_e8m23_t xi) {
     mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
+    mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_ADDS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
 mag_tensor_t* mag_subs(mag_tensor_t* x, mag_e8m23_t xi) {
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
+    mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_SUBS, false, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
 mag_tensor_t* mag_subs_(mag_tensor_t* x, mag_e8m23_t xi) {
     mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
+    mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_SUBS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
 mag_tensor_t* mag_muls(mag_tensor_t* x, mag_e8m23_t xi) {
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
+    mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_MULS, false, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
 mag_tensor_t* mag_muls_(mag_tensor_t* x, mag_e8m23_t xi) {
     mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
+    mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_MULS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
 mag_tensor_t* mag_divs(mag_tensor_t* x, mag_e8m23_t xi) {
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
+    mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_DIVS, false, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
 mag_tensor_t* mag_divs_(mag_tensor_t* x, mag_e8m23_t xi) {
     mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
+    mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_DIVS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
 mag_tensor_t* mag_pows(mag_tensor_t* x, mag_e8m23_t xi) {
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
+    mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_POWS, false, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
 mag_tensor_t* mag_pows_(mag_tensor_t* x, mag_e8m23_t xi) {
     mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
-    mag_op_param_t param = {.type=MAG_OP_TPARAM_F32, .x.e8m23=xi};
+    mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_POWS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
 
@@ -2441,38 +2441,23 @@ void mag_tensor_copy_buffer_from(mag_tensor_t* t, const void* data, size_t size)
 
 void mag_tensor_fill(mag_tensor_t* t, mag_e8m23_t x) {
     t->init_op = MAG_IOP_BROADCAST;
-    t->init_op_params[0] = (mag_op_param_t) {
-        .type = MAG_OP_TPARAM_F32,
-        .x.e8m23 = x
-    };
+    t->init_op_params[0] = mag_opp_pack_e8m23(x);
     mag_op_exec(t, t->ctx->device, MAG_GRA_INIT);
 }
 
 void mag_tensor_fill_random_uniform(mag_tensor_t* t, mag_e8m23_t min, mag_e8m23_t max) {
     mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
     t->init_op = MAG_IOP_RAND_UNIFORM;
-    t->init_op_params[0] = (mag_op_param_t) {
-        .type = MAG_OP_TPARAM_F32,
-        .x.e8m23 = min
-    };
-    t->init_op_params[1] = (mag_op_param_t) {
-        .type = MAG_OP_TPARAM_F32,
-        .x.e8m23 = max
-    };
+    t->init_op_params[0] = mag_opp_pack_e8m23(min);
+    t->init_op_params[1] = mag_opp_pack_e8m23(max);
     mag_op_exec(t, t->ctx->device, MAG_GRA_INIT);
 }
 
 void mag_tensor_fill_random_normal(mag_tensor_t* t, mag_e8m23_t mean, mag_e8m23_t stddev) {
     mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
     t->init_op = MAG_IOP_RAND_NORMAL;
-    t->init_op_params[0] = (mag_op_param_t) {
-        .type = MAG_OP_TPARAM_F32,
-        .x.e8m23 = mean
-    };
-    t->init_op_params[1] = (mag_op_param_t) {
-        .type = MAG_OP_TPARAM_F32,
-        .x.e8m23 = stddev
-    };
+    t->init_op_params[0] = mag_opp_pack_e8m23(mean);
+    t->init_op_params[1] = mag_opp_pack_e8m23(stddev);
     mag_op_exec(t, t->ctx->device, MAG_GRA_INIT);
 }
 

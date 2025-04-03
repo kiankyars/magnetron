@@ -19,7 +19,7 @@ extern "C" {
 #define MAG_DEFAULT_CHUNK_SIZE (1ull<<30)  /* Default size of memory chunk in bytes. 1 GiB */
 #define MAG_DEFAULT_CHUNK_CAP 128          /* Default capacity of memory chunk */
 #define MAG_MAX_DIMS 6                     /* Maximum number of dimensions for a tensor */
-#define MAG_MAX_TENSOR_NAME_LEN 64         /* Maximum length for tensor name */
+#define MAG_MAX_TENSOR_NAME_LEN 32         /* Maximum length for tensor name */
 #define MAG_MAX_INPUT_TENSORS 2            /* Maximum number of input tensors for an operation */
 #define MAG_MAX_OP_PARAMS 6                /* Maximum number of parameters for an operation */
 
