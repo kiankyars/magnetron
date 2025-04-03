@@ -174,18 +174,18 @@ void* (*mag_alloc)(void* blk, size_t size) = &mag_alloc_stub;
 void* (*mag_get_alloc_fn(void))(void* blk, size_t size) { return mag_alloc; } /* Get global allocator. */
 void mag_set_alloc_fn(void* (*alloc)(void* blk, size_t size)) { mag_assert2(alloc); mag_alloc = alloc; } /* Set global allocator. */
 
-void mag_humanize_memory_size(size_t n, double* out, const char** unit) { /* Format and convert a memory size to the appropriate unit. For example. 1024 => 1 KiB */
+void mag_humanize_memory_size(size_t n, mag_e11m52_t* out, const char** unit) { /* Format and convert a memory size to the appropriate unit. For example. 1024 => 1 KiB */
     if (n < (1<<10)) {
-        *out = (double)n;
+        *out = (mag_e11m52_t)n;
         *unit = "B";
     } else if (n < (1<<20)) {
-        *out = (double)n/(double)(1<<10);
+        *out = (mag_e11m52_t)n/(mag_e11m52_t)(1<<10);
         *unit = "KiB";
     } else if (n < (1<<30)) {
-        *out = (double)n/(double)(1<<20);
+        *out = (mag_e11m52_t)n/(mag_e11m52_t)(1<<20);
         *unit = "MiB";
     } else {
-        *out = (double)n/(double)(1<<30);
+        *out = (mag_e11m52_t)n/(mag_e11m52_t)(1<<30);
         *unit = "GiB";
     }
 }
@@ -350,8 +350,8 @@ static uint64_t mag_hpc_clock_ns(void) { /* High precision clock in nanoseconds.
 static uint64_t mag_hpc_clock_elapsed_ns(uint64_t start) { /* High precision clock elapsed time in microseconds. */
     return (uint64_t)llabs((int64_t)mag_hpc_clock_ns() - (int64_t)start);
 }
-static double mag_hpc_clock_elapsed_ms(uint64_t start) { /* High precision clock elapsed time in milliseconds. */
-    return (double)mag_hpc_clock_elapsed_ns(start) / 1e6;
+static mag_e11m52_t mag_hpc_clock_elapsed_ms(uint64_t start) { /* High precision clock elapsed time in milliseconds. */
+    return (mag_e11m52_t)mag_hpc_clock_elapsed_ns(start) / 1e6;
 }
 #define mag_clock_cycles() ((uint64_t)clock())
 #define mag_cycles_per_ms() ((uint64_t)CLOCKS_PER_SEC/1000)
@@ -503,12 +503,12 @@ static bool mag_compute_graph_contains( /* Check if the folded graph contains a 
 }
 
 /* Eval Chebyshev coeffs steps for some x. f(x) : [a, b] -> ℝ. */
-static double mag_chebyshev_eval(double x, double a, double b, const double* coeffs, uint32_t steps) {
-    double scale = 4.0/(b - a);
-    double rls = -2.0 + (x - a)*scale;
-    double k1 = 0.0, k2 = 0.0;
+static mag_e11m52_t mag_chebyshev_eval(mag_e11m52_t x, mag_e11m52_t a, mag_e11m52_t b, const mag_e11m52_t* coeffs, uint32_t steps) {
+    mag_e11m52_t scale = 4.0/(b - a);
+    mag_e11m52_t rls = -2.0 + (x - a)*scale;
+    mag_e11m52_t k1 = 0.0, k2 = 0.0;
     for (uint32_t j = steps-1; j; --j) {
-        double tmp = k1;
+        mag_e11m52_t tmp = k1;
         k1 = rls*k1 - k2 + coeffs[j];
         k2 = tmp;
     }
@@ -516,20 +516,20 @@ static double mag_chebyshev_eval(double x, double a, double b, const double* coe
 }
 
 /* Generate Chebyshev coeffs for f(x) : [a, b] -> ℝ. */
-static double* mag_chebyshev_setup(double (*f)(double), double a, double b, uint32_t steps, bool linear_l, bool linear_r) {
+static mag_e11m52_t* mag_chebyshev_setup(mag_e11m52_t (*f)(mag_e11m52_t), mag_e11m52_t a, mag_e11m52_t b, uint32_t steps, bool linear_l, bool linear_r) {
     mag_assert2(steps);
-    double* r = (*mag_alloc)(NULL, sizeof(*r)*steps);
+    mag_e11m52_t* r = (*mag_alloc)(NULL, sizeof(*r)*steps);
     memset(r, 0, sizeof(*r)*steps);
-    double dsteps = (double)steps;
+    mag_e11m52_t dsteps = (mag_e11m52_t)steps;
     for (uint32_t i=0; i < steps; ++i) {
         for (uint32_t j=0; j < steps; ++j) {
-            double wav = 0.5*(1.0 + cos(M_PI*(j + 0.5)/dsteps));
-            double x = a + (b - a)*wav, y = (*f)(x);
-            double weight = cos(M_PI*(double)i*(j + 0.5)/dsteps);
+            mag_e11m52_t wav = 0.5*(1.0 + cos(M_PI*(j + 0.5)/dsteps));
+            mag_e11m52_t x = a + (b - a)*wav, y = (*f)(x);
+            mag_e11m52_t weight = cos(M_PI*(mag_e11m52_t)i*(j + 0.5)/dsteps);
             r[i] += 2.0*y*weight/dsteps;
         }
     }
-    double xmi = 0.0, xma = 0.0;
+    mag_e11m52_t xmi = 0.0, xma = 0.0;
     if (linear_l) xmi = (*f)(a) - mag_chebyshev_eval(a, a, b, r, steps);
     if (linear_r) xma = (*f)(b) - mag_chebyshev_eval(b, a, b, r, steps);
     r[0] += 2.0*(xma + xmi)*0.5;
@@ -613,12 +613,12 @@ static void mag_system_host_info_dump(mag_ctx_t* ctx) {
         }
     #endif
     /* Now print memory information. */
-    double mem_total, mem_free, mem_used;
+    mag_e11m52_t mem_total, mem_free, mem_used;
     const char* mem_unit_total, *mem_unit_free, *mem_unit_used;
     mag_humanize_memory_size(ctx->machine.phys_mem_total, &mem_total, &mem_unit_total);
     mag_humanize_memory_size(ctx->machine.phys_mem_free, &mem_free, &mem_unit_free);
     mag_humanize_memory_size((size_t)llabs((int64_t)ctx->machine.phys_mem_total-(int64_t)ctx->machine.phys_mem_free), &mem_used, &mem_unit_used);
-    double mem_used_percent = fabs((double)(ctx->machine.phys_mem_total-ctx->machine.phys_mem_free))/(double)ctx->machine.phys_mem_total*100.0;
+    mag_e11m52_t mem_used_percent = fabs((mag_e11m52_t)(ctx->machine.phys_mem_total-ctx->machine.phys_mem_free))/(mag_e11m52_t)ctx->machine.phys_mem_total*100.0;
     mag_log_info("Physical Machine Memory: %.03f %s, Free: %.03f %s, Used: %.03f %s (%.02f%%)", mem_total, mem_unit_total, mem_free, mem_unit_free, mem_used, mem_unit_used, mem_used_percent);
 }
 
@@ -880,7 +880,7 @@ MAG_COLDPROC void mag_fixed_intrusive_pool_print_info(mag_fixed_intrusive_pool* 
         (size_t)pool->num_freelist_hits,
         (size_t)pool->num_pool_hits
     );
-    double mem_alloced, pool_mem;
+    mag_e11m52_t mem_alloced, pool_mem;
     const char* mem_unit_alloced, *mem_unit_pool;
     mag_humanize_memory_size(pool->num_chunks*pool->blocks_per_chunk*pool->block_size, &mem_alloced, &mem_unit_alloced);
     mag_humanize_memory_size(pool->num_allocs*pool->block_size, &pool_mem, &mem_unit_pool);
@@ -1242,7 +1242,7 @@ static void mag_op_backward_permute(mag_tensor_t* node, mag_tensor_t** grads) {
 
 static void mag_op_backward_mean(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
-    double scale = 1.0/(double)x->numel;
+    mag_e11m52_t scale = 1.0/(mag_e11m52_t)x->numel;
     mag_tensor_t* scale_tensor = mag_tensor_create(x->ctx, x->dtype, x->shape, x->rank, NULL, 0);
     mag_tensor_fill(scale_tensor, scale);
     *grads = mag_mul(scale_tensor, node->grad);

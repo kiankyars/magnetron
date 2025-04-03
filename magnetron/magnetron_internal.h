@@ -218,6 +218,14 @@ static MAG_AINLINE bool mag_atomic_compare_exchange_strong(volatile mag_atomic_t
 mag_static_assert(sizeof(0u) == 4);
 mag_static_assert(sizeof(0ull) == 8);
 
+/*
+** Because multiple floating-point formats with the same bit width exist (e.g. f16, bf16), all floats are described by their exponent (E) and mantissa (M) bits.
+** The builtin float keyword is only used for the public API in magnetron.h. The internal code uses the following types:
+*/
+typedef double mag_e11m52_t;            /* IEEE 754 double precision float. */
+typedef float mag_e8m23_t;              /* IEEE 754 single precision float. */
+typedef struct mag_e5m10_t { uint16_t bits; } mag_e5m10_t;  /* IEEE 754 half precision float. */
+
 #ifdef __BYTE_ORDER
 #if defined(__BIG_ENDIAN) && (__BYTE_ORDER == __BIG_ENDIAN)
 #define MAG_BE
@@ -306,7 +314,7 @@ extern MAG_EXPORT bool mag_log_enabled;
 extern MAG_EXPORT void* (*mag_alloc)(void* blk, size_t size);
 extern MAG_EXPORT void* mag_alloc_aligned(size_t size, size_t align);
 extern MAG_EXPORT void mag_free_aligned(void* blk);
-extern MAG_EXPORT void mag_humanize_memory_size(size_t n, double* out, const char** unit);
+extern MAG_EXPORT void mag_humanize_memory_size(size_t n, mag_e11m52_t* out, const char** unit);
 extern MAG_EXPORT uintptr_t mag_thread_id(void);
 
 #define mag_swap(T, a, b) do { T tmp = (a); (a) = (b); (b) = tmp; } while (0)
@@ -361,14 +369,6 @@ static inline void* mag_pincr(void** p, size_t sz, size_t align) {
     *p = (void*)((uint8_t*)pp+sz);
     return pp;
 }
-
-/*
-** Because multiple floating-point formats with the same bit width exist (e.g. f16, bf16), all floats are described by their exponent (E) and mantissa (M) bits.
-** The builtin float keyword is only used for the public API in magnetron.h. The internal code uses the following types:
-*/
-typedef double mag_e11m52_t;            /* IEEE 754 double precision float. */
-typedef float mag_e8m23_t;              /* IEEE 754 single precision float. */
-typedef struct mag_e5m10_t { uint16_t bits; } mag_e5m10_t;  /* IEEE 754 half precision float. */
 
 /*
 **  Fast u32 division and remainder. Paper:

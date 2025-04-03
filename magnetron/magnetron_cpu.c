@@ -126,7 +126,7 @@ static bool mag_blas_detect_optimal_specialization(const mag_ctx_t* ctx, mag_ker
 
 typedef struct mag_cpu_op_info_t {
     bool mt_support;
-    double growth;
+    mag_e11m52_t growth;
     int64_t threshold;
 } mag_cpu_op_info_t;
 
@@ -524,9 +524,9 @@ static mag_cpu_device_t* mag_cpu_init_device(mag_ctx_t* ctx, uint32_t num_thread
 */
 static uint32_t mag_cpu_dynamic_work_scaling(mag_cpu_device_t* dvc, mag_op_t op, int64_t numel) {
     const mag_cpu_op_info_t* info = mag_cpu_op_infos+op;
-    if (!dvc->pool || !info->mt_support || numel < info->threshold) return 1;       /* Use a single worker (main thread). */
-    numel -= info->threshold;                                                       /* Saturate threshold */
-    uint32_t workers = (uint32_t)ceil(info->growth * log2((double)numel));       /* Logarithmic scaling */
+    if (!dvc->pool || !info->mt_support || numel < info->threshold) return 1;           /* Use a single worker (main thread). */
+    numel -= info->threshold;                                                           /* Saturate threshold */
+    uint32_t workers = (uint32_t)ceil(info->growth * log2((mag_e11m52_t)numel));        /* Logarithmic scaling */
     workers = mag_xmin(dvc->num_allocated_workers, mag_xmax(1, workers));
     return workers;
 }
