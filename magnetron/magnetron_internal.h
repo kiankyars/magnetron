@@ -226,6 +226,8 @@ typedef double mag_e11m52_t;            /* IEEE 754 double precision float. */
 typedef float mag_e8m23_t;              /* IEEE 754 single precision float. */
 typedef struct mag_e5m10_t { uint16_t bits; } mag_e5m10_t;  /* IEEE 754 half precision float. */
 
+#define mag_u64x(hi, lo) (((uint64_t)0x##hi<<32)+(uint64_t)0x##lo)
+
 #ifdef __BYTE_ORDER
 #if defined(__BIG_ENDIAN) && (__BYTE_ORDER == __BIG_ENDIAN)
 #define MAG_BE
@@ -542,7 +544,7 @@ mag_static_assert(MAG_OPP__NUM-1 <= 3); /* Must fit in 2 bits */
 */
 typedef uint64_t mag_opp_t;
 static MAG_AINLINE mag_opp_t mag_opp_pack(uint64_t dat, mag_opp_type_t t) {
-    mag_assert(dat>>(64-2)==0, "contained value must be a 2-bit integer: %" PRIx64, dat);
+    mag_assert(dat>>(64-2)==0 || (t==MAG_OPP_I62 && (dat>>(64-2) == 3)), "contained value must be a 2-bit integer: %" PRIx64, dat);
     return (dat<<2)|(3&t);
 }
 static MAG_AINLINE mag_opp_t mag_opp_pack_none(void) { return 0; }
@@ -550,23 +552,28 @@ static MAG_AINLINE mag_opp_t mag_opp_pack_e8m23(mag_e8m23_t x) {
     union { uint32_t u32; mag_e8m23_t e8m23; } castor = {.e8m23=x};
     return mag_opp_pack(castor.u32, MAG_OPP_E8M23);
 }
-static MAG_AINLINE mag_opp_t mag_opp_pack_i62(int64_t x) { return mag_opp_pack(x, MAG_OPP_I62); }
+static MAG_AINLINE mag_opp_t mag_opp_pack_i62(int64_t x) {
+    mag_assert(x >= -(1ll<<61) && x <= ((1ll<<61)-1), "int62 out of range: %" PRIi64, x);
+    return mag_opp_pack(x&((1ull<<62)-1), MAG_OPP_I62);
+}
 static MAG_AINLINE mag_opp_t mag_opp_pack_u62(uint64_t x) { return mag_opp_pack(x, MAG_OPP_U62); }
 static MAG_AINLINE mag_opp_type_t mag_opp_unpack_type(mag_opp_t pa) { return (mag_opp_type_t)(3&pa); }
-static MAG_AINLINE uint64_t mag_opp_unpack_value(mag_opp_t pa) { return pa>>2; }
+static MAG_AINLINE uint64_t mag_opp_unpack_raw_value(mag_opp_t pa) { return pa>>2; }
 static MAG_AINLINE bool mag_opp_is_type(mag_opp_t pa, mag_opp_type_t type) { return (3&pa) == type; }
 static MAG_AINLINE mag_e8m23_t mag_opp_unpack_e8m23_or_panic(mag_opp_t pa) {
     mag_assert(mag_opp_is_type(pa, MAG_OPP_E8M23), "invalid op param type: %d", mag_opp_unpack_type(pa))
-    union { uint32_t u32; mag_e8m23_t e8m23; } castor = {.u32=(uint32_t)mag_opp_unpack_value(pa)};
+    union { uint32_t u32; mag_e8m23_t e8m23; } castor = {.u32=(uint32_t)mag_opp_unpack_raw_value(pa)};
     return castor.e8m23;
 }
 static MAG_AINLINE int64_t mag_opp_unpack_i62_or_panic(mag_opp_t pa) {
     mag_assert(mag_opp_is_type(pa, MAG_OPP_I62), "invalid op param type: %d", mag_opp_unpack_type(pa))
-    return (int64_t)mag_opp_unpack_value(pa);
+    uint64_t v = mag_opp_unpack_raw_value(pa);
+    if (v & (1ull<<61)) v|=(3ull<<62);
+    return (int64_t)v;
 }
 static MAG_AINLINE uint64_t mag_opp_unpack_u62_or_panic(mag_opp_t pa) {
     mag_assert(mag_opp_is_type(pa, MAG_OPP_U62), "invalid op param type: %d", mag_opp_unpack_type(pa))
-    return mag_opp_unpack_value(pa);
+    return mag_opp_unpack_raw_value(pa);
 }
 static MAG_AINLINE mag_e8m23_t mag_opp_unpack_e8m23_or(mag_opp_t pa, mag_e8m23_t fallback) {
     return mag_opp_is_type(pa, MAG_OPP_E8M23) ? mag_opp_unpack_e8m23_or_panic(pa) : fallback;

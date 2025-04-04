@@ -2583,31 +2583,16 @@ static void mag_tensor_array_push(mag_tensor_array_t* arr, mag_tensor_t* t) {
     arr->data[arr->size++] = t;
 }
 
-static bool mag_was_visited(mag_tensor_t** visited, size_t len, mag_tensor_t* t) {
-    for (size_t i = 0; i < len; ++i) if (visited[i] == t) return 1;
-    return 0;
-}
-
-static void mag_mark_visited(mag_tensor_t*** visited, size_t* len, size_t* cap, mag_tensor_t* t) {
-    if (*len == *cap) {
-        size_t nc = !*cap ? 16 : (*cap<<=1);
-        *visited = (*mag_alloc)(*visited, nc*sizeof(**visited));
-        *cap = nc;
-    }
-    (*visited)[(*len)++] = t;
-}
-
 static void mag_collect_topo_iterative(mag_tensor_t* root, mag_tensor_array_t* out_array) {
     size_t sta_len = 0, sta_cap = 0;
-    size_t vi_len = 0, vi_cap = 0;
     mag_topo_stack_record_t* stack = NULL;
-    mag_tensor_t** visited = NULL;
 
     #define mag_sta_push(_t) do { \
         if (sta_len == sta_cap) { \
-            size_t nc = !sta_cap ? 16 : (sta_cap<<1); \
-            stack = (*mag_alloc)(stack, nc*sizeof(*stack)); \
-            sta_cap = nc; \
+        size_t old_cap = sta_cap; \
+        size_t nc = (old_cap == 0) ? 16 : (old_cap * 2); \
+        stack = (*mag_alloc)(stack, nc*sizeof(*stack)); \
+        sta_cap = nc; \
         } \
         stack[sta_len].tensor = (_t); \
         stack[sta_len].next_child_idx = 0; \
@@ -2616,7 +2601,7 @@ static void mag_collect_topo_iterative(mag_tensor_t* root, mag_tensor_array_t* o
     #define mag_sta_pop() (stack[--sta_len])
 
     if (!(root->flags & MAG_TFLAG_REQUIRES_GRAD)) return;
-    mag_mark_visited(&visited, &vi_len, &vi_cap, root);
+    mag_hashset_t visited = mag_hashset_init(8192); // todo dynamic
     mag_sta_push(root);
     while (sta_len) { /* Iterative DFS */
         mag_topo_stack_record_t* top = &stack[sta_len - 1];
@@ -2624,8 +2609,8 @@ static void mag_collect_topo_iterative(mag_tensor_t* root, mag_tensor_array_t* o
         if (top->next_child_idx < mag_op_meta_of(cur_tensor->op)->argcount) {
             mag_tensor_t* child = cur_tensor->op_inputs[top->next_child_idx++];
             if (child && (child->flags & MAG_TFLAG_REQUIRES_GRAD)) {
-                if (!mag_was_visited(visited, vi_len, child)) {
-                    mag_mark_visited(&visited, &vi_len, &vi_cap, child);
+                if (!mag_hashset_contains_key(&visited, child)) {
+                    mag_hashset_insert(&visited, child);
                     mag_sta_push(child);
                 }
             }
@@ -2639,7 +2624,7 @@ static void mag_collect_topo_iterative(mag_tensor_t* root, mag_tensor_array_t* o
     #undef mag_sta_pop
 
     (*mag_alloc)(stack, 0);
-    (*mag_alloc)(visited, 0);
+    mag_hashset_free(&visited);
 }
 
 static void mag_tensor_patch_grad(mag_tensor_t* dst, mag_tensor_t* grad) {
