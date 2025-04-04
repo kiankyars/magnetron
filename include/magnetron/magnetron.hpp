@@ -292,6 +292,7 @@ namespace magnetron {
 
         [[nodiscard]] auto clone() const noexcept -> tensor { return tensor{mag_clone(m_tensor)}; }
         [[nodiscard]] auto view() const noexcept -> tensor { return tensor{mag_view(m_tensor)}; }
+        [[nodiscard]] auto T() const noexcept -> tensor { return tensor{mag_transpose(m_tensor)}; }
         [[nodiscard]] auto transpose() const noexcept -> tensor { return tensor{mag_transpose(m_tensor)}; }
         [[nodiscard]] auto permute(const std::array<std::int64_t, k_max_dims>& axes) const noexcept -> tensor { return tensor{mag_permute(m_tensor, axes[0], axes[1], axes[2], axes[3], axes[4], axes[5])}; }
         [[nodiscard]] auto mean() const noexcept -> tensor { return tensor{mag_mean(m_tensor)}; }

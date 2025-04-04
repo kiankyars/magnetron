@@ -225,7 +225,7 @@ namespace magnetron::test {
                 for (auto& param : params()) {
                     auto grad {param.grad()};
                     if (!grad.has_value()) [[unlikely]] {
-                        std::abort();
+                        throw std::runtime_error("Parameter has no gradient");
                     }
                     tensor delta {param - *param.grad()*lr};
                     delta.requires_grad(true);
@@ -256,7 +256,7 @@ namespace magnetron::test {
             }
 
             [[nodiscard]] auto operator()(tensor x) const -> tensor {
-                tensor y {x & weight->transpose().clone()};
+                tensor y {x & weight->T().clone()};
                 if (bias.has_value())
                     y = y + *bias;
                 return y;

@@ -2667,56 +2667,67 @@ static void MAG_HOTPROC mag_blas_repeat_back_e8m23(const mag_compute_payload_t* 
     mag_load_local_storage_group(r, rs, strides);
     mag_load_local_storage_group(x, xd, shape);
     mag_load_local_storage_group(x, xs, strides);
-    /* TODO: support transposed tensors */
     mag_assert2(rs0 == 1);
-    mag_assert2(xs0 == 1)
-    const int64_t rc0 = xd0/rd0;
-    const int64_t rc1 = xd1/rd1;
-    const int64_t rc2 = xd2/rd2;
-    const int64_t rc3 = xd3/rd3;
-    const int64_t rc4 = xd4/rd4;
-    const int64_t rc5 = xd5/rd5;
+    mag_assert2(xs0 == 1);
     if (mag_tensor_is_contiguous(r)) {
-        mag_vfill_e8m23(r->numel, br, 0);
+        mag_vfill_e8m23(r->numel, br, 0.0f);
     } else {
-        for (int64_t i5=0; i5 < rd5; ++i5) {
-            for (int64_t i4=0; i4 < rd4; ++i4) {
-                for (int64_t i3=0; i3 < rd3; ++i3) {
-                    for (int64_t i2=0; i2 < rd2; ++i2) {
-                        for (int64_t i1=0; i1 < rd1; ++i1) {
-                            mag_e8m23_t* p_r = br + i5*rs5 + i4*rs4 + i3*rs3 + i2*rs2 + i1*rs1;
+        for (int64_t i5 = 0; i5 < rd5; i5++) {
+            for (int64_t i4 = 0; i4 < rd4; i4++) {
+                for (int64_t i3 = 0; i3 < rd3; i3++) {
+                    for (int64_t i2 = 0; i2 < rd2; i2++) {
+                        for (int64_t i1 = 0; i1 < rd1; i1++) {
+                            mag_e8m23_t* p_r = br
+                                + i5*rs5 + i4*rs4 + i3*rs3 + i2*rs2 + i1*rs1;
                             mag_bnd_chk(p_r, br, mag_tensor_get_data_size(r));
-                            mag_vfill_e8m23(rd0, p_r, 0);
+                            mag_vfill_e8m23(rd0, p_r, 0.0f);
                         }
                     }
                 }
             }
         }
     }
-    for (int64_t i5=0; i5 < rc5; ++i5) {
-        for (int64_t k5=0; k5 < rd5; ++k5) {
-            for (int64_t i4=0; i4 < rc4; ++i4) {
-                for (int64_t k4=0; k4 < rd4; ++k4) {
-                    for (int64_t i3=0; i3 < rc3; ++i3) {
-                        for (int64_t k3=0; k3 < rd3; ++k3) {
-                            for (int64_t i2=0; i2 < rc2; ++i2) {
-                                for (int64_t k2=0; k2 < rd2; ++k2) {
-                                    for (int64_t i1=0; i1 < rc1; ++i1) {
-                                        for (int64_t k1=0; k1 < rd1; ++k1) {
-                                            for (int64_t i0=0; i0 < rc0; ++i0) {
-                                                mag_e8m23_t* p_r = br + k5*rs5+ k4*rs4 + k3*rs3 + k2*rs2 + k1*rs1;
-                                                const mag_e8m23_t* p_x = bx
-                                                + (i5*rd5 + k5)*xs5 + (i4*rd4 + k4)*xs4
-                                                + (i3*rd3 + k3)*xs3 + (i2*rd2 + k2)*xs2
-                                                + (i1*rd1 + k1)*xs1 + (i0*rd0)     *xs0;
-                                                mag_bnd_chk(p_r, br, mag_tensor_get_data_size(r));
-                                                mag_bnd_chk(p_x, bx, mag_tensor_get_data_size(x));
-                                                mag_vacc_e8m23(rd0, p_r, p_x);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+    int64_t bc0 = rd0 == xd0 ? 1 : (rd0 == 1 ? xd0 : 1);
+    int64_t bc1 = rd1 == xd1 ? 1 : (rd1 == 1 ? xd1 : 1);
+    int64_t bc2 = rd2 == xd2 ? 1 : (rd2 == 1 ? xd2 : 1);
+    int64_t bc3 = rd3 == xd3 ? 1 : (rd3 == 1 ? xd3 : 1);
+    int64_t bc4 = rd4 == xd4 ? 1 : (rd4 == 1 ? xd4 : 1);
+    int64_t bc5 = rd5 == xd5 ? 1 : (rd5 == 1 ? xd5 : 1);
+    for (int64_t i5=0; i5 < bc5; i5++) {
+        for (int64_t i4=0; i4 < bc4; i4++) {
+            for (int64_t i3=0; i3 < bc3; i3++) {
+                for (int64_t i2=0; i2 < bc2; i2++) {
+                    for (int64_t i1=0; i1 < bc1; i1++) {
+                        for (int64_t i0=0; i0 < bc0; i0++) {
+                            const int64_t r_off_5 = (rd5 > 1) ? i5 : 0;
+                            const int64_t r_off_4 = (rd4 > 1) ? i4 : 0;
+                            const int64_t r_off_3 = (rd3 > 1) ? i3 : 0;
+                            const int64_t r_off_2 = (rd2 > 1) ? i2 : 0;
+                            const int64_t r_off_1 = (rd1 > 1) ? i1 : 0;
+                            const int64_t r_off_0 = (rd0 > 1) ? i0 : 0;
+                            mag_e8m23_t* p_r = br
+                                + (r_off_5*rs5)
+                                + (r_off_4*rs4)
+                                + (r_off_3*rs3)
+                                + (r_off_2*rs2)
+                                + (r_off_1*rs1)
+                                + (r_off_0*rs0);
+                            mag_bnd_chk(p_r, br, mag_tensor_get_data_size(r));
+                            int64_t x_off_5 = (xd5 > 1) ? i5 : 0;
+                            int64_t x_off_4 = (xd4 > 1) ? i4 : 0;
+                            int64_t x_off_3 = (xd3 > 1) ? i3 : 0;
+                            int64_t x_off_2 = (xd2 > 1) ? i2 : 0;
+                            int64_t x_off_1 = (xd1 > 1) ? i1 : 0;
+                            int64_t x_off_0 = (xd0 > 1) ? i0 : 0;
+                            const mag_e8m23_t* p_x = bx
+                                + (x_off_5 * xs5)
+                                + (x_off_4 * xs4)
+                                + (x_off_3 * xs3)
+                                + (x_off_2 * xs2)
+                                + (x_off_1 * xs1)
+                                + (x_off_0 * xs0);
+                            mag_bnd_chk(p_x, bx, mag_tensor_get_data_size(x));
+                            *p_r += *p_x;
                         }
                     }
                 }

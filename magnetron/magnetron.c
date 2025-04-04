@@ -1207,8 +1207,8 @@ static mag_tensor_t* mag_result_constructor_routine_matmul(mag_tensor_t** inputs
     return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, shape, rank, NULL, 0);
 }
 
-static mag_tensor_t* mag_result_constructor_routine_repeat_rev(mag_tensor_t** inputs,  const mag_opp_t* params) {
-    return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, inputs[1]->shape, MAG_MAX_DIMS, NULL, 0);
+static mag_tensor_t* mag_result_constructor_routine_repeat_back(mag_tensor_t** inputs,  const mag_opp_t* params) {
+    return mag_tensor_create(inputs[0]->ctx, inputs[0]->dtype, inputs[1]->shape, inputs[1]->rank, NULL, 0);
 }
 
 static void mag_op_backward_nop(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1259,7 +1259,7 @@ static void mag_op_backward_max(mag_tensor_t* node, mag_tensor_t** grads) {
 
 static void mag_op_backward_sum(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
-    mag_tensor_t* zeros = mag_muls(x, 0.f);
+    mag_tensor_t* zeros = mag_muls(x, 0.f); /* wtf is this TODO */
     mag_tensor_t* ones  = mag_adds(zeros, 1.f);
     *grads = mag_mul(ones, node->grad);
     mag_tensor_decref(zeros);
@@ -1882,7 +1882,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .opp_types = {},
             .inplace = true,
             .backward = NULL,
-            .r_alloc = &mag_result_constructor_routine_repeat_rev,
+            .r_alloc = &mag_result_constructor_routine_repeat_back,
             .validator = mag_validate_op_repeat_rev
         }
     };

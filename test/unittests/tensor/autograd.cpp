@@ -108,13 +108,16 @@ TEST(cpu_autograd, broadcast) {
     }
 
     // check backward pass
-    for (std::int64_t i {}; i < x.grad().value().numel(); ++i) { // ∂z/∂x = 0.6
-        ASSERT_FLOAT_EQ(x.grad().value()(i), 0.6f);
+    auto x_grad {x.grad().value()};
+    for (std::int64_t i {}; i < x_grad.numel(); ++i) { // ∂z/∂x = 0.6
+        ASSERT_FLOAT_EQ(x_grad(i), 0.6f);
     }
-    for (std::int64_t i {}; i < y.grad().value().numel(); ++i) { // ∂z/∂x = -0.4
-        ASSERT_FLOAT_EQ(y.grad().value()(i), -3.6f);
+    auto y_grad {y.grad().value()};
+    for (std::int64_t i {}; i < y_grad.numel(); ++i) { // ∂z/∂x = -3.6f
+        ASSERT_FLOAT_EQ(y_grad(i), -3.6f);
     }
-    for (std::int64_t i {}; i < z.grad().value().numel(); ++i) { // ∂z/∂x = 1
-        ASSERT_FLOAT_EQ(z.grad().value()(i), 1.0f);
+    auto z_grad {z.grad().value()};
+    for (std::int64_t i {}; i < z_grad.numel(); ++i) { // ∂z/∂x = 1
+        ASSERT_FLOAT_EQ(z_grad(i), 1.0f);
     }
 }

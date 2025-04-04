@@ -1,6 +1,6 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
-epochs: int = 8
+epochs: int = 2000
 
 def xor_magnetron():
     import magnetron as mag
@@ -24,8 +24,6 @@ def xor_magnetron():
         model.l2.bias,
     ]
     optimizer = mag.optim.SGD(params, lr=1e-1)
-    for param in params:
-        print(param.x.tolist())
     criterion = mag.optim.mse_loss
 
     x = mag.Tensor.const([[0, 0], [0, 1], [1, 0], [1, 1]], name='x')
@@ -35,12 +33,10 @@ def xor_magnetron():
         y_hat = model(x)
         loss = criterion(y_hat, y)
         loss.backward()
-        for param in params:
-            print(f"grad Magnetron:", param.x.grad.tolist())
         optimizer.step()
         optimizer.zero_grad()
-        #if epoch % 100 == 0:
-         #   print(f'Epoch: {epoch}, Loss: {loss.item()}')
+        if epoch % 100 == 0:
+            print(f'Epoch: {epoch}, Loss: {loss.item()}')
 
     with mag.no_grad():
         y_hat = model(x)
@@ -67,8 +63,6 @@ def xor_torch():
             return x
 
     model = XOR()
-    for param in model.parameters():
-        print(torch.flatten(param).tolist())
     optimizer = optim.SGD(model.parameters(), lr=0.1)
     criterion = nn.MSELoss()
 
@@ -88,11 +82,9 @@ def xor_torch():
         y_hat = model(x)
         loss = criterion(y_hat, y)
         loss.backward()
-        for name, param in model.named_parameters():
-            print(f"grad Torch:", torch.flatten(param.grad).tolist())
         optimizer.step()
-        #if epoch % 100 == 0:
-         #   print(f'Epoch: {epoch}, Loss: {loss.item()}')
+        if epoch % 100 == 0:
+            print(f'Epoch: {epoch}, Loss: {loss.item()}')
 
     with torch.no_grad():
         y_hat = model(x)
