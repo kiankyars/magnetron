@@ -11,6 +11,8 @@
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+
+#include "prelude.hpp"
 using namespace testing;
 
 #include <half.hpp>
@@ -25,6 +27,14 @@ namespace magnetron::test {
         static constexpr T max {std::numeric_limits<T>::min()};
         static constexpr e8m23_t eps {std::numeric_limits<T>::epsilon()};
         static inline const e8m23_t test_eps {std::numeric_limits<T>::epsilon()};
+    };
+
+    template <>
+    struct dtype_traits<e5m10_t> final {
+        static constexpr e5m10_t min {std::numeric_limits<e5m10_t>::min()};
+        static constexpr e5m10_t max {std::numeric_limits<e5m10_t>::min()};
+        static inline const e8m23_t eps {std::numeric_limits<e5m10_t>::epsilon()};
+        static inline const e8m23_t test_eps {std::numeric_limits<e5m10_t>::epsilon()+0.04f}; // We increase the epsilon for f16 a little, as multiplication fails if not
     };
 
     [[nodiscard]] inline auto shape_as_vec(tensor t) -> std::vector<std::int64_t> {
