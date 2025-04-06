@@ -6,11 +6,11 @@ using namespace magnetron;
 
 TEST(cpu_autograd, simple) {
     context ctx {compute_device::cpu};
-    tensor x {ctx, dtype::e8m23, 4, 4, 4, 4};
+    tensor x {ctx, dtype::e8m23, 1};
     x.fill(3.0f);
-    tensor y {ctx, dtype::e8m23, 4, 4, 4, 4};
+    tensor y {ctx, dtype::e8m23, 1};
     y.fill(2.0f);
-    tensor k {ctx, dtype::e8m23, 4, 4, 4, 4};
+    tensor k {ctx, dtype::e8m23, 1};
     k.fill(10.0f);
 
     tensor z {(x + y)*(x - y)/k};
@@ -45,9 +45,9 @@ TEST(cpu_autograd, simple) {
 
 TEST(cpu_autograd, scalar_complex) {
     context ctx {compute_device::cpu};
-    tensor two {ctx, dtype::e8m23, 5, 5, 3, 9};
+    tensor two {ctx, dtype::e8m23, 1};
     two.fill(2.0f);
-    tensor x {ctx, dtype::e8m23, 5, 5, 3, 9};
+    tensor x {ctx, dtype::e8m23, 1};
     x.fill(-4.0f);
     tensor z {two*x+two+x};
     tensor q {z.relu()+z*x};
