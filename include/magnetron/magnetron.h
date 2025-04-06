@@ -19,7 +19,7 @@ extern "C" {
 #define MAG_DEFAULT_CHUNK_SIZE (1ull<<30)  /* Default size of memory chunk in bytes. 1 GiB */
 #define MAG_DEFAULT_CHUNK_CAP 128          /* Default capacity of memory chunk */
 #define MAG_MAX_DIMS 6                     /* Maximum number of dimensions for a tensor */
-#define MAG_MAX_TENSOR_NAME_LEN 64         /* Maximum length for tensor name */
+#define MAG_MAX_TENSOR_NAME_LEN 32         /* Maximum length for tensor name */
 #define MAG_MAX_INPUT_TENSORS 2            /* Maximum number of input tensors for an operation */
 #define MAG_MAX_OP_PARAMS 6                /* Maximum number of parameters for an operation */
 
@@ -297,6 +297,7 @@ extern MAG_EXPORT mag_tensor_t* _Nonnull mag_divs_(mag_tensor_t* _Nonnull x, flo
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_pows(mag_tensor_t* _Nonnull x, float xi);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_pows_(mag_tensor_t* _Nonnull x, float xi);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_matmul(mag_tensor_t* _Nonnull x, mag_tensor_t* _Nonnull y);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_repeat_back(mag_tensor_t* _Nonnull x, mag_tensor_t* _Nonnull y);
 
 /* ============ Tensor Init Operators ============ */
 
@@ -408,7 +409,8 @@ extern MAG_EXPORT void mag_tensor_img_draw_box(mag_tensor_t* _Nonnull t, int32_t
 extern MAG_EXPORT void mag_tensor_img_draw_text(mag_tensor_t* _Nonnull t, int32_t x, int32_t y, int32_t size, uint32_t rgb, const char* _Nonnull txt);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_load_image(mag_ctx_t* _Nonnull ctx, const char* _Nonnull file, mag_color_channels_t channels, uint32_t resize_w, uint32_t resize_h);    /* Create a tensor from an image file. */
 extern MAG_EXPORT void mag_tensor_save_image(const mag_tensor_t* _Nonnull t, const char* _Nonnull file);                                                                                    /* Save tensor data as an image */
-extern MAG_EXPORT void mag_tensor_export_graphviz(const mag_tensor_t* _Nonnull t, const char* _Nonnull file);                                                                               /* Export tensor computation graph as Graphviz DOT file *//* Get image channels from tensor */
+extern MAG_EXPORT void mag_tensor_export_forward_graph_graphviz(mag_tensor_t* _Nonnull t, const char* _Nonnull file);                                                                      /* Export tensor computation graph as Graphviz DOT file *//* Get image channels from tensor */
+extern MAG_EXPORT void mag_tensor_export_backward_graph_graphviz(mag_tensor_t* _Nonnull t, const char* _Nonnull file);
 
 #ifdef __cplusplus
 }

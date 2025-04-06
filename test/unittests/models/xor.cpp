@@ -47,7 +47,21 @@ TEST(models, xor) {
         tensor y_hat {model(x)};
         tensor loss {nn::optimizer::mse(y_hat, y)};
         loss.backward();
+        if (epoch % 100 == 0) {
+            std::cout << "Epoch: " << epoch << ", Loss: " << loss(0) << std::endl;
+        }
         optimizer.step();
         optimizer.zero_grad();
+    }
+
+    tensor y_hat {model(x)};
+
+    std::vector<e8m23_t> output {y_hat.to_vector()};
+    for (auto r : output) {
+        std::cout << r << " ";
+    }
+    std::cout << std::endl;
+    for (auto r : y_data) {
+        std::cout << r[0] << " ";
     }
 }

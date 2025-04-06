@@ -536,6 +536,7 @@ class Tensor:
 
     def backward(self) -> None:
         assert self.requires_grad, 'Tensor must require gradient tracking'
+        assert self.rank == 1 and self.numel == 1, 'Tensor must be scalar'
         C.mag_tensor_backward(self._ptr)
 
     def zero_grad(self) -> None:

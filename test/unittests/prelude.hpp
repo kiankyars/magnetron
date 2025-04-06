@@ -42,12 +42,12 @@ namespace magnetron::test {
         return {std::begin(internal->op_inputs), std::end(internal->op_inputs)};
     }
 
-    [[nodiscard]] inline auto op_params_as_vec(tensor t) -> std::vector<mag_op_param_t> {
+    [[nodiscard]] inline auto op_params_as_vec(tensor t) -> std::vector<mag_opp_t> {
         mag_tensor_t* internal {&*t};
         return {std::begin(internal->op_params), std::end(internal->op_params)};
     }
 
-    [[nodiscard]] inline auto init_op_params_as_vec(tensor t) -> std::vector<mag_op_param_t> {
+    [[nodiscard]] inline auto init_op_params_as_vec(tensor t) -> std::vector<mag_opp_t> {
         mag_tensor_t* internal {&*t};
         return {std::begin(internal->init_op_params), std::end(internal->init_op_params)};
     }
@@ -101,6 +101,7 @@ namespace magnetron::test {
         requires std::is_invocable_r_v<tensor, A, tensor, tensor> && std::is_invocable_v<B, e8m23_t, e8m23_t>
     auto test_binary_operator(std::int64_t lim, e8m23_t eps, dtype ty, A&& a, B&& b, e8m23_t min = -10.0, e8m23_t max = 10.0) -> decltype(auto) {
         auto ctx = context{compute_device::cpu};
+        ctx.stop_grad_recorder();
         for_all_shape_perms(lim, BROADCAST ? 2 : 1, [&](std::span<const std::int64_t> shape) {
             tensor t_a {ctx, ty, shape};
             t_a.fill_rand_uniform(min, max);
@@ -193,6 +194,9 @@ namespace magnetron::test {
             virtual auto step() -> void = 0;
 
             [[nodiscard]] auto params() noexcept -> std::span<tensor> { return m_params; }
+            auto set_params(std::span<tensor> params) -> void {
+                m_params = params;
+            }
 
             auto zero_grad() -> void {
                 for (auto param : params()) {
@@ -219,8 +223,13 @@ namespace magnetron::test {
 
             auto step() -> void override {
                 for (auto& param : params()) {
-                    if (auto grad {param.grad()}; grad.has_value()) param = param - *param.grad()*lr;
-                    else throw std::runtime_error{"No gradient available for parameter"};
+                    auto grad {param.grad()};
+                    if (!grad.has_value()) [[unlikely]] {
+                        throw std::runtime_error("Parameter has no gradient");
+                    }
+                    tensor delta {param - *param.grad()*lr};
+                    delta.requires_grad(true);
+                    param.copy_buffer_from(delta.data_ptr(), delta.data_size());
                 }
             }
 
@@ -232,20 +241,22 @@ namespace magnetron::test {
         public:
             linear_layer(context& ctx, std::int64_t in_features, std::int64_t out_features, bool has_bias = true) {
                 tensor weight {ctx, dtype::e8m23, out_features, in_features};
+                weight.set_name("weight");
                 weight.fill_rand_normal(0.0f, 1.0f);
                 weight = weight/static_cast<e8m23_t>(std::sqrt(in_features + out_features));
                 register_param(weight);
                 this->weight = weight;
                 if (has_bias) {
                     tensor bias {ctx, dtype::e8m23, out_features};
-                    register_param(bias);
                     bias.fill(0);
+                    bias.set_name("bias");
+                    register_param(bias);
                     this->bias = bias;
                 }
             }
 
             [[nodiscard]] auto operator()(tensor x) const -> tensor {
-                tensor y {x & weight->transpose().clone()};
+                tensor y {x & weight->T().clone()};
                 if (bias.has_value())
                     y = y + *bias;
                 return y;

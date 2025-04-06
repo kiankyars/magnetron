@@ -85,8 +85,7 @@ class Linear(Module):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
-        weight = Tensor.normal((out_features, in_features), mean=0, stddev=1)
-        weight = weight / math.sqrt(in_features + out_features)
+        weight = Tensor.full((out_features, in_features), fill_value=0.5)
         self.weight = Parameter(weight)
         if bias:
             self.bias = Parameter(Tensor.zeros((out_features,), name='bias'))
