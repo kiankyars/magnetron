@@ -33,4 +33,4 @@ for epoch in range(2000):
 
 with mag.no_grad():
     y_hat = model(x)
-    print(y_hat)
+    print(y_hat.tolist())

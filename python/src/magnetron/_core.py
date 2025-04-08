@@ -35,55 +35,22 @@ class PRNGAlgorithm(Enum):
     PCG = C.MAG_PRNG_PCG
 
 
-class DType(Enum):
-    E8M23 = C.MAG_DTYPE_E8M23
-    E5M10 = C.MAG_DTYPE_E5M10
-    F32 = E8M23
-    F16 = E5M10
+@dataclass
+class DType:
+    value: int
+    size: int
+    name: str
+    is_fp: bool
 
 
-@unique
-class ColorChannels(Enum):
-    AUTO = 0
-    GRAY = auto()
-    GRAY_A = auto()
-    RGB = auto()
-    RGBA = auto()
-
-    @property
-    def argument_count(self) -> int:
-        return C.mag_op_get_argcount(self.value)
-
-    @property
-    def supports_inplace(self) -> bool:
-        return C.mag_op_supports_inplace(self.value)
-
-    @property
-    def is_unary(self) -> bool:
-        return self.argument_count == 1
-
-    @property
-    def is_binary(self) -> bool:
-        return self.argument_count == 2
-
-
-@unique
-class GraphEvalOrder(Enum):
-    FORWARD = 0
-    REVERSE = 1
-
-
-@unique
-class ExecutionMode(Enum):
-    EAGER = 0
-    DEFERRED = 1
+e8m23 = f32 = DType(C.MAG_DTYPE_E8M23, 4, 'e8m23', True)
+e5m10 = f16 = DType(C.MAG_DTYPE_E5M10, 2, 'e5m10', True)
 
 
 @dataclass
 class GlobalConfig:
-    verbose: bool = getenv('MAG_VERBOSE', '0') == '1'
+    verbose: bool = getenv('MAGNETRON_VERBOSE', '0') == '1'
     compute_device: ComputeDevice.CPU | ComputeDevice.CUDA = ComputeDevice.CPU()
-    default_dtype: DType = DType.F32
 
 
 @typing.final
@@ -97,12 +64,7 @@ class Context:
         C.mag_set_log_mode(GlobalConfig.verbose)
         return Context(GlobalConfig.compute_device)
 
-    def __init__(
-        self,
-        device: ComputeDevice.CPU | ComputeDevice.CUDA,
-        *,
-        execution_mode: ExecutionMode = ExecutionMode.EAGER,
-    ) -> None:
+    def __init__(self, device: ComputeDevice.CPU | ComputeDevice.CUDA) -> None:
         descriptor: ffi.CData = ffi.new('mag_device_descriptor_t*')
         if isinstance(device, ComputeDevice.CPU):
             descriptor.type = 0
@@ -111,20 +73,11 @@ class Context:
             descriptor.type = 1
             descriptor.cuda_device_id = abs(device.device_id)
         self._ptr = C.mag_ctx_create2(descriptor)
-        self.execution_mode = execution_mode
-        self.default_dtype = GlobalConfig.default_dtype
+        self.default_dtype = e8m23
 
     @property
     def compute_device_name(self) -> str:
         return ffi.string(C.mag_ctx_get_compute_device_name(self._ptr)).decode('utf-8')
-
-    @property
-    def execution_mode(self) -> ExecutionMode:
-        return ExecutionMode(C.mag_ctx_get_exec_mode(self._ptr))
-
-    @execution_mode.setter
-    def execution_mode(self, mode: ExecutionMode) -> None:
-        C.mag_ctx_set_exec_mode(self._ptr, mode.value)
 
     @property
     def prng_algorithm(self) -> PRNGAlgorithm:
@@ -411,28 +364,6 @@ class Tensor:
         instance = C.mag_tensor_load(Context.primary()._ptr, bytes(file_path, 'utf-8'))
         return cls(ptr=instance)
 
-    @classmethod
-    def load_image(
-        cls,
-        file_path: str,
-        *,
-        name: str | None = None,
-        channels: ColorChannels = ColorChannels.AUTO,
-        resize_to: (int, int) = (0, 0),
-    ) -> 'Tensor':
-        assert isfile(file_path), f'File not found: {file_path}'
-        instance = C.mag_tensor_load_image(
-            Context.primary()._ptr,
-            bytes(file_path, 'utf-8'),
-            channels.value,
-            resize_to[0],
-            resize_to[1],
-        )
-        tensor = cls(instance)
-        if name is not None:
-            tensor.name = name
-        return tensor
-
     def print(self, print_header: bool = False, print_data: bool = True) -> None:
         C.mag_tensor_print(self._ptr, print_header, print_data)
 
@@ -529,9 +460,8 @@ class Tensor:
         if not self.requires_grad:
             return None
         ptr: ffi.CData = C.mag_tensor_get_grad(self._ptr)
-        if ptr == ffi.NULL:
+        if ptr is None or ptr == ffi.NULL:
             return None
-        C.mag_tensor_incref(ptr)
         return Tensor(ptr)
 
     def backward(self) -> None:
@@ -543,39 +473,10 @@ class Tensor:
         assert self.requires_grad, 'Tensor must require gradient tracking'
         C.mag_tensor_zero_grad(self._ptr)
 
-    def is_close(
-        self, other: 'Tensor', eps: float = -1.0, print_eq_percent: bool = False
-    ) -> (bool, float):
-        percent_eq = ffi.new('double[1]')
-        is_eq = C.mag_tensor_is_close(self._ptr, other._ptr, eps, percent_eq)
-        if print_eq_percent:
-            print(f'Tensors are close: {is_eq}, Percent equal: {percent_eq[0]:.2f}%')
-        return is_eq, percent_eq[0]
-
-    def draw_box(
-        self, p1: (int, int), p2: (int, int), width: int = 2, rgb: int = 0xFFFFFF
-    ) -> None:
-        assert p2[0] > p1[0] and p2[1] > p1[1] and width > 0
-        C.mag_tensor_img_draw_box(
-            self._ptr, p1[0], p1[1], p2[0], p2[1], width, rgb & 0xFFFFFF
-        )
-
-    def draw_text(
-        self, p: (int, int), size: int, txt: str, rgb: int = 0xFFFFFF
-    ) -> None:
-        C.mag_tensor_img_draw_text(
-            self._ptr, p[0], p[1], size, rgb & 0xFFFFFF, bytes(txt, 'utf-8')
-        )
-
     def save(self, file_path: str) -> None:
         if not file_path.endswith('.magnetron'):
             file_path += '.magnetron'
         C.mag_tensor_save(self._ptr, bytes(file_path, 'utf-8'))
-
-    def save_image(self, file_path: str) -> None:
-        assert self.rank == 3, 'Tensor must be a 3D image _ptr'
-        assert self.channels in (1, 3, 4), 'Invalid number of color channels'
-        C.mag_tensor_save_image(self._ptr, bytes(file_path, 'utf-8'))
 
     def export_graphviz(self, file_path: str) -> None:
         C.mag_tensor_export_graphviz(self._ptr, bytes(file_path, 'utf-8'))
