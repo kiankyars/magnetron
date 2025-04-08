@@ -609,7 +609,7 @@ static MAG_AINLINE bool mag_rc_control_decref(mag_rc_control_block_t* rcb) {
 
 typedef struct mag_op_meta_t {
     const char* mnemonic;                                   /* Operation mnemonic */
-    uint8_t argcount;                                       /* Number of arguments */
+    uint8_t numin;                                          /* Number of inputs */
     uint8_t paramcount;                                     /* Number of parameters */
     mag_opp_type_t opp_types[MAG_MAX_OP_PARAMS];            /* Parameter types */
     bool inplace;                                           /* Supports inplace execution */
@@ -662,6 +662,7 @@ typedef enum mag_transfer_op_t {
 /* Buffer interface on a compute device */
 typedef struct mag_storage_buffer_t mag_storage_buffer_t;
 struct mag_storage_buffer_t {
+    mag_ctx_t* ctx;
     mag_rc_control_block_t rc_control;  /* Reference count control block. */
     uintptr_t base;                     /* Pointer to buffer on device. Might point to GPU or any other device memory. */
     size_t size;                        /* Size of buffer in bytes. */
@@ -830,6 +831,8 @@ struct mag_ctx_t {
         int64_t arm64_cpu_sve_width;                    /* ARM64 SVE vector register width. */
 #endif
     } machine;
+    size_t num_tensors;                                 /* Total tensor instances allocated. */
+    size_t num_storages;                                /* Total storage buffers allocated. */
     mag_exec_mode_t exec_mode;                          /* Execution mode. */
     mag_ctx_flags_t flags;                              /* Context flags. */
     mag_prng_algorithm_t prng_algo;
@@ -866,7 +869,7 @@ struct mag_tensor_t {
     int64_t numel;                                      /* Number of elements in the tensor. */
     mag_tensor_flags_t flags;                           /* Tensor flags. */
     mag_op_t op;                                        /* Opcode for operators. */
-    mag_tensor_t* op_inputs[MAG_MAX_INPUT_TENSORS];     /* Input tensors for operators. */
+    mag_tensor_t* op_inputs[MAG_MAX_OP_INPUTS];     /* Input tensors for operators. */
     mag_opp_t op_params[MAG_MAX_OP_PARAMS];             /* Operator parameters. */
     mag_init_op_t init_op;                              /* Initialization op */
     mag_opp_t init_op_params[MAG_MAX_OP_PARAMS];        /* Init operator parameters */

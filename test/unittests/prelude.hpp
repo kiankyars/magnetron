@@ -237,8 +237,7 @@ namespace magnetron::test {
                     if (!grad.has_value()) [[unlikely]] {
                         throw std::runtime_error("Parameter has no gradient");
                     }
-                    tensor delta {param - *param.grad()*lr};
-                    delta.requires_grad(true);
+                    tensor delta {param - *grad*lr};
                     param.copy_buffer_from(delta.data_ptr(), delta.data_size());
                 }
             }

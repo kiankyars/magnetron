@@ -478,6 +478,9 @@ mag_static_assert((MAG_CPU_BUF_ALIGN & 63)==0);
 
 static void mag_cpu_storage_dtor(void* self) {
     mag_storage_buffer_t* buf = self;
+    mag_ctx_t* ctx = buf->ctx;
+    mag_assert(ctx->num_storages > 0, "double freed storage");
+    --ctx->num_storages;
     mag_free_aligned((void*)buf->base);
     (*mag_alloc)(buf, 0);
 }
@@ -487,6 +490,7 @@ static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer
     void* block = mag_alloc_aligned(size, MAG_CPU_BUF_ALIGN);
     *out = (*mag_alloc)(NULL, sizeof(**out));
     **out = (mag_storage_buffer_t){ /* Set up storage buffer. */
+        .ctx = host->ctx,
         .rc_control = mag_rc_control_init(*out, &mag_cpu_storage_dtor),
         .base = (uintptr_t)block,
         .size = size,
@@ -497,6 +501,7 @@ static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer
         .broadcast = &mag_cpu_buf_broadcast,
         .transfer = &mag_cpu_transfer
     };
+    ++host->ctx->num_storages;
 }
 
 static mag_cpu_device_t* mag_cpu_init_device(mag_ctx_t* ctx, uint32_t num_threads) {

@@ -215,15 +215,15 @@ TEST(core_tensor_logic, ref_count_clone) {
     ASSERT_EQ(a.refcount(), 1);
     {
         tensor b = a.clone();
-        ASSERT_EQ(a.refcount(), 1);
+        ASSERT_EQ(a.refcount(), 2);
         ASSERT_EQ(b.refcount(), 1);
         {
-            tensor c  = b.clone();
-            ASSERT_EQ(a.refcount(), 1);
-            ASSERT_EQ(b.refcount(), 1);
+            tensor c = b.clone();
+            ASSERT_EQ(a.refcount(), 2);
+            ASSERT_EQ(b.refcount(), 2);
             ASSERT_EQ(c.refcount(), 1);
         }
-        ASSERT_EQ(a.refcount(), 1);
+        ASSERT_EQ(a.refcount(), 2);
         ASSERT_EQ(b.refcount(), 1);
     }
     ASSERT_EQ(a.refcount(), 1);
