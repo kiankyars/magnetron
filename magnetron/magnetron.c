@@ -1939,6 +1939,7 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
         : (*r_alloc)(inputs, opps);                                                                             /* Construct new result tensor. */
     mag_assert((*validate_op)(op, R, inputs, opps), "Invalid operation %s.", meta->mnemonic);                   /* Validate operation */
     R->op = op;                                                                                                 /* Set operation for deferred execution mode. */
+    mag_assert2(numin <= MAG_MAX_OP_INPUTS);
     for (uint32_t i=0; i < numin; ++i) {                                                                        /* Set input tensors and flags. */
         mag_tensor_t* input = inputs[i];
         R->op_inputs[i] = input;
@@ -1947,10 +1948,10 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
             mag_tensor_incref(input); /* Input must stay alive for backward pass. */
         }
     }
-    if (opps) memcpy(R->op_params, opps, numopps*sizeof(*opps));    /* Copy operation parameters */
-    if (mag_likely(ctx->exec_mode == MAG_EXEC_MODE_EAGER)) {          /* In eager execution mode, we execute immediately. */
-        mag_op_exec(R, ctx->device, gra);                             /* Execute the operation immediately. */
-        if (!(ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)) {             /* If not recording gradients, free parent tensors. */
+    if (opps) memcpy(R->op_params, opps, numopps*sizeof(*opps));        /* Copy operation parameters */
+    if (mag_likely(ctx->exec_mode == MAG_EXEC_MODE_EAGER)) {            /* In eager execution mode, we execute immediately. */
+        mag_op_exec(R, ctx->device, gra);                               /* Execute the operation immediately. */
+        if (!(ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)) {               /* If not recording gradients, free parent tensors. */
             memset(R->op_inputs, 0, sizeof(R->op_inputs));
         }
     }
@@ -2383,7 +2384,7 @@ bool mag_tensor_are_strides_eq(const mag_tensor_t* x, const mag_tensor_t* y) {
 
 bool mag_tensor_can_broadcast(const mag_tensor_t* x, const mag_tensor_t* y) {
     #pragma GCC unroll 6
-    for (uint32_t i=0; i < MAG_MAX_DIMS; ++i)
+    for (int i=0; i < MAG_MAX_DIMS; ++i)
         if ((y->shape[i] % x->shape[i]) != 0)
             return false;
     return true;
@@ -2393,7 +2394,7 @@ bool mag_tensor_is_transposed(const mag_tensor_t* t) { return t->strides[0] > t-
 
 bool mag_tensor_is_permuted(const mag_tensor_t* t) {
     #pragma GCC unroll 5
-    for (uint32_t i=0; i < MAG_MAX_DIMS-1; ++i)
+    for (int i=0; i < MAG_MAX_DIMS-1; ++i)
         if (t->strides[i] > t->strides[i+1])
             return true;
     return false;
