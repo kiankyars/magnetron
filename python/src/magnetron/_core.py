@@ -41,6 +41,7 @@ class DType(Enum):
     F32 = E8M23
     F16 = E5M10
 
+
 @unique
 class ColorChannels(Enum):
     AUTO = 0
@@ -223,6 +224,7 @@ class no_grad(contextlib.ContextDecorator):
         """Re-enable gradient tracking when exiting the context."""
         Context.primary().start_grad_recorder()
 
+
 _ALLOC_DISPATCH: list[int, ffi.CData] = {
     1: C.mag_tensor_create_1d,
     2: C.mag_tensor_create_2d,
@@ -232,6 +234,7 @@ _ALLOC_DISPATCH: list[int, ffi.CData] = {
     6: C.mag_tensor_create_6d,
 }
 assert len(_ALLOC_DISPATCH) == MAX_DIMS
+
 
 class Tensor:
     """A 1-6 dimensional tensor with support for automatic differentiation."""
@@ -243,7 +246,7 @@ class Tensor:
         self._ptr = ptr
 
     def __del__(self) -> None:
-        if (self._ptr is not None and self._ptr != ffi.NULL):
+        if self._ptr is not None and self._ptr != ffi.NULL:
             C.mag_tensor_decref(self._ptr)
         self._ptr = ffi.NULL
 
@@ -465,9 +468,11 @@ class Tensor:
         return self.tolist()[0]
 
     def tolist(self) -> list[float]:
-        ptr: ffi.CData = C.mag_tensor_to_float_array(self._ptr) # Convert tensor dtype to float array
+        ptr: ffi.CData = C.mag_tensor_to_float_array(
+            self._ptr
+        )  # Convert tensor dtype to float array
         unpacked: list[float] = ffi.unpack(ptr, self.numel)
-        C.mag_tensor_to_float_array_free_data(ptr) # Free allocated native float array
+        C.mag_tensor_to_float_array_free_data(ptr)  # Free allocated native float array
         return unpacked
 
     @property

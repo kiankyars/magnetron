@@ -112,11 +112,12 @@ def test_autograd_inherit_nograd() -> None:
 
     assert magy.item() == torchy.data.item()
 
-def test_autograd_broadcast():
+
+def test_autograd_broadcast() -> None:
     x = torch.full(size=(3, 3, 3, 3), fill_value=3.0, requires_grad=True)
     y = torch.full(size=(3, 3), fill_value=2.0, requires_grad=True)
     k = torch.full(size=(1,), fill_value=10.0, requires_grad=True)
-    z = (x + y)*(x - y)/k
+    z = (x + y) * (x - y) / k
     z.sum().backward()
-    print("\nx grad:" + str(x.grad[0][0][0][0]))
-    print("\ny grad:" + str(y.grad[0][0]))
+    print('\nx grad:' + str(x.grad[0][0][0][0]))
+    print('\ny grad:' + str(y.grad[0][0]))
