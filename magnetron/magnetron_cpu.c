@@ -170,6 +170,7 @@ static const mag_cpu_op_info_t mag_cpu_op_infos[MAG_OP__NUM] = {
     [MAG_OP_MULS]           = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
     [MAG_OP_DIVS]           = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
     [MAG_OP_MATMUL]         = {.mt_support = true,  .growth = 3.0, .threshold =  10000},
+    [MAG_OP_REPEAT_BACK]    = {.mt_support = false, .growth = 3.0, .threshold =  10000},
 };
 
 typedef struct mag_worker_t mag_worker_t;

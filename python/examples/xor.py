@@ -37,6 +37,7 @@ def xor_magnetron():
         optimizer.zero_grad()
         if epoch % 100 == 0:
             print(f'Epoch: {epoch}, Loss: {loss.item()}')
+        optimizer.zero_grad()
 
     with mag.no_grad():
         y_hat = model(x)
@@ -51,11 +52,7 @@ def xor_torch():
         def __init__(self):
             super(XOR, self).__init__()
             self.l1 = nn.Linear(2, 2)
-            self.l1.weight = nn.Parameter(torch.full_like(self.l1.weight, fill_value=0.5))
-            self.l1.bias = nn.Parameter(torch.full_like(self.l1.bias, fill_value=0.0))
             self.l2 = nn.Linear(2, 1)
-            self.l2.weight = nn.Parameter(torch.full_like(self.l2.weight, fill_value=0.5))
-            self.l2.bias = nn.Parameter(torch.full_like(self.l2.bias, fill_value=0.0))
 
         def forward(self, x):
             x = torch.tanh(self.l1(x))
@@ -85,6 +82,7 @@ def xor_torch():
         optimizer.step()
         if epoch % 100 == 0:
             print(f'Epoch: {epoch}, Loss: {loss.item()}')
+        optimizer.zero_grad()
 
     with torch.no_grad():
         y_hat = model(x)

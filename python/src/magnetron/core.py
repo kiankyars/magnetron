@@ -223,34 +223,29 @@ class no_grad(contextlib.ContextDecorator):
         """Re-enable gradient tracking when exiting the context."""
         Context.primary().start_grad_recorder()
 
+_ALLOC_DISPATCH: list[int, ffi.CData] = {
+    1: C.mag_tensor_create_1d,
+    2: C.mag_tensor_create_2d,
+    3: C.mag_tensor_create_3d,
+    4: C.mag_tensor_create_4d,
+    5: C.mag_tensor_create_5d,
+    6: C.mag_tensor_create_6d,
+}
+assert len(_ALLOC_DISPATCH) == MAX_DIMS
 
 class Tensor:
     """A 1-6 dimensional tensor with support for automatic differentiation."""
 
-    __slots__ = ('__weakref__', '_ctx', '_ptr', '_inputs')
+    __slots__ = ('__weakref__', '_ctx', '_ptr')
 
     def __init__(self, ptr: ffi.CData | None = None) -> None:
         self._ctx = None
         self._ptr = ptr
-        self._inputs = None
 
     def __del__(self) -> None:
-        if (
-            isinstance(self._ptr, ffi.CData)
-            and self._ptr != ffi.NULL
-        ):
+        if (self._ptr is not None and self._ptr != ffi.NULL):
             C.mag_tensor_decref(self._ptr)
         self._ptr = ffi.NULL
-
-    _ALLOC_DISPATCH: list[int, ffi.CData] = {
-        1: C.mag_tensor_create_1d,
-        2: C.mag_tensor_create_2d,
-        3: C.mag_tensor_create_3d,
-        4: C.mag_tensor_create_4d,
-        5: C.mag_tensor_create_5d,
-        6: C.mag_tensor_create_6d,
-    }
-    assert len(_ALLOC_DISPATCH) == MAX_DIMS
 
     def _new(
         self,
@@ -264,7 +259,7 @@ class Tensor:
         assert 0 < len(shape) <= MAX_DIMS, f'Invalid number of dimensions: {len(shape)}'
         assert all(0 < dim <= DIM_MAX for dim in shape), 'Invalid dimension size'
         self._ctx = weakref.ref(ctx)
-        self._ptr = self._ALLOC_DISPATCH[len(shape)](ctx._ptr, dtype.value, *shape)
+        self._ptr = _ALLOC_DISPATCH[len(shape)](ctx._ptr, dtype.value, *shape)
         self.requires_grad = requires_grad
         if name:
             self.name = name
@@ -607,23 +602,18 @@ class Tensor:
         return Tensor(C.mag_permute(self._ptr, *axes))
 
     def mean(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_mean(self._ptr))
 
     def min(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_min(self._ptr))
 
     def max(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_max(self._ptr))
 
     def sum(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_sum(self._ptr))
 
     def abs(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_abs(self._ptr))
 
     def abs_(self) -> 'Tensor':
@@ -633,7 +623,6 @@ class Tensor:
         return Tensor(C.mag_abs_(self._ptr))
 
     def neg(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_neg(self._ptr))
 
     def neg_(self) -> 'Tensor':
@@ -646,7 +635,6 @@ class Tensor:
         return self.neg()
 
     def log(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_log(self._ptr))
 
     def log_(self) -> 'Tensor':
@@ -656,7 +644,6 @@ class Tensor:
         return Tensor(C.mag_log_(self._ptr))
 
     def sqr(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_sqr(self._ptr))
 
     def sqr_(self) -> 'Tensor':
@@ -666,7 +653,6 @@ class Tensor:
         return Tensor(C.mag_sqr_(self._ptr))
 
     def sqrt(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_sqrt(self._ptr))
 
     def sqrt_(self) -> 'Tensor':
@@ -676,7 +662,6 @@ class Tensor:
         return Tensor(C.mag_sqrt_(self._ptr))
 
     def sin(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_sin(self._ptr))
 
     def sin_(self) -> 'Tensor':
@@ -686,7 +671,6 @@ class Tensor:
         return Tensor(C.mag_sin_(self._ptr))
 
     def cos(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_cos(self._ptr))
 
     def cos_(self) -> 'Tensor':
@@ -696,7 +680,6 @@ class Tensor:
         return Tensor(C.mag_cos_(self._ptr))
 
     def step(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_step(self._ptr))
 
     def step_(self) -> 'Tensor':
@@ -706,7 +689,6 @@ class Tensor:
         return Tensor(C.mag_step_(self._ptr))
 
     def exp(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_exp(self._ptr))
 
     def exp_(self) -> 'Tensor':
@@ -716,7 +698,6 @@ class Tensor:
         return Tensor(C.mag_exp_(self._ptr))
 
     def softmax(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_softmax(self._ptr))
 
     def softmax_(self) -> 'Tensor':
@@ -726,7 +707,6 @@ class Tensor:
         return Tensor(C.mag_softmax_(self._ptr))
 
     def sigmoid(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_sigmoid(self._ptr))
 
     def sigmoid_(self) -> 'Tensor':
@@ -736,7 +716,6 @@ class Tensor:
         return Tensor(C.mag_sigmoid_(self._ptr))
 
     def hard_sigmoid(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_hard_sigmoid(self._ptr))
 
     def hard_sigmoid_(self) -> 'Tensor':
@@ -746,7 +725,6 @@ class Tensor:
         return Tensor(C.mag_hard_sigmoid_(self._ptr))
 
     def silu(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_silu(self._ptr))
 
     def silu_(self) -> 'Tensor':
@@ -756,7 +734,6 @@ class Tensor:
         return Tensor(C.mag_silu_(self._ptr))
 
     def tanh(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_tanh(self._ptr))
 
     def tanh_(self) -> 'Tensor':
@@ -766,7 +743,6 @@ class Tensor:
         return Tensor(C.mag_tanh_(self._ptr))
 
     def relu(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_relu(self._ptr))
 
     def relu_(self) -> 'Tensor':
@@ -776,7 +752,6 @@ class Tensor:
         return Tensor(C.mag_relu_(self._ptr))
 
     def gelu(self) -> 'Tensor':
-        self._inputs = (weakref.ref(self),)
         return Tensor(C.mag_gelu(self._ptr))
 
     def gelu_(self) -> 'Tensor':
@@ -788,85 +763,72 @@ class Tensor:
     def __add__(self, other: object | int | float) -> 'Tensor':
         if not isinstance(other, Tensor):
             other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (weakref.ref(self), weakref.ref(other))
         return Tensor(C.mag_add(self._ptr, other._ptr))
 
     def __radd__(self, other: int | float) -> 'Tensor':
         other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (weakref.ref(other), weakref.ref(self))
         return other + self
 
     def __iadd__(self, other: object | int | float) -> 'Tensor':
         assert not self.requires_grad, (
             'In-place operations are not supported for gradient-tracking tensors'
         )
-        if isinstance(other, Tensor):
-            return Tensor(C.mag_add_(self._ptr, other._ptr))
-        else:
-            return Tensor(C.mag_adds_(self._ptr, float(other)))
+        if not isinstance(other, Tensor):
+            other = Tensor.full(self.shape, fill_value=float(other))
+        return Tensor(C.mag_adds_(self._ptr, float(other)))
 
     def __sub__(self, other: object | int | float) -> 'Tensor':
         if not isinstance(other, Tensor):
             other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (weakref.ref(self), weakref.ref(other))
         return Tensor(C.mag_sub(self._ptr, other._ptr))
 
     def __rsub__(self, other: int | float) -> 'Tensor':
         other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (weakref.ref(other), weakref.ref(self))
         return other - self
 
     def __isub__(self, other: object | int | float) -> 'Tensor':
         assert not self.requires_grad, (
             'In-place operations are not supported for gradient-tracking tensors'
         )
-        if isinstance(other, Tensor):
-            return Tensor(C.mag_sub_(self._ptr, other._ptr))
-        else:
-            return Tensor(C.mag_subs_(self._ptr, float(other)))
+        if not isinstance(other, Tensor):
+            other = Tensor.full(self.shape, fill_value=float(other))
+        return Tensor(C.mag_sub_(self._ptr, other._ptr))
 
     def __mul__(self, other: object | int | float) -> 'Tensor':
         if not isinstance(other, Tensor):
             other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (weakref.ref(self), weakref.ref(other))
         return Tensor(C.mag_mul(self._ptr, other._ptr))
 
     def __rmul__(self, other: int | float) -> 'Tensor':
         other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (weakref.ref(other), weakref.ref(self))
         return other * self
 
     def __imul__(self, other: object | int | float) -> 'Tensor':
         assert not self.requires_grad, (
             'In-place operations are not supported for gradient-tracking tensors'
         )
-        if isinstance(other, Tensor):
-            return Tensor(C.mag_mul_(self._ptr, other._ptr))
-        else:
-            return Tensor(C.mag_muls_(self._ptr, float(other)))
+        if not isinstance(other, Tensor):
+            other = Tensor.full(self.shape, fill_value=float(other))
+        return Tensor(C.mag_mul_(self._ptr, other._ptr))
 
     def __truediv__(self, other: object | int | float) -> 'Tensor':
         if not isinstance(other, Tensor):
             other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (weakref.ref(self), weakref.ref(other))
         return Tensor(C.mag_div(self._ptr, other._ptr))
 
     def __rtruediv__(self, other: int | float) -> 'Tensor':
         other = Tensor.full(self.shape, fill_value=float(other))
-        self._inputs = (weakref.ref(other), weakref.ref(self))
         return other / self
 
     def __itruediv__(self, other: object | int | float) -> 'Tensor':
         assert not self.requires_grad, (
             'In-place operations are not supported for gradient-tracking tensors'
         )
-        if isinstance(other, Tensor):
+        if not isinstance(other, Tensor):
+            other = Tensor.full(self.shape, fill_value=float(other))
             return Tensor(C.mag_div_(self._ptr, other._ptr))
-        else:
-            return Tensor(C.mag_divs_(self._ptr, float(other)))
 
     def __matmul__(self, other: 'Tensor') -> 'Tensor':
-        self._inputs = (weakref.ref(self), weakref.ref(other))
         return Tensor(C.mag_matmul(self._ptr, other._ptr))
 
     def __imatmul__(self, other: 'Tensor') -> 'Tensor':
