@@ -476,10 +476,18 @@ mag_static_assert((MAG_CPU_BUF_ALIGN & 15)==0);
 mag_static_assert((MAG_CPU_BUF_ALIGN & 31)==0);
 mag_static_assert((MAG_CPU_BUF_ALIGN & 63)==0);
 
-static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer_t* out, size_t size, mag_dtype_t dtype) {
-    mag_assert2(size);
+static void mag_cpu_storage_dtor(void* self) {
+    mag_storage_buffer_t* buf = self;
+    mag_free_aligned((void*)buf->base);
+    (*mag_alloc)(buf, 0);
+}
+
+static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer_t** out, size_t size, mag_dtype_t dtype) {
+    mag_assert(size, "storage size must be > 0");
     void* block = mag_alloc_aligned(size, MAG_CPU_BUF_ALIGN);
-    *out = (mag_storage_buffer_t){ /* Set up storage buffer. */
+    *out = (*mag_alloc)(NULL, sizeof(**out));
+    **out = (mag_storage_buffer_t){ /* Set up storage buffer. */
+        .rc_control = mag_rc_control_init(&mag_cpu_storage_dtor),
         .base = (uintptr_t)block,
         .size = size,
         .alignment = MAG_CPU_BUF_ALIGN,
@@ -489,11 +497,6 @@ static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer
         .broadcast = &mag_cpu_buf_broadcast,
         .transfer = &mag_cpu_transfer
     };
-}
-
-static void mag_cpu_free_storage(mag_compute_device_t* dvc, mag_storage_buffer_t* buf) {
-    mag_free_aligned((void*)buf->base);
-    memset(buf, 0, sizeof(*buf)); /* Set to zero. */
 }
 
 static mag_cpu_device_t* mag_cpu_init_device(mag_ctx_t* ctx, uint32_t num_threads) {
@@ -541,6 +544,7 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num
     mag_cpu_device_t* cpu_dvc = mag_cpu_init_device(ctx, num_threads);
     mag_compute_device_t* dvc = (*mag_alloc)(NULL, sizeof(*dvc));
     *dvc = (mag_compute_device_t){ /* Initialize device interface */
+        .ctx = ctx,
         .name = "CPU",
         .impl = cpu_dvc,
         .is_async = false,
@@ -549,7 +553,6 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num
         .eager_exec_fwd = &mag_cpu_exec_fwd,
         .eager_exec_bwd = &mag_cpu_exec_bwd,
         .alloc_storage = &mag_cpu_alloc_storage,
-        .free_storage = &mag_cpu_free_storage,
     };
     snprintf(dvc->name, sizeof(dvc->name), "%s", ctx->machine.cpu_name);
     return dvc;

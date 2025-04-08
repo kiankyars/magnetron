@@ -308,7 +308,8 @@ extern MAG_EXPORT void mag_tensor_fill_random_normal(mag_tensor_t* _Nonnull t, f
 
 /* ============ Tensor Property Accessors ============ */
 
-extern MAG_EXPORT uint32_t mag_tensor_get_refcount(const mag_tensor_t* _Nonnull t);                                     /* Return strong refcount is loword, weak refcount is hiword. */
+extern MAG_EXPORT uint64_t mag_tensor_get_refcount(const mag_tensor_t* _Nonnull t);                                     /* Return reference count of tensor itself. */
+extern MAG_EXPORT uint64_t mag_tensor_get_storage_refcount(const mag_tensor_t* _Nonnull t);                             /* Return reference count of tensor itself. */
 extern MAG_EXPORT size_t mag_tensor_get_memory_usage(const mag_tensor_t* _Nonnull t);                                   /* Return memory used by this tensor in bytes. */
 extern MAG_EXPORT void mag_tensor_set_name(mag_tensor_t* _Nonnull t, const char* _Nonnull name);                        /* Set the name of the tensor */
 extern MAG_EXPORT void mag_tensor_fmt_name(mag_tensor_t* _Nonnull t, const char* _Nonnull fmt, ...);                    /* Format the name of the tensor */
