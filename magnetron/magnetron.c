@@ -601,6 +601,10 @@ mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
     mag_ctx_t* ctx = (*mag_alloc)(NULL, sizeof(*ctx)); /* Allocate context. */
     memset(ctx, 0, sizeof(*ctx));
 
+    /* Init memory pools */
+    mag_fixed_intrusive_pool_init(&ctx->tensor_pool, sizeof(mag_tensor_t), __alignof(mag_tensor_t), 0x1000);
+    mag_fixed_intrusive_pool_init(&ctx->storage_pool, sizeof(mag_storage_buffer_t), __alignof(mag_storage_buffer_t), 0x1000);
+
     ctx->tr_id = mag_thread_id(); /* Get thread ID. */
     ctx->flags |= MAG_CTX_FLAG_GRAD_RECORDER; /* Enable gradient recording by default. */
     ctx->prng_algo = MAG_PRNG_MERSENNE_TWISTER;
@@ -623,6 +627,8 @@ mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
 void mag_ctx_destroy(mag_ctx_t* ctx) {
     mag_assert(ctx->num_tensors == 0, "%zu tensors have not been freed", ctx->num_tensors);
     mag_assert(ctx->num_storages == 0, "%zu storages have not been freed", ctx->num_storages);
+    mag_fixed_intrusive_pool_destroy(&ctx->tensor_pool);
+    mag_fixed_intrusive_pool_destroy(&ctx->storage_pool);
     mag_destroy_dynamic_device(ctx->device); ctx->device = NULL; /* Shutdown compute device. */
     memset(ctx, 0, sizeof(*ctx)); /* Poison context memory. */
     (*mag_alloc)(ctx, 0); /* Free ctx. */
@@ -1802,7 +1808,7 @@ static void mag_tensor_dtor(void* self) {
     #ifndef NDEBUG
         memset(t, 0, sizeof(*t));
     #endif
-    (*mag_alloc)(t, 0);
+    mag_fixed_intrusive_pool_free(&ctx->tensor_pool, t);
 }
 
 static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const int64_t* dims, int64_t rank, mag_tensor_t* view, size_t view_offs) {
@@ -1821,7 +1827,7 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
         mag_assert2(dims[i] > 0 && !mag_imull64_ov(dims[i], numel, &numel)); /* Overflow in buffer size. Max: INT64_MAX. Reduce dimensions. */
     int64_t numbytes = numel*dts;
     mag_assert2(!view || !numbytes || numbytes + view_offs <= mag_tensor_get_data_size(view)); /* Slice must be within viewed tensor data range. *//* Allocate memory for tensor struct on CPU RAM. */
-    mag_tensor_t* t = (*mag_alloc)(NULL, sizeof(*t));
+    mag_tensor_t* t = mag_fixed_intrusive_pool_malloc(&ctx->tensor_pool);
     #ifndef NDEBUG
         memset(t, 0, sizeof(*t));
     #endif

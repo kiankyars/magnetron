@@ -482,13 +482,14 @@ static void mag_cpu_storage_dtor(void* self) {
     mag_assert(ctx->num_storages > 0, "double freed storage");
     --ctx->num_storages;
     mag_free_aligned((void*)buf->base);
-    (*mag_alloc)(buf, 0);
+    mag_fixed_intrusive_pool_free(&ctx->storage_pool, buf);
 }
 
 static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer_t** out, size_t size, mag_dtype_t dtype) {
     mag_assert(size, "storage size must be > 0");
+    mag_ctx_t* ctx = host->ctx;
     void* block = mag_alloc_aligned(size, MAG_CPU_BUF_ALIGN);
-    *out = (*mag_alloc)(NULL, sizeof(**out));
+    *out = mag_fixed_intrusive_pool_malloc(&ctx->storage_pool);
     **out = (mag_storage_buffer_t){ /* Set up storage buffer. */
         .ctx = host->ctx,
         .rc_control = mag_rc_control_init(*out, &mag_cpu_storage_dtor),
