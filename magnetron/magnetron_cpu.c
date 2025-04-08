@@ -487,7 +487,7 @@ static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer
     void* block = mag_alloc_aligned(size, MAG_CPU_BUF_ALIGN);
     *out = (*mag_alloc)(NULL, sizeof(**out));
     **out = (mag_storage_buffer_t){ /* Set up storage buffer. */
-        .rc_control = mag_rc_control_init(&mag_cpu_storage_dtor),
+        .rc_control = mag_rc_control_init(*out, &mag_cpu_storage_dtor),
         .base = (uintptr_t)block,
         .size = size,
         .alignment = MAG_CPU_BUF_ALIGN,

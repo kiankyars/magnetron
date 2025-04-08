@@ -1920,13 +1920,13 @@ int64_t mag_tensor_get_data_size(const mag_tensor_t* t) { return t->storage->siz
 int64_t mag_tensor_get_numel(const mag_tensor_t* t) { return t->numel; }
 
 static void mag_tensor_dtor(void* self) {
-    //mag_tensor_t* t = self;
-    //if (t->grad) {
-    //    mag_tensor_decref(t->grad);
-    //    t->grad = NULL;
-    //}
-    //mag_rc_control_decref(&t->storage->rc_control);
-    //(*mag_alloc)(t, 0);
+    mag_tensor_t* t = self;
+    if (t->grad) {
+        mag_tensor_decref(t->grad);
+        t->grad = NULL;
+    }
+    mag_rc_control_decref(&t->storage->rc_control);
+    (*mag_alloc)(t, 0);
 }
 
 static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const int64_t* dims, int64_t rank, mag_tensor_t* view, size_t view_offs) {
@@ -1949,7 +1949,7 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
     memset(t, 0, sizeof(*t));
     *t = (mag_tensor_t) {
         .ctx = ctx,
-        .rc_control = mag_rc_control_init(&mag_tensor_dtor),
+        .rc_control = mag_rc_control_init(t, &mag_tensor_dtor),
         .rank = rank,
         .shape = {0},
         .strides = {0},
@@ -1968,7 +1968,6 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
         .name = "",
         .ud = NULL
     };
-    mag_tensor_incref(t);
     /* Allocate device memory */
     mag_compute_device_t* dvc = ctx->device;
     void (*allocator)(mag_compute_device_t*, mag_storage_buffer_t**, size_t, mag_dtype_t) = dvc->alloc_storage;

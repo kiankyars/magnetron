@@ -253,9 +253,9 @@ namespace magnetron::test {
                 tensor weight {ctx, dtype::e8m23, out_features, in_features};
                 weight.set_name("weight");
                 weight.fill_rand_normal(0.0f, 1.0f);
-                weight = weight/static_cast<e8m23_t>(std::sqrt(in_features + out_features));
-                register_param(weight);
-                this->weight = weight;
+                tensor weight2 = weight/static_cast<e8m23_t>(std::sqrt(in_features + out_features));
+                register_param(weight2);
+                this->weight = weight2;
                 if (has_bias) {
                     tensor bias {ctx, dtype::e8m23, out_features};
                     bias.fill(0);

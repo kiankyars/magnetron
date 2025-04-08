@@ -587,20 +587,21 @@ static MAG_AINLINE uint64_t mag_opp_unpack_u62_or(mag_opp_t pa, uint64_t fallbac
 
 typedef struct mag_rc_control_block_t {
     uint64_t rc;
+    void* self;
     void (*dtor)(void*);
 } mag_rc_control_block_t;
 
-static MAG_AINLINE mag_rc_control_block_t mag_rc_control_init(void (*dtor)(void*)) {
-    mag_assert2(dtor); /* Destructor must be set. */
-    return (mag_rc_control_block_t){.rc=1, .dtor=dtor};
+static MAG_AINLINE mag_rc_control_block_t mag_rc_control_init(void* self, void (*dtor)(void*)) {
+    mag_assert2(self && dtor); /* Self and destructor must be set. */
+    return (mag_rc_control_block_t){.rc=1, .self=self, .dtor=dtor};
 }
 static MAG_AINLINE void mag_rc_control_incref(mag_rc_control_block_t* rcb) {
-    mag_assert(++rcb->rc <= 0xffffffffu, "Reference count overflow");
+    mag_assert(++rcb->rc < 0xffffffffu, "Reference count overflow");
 }
 static MAG_AINLINE bool mag_rc_control_decref(mag_rc_control_block_t* rcb) {
     mag_assert(rcb->rc, "Reference count underflow (double free)");
     if (--rcb->rc == 0) { /* Call destructor. */
-        (*rcb->dtor)(rcb);
+        (*rcb->dtor)(rcb->self);
         return true; /* Object was destroyed. */
     }
     return false;
