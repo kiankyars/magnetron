@@ -960,26 +960,25 @@ static bool mag_check_is_shape_broadcastable(mag_op_t op, const mag_tensor_t* a,
     char shape_2[MAG_FMT_DIM_BUF_SIZE];
     mag_fmt_dims(&shape_1, &a->shape, a->rank);
     mag_fmt_dims(&shape_2, &b->shape, b->rank);
-    char broadcast_able_str[MAG_MAX_DIMS*2+4+1] = {0};
-    char* p = broadcast_able_str;
-    *p++ = '[';
-    for (int i=0; i < MAG_MAX_DIMS; ++i) { /* Format and show which axes are broadcastable and which are not. */
-        *p++ = a->shape[i] % b->shape[i] == 0 ? 'Y' : 'N';
-        *p++ = i < MAG_MAX_DIMS-1 ? ',' : ']';
+    char bc[MAG_MAX_DIMS*2+3] = "[";
+    int64_t pos = 1;
+    int64_t mr = mag_xmax(a->rank, b->rank);
+    for (int64_t d=0; d < mr; ++d) {
+        int64_t asz = d < a->rank ? a->shape[a->rank-1-d] : 1;
+        int64_t bsz = d < b->rank ? b->shape[b->rank-1-d] : 1;
+        bc[pos++] = asz == bsz || asz == 1 || bsz == 1 ? 'Y' : 'N';
+        bc[pos++] = d == mr-1 ? ']' : ',';
     }
-    *p = '\0';
+    bc[pos] = '\0';
     fprintf(stderr,
         "Failed to execute operation: %s.\n"
-        "ERROR: Input tensor shapes must be broadcast-able.\n"
-        "    - Input Tensor 1 '%s' Shape: %s\n"
-        "    - Input Tensor 2 '%s' Shape: %s\n"
-        "    Broadcast-able: %s\n"
-        "    Hint: Adjust tensor shapes using transpose() or permute().\n",
-        meta->mnemonic,
-        a->name, shape_1,
-        b->name, shape_2,
-        broadcast_able_str
-    );
+        "ERROR: Input tensor shapes must be broadcast‑able (NumPy rules).\n"
+        "    - Tensor 1 '%s' Shape: %s\n"
+        "    - Tensor 2 '%s' Shape: %s\n"
+        "    Broadcast‑ability per‑dim (right‑aligned): %s\n"
+        "    Hint: Use unsqueeze()/view()/permute() to match shapes.\n",
+        meta->mnemonic, a->name, shape_1, b->name, shape_2, bc);
+
     mag_print_separator(stderr);
     fputc('\n', stderr);
     fflush(stderr);
@@ -1093,20 +1092,26 @@ static mag_tensor_t* mag_result_constructor_routine_transposed(mag_tensor_t** in
 }
 
 static mag_tensor_t* mag_result_constructor_routine_permuted(mag_tensor_t** inputs,  const mag_opp_t* params) {
-    mag_assert2(params != NULL); /* TODO */
-    mag_tensor_t* permuted = mag_result_constructor_routine_view(inputs, params);
-    uint64_t axes[MAG_MAX_DIMS];
-    for (int i=0; i < MAG_MAX_DIMS; ++i) /* Unpack axes */
+    mag_assert2(params != NULL);
+    const mag_tensor_t* in = inputs[0];
+    mag_tensor_t* out = mag_result_constructor_routine_view(inputs, params);
+    int64_t axes[MAG_MAX_DIMS];
+    for (int64_t i=0; i < in->rank; ++i)
         axes[i] = mag_opp_unpack_u62_or_panic(params[i]);
-    for (int i=0; i < MAG_MAX_DIMS; ++i) /* Check that all axes are unique */
-        for (int j = i+1; j < MAG_MAX_DIMS; ++j)
-            mag_assert(axes[i] != axes[j], "Axes must be unique: %zu != %zu", axes[i], axes[j]);
-    for (int i=0; i < MAG_MAX_DIMS; ++i) { /* Permute shape and strides */
-        mag_assert2(axes[i] < MAG_MAX_DIMS);
-        permuted->shape[axes[i]] = inputs[0]->shape[i];
-        permuted->strides[axes[i]] = inputs[0]->strides[i];
+    for (int64_t i=0; i < in->rank; ++i) {
+        mag_assert2(axes[i] < in->rank);
+        for (int64_t j=i+1; j < in->rank; ++j)
+            mag_assert(axes[i] != axes[j], "Axes must be unique: %zu == %zu", axes[i], axes[j]);
     }
-    return permuted;
+    int64_t tmp_shape[MAG_MAX_DIMS];
+    int64_t tmp_stride[MAG_MAX_DIMS];
+    memcpy(tmp_shape, in->shape, sizeof(tmp_shape));
+    memcpy(tmp_stride, in->strides, sizeof(tmp_stride));
+    for (int64_t i=0; i < in->rank; ++i) {
+        out->shape[i] = tmp_shape[axes[i]];
+        out->strides[i] = tmp_stride[axes[i]];
+    }
+    return out;
 }
 
 static mag_tensor_t* mag_result_constructor_routine_matmul(mag_tensor_t** inputs,  const mag_opp_t* params) { /* MxR = MxN * NxR */
@@ -2385,11 +2390,14 @@ bool mag_tensor_are_strides_eq(const mag_tensor_t* x, const mag_tensor_t* y) {
     return memcmp(x->strides, y->strides, sizeof(x->strides)) == 0;
 }
 
-bool mag_tensor_can_broadcast(const mag_tensor_t* x, const mag_tensor_t* y) {
-    #pragma GCC unroll 6
-    for (int i=0; i < MAG_MAX_DIMS; ++i)
-        if ((y->shape[i] % x->shape[i]) != 0)
+bool mag_tensor_can_broadcast(const mag_tensor_t* small, const mag_tensor_t* big) {
+    int64_t mr = mag_xmax(small->rank, big->rank);
+    for (int64_t d=0; d < mr; ++d) {
+        int64_t asz = d < small->rank ? small->shape[small->rank-1-d] : 1;
+        int64_t bsz = d < big->rank ? big->shape[big->rank-1-d] : 1;
+        if (asz != bsz && asz != 1 && bsz != 1)
             return false;
+    }
     return true;
 }
 
@@ -2404,15 +2412,12 @@ bool mag_tensor_is_permuted(const mag_tensor_t* t) {
 }
 
 bool mag_tensor_is_contiguous(const mag_tensor_t* t) {
-    int64_t expected_stride = 1;
-    for (int d = (int)t->rank - 1; d >= 0; --d) {
+    int64_t str = 1;
+    for (int64_t d=t->rank-1; d >= 0; --d) {
         int64_t size_d = t->shape[d];
-        if (size_d == 1) {
-            continue;
-        }
-        if (t->strides[d] != expected_stride)
-            return false;
-        expected_stride *= size_d;
+        if (size_d == 1) continue;
+        if (t->strides[d] != str) return false;
+        str *= size_d;
     }
     return true;
 }

@@ -322,7 +322,7 @@ extern MAG_EXPORT int64_t mag_tensor_get_channels(const mag_tensor_t* _Nonnull t
 
 extern MAG_EXPORT bool mag_tensor_is_shape_eq(const mag_tensor_t* _Nonnull x, const mag_tensor_t* _Nonnull y);          /* Checks if a and b have the same shape. */
 extern MAG_EXPORT bool mag_tensor_are_strides_eq(const mag_tensor_t* _Nonnull x, const mag_tensor_t* _Nonnull y);       /* Checks if a and b have the same strides. */
-extern MAG_EXPORT bool mag_tensor_can_broadcast(const mag_tensor_t* _Nonnull x, const mag_tensor_t* _Nonnull y);        /* Checks if b can be broadcasted into a. */
+extern MAG_EXPORT bool mag_tensor_can_broadcast(const mag_tensor_t* _Nonnull small, const mag_tensor_t* _Nonnull big);        /* Checks if b can be broadcasted into a. */
 extern MAG_EXPORT bool mag_tensor_is_transposed(const mag_tensor_t* _Nonnull t);                                        /* Check if the tensor is transposed */
 extern MAG_EXPORT bool mag_tensor_is_permuted(const mag_tensor_t* _Nonnull t);                                          /* Check if the tensor is permuted */
 extern MAG_EXPORT bool mag_tensor_is_contiguous(const mag_tensor_t* _Nonnull t);                                        /* Check if the tensor memory is contiguous */

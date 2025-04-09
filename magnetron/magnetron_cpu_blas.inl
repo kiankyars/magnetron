@@ -52,13 +52,6 @@
 
 #define MAG_TAU (2.0f*3.14159265358979323846264338327950288f) /* τ = 2π */
 
-#if defined(__APPLE__) && defined(MAG_ACCELERATE)
-#include <Accelerate/Accelerate.h>
-#endif
-#ifdef MAG_OPENBLAS
-#include <cblas.h>
-#endif
-
 #if defined(_MSC_VER) && defined(__AVX2__) /*MSVC does not define FMA and F16C with AVX 2*/
 #define __FMA__ 1
 #define __F16C__ 1
@@ -2253,24 +2246,24 @@ static void MAG_HOTPROC mag_blas_sum_e5m10(const mag_compute_payload_t* payload,
         const mag_compute_payload_t* payload, mag_kernel_context_t* ctx)        \
     {                                                                           \
         (void) ctx;                                                            \
-        mag_tensor_t*       r = payload->node;                                 \
+        mag_tensor_t* r = payload->node;                                 \
         const mag_tensor_t* x = r->op_inputs[0];                               \
         const mag_tensor_t* y = r->op_inputs[1];                               \
-        mag_##T##_t*       br = mag_##T##p_mut(r);                             \
+        mag_##T##_t* br = mag_##T##p_mut(r);                             \
         const mag_##T##_t* bx = mag_##T##p(x);                                 \
         const mag_##T##_t* by = mag_##T##p(y);                                 \
-        int64_t tc     = payload->thread_num;                                  \
-        int64_t ti     = payload->thread_idx;                                  \
-        int64_t total  = r->numel;                                             \
-        int64_t chunk  = (total + tc - 1) / tc;                                \
-        int64_t start  = ti * chunk;                                           \
-        int64_t end    = mag_xmin(start + chunk, total);                       \
+        int64_t tc = payload->thread_num;                                  \
+        int64_t ti = payload->thread_idx;                                  \
+        int64_t total = r->numel;                                             \
+        int64_t chunk = (total + tc - 1) / tc;                                \
+        int64_t start = ti * chunk;                                           \
+        int64_t end = mag_xmin(start + chunk, total);                       \
         for (int64_t idx = start; idx < end; idx++) {                          \
             int64_t tmp = idx;                                                \
             int64_t roff = 0;                                                 \
             int64_t xoff = 0;                                                 \
             int64_t yoff = 0;                                                 \
-            for (int d = (int)r->rank - 1; d >= 0; d--) {                      \
+            for (int64_t d = r->rank - 1; d >= 0; --d) {                      \
                 int64_t coord = tmp % r->shape[d];                             \
                 tmp /= r->shape[d];                                            \
                 int64_t xcoord = (x->shape[d] == 1) ? 0 : coord;               \
@@ -2279,7 +2272,6 @@ static void MAG_HOTPROC mag_blas_sum_e5m10(const mag_compute_payload_t* payload,
                 xoff += xcoord * x->strides[d];                                \
                 yoff += ycoord * y->strides[d];                                \
             }                                                                  \
-                                                                               \
             br[roff] = OP(bx[xoff], by[yoff]);                                 \
         }                                                                      \
     }
@@ -2371,62 +2363,74 @@ mag_cpu_blas_impl_binary(e5m10, div, mag_sdiv)
 #undef mag_cpu_blas_impl_unary_scalar
 #undef mag_cpu_blas_impl_unary
 #undef mag_cpu_blas_impl_binary
-/* ---------- helpers --------------------------------------------------- */
-/* right‑aligned offset: works for rank 1‑3                               */
+
+#define VLA(type, name, size) \
+type* name = (type*)(*mag_alloc)(NULL, (size) * sizeof(type))
+
+/* -------------------------------------------------------------------------- */
+/*  Row‑major offset helper (rank 1‒3)                                        */
+/* -------------------------------------------------------------------------- */
 static inline int64_t mag_offset_rmn(const mag_tensor_t* t,
                                      int64_t batch, int64_t i, int64_t j)
 {
-    int r = (int)t->rank;               /* 1, 2 or 3 */
+    int64_t r = (int64_t)t->rank;   /* 1, 2 or 3 */
 
     int64_t off = 0;
-    if (r == 3) off += batch * t->strides[0],
-                  off += i     * t->strides[1],
-                  off += j     * t->strides[2];
-    else if (r == 2) off += i  * t->strides[0],
-                     off += j  * t->strides[1];
-    else              off += i  * t->strides[0];      /* rank 1: j == 0 */
-
+    if (r == 3) {
+        off += batch * t->strides[0];
+        off += i     * t->strides[1];
+        off += j     * t->strides[2];
+    } else if (r == 2) {
+        off += i * t->strides[0];
+        off += j * t->strides[1];
+    } else {                        /* rank 1: j == 0 */
+        off += i * t->strides[0];
+    }
     return off;
 }
 
-/* ----------------- fixed matmul --------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*  Raw mat‑mul implementation (loops only)                                   */
+/* -------------------------------------------------------------------------- */
 static void MAG_HOTPROC
 mag_blas_matmul_e8m23(const mag_compute_payload_t* payload,
                       mag_kernel_context_t*       ctx)
 {
     (void)ctx;
-    if (payload->thread_idx != 0) return;             /* single thread */
+    if (payload->thread_idx != 0) return;            /* single thread */
 
-    mag_tensor_t*       r  = payload->node;           /* result */
-    const mag_tensor_t* x  = r->op_inputs[0];         /* left   */
-    const mag_tensor_t* y  = r->op_inputs[1];         /* right  */
+    mag_tensor_t*       r  = payload->node;          /* result */
+    const mag_tensor_t* x  = r->op_inputs[0];        /* left   */
+    const mag_tensor_t* y  = r->op_inputs[1];        /* right  */
 
     mag_e8m23_t*       br = mag_e8m23p_mut(r);
     const mag_e8m23_t* bx = mag_e8m23p(x);
     const mag_e8m23_t* by = mag_e8m23p(y);
 
-    /* -------- determine M,K,N and batch ------------------------------ */
+    /* ---- derive M, N, K and batch ---------------------------------- */
     int64_t M, N, K;
-    if (r->rank == 1) {          /* vector result */
-        M = r->shape[0];  N = 1;
-    } else {                     /* rank 2 or 3 */
-        M = r->shape[r->rank-2];
-        N = r->shape[r->rank-1];
+    if (r->rank == 1) {              /* vector result */
+        M = r->shape[0];
+        N = 1;
+    } else {                         /* rank 2 or 3 */
+        M = r->shape[r->rank - 2];
+        N = r->shape[r->rank - 1];
     }
-    K = x->shape[x->rank-1];
+    K = x->shape[x->rank - 1];
 
-    int64_t batch = (r->rank == 3) ? r->shape[0] : 1;
+    int64_t batch    = (r->rank == 3) ? r->shape[0] : 1;
     int64_t bx_batch = (x->rank == 3) ? x->shape[0] : 1;
     int64_t by_batch = (y->rank == 3) ? y->shape[0] : 1;
 
-    /* -------- BLAS requires contiguous row‑major --------------------- */
-    bool x_row = mag_tensor_is_contiguous(x) && x->strides[x->rank-1]==1;
-    bool y_row = mag_tensor_is_contiguous(y) && (y->rank==1 || y->strides[y->rank-1]==1);
-    bool r_row = mag_tensor_is_contiguous(r) && (r->rank==1 || r->strides[r->rank-1]==1);
+    /* ---- layout checks --------------------------------------------- */
+    bool x_row = mag_tensor_is_contiguous(x) && x->strides[x->rank - 1] == 1;
+    bool y_row = mag_tensor_is_contiguous(y) && (y->rank == 1 || y->strides[y->rank - 1] == 1);
+    bool r_row = mag_tensor_is_contiguous(r) && (r->rank == 1 || r->strides[r->rank - 1] == 1);
 
-    mag_e8m23_t* xbuf = (*mag_alloc)(0, sizeof(mag_e8m23_t)*M*K);
-    mag_e8m23_t* ybuf = (*mag_alloc)(0, sizeof(mag_e8m23_t)*K*N);
-    mag_e8m23_t* rbuf = (*mag_alloc)(0, sizeof(mag_e8m23_t)*M*N);
+    /* ---- temporary row‑major buffers (only used if packing needed) -- */
+    VLA(mag_e8m23_t, xbuf, M * K);
+    VLA(mag_e8m23_t, ybuf, K * N);
+    VLA(mag_e8m23_t, rbuf, M * N);
 
     for (int64_t b = 0; b < batch; ++b) {
 
@@ -2437,37 +2441,46 @@ mag_blas_matmul_e8m23(const mag_compute_payload_t* payload,
         const mag_e8m23_t* py = by + mag_offset_rmn(y, yb, 0, 0);
         mag_e8m23_t*       pr = br + mag_offset_rmn(r,  b,  0, 0);
 
+        /* ---- pack X if needed -------------------------------------- */
         const mag_e8m23_t* A = px;
-        const mag_e8m23_t* B = py;
-        int lda = K, ldb = N, ldc = N;
-
         if (!x_row) {
-            for (int64_t i=0;i<M;++i)
-                for (int64_t k=0;k<K;++k)
-                    xbuf[i*K+k] = px[mag_offset_rmn(x, xb, i, k)];
+            for (int64_t i = 0; i < M; ++i)
+                for (int64_t k = 0; k < K; ++k)
+                    xbuf[i * K + k] = px[mag_offset_rmn(x, xb, i, k)];
             A = xbuf;
         }
+
+        /* ---- pack / broadcast Y if needed -------------------------- */
+        const mag_e8m23_t* B = py;
         if (!y_row) {
-            for (int64_t k=0;k<K;++k)
-                for (int64_t n=0;n<N;++n)
-                    ybuf[k*N+n] = (y->rank==1)
-                                   ? py[k]                    /* vector */
-                                   : py[mag_offset_rmn(y, yb, k, n)];
+            for (int64_t k = 0; k < K; ++k)
+                for (int64_t n = 0; n < N; ++n)
+                    ybuf[k * N + n] = (y->rank == 1)
+                                        ? py[k]                         /* vector */
+                                        : py[mag_offset_rmn(y, yb, k, n)];
             B = ybuf;
         }
 
+        /* ---- choose output buffer ---------------------------------- */
+        mag_e8m23_t* C = r_row ? pr : rbuf;
+
+        /* ---- plain triple‑loop GEMM -------------------------------- */
+        for (int64_t i = 0; i < M; ++i) {
+            for (int64_t n = 0; n < N; ++n) {
+                mag_e11m52_t acc = 0.0;               /* fp64 accumulator */
+                for (int64_t k = 0; k < K; ++k) {
+                    acc += (mag_e11m52_t)A[i * K + k] *
+                           (mag_e11m52_t)B[k * N + n];
+                }
+                C[i * N + n] = (mag_e8m23_t)acc;
+            }
+        }
+
+        /* ---- scatter back if result not row‑major ------------------ */
         if (!r_row) {
-            cblas_sgemm(CblasRowMajor,CblasNoTrans,CblasNoTrans,
-                        (int)M,(int)N,(int)K,1.0f,(const float*)A,lda,
-                                            (const float*)B,ldb,
-                                            0.0f,(float*)rbuf,N);
-            for (int64_t i=0;i<M;++i)
-                pr[mag_offset_rmn(r,b,i,0)] = rbuf[i*N];
-        } else {
-            cblas_sgemm(CblasRowMajor,CblasNoTrans,CblasNoTrans,
-                        (int)M,(int)N,(int)K,1.0f,(const float*)A,lda,
-                                            (const float*)B,ldb,
-                                            0.0f,(float*)pr,ldc);
+            for (int64_t i = 0; i < M; ++i)
+                for (int64_t n = 0; n < N; ++n)
+                    pr[mag_offset_rmn(r, b, i, n)] = rbuf[i * N + n];
         }
     }
 
