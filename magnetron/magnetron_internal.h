@@ -585,9 +585,31 @@ static MAG_AINLINE uint64_t mag_opp_unpack_u62_or(mag_opp_t pa, uint64_t fallbac
     return mag_opp_is_type(pa, MAG_OPP_U62) ? mag_opp_unpack_u62_or_panic(pa) : fallback;
 }
 
+typedef struct mag_rc_control_block_t {
+    uint64_t rc;
+    void* self;
+    void (*dtor)(void*);
+} mag_rc_control_block_t;
+
+static MAG_AINLINE mag_rc_control_block_t mag_rc_control_init(void* self, void (*dtor)(void*)) {
+    mag_assert2(self && dtor); /* Self and destructor must be set. */
+    return (mag_rc_control_block_t){.rc=1, .self=self, .dtor=dtor};
+}
+static MAG_AINLINE void mag_rc_control_incref(mag_rc_control_block_t* rcb) {
+    mag_assert(++rcb->rc < 0xffffffffu, "Reference count overflow");
+}
+static MAG_AINLINE bool mag_rc_control_decref(mag_rc_control_block_t* rcb) {
+    mag_assert(rcb->rc, "Reference count underflow (double free)");
+    if (--rcb->rc == 0) { /* Call destructor. */
+        (*rcb->dtor)(rcb->self);
+        return true; /* Object was destroyed. */
+    }
+    return false;
+}
+
 typedef struct mag_op_meta_t {
     const char* mnemonic;                                   /* Operation mnemonic */
-    uint8_t argcount;                                       /* Number of arguments */
+    uint8_t numin;                                          /* Number of inputs */
     uint8_t paramcount;                                     /* Number of parameters */
     mag_opp_type_t opp_types[MAG_MAX_OP_PARAMS];            /* Parameter types */
     bool inplace;                                           /* Supports inplace execution */
@@ -640,12 +662,14 @@ typedef enum mag_transfer_op_t {
 /* Buffer interface on a compute device */
 typedef struct mag_storage_buffer_t mag_storage_buffer_t;
 struct mag_storage_buffer_t {
-    uintptr_t base;                                                                                                                     /* Pointer to buffer on device. Might point to GPU or any other device memory. */
-    size_t size;                                                                                                                        /* Size of buffer in bytes. */
-    size_t alignment;                                                                                                                   /* Alignment of buffer. */
-    size_t granularity;                                                                                                                 /* Element size granularity. */
-    mag_dtype_t dtype;
-    mag_compute_device_t* host;                                                                                                         /* Host device. */
+    mag_ctx_t* ctx;
+    mag_rc_control_block_t rc_control;  /* Reference count control block. */
+    uintptr_t base;                     /* Pointer to buffer on device. Might point to GPU or any other device memory. */
+    size_t size;                        /* Size of buffer in bytes. */
+    size_t alignment;                   /* Alignment of buffer. */
+    size_t granularity;                 /* Element size granularity. */
+    mag_dtype_t dtype;                  /* Data type of buffer. */
+    mag_compute_device_t* host;         /* Host device. */
     /* Broadcast (fill) buffer with x. */
     void (*broadcast)(
         mag_storage_buffer_t* sto,
@@ -666,6 +690,7 @@ struct mag_storage_buffer_t {
 
 /* Device interface to any compute backend device (CPU, GPU, TPU etc..) */
 struct mag_compute_device_t {
+    mag_ctx_t* ctx;
     char name[128];                                                                                                 /* Device name. */
     void* impl;                                                                                                     /* Device specific implementation, if applicable. */
     bool is_async;                                                                                                  /* If device is async. */
@@ -673,8 +698,7 @@ struct mag_compute_device_t {
     void (*eager_exec_init)(mag_compute_device_t* dvc, mag_tensor_t* root);                                         /* Execute a single init op. */
     void (*eager_exec_fwd)(mag_compute_device_t* dvc, mag_tensor_t* root);                                          /* Execute a single op forward. */
     void (*eager_exec_bwd)(mag_compute_device_t* dvc, mag_tensor_t* root);                                          /* Execute a single op backwards. */
-    void (*alloc_storage)(mag_compute_device_t* dvc, mag_storage_buffer_t* out, size_t size, mag_dtype_t dtype);    /* Allocate storage buffer in device memory */
-    void (*free_storage)(mag_compute_device_t* dvc, mag_storage_buffer_t* buf);                                     /* Free storage buffer in device memory */
+    void (*alloc_storage)(mag_compute_device_t* dvc, mag_storage_buffer_t** out, size_t size, mag_dtype_t dtype);   /* Allocate storage buffer in device memory */
 };
 
 /* Device creation and destruction. */
@@ -807,13 +831,13 @@ struct mag_ctx_t {
         int64_t arm64_cpu_sve_width;                    /* ARM64 SVE vector register width. */
 #endif
     } machine;
-#ifdef MAG_DEBUG
-    mag_tensor_node_t* rc_tracked;                      /* Linked list of RC tensors for sanitize. */
-#endif
-    mag_fixed_intrusive_pool tensor_pool;               /* Fixed-size memory pool for tensors. */
+    size_t num_tensors;                                 /* Total tensor instances allocated. */
+    size_t num_storages;                                /* Total storage buffers allocated. */
+    mag_fixed_intrusive_pool tensor_pool;               /* Tensor struct memory pool. */
+    mag_fixed_intrusive_pool storage_pool;              /* Storage struct memory pool. */
     mag_exec_mode_t exec_mode;                          /* Execution mode. */
     mag_ctx_flags_t flags;                              /* Context flags. */
-    mag_prng_algorithm_t prng_algo;
+    mag_prng_algorithm_t prng_algo;                     /* Active PRNG algorithm. */
     uintptr_t tr_id;                                    /* Host thread ID. */
     size_t sh_len;                                      /* Number of shutdown hooks. */
     size_t sh_cap;                                      /* Maximum number of shutdown hooks. */
@@ -837,25 +861,20 @@ mag_static_assert(MAG_TFLAG_LEN <= 0xff);
 ** Tensor with up to 6 Dimensions.
 */
 struct mag_tensor_t {
-    struct {
-        uint32_t rc_strong;                             /* Strong reference count. */
-#ifdef MAG_DEBUG
-        void (*dtor)(mag_tensor_t*);                    /* Debug destructor. */
-#endif
-    } rcb;                                              /* Reference count control block. */
     mag_ctx_t* ctx;                                     /* Host context. */
+    mag_rc_control_block_t rc_control;                  /* Reference counting control block. */
     int64_t rank;                                       /* Number of active dimensions. [1, MAX_DIMS] */
     int64_t shape[MAG_MAX_DIMS];                        /* Shape of the tensor. */
     int64_t strides[MAG_MAX_DIMS];                      /* Strides of the tensor. We store the strides in element counts and NOT in bytes. */
     mag_dtype_t dtype;                                  /* Data type of the tensor. */
-    mag_storage_buffer_t storage;                       /* Storage buffer. */
+    mag_storage_buffer_t* storage;                      /* Storage buffer. */
     int64_t numel;                                      /* Number of elements in the tensor. */
     mag_tensor_flags_t flags;                           /* Tensor flags. */
     mag_op_t op;                                        /* Opcode for operators. */
-    mag_tensor_t* op_inputs[MAG_MAX_INPUT_TENSORS];     /* Input tensors for operators. */
-    mag_opp_t op_params[MAG_MAX_OP_PARAMS];        /* Operator parameters. */
+    mag_tensor_t* op_inputs[MAG_MAX_OP_INPUTS];     /* Input tensors for operators. */
+    mag_opp_t op_params[MAG_MAX_OP_PARAMS];             /* Operator parameters. */
     mag_init_op_t init_op;                              /* Initialization op */
-    mag_opp_t init_op_params[MAG_MAX_OP_PARAMS];   /* Init operator parameters */
+    mag_opp_t init_op_params[MAG_MAX_OP_PARAMS];        /* Init operator parameters */
     mag_tensor_t* view_uplink;                          /* View base tensor. */
     size_t view_offs;                                   /* Offset in view tensor. */
     mag_tensor_t* grad;                                 /* ∇f - Gradient tensor. */

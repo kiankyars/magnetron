@@ -20,7 +20,7 @@ extern "C" {
 #define MAG_DEFAULT_CHUNK_CAP 128          /* Default capacity of memory chunk */
 #define MAG_MAX_DIMS 6                     /* Maximum number of dimensions for a tensor */
 #define MAG_MAX_TENSOR_NAME_LEN 32         /* Maximum length for tensor name */
-#define MAG_MAX_INPUT_TENSORS 2            /* Maximum number of input tensors for an operation */
+#define MAG_MAX_OP_INPUTS 2            /* Maximum number of input tensors for an operation */
 #define MAG_MAX_OP_PARAMS 6                /* Maximum number of parameters for an operation */
 
 #ifndef MAG_EXPORT
@@ -286,16 +286,6 @@ extern MAG_EXPORT mag_tensor_t* _Nonnull mag_mul( mag_tensor_t* _Nonnull x, mag_
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_mul_(mag_tensor_t* _Nonnull x, mag_tensor_t* _Nonnull y);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_div(mag_tensor_t* _Nonnull x, mag_tensor_t* _Nonnull y);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_div_(mag_tensor_t* _Nonnull x, mag_tensor_t* _Nonnull y);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_adds(mag_tensor_t* _Nonnull x, float xi);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_adds_(mag_tensor_t* _Nonnull x, float xi);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_subs( mag_tensor_t* _Nonnull x, float xi);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_subs_(mag_tensor_t* _Nonnull x, float xi);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_muls(mag_tensor_t* _Nonnull x, float xi);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_muls_(mag_tensor_t* _Nonnull x, float xi);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_divs(mag_tensor_t* _Nonnull x, float xi);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_divs_(mag_tensor_t* _Nonnull x, float xi);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_pows(mag_tensor_t* _Nonnull x, float xi);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_pows_(mag_tensor_t* _Nonnull x, float xi);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_matmul(mag_tensor_t* _Nonnull x, mag_tensor_t* _Nonnull y);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_repeat_back(mag_tensor_t* _Nonnull x, mag_tensor_t* _Nonnull y);
 
@@ -308,7 +298,8 @@ extern MAG_EXPORT void mag_tensor_fill_random_normal(mag_tensor_t* _Nonnull t, f
 
 /* ============ Tensor Property Accessors ============ */
 
-extern MAG_EXPORT uint32_t mag_tensor_get_refcount(const mag_tensor_t* _Nonnull t);                                     /* Return strong refcount is loword, weak refcount is hiword. */
+extern MAG_EXPORT uint64_t mag_tensor_get_refcount(const mag_tensor_t* _Nonnull t);                                     /* Return reference count of tensor itself. */
+extern MAG_EXPORT uint64_t mag_tensor_get_storage_refcount(const mag_tensor_t* _Nonnull t);                             /* Return reference count of tensor itself. */
 extern MAG_EXPORT size_t mag_tensor_get_memory_usage(const mag_tensor_t* _Nonnull t);                                   /* Return memory used by this tensor in bytes. */
 extern MAG_EXPORT void mag_tensor_set_name(mag_tensor_t* _Nonnull t, const char* _Nonnull name);                        /* Set the name of the tensor */
 extern MAG_EXPORT void mag_tensor_fmt_name(mag_tensor_t* _Nonnull t, const char* _Nonnull fmt, ...);                    /* Format the name of the tensor */

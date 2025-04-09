@@ -1,7 +1,8 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
-import math
 
-from magnetron.core import Tensor, ffi
+from abc import ABC, abstractmethod
+
+from magnetron import Tensor
 
 
 class Parameter:
@@ -12,7 +13,7 @@ class Parameter:
         self.x = x
 
 
-class Module:
+class Module(ABC):
     """Base class for all neural network modules."""
 
     def parameters(self) -> list[Parameter]:
@@ -38,6 +39,7 @@ class Module:
         for p in self.parameters():
             p.x.requires_grad = True
 
+    @abstractmethod
     def forward(self, *args: Tensor, **kwargs: dict) -> Tensor:
         """Forward pass must be implemented by subclass."""
         raise NotImplementedError
@@ -95,3 +97,19 @@ class Linear(Module):
         if self.bias is not None:
             x = x + self.bias.x
         return x
+
+
+class Loss(ABC):
+    """Base class for all loss functions."""
+
+    @abstractmethod
+    def __call__(self, y_hat: Tensor, y: Tensor) -> Tensor:
+        raise NotImplementedError
+
+
+class MSELoss(Loss):
+    """Mean Squared Error Loss."""
+
+    def __call__(self, y_hat: Tensor, y: Tensor) -> Tensor:
+        d = y_hat - y
+        return (d * d).mean()

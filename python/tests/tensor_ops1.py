@@ -2,6 +2,7 @@
 
 from magnetron import *
 
+
 def test_tensor_clone() -> None:
     a = Tensor.const([[1, 2], [3, 4]])
     b = a.clone()

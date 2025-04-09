@@ -215,15 +215,15 @@ TEST(core_tensor_logic, ref_count_clone) {
     ASSERT_EQ(a.refcount(), 1);
     {
         tensor b = a.clone();
-        ASSERT_EQ(a.refcount(), 1);
+        ASSERT_EQ(a.refcount(), 2);
         ASSERT_EQ(b.refcount(), 1);
         {
-            tensor c  = b.clone();
-            ASSERT_EQ(a.refcount(), 1);
-            ASSERT_EQ(b.refcount(), 1);
+            tensor c = b.clone();
+            ASSERT_EQ(a.refcount(), 2);
+            ASSERT_EQ(b.refcount(), 2);
             ASSERT_EQ(c.refcount(), 1);
         }
-        ASSERT_EQ(a.refcount(), 1);
+        ASSERT_EQ(a.refcount(), 2);
         ASSERT_EQ(b.refcount(), 1);
     }
     ASSERT_EQ(a.refcount(), 1);
@@ -282,12 +282,12 @@ TEST(core_tensor_logic, init_1d) {
 
     // now check some internal data
     mag_tensor_t* internal {&*t};
-    ASSERT_NE(internal->storage.alignment, 0);
-    ASSERT_NE(internal->storage.base, 0);
-    ASSERT_NE(internal->storage.size, 0);
-    ASSERT_NE(internal->storage.host, nullptr);
-    ASSERT_NE(internal->storage.broadcast, nullptr);
-    ASSERT_NE(internal->storage.transfer, nullptr);
+    ASSERT_NE(internal->storage->alignment, 0);
+    ASSERT_NE(internal->storage->base, 0);
+    ASSERT_NE(internal->storage->size, 0);
+    ASSERT_NE(internal->storage->host, nullptr);
+    ASSERT_NE(internal->storage->broadcast, nullptr);
+    ASSERT_NE(internal->storage->transfer, nullptr);
     ASSERT_EQ(internal->view_offs, 0);
     ASSERT_EQ(internal->view_uplink, nullptr);
     ASSERT_EQ(internal->op, MAG_OP_NOP);
@@ -332,12 +332,12 @@ TEST(core_tensor_logic, init_2d) {
 
     // now check some internal data
     mag_tensor_t* internal {&*t};
-    ASSERT_NE(internal->storage.alignment, 0);
-    ASSERT_NE(internal->storage.base, 0);
-    ASSERT_NE(internal->storage.size, 0);
-    ASSERT_NE(internal->storage.host, nullptr);
-    ASSERT_NE(internal->storage.broadcast, nullptr);
-    ASSERT_NE(internal->storage.transfer, nullptr);
+    ASSERT_NE(internal->storage->alignment, 0);
+    ASSERT_NE(internal->storage->base, 0);
+    ASSERT_NE(internal->storage->size, 0);
+    ASSERT_NE(internal->storage->host, nullptr);
+    ASSERT_NE(internal->storage->broadcast, nullptr);
+    ASSERT_NE(internal->storage->transfer, nullptr);
     ASSERT_EQ(internal->view_offs, 0);
     ASSERT_EQ(internal->view_uplink, nullptr);
     ASSERT_EQ(internal->op, MAG_OP_NOP);
@@ -382,12 +382,12 @@ TEST(core_tensor_logic, init_3d) {
 
     // now check some internal data
     mag_tensor_t* internal {&*t};
-    ASSERT_NE(internal->storage.alignment, 0);
-    ASSERT_NE(internal->storage.base, 0);
-    ASSERT_NE(internal->storage.size, 0);
-    ASSERT_NE(internal->storage.host, nullptr);
-    ASSERT_NE(internal->storage.broadcast, nullptr);
-    ASSERT_NE(internal->storage.transfer, nullptr);
+    ASSERT_NE(internal->storage->alignment, 0);
+    ASSERT_NE(internal->storage->base, 0);
+    ASSERT_NE(internal->storage->size, 0);
+    ASSERT_NE(internal->storage->host, nullptr);
+    ASSERT_NE(internal->storage->broadcast, nullptr);
+    ASSERT_NE(internal->storage->transfer, nullptr);
     ASSERT_EQ(internal->view_offs, 0);
     ASSERT_EQ(internal->view_uplink, nullptr);
     ASSERT_EQ(internal->op, MAG_OP_NOP);
@@ -432,12 +432,12 @@ TEST(core_tensor_logic, init_4d) {
 
     // now check some internal data
     mag_tensor_t* internal {&*t};
-    ASSERT_NE(internal->storage.alignment, 0);
-    ASSERT_NE(internal->storage.base, 0);
-    ASSERT_NE(internal->storage.size, 0);
-    ASSERT_NE(internal->storage.host, nullptr);
-    ASSERT_NE(internal->storage.broadcast, nullptr);
-    ASSERT_NE(internal->storage.transfer, nullptr);
+    ASSERT_NE(internal->storage->alignment, 0);
+    ASSERT_NE(internal->storage->base, 0);
+    ASSERT_NE(internal->storage->size, 0);
+    ASSERT_NE(internal->storage->host, nullptr);
+    ASSERT_NE(internal->storage->broadcast, nullptr);
+    ASSERT_NE(internal->storage->transfer, nullptr);
     ASSERT_EQ(internal->view_offs, 0);
     ASSERT_EQ(internal->view_uplink, nullptr);
     ASSERT_EQ(internal->op, MAG_OP_NOP);
@@ -482,12 +482,12 @@ TEST(core_tensor_logic, init_5d) {
 
     // now check some internal data
     mag_tensor_t* internal {&*t};
-    ASSERT_NE(internal->storage.alignment, 0);
-    ASSERT_NE(internal->storage.base, 0);
-    ASSERT_NE(internal->storage.size, 0);
-    ASSERT_NE(internal->storage.host, nullptr);
-    ASSERT_NE(internal->storage.broadcast, nullptr);
-    ASSERT_NE(internal->storage.transfer, nullptr);
+    ASSERT_NE(internal->storage->alignment, 0);
+    ASSERT_NE(internal->storage->base, 0);
+    ASSERT_NE(internal->storage->size, 0);
+    ASSERT_NE(internal->storage->host, nullptr);
+    ASSERT_NE(internal->storage->broadcast, nullptr);
+    ASSERT_NE(internal->storage->transfer, nullptr);
     ASSERT_EQ(internal->view_offs, 0);
     ASSERT_EQ(internal->view_uplink, nullptr);
     ASSERT_EQ(internal->op, MAG_OP_NOP);
@@ -532,12 +532,12 @@ TEST(core_tensor_logic, init_6d) {
 
     // now check some internal data
     mag_tensor_t* internal {&*t};
-    ASSERT_NE(internal->storage.alignment, 0);
-    ASSERT_NE(internal->storage.base, 0);
-    ASSERT_NE(internal->storage.size, 0);
-    ASSERT_NE(internal->storage.host, nullptr);
-    ASSERT_NE(internal->storage.broadcast, nullptr);
-    ASSERT_NE(internal->storage.transfer, nullptr);
+    ASSERT_NE(internal->storage->alignment, 0);
+    ASSERT_NE(internal->storage->base, 0);
+    ASSERT_NE(internal->storage->size, 0);
+    ASSERT_NE(internal->storage->host, nullptr);
+    ASSERT_NE(internal->storage->broadcast, nullptr);
+    ASSERT_NE(internal->storage->transfer, nullptr);
     ASSERT_EQ(internal->view_offs, 0);
     ASSERT_EQ(internal->view_uplink, nullptr);
     ASSERT_EQ(internal->op, MAG_OP_NOP);

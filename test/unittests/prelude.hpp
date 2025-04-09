@@ -11,6 +11,8 @@
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+
+#include "prelude.hpp"
 using namespace testing;
 
 #include <half.hpp>
@@ -25,6 +27,14 @@ namespace magnetron::test {
         static constexpr T max {std::numeric_limits<T>::min()};
         static constexpr e8m23_t eps {std::numeric_limits<T>::epsilon()};
         static inline const e8m23_t test_eps {std::numeric_limits<T>::epsilon()};
+    };
+
+    template <>
+    struct dtype_traits<e5m10_t> final {
+        static constexpr e5m10_t min {std::numeric_limits<e5m10_t>::min()};
+        static constexpr e5m10_t max {std::numeric_limits<e5m10_t>::min()};
+        static inline const e8m23_t eps {std::numeric_limits<e5m10_t>::epsilon()};
+        static inline const e8m23_t test_eps {std::numeric_limits<e5m10_t>::epsilon()+0.04f}; // We increase the epsilon for f16 a little, as multiplication fails if not
     };
 
     [[nodiscard]] inline auto shape_as_vec(tensor t) -> std::vector<std::int64_t> {
@@ -227,8 +237,7 @@ namespace magnetron::test {
                     if (!grad.has_value()) [[unlikely]] {
                         throw std::runtime_error("Parameter has no gradient");
                     }
-                    tensor delta {param - *param.grad()*lr};
-                    delta.requires_grad(true);
+                    tensor delta {param - *grad*lr};
                     param.copy_buffer_from(delta.data_ptr(), delta.data_size());
                 }
             }
@@ -243,9 +252,9 @@ namespace magnetron::test {
                 tensor weight {ctx, dtype::e8m23, out_features, in_features};
                 weight.set_name("weight");
                 weight.fill_rand_normal(0.0f, 1.0f);
-                weight = weight/static_cast<e8m23_t>(std::sqrt(in_features + out_features));
-                register_param(weight);
-                this->weight = weight;
+                tensor weight2 = weight/static_cast<e8m23_t>(std::sqrt(in_features + out_features));
+                register_param(weight2);
+                this->weight = weight2;
                 if (has_bias) {
                     tensor bias {ctx, dtype::e8m23, out_features};
                     bias.fill(0);

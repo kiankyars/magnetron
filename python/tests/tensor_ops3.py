@@ -5,6 +5,7 @@ import numpy as np
 
 EPS = 1e-4
 
+
 def tonumpy(t: Tensor) -> np.array:
     return np.array(t.tolist(), dtype=np.float32).reshape(t.shape)
 

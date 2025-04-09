@@ -105,7 +105,9 @@ MAG_NORET MAG_COLDPROC MAG_EXPORT void mag_panic(const char* msg, ...) { /* Pani
     #endif
     mag_panic_dump(stdout, true, msg, args);
     va_end(args);
-    mag_dump_backtrace();
+    #ifdef NDEBUG
+        mag_dump_backtrace();
+    #endif
     abort();
 }
 
@@ -442,66 +444,6 @@ static void mag_hashset_free(mag_hashset_t* set) {
     (*mag_alloc)(set->keys, 0);
 }
 
-/* Recursive node visitor for graph traversal. */
-static void mag_compute_graph_fold_impl(
-    const mag_tensor_t* node,
-    mag_hashset_t* visited,
-    const mag_tensor_t** nodes,
-    const mag_tensor_t** leafs,
-    size_t* n_nodes,
-    size_t* n_leafs,
-    bool forward,
-    size_t cap
-) {
-    if (!node) return;
-    if (mag_hashset_contains_key(visited, node)) return; /* Already visited */
-    if (mag_unlikely(mag_hashset_insert(visited, node) == MAG_HASHSET_FULL)) return; /* Insert failed */
-    for (unsigned i = 0; i < MAG_MAX_INPUT_TENSORS; ++i) {
-        unsigned k = forward ? i : MAG_MAX_INPUT_TENSORS-i-1; /* Forward or reverse order */
-        if (node->op_inputs[k]) /* Recurse to parent nodes */
-            mag_compute_graph_fold_impl(node->op_inputs[k], visited, nodes, leafs, n_nodes, n_leafs, forward, cap); /* Recurse */
-    }
-    if (node->op == MAG_OP_NOP) { /* Leaf node */
-        mag_assert(*n_leafs < cap, "Graph fold cap exhausted: %zu, increase cap", cap);
-        leafs[(*n_leafs)++] = node;
-    } else { /* Connected node */
-        mag_assert(*n_nodes < cap, "Graph fold cap exhausted: %zu, increase cap", cap);
-        nodes[(*n_nodes)++] = node;
-    }
-}
-
-/* Fold the graph and collect unique nodes and leafs. After collection callback is invoked. If cap is exhausted, program is aborted. */
-static void mag_compute_graph_fold(
-    size_t cap,
-    const mag_tensor_t* root,
-    void (*f)(const mag_tensor_t** nodes, size_t n_nodes, const mag_tensor_t** leafs, size_t n_leafs, void* ud),
-    bool forward,
-    void* ud
-) {
-    mag_hashset_t visited = mag_hashset_init(cap);
-    size_t n_nodes = 0, n_leafs = 0;
-    const mag_tensor_t** nodes = (*mag_alloc)(NULL, sizeof(*nodes)*cap);
-    const mag_tensor_t** leafs = (*mag_alloc)(NULL, sizeof(*leafs)*cap);
-    memset(nodes, 0, sizeof(*nodes)*cap);
-    memset(leafs, 0, sizeof(*leafs)*cap);
-    mag_compute_graph_fold_impl(root, &visited, nodes, leafs, &n_nodes, &n_leafs, forward, cap);
-    (*f)(nodes, n_nodes, leafs, n_leafs, ud);
-    (*mag_alloc)(nodes, 0);
-    (*mag_alloc)(leafs, 0);
-    mag_hashset_free(&visited);
-}
-
-static bool mag_compute_graph_contains( /* Check if the folded graph contains a node. */
-    const mag_tensor_t** nodes,
-    size_t n_nodes,
-    const mag_tensor_t* node
-) {
-    for (size_t i=0; i < n_nodes; ++i)
-        if (nodes[i] == node)
-            return true;
-    return false;
-}
-
 /* Eval Chebyshev coeffs steps for some x. f(x) : [a, b] -> ℝ. */
 static mag_e11m52_t mag_chebyshev_eval(mag_e11m52_t x, mag_e11m52_t a, mag_e11m52_t b, const mag_e11m52_t* coeffs, uint32_t steps) {
     mag_e11m52_t scale = 4.0/(b - a);
@@ -659,8 +601,9 @@ mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
     mag_ctx_t* ctx = (*mag_alloc)(NULL, sizeof(*ctx)); /* Allocate context. */
     memset(ctx, 0, sizeof(*ctx));
 
-    /* Init allocators */
-    mag_fixed_intrusive_pool_init(&ctx->tensor_pool, sizeof(mag_tensor_t), __alignof(mag_tensor_t), 4096);
+    /* Init memory pools */
+    mag_fixed_intrusive_pool_init(&ctx->tensor_pool, sizeof(mag_tensor_t), __alignof(mag_tensor_t), 0x1000);
+    mag_fixed_intrusive_pool_init(&ctx->storage_pool, sizeof(mag_storage_buffer_t), __alignof(mag_storage_buffer_t), 0x1000);
 
     ctx->tr_id = mag_thread_id(); /* Get thread ID. */
     ctx->flags |= MAG_CTX_FLAG_GRAD_RECORDER; /* Enable gradient recording by default. */
@@ -681,29 +624,11 @@ mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
     return ctx;
 }
 
-static void mag_tensor_destroy(mag_tensor_t* t);
-
 void mag_ctx_destroy(mag_ctx_t* ctx) {
-#ifdef MAG_DEBUG /* Check for leaked tensors in RC tracking list and print them */
-    mag_tensor_node_t** head = &ctx->rc_tracked;
-    mag_tensor_node_t* curr = *head;
-    uint32_t nleaked = 0;
-    for (; curr; curr = curr->next, ++nleaked) {
-        mag_log_error("Leaked tensor detected: %p, RCS: %u, RCW: %u, CTOR: %s", curr->tensor, curr->tensor->rcb.rc_strong, curr->tensor->rcb.rc_weak, curr->tensor->rcb.dtor ? "Y" : "N");
-        mag_tensor_print(curr->tensor, true, false);
-    }
-    if (nleaked) mag_log_error("Leaked tensors detected: %u", nleaked);
-    else mag_log_info("No leaked tensors detected.");
-    curr = *head;
-    while (curr) { /* Free tracking list */
-        mag_tensor_node_t* tmp = curr;
-        curr = curr->next;
-        mag_tensor_destroy(tmp->tensor);
-        (*mag_alloc)(tmp, 0);
-    }
-    *head = NULL;
-#endif
-    mag_fixed_intrusive_pool_destroy(&ctx->tensor_pool); /* Free tensor pool. */
+    mag_assert(ctx->num_tensors == 0, "%zu tensors have not been freed", ctx->num_tensors);
+    mag_assert(ctx->num_storages == 0, "%zu storages have not been freed", ctx->num_storages);
+    mag_fixed_intrusive_pool_destroy(&ctx->tensor_pool);
+    mag_fixed_intrusive_pool_destroy(&ctx->storage_pool);
     mag_destroy_dynamic_device(ctx->device); ctx->device = NULL; /* Shutdown compute device. */
     memset(ctx, 0, sizeof(*ctx)); /* Poison context memory. */
     (*mag_alloc)(ctx, 0); /* Free ctx. */
@@ -924,20 +849,20 @@ const mag_dtype_meta_t* mag_dtype_meta_of(mag_dtype_t type) {
 /* Check if the input tensors are not null and valid. Return true if valid, else false. */
 static bool mag_check_are_inputs_valid(mag_op_t op, mag_tensor_t** inputs, uint32_t numin) {
     const mag_op_meta_t* meta = mag_op_meta_of(op);
-    if (mag_unlikely(meta->argcount != numin || numin > MAG_MAX_INPUT_TENSORS)) {
+    if (mag_unlikely(meta->numin != numin || numin > MAG_MAX_OP_INPUTS)) {
         mag_print_separator(stderr);
         fprintf(stderr,
             "Failed to execute operation: %s.\n"
             "ERROR: Operation requires %u input tensors, but %u were provided.\n"
             "    Hint: Ensure the correct number of input tensors are provided.\n",
-            meta->mnemonic, meta->argcount, numin
+            meta->mnemonic, meta->numin, numin
         );
         mag_print_separator(stderr);
         fputc('\n', stderr);
         fflush(stderr);
         return false;
     }
-    for (uint32_t i=0; i < meta->argcount; ++i) {
+    for (uint32_t i=0; i < meta->numin; ++i) {
         if (mag_unlikely(!inputs[i])) {
             mag_print_separator(stderr);
             fprintf(stderr,
@@ -1038,7 +963,7 @@ static bool mag_check_is_shape_broadcastable(mag_op_t op, const mag_tensor_t* a,
     char broadcast_able_str[MAG_MAX_DIMS*2+4+1] = {0};
     char* p = broadcast_able_str;
     *p++ = '[';
-    for (uint32_t i=0; i < MAG_MAX_DIMS; ++i) { /* Format and show which axes are broadcastable and which are not. */
+    for (int i=0; i < MAG_MAX_DIMS; ++i) { /* Format and show which axes are broadcastable and which are not. */
         *p++ = a->shape[i] % b->shape[i] == 0 ? 'Y' : 'N';
         *p++ = i < MAG_MAX_DIMS-1 ? ',' : ']';
     }
@@ -1171,12 +1096,12 @@ static mag_tensor_t* mag_result_constructor_routine_permuted(mag_tensor_t** inpu
     mag_assert2(params != NULL); /* TODO */
     mag_tensor_t* permuted = mag_result_constructor_routine_view(inputs, params);
     uint64_t axes[MAG_MAX_DIMS];
-    for (uint32_t i=0; i < MAG_MAX_DIMS; ++i) /* Unpack axes */
+    for (int i=0; i < MAG_MAX_DIMS; ++i) /* Unpack axes */
         axes[i] = mag_opp_unpack_u62_or_panic(params[i]);
-    for (uint32_t i=0; i < MAG_MAX_DIMS; ++i) /* Check that all axes are unique */
-        for (uint32_t j = i+1; j < MAG_MAX_DIMS; ++j)
+    for (int i=0; i < MAG_MAX_DIMS; ++i) /* Check that all axes are unique */
+        for (int j = i+1; j < MAG_MAX_DIMS; ++j)
             mag_assert(axes[i] != axes[j], "Axes must be unique: %zu != %zu", axes[i], axes[j]);
-    for (uint32_t i=0; i < MAG_MAX_DIMS; ++i) { /* Permute shape and strides */
+    for (int i=0; i < MAG_MAX_DIMS; ++i) { /* Permute shape and strides */
         mag_assert2(axes[i] < MAG_MAX_DIMS);
         permuted->shape[axes[i]] = inputs[0]->shape[i];
         permuted->strides[axes[i]] = inputs[0]->strides[i];
@@ -1259,26 +1184,34 @@ static void mag_op_backward_max(mag_tensor_t* node, mag_tensor_t** grads) {
 
 static void mag_op_backward_sum(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
-    mag_tensor_t* zeros = mag_muls(x, 0.f); /* wtf is this TODO */
-    mag_tensor_t* ones  = mag_adds(zeros, 1.f);
+    mag_tensor_t* ones = mag_tensor_create(x->ctx, x->dtype, x->shape, x->rank, NULL, 0);
+    mag_tensor_fill(ones, 1.f);
     *grads = mag_mul(ones, node->grad);
-    mag_tensor_decref(zeros);
     mag_tensor_decref(ones);
 }
 
 static void mag_op_backward_abs(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
     mag_tensor_t* step = mag_step(x);
-    mag_tensor_t* step2 = mag_muls(step, 2.f);
-    mag_tensor_t* sign = mag_subs(step2, 1.f);
+    mag_tensor_t* one = mag_tensor_create_1d(x->ctx, x->dtype, 1);
+    mag_tensor_fill(one, 1.f);
+    mag_tensor_t* two = mag_tensor_create_1d(x->ctx, x->dtype, 1);
+    mag_tensor_fill(two, 2.f);
+    mag_tensor_t* step2 = mag_mul(step, two);
+    mag_tensor_t* sign = mag_sub(step2, one);
     grads[0] = mag_mul(node->grad, sign);
+    mag_tensor_decref(two);
+    mag_tensor_decref(one);
     mag_tensor_decref(step);
     mag_tensor_decref(step2);
     mag_tensor_decref(sign);
 }
 
 static void mag_op_backward_neg(mag_tensor_t* node, mag_tensor_t** grads) {
-    grads[0] = mag_muls(node->grad, -1.f);
+    mag_tensor_t* mone = mag_tensor_create_1d(node->grad->ctx, node->grad->dtype, 1);
+    mag_tensor_fill(mone, -1.f);
+    grads[0] = mag_mul(node->grad, mone);
+    mag_tensor_decref(mone);
 }
 
 static void mag_op_backward_log(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1288,16 +1221,22 @@ static void mag_op_backward_log(mag_tensor_t* node, mag_tensor_t** grads) {
 
 static void mag_op_backward_sqr(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
-    mag_tensor_t* two_x = mag_muls(x, 2.f);
+    mag_tensor_t* two = mag_tensor_create_1d(x->ctx, x->dtype, 1);
+    mag_tensor_fill(two, 2.f);
+    mag_tensor_t* two_x = mag_mul(x, two);
     grads[0] = mag_mul(node->grad, two_x);
+    mag_tensor_decref(two);
     mag_tensor_decref(two_x);
 }
 
 static void mag_op_backward_sqrt(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
     mag_tensor_t* sqrt_x = mag_sqrt(x);
-    mag_tensor_t* denom = mag_muls(sqrt_x, 2.f);
+    mag_tensor_t* two = mag_tensor_create_1d(x->ctx, x->dtype, 1);
+    mag_tensor_fill(two, 2.f);
+    mag_tensor_t* denom = mag_mul(sqrt_x, two);
     grads[0] = mag_div(node->grad, denom);
+    mag_tensor_decref(two);
     mag_tensor_decref(sqrt_x);
     mag_tensor_decref(denom);
 }
@@ -1312,14 +1251,17 @@ static void mag_op_backward_sin(mag_tensor_t* node, mag_tensor_t** grads) {
 static void mag_op_backward_cos(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
     mag_tensor_t* sin_x = mag_sin(x);
-    mag_tensor_t* neg_sin_x = mag_muls(sin_x, -1.f);
+    mag_tensor_t* m1 = mag_tensor_create_1d(x->ctx, x->dtype, 1);
+    mag_tensor_fill(m1, -1);
+    mag_tensor_t* neg_sin_x = mag_mul(sin_x, m1);
     grads[0] = mag_mul(node->grad, neg_sin_x);
+    mag_tensor_decref(m1);
     mag_tensor_decref(sin_x);
     mag_tensor_decref(neg_sin_x);
 }
 
 static void mag_op_backward_step(mag_tensor_t* node, mag_tensor_t** grads) {
-    grads[0] = mag_muls(node->grad, 0.f);
+    mag_panic("NYI");
 }
 
 static void mag_op_backward_exp(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1380,14 +1322,16 @@ static void mag_op_backward_gelu(mag_tensor_t* node, mag_tensor_t** grads) {
 static void mag_op_backward_add(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
     mag_tensor_t* y = node->op_inputs[1];
-    (void)x, (void)y;
     if (x->flags&MAG_TFLAG_REQUIRES_GRAD)
         grads[0] = mag_clone(node->grad);
     if (y->flags&MAG_TFLAG_REQUIRES_GRAD) {
-        mag_tensor_t* tmp = node->grad;
-        if (!mag_tensor_is_shape_eq(x, y))
-            tmp = mag_repeat_back(tmp, y);
-        grads[1] = mag_clone(tmp);
+        mag_tensor_t* grad = node->grad;
+        if (!mag_tensor_is_shape_eq(x, y)) {
+            grad = mag_repeat_back(grad, y);
+        } else {
+            grad = mag_clone(grad); /* Output gradients must be a new allocated tensor, so we clone. */
+        }
+        grads[1] = grad;
     }
 }
 
@@ -1397,10 +1341,13 @@ static void mag_op_backward_sub(mag_tensor_t* node, mag_tensor_t** grads) {
     if (x->flags&MAG_TFLAG_REQUIRES_GRAD)
         grads[0] = mag_clone(node->grad);
     if (y->flags&MAG_TFLAG_REQUIRES_GRAD) {
-        mag_tensor_t* tmp = mag_neg(node->grad);
-        if (!mag_tensor_is_shape_eq(x, y))
-            tmp = mag_repeat_back(tmp, y);
-        grads[1] = mag_clone(tmp);
+        mag_tensor_t* mg = mag_neg(node->grad);
+        if (!mag_tensor_is_shape_eq(x, y)) {
+            mag_tensor_t* pmg = mg;
+            mg = mag_repeat_back(pmg, y);
+            mag_tensor_decref(pmg);
+        }
+        grads[1] = mg;
     }
 }
 
@@ -1410,10 +1357,13 @@ static void mag_op_backward_mul(mag_tensor_t* node, mag_tensor_t** grads) {
     if (x->flags&MAG_TFLAG_REQUIRES_GRAD)
         grads[0] = mag_mul(node->grad, y);
     if (y->flags&MAG_TFLAG_REQUIRES_GRAD) {
-        mag_tensor_t* tmp = mag_mul(x, node->grad);
-        if (!mag_tensor_is_shape_eq(x, y))
-            tmp = mag_repeat_back(tmp, y);
-        grads[1] = mag_clone(tmp);
+        mag_tensor_t* xg = mag_mul(x, node->grad);
+        if (!mag_tensor_is_shape_eq(x, y)) {
+            mag_tensor_t* pxg = xg;
+            xg = mag_repeat_back(pxg, y);
+            mag_tensor_decref(pxg);
+        }
+        grads[1] = xg;
     }
 }
 
@@ -1423,51 +1373,20 @@ static void mag_op_backward_div(mag_tensor_t* node, mag_tensor_t** grads) {
     if (x->flags&MAG_TFLAG_REQUIRES_GRAD)
         grads[0] = mag_div(node->grad, y);
     if (y->flags&MAG_TFLAG_REQUIRES_GRAD) {
-        mag_tensor_t* a = mag_mul(node->grad, x);
-        mag_tensor_t* b  = mag_mul(y, y);
-        mag_tensor_t* c = mag_div(a, b);
-        mag_tensor_t* tmp = mag_neg(c);
-        if (!mag_tensor_is_shape_eq(x, y))
-            tmp = mag_repeat_back(tmp, y);
-        grads[1] = mag_clone(tmp);
-        mag_tensor_decref(a);
-        mag_tensor_decref(b);
-        mag_tensor_decref(c);
+        mag_tensor_t* gx = mag_mul(node->grad, x);
+        mag_tensor_t* yy = mag_mul(y, y);
+        mag_tensor_t* gxyy = mag_div(gx, yy);
+        mag_tensor_t* mgxyy = mag_neg(gxyy);
+        if (!mag_tensor_is_shape_eq(x, y)) {
+            mag_tensor_t* pmgxyy = mgxyy;
+            mgxyy = mag_repeat_back(pmgxyy, y);
+            mag_tensor_decref(pmgxyy);
+        }
+        grads[1] = mgxyy;
+        mag_tensor_decref(gxyy);
+        mag_tensor_decref(yy);
+        mag_tensor_decref(gx);
     }
-}
-
-static void mag_op_backward_adds(mag_tensor_t* node, mag_tensor_t** grads) {
-    grads[0] = mag_clone(node->grad);
-    grads[1] = mag_sum(node->grad);
-}
-
-static void mag_op_backward_subs(mag_tensor_t* node, mag_tensor_t** grads) {
-    grads[0] = mag_clone(node->grad);
-    mag_tensor_t* tmp = mag_sum(node->grad);
-    grads[1] = mag_neg(tmp);
-    mag_tensor_decref(tmp);
-}
-
-static void mag_op_backward_muls(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_tensor_t* x = node->op_inputs[0];
-    mag_e8m23_t xi = mag_opp_unpack_e8m23_or_panic(node->op_params[0]);
-    grads[0] = mag_muls(node->grad, xi);
-    mag_tensor_t* tmp = mag_mul(node->grad, x);
-    grads[1] = mag_sum(tmp);
-    mag_tensor_decref(tmp);
-}
-
-static void mag_op_backward_divs(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_tensor_t* x = node->op_inputs[0];
-    mag_e8m23_t xi = mag_opp_unpack_e8m23_or_panic(node->op_params[0]);
-    grads[0] = mag_muls(node->grad, 1.0f / xi);
-    mag_tensor_t* tmp = mag_mul(node->grad, x);
-    grads[1] = mag_muls(mag_sum(tmp), -1.0f / (xi * xi));
-    mag_tensor_decref(tmp);
-}
-
-static void mag_op_backward_pows(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
 }
 
 static void mag_op_backward_matmul(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1489,7 +1408,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
     static const mag_op_meta_t infos[MAG_OP__NUM] = {
         [MAG_OP_NOP] = {
             .mnemonic = "nop",
-            .argcount = 0,
+            .numin = 0,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = false,
@@ -1499,7 +1418,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_CLONE] = {
             .mnemonic = "clone",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = false,
@@ -1509,7 +1428,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_VIEW] = {
             .mnemonic = "view",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = false,
@@ -1519,7 +1438,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_TRANSPOSE] = {
             .mnemonic = "transpose",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = false,
@@ -1529,7 +1448,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_PERMUTE] = {
             .mnemonic = "permute",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = MAG_MAX_DIMS,
             .opp_types = {
                 MAG_OPP_U62,
@@ -1546,7 +1465,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_MEAN] = {
             .mnemonic = "mean",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = false,
@@ -1556,7 +1475,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_MIN] = {
             .mnemonic = "min",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = false,
@@ -1566,7 +1485,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_MAX] = {
             .mnemonic = "max",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = false,
@@ -1576,7 +1495,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_SUM] = {
             .mnemonic = "sum",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = false,
@@ -1586,7 +1505,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_ABS] = {
             .mnemonic = "abs",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1596,7 +1515,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_NEG] = {
             .mnemonic = "neg",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1606,7 +1525,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_LOG] = {
             .mnemonic = "log",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1616,7 +1535,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_SQR] = {
             .mnemonic = "sqr",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1626,7 +1545,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_SQRT] = {
             .mnemonic = "sqrt",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1636,7 +1555,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_SIN] = {
             .mnemonic = "sin",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1646,7 +1565,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_COS] = {
             .mnemonic = "cos",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1656,7 +1575,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_STEP] = {
             .mnemonic = "step",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1666,7 +1585,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_EXP] = {
             .mnemonic = "exp",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1676,7 +1595,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_SOFTMAX] = {
             .mnemonic = "softmax",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1686,7 +1605,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_SOFTMAX_DV] = {
             .mnemonic = "softmax_dv",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1696,7 +1615,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_SIGMOID] = {
             .mnemonic = "sigmoid",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1706,7 +1625,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_SIGMOID_DV] = {
             .mnemonic = "sigmoid_dv",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1716,7 +1635,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_HARD_SIGMOID] = {
             .mnemonic = "hard_sigmoid",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1726,7 +1645,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_SILU] = {
             .mnemonic = "silu",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1736,7 +1655,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_SILU_DV] = {
             .mnemonic = "silu_dv",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1746,7 +1665,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_TANH] = {
             .mnemonic = "tanh",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1756,7 +1675,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_TANH_DV] = {
             .mnemonic = "tanh_dv",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1766,7 +1685,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_RELU] = {
             .mnemonic = "relu",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1776,7 +1695,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_RELU_DV] = {
             .mnemonic = "relu_dv",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1786,7 +1705,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_GELU] = {
             .mnemonic = "gelu",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1796,7 +1715,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_GELU_DV] = {
             .mnemonic = "gelu_dv",
-            .argcount = 1,
+            .numin = 1,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1806,7 +1725,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_ADD] = {
             .mnemonic = "add",
-            .argcount = 2,
+            .numin = 2,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1816,7 +1735,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_SUB] = {
             .mnemonic = "sub",
-            .argcount = 2,
+            .numin = 2,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1826,7 +1745,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_MUL] = {
             .mnemonic = "mul",
-            .argcount = 2,
+            .numin = 2,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1836,7 +1755,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_DIV] = {
             .mnemonic = "div",
-            .argcount = 2,
+            .numin = 2,
             .paramcount = 0,
             .opp_types = {MAG_OPP_NONE},
             .inplace = true,
@@ -1844,59 +1763,9 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_binary
         },
-        [MAG_OP_ADDS] = {
-            .mnemonic = "adds",
-            .argcount = 1,
-            .paramcount = 1,
-            .opp_types = {MAG_OPP_E8M23},
-            .inplace = true,
-            .backward = &mag_op_backward_adds,
-            .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
-        },
-        [MAG_OP_SUBS] = {
-            .mnemonic = "subs",
-            .argcount = 1,
-            .paramcount = 1,
-            .opp_types = {MAG_OPP_E8M23},
-            .inplace = true,
-            .backward = &mag_op_backward_subs,
-            .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
-        },
-        [MAG_OP_MULS] = {
-            .mnemonic = "muls",
-            .argcount = 1,
-            .paramcount = 1,
-            .opp_types = {MAG_OPP_E8M23},
-            .inplace = true,
-            .backward = &mag_op_backward_muls,
-            .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
-        },
-        [MAG_OP_DIVS] = {
-            .mnemonic = "divs",
-            .argcount = 1,
-            .paramcount = 1,
-            .opp_types = {MAG_OPP_E8M23},
-            .inplace = true,
-            .backward = &mag_op_backward_divs,
-            .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
-        },
-        [MAG_OP_POWS] = {
-            .mnemonic = "pows",
-            .argcount = 1,
-            .paramcount = 1,
-            .opp_types = {MAG_OPP_E8M23},
-            .inplace = true,
-            .backward = &mag_op_backward_pows,
-            .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
-        },
         [MAG_OP_MATMUL] = {
             .mnemonic = "matmul",
-            .argcount = 2,
+            .numin = 2,
             .paramcount = 0,
             .opp_types = {},
             .inplace = true,
@@ -1906,7 +1775,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
         },
         [MAG_OP_REPEAT_BACK] = {
             .mnemonic = "repeat_rev",
-            .argcount = 2,
+            .numin = 2,
             .paramcount = 0,
             .opp_types = {},
             .inplace = true,
@@ -1920,26 +1789,37 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
 
 #undef mag_validate_inputs
 
-int64_t mag_tensor_get_data_size(const mag_tensor_t* t) { return t->storage.size; }
+int64_t mag_tensor_get_data_size(const mag_tensor_t* t) { return t->storage->size; }
 int64_t mag_tensor_get_numel(const mag_tensor_t* t) { return t->numel; }
 
-#ifdef MAG_DEBUG
-    static void mag_tensor_sanitize_dtor(mag_tensor_t* t) {
-        (void)t;
+static void mag_tensor_dtor(void* self) {
+    mag_tensor_t* t = self;
+    mag_ctx_t* ctx = t->ctx;
+    mag_assert(ctx->num_tensors > 0, "double freed tensor");
+    --ctx->num_tensors;
+    if (t->grad) {
+        mag_tensor_decref(t->grad);
+        t->grad = NULL;
     }
-#endif
+    for (int i=0; i < MAG_MAX_OP_INPUTS; ++i)
+        if (t->op_inputs[i])
+            mag_tensor_decref(t->op_inputs[i]);
+    mag_rc_control_decref(&t->storage->rc_control);
+    #ifndef NDEBUG
+        memset(t, 0, sizeof(*t));
+    #endif
+    mag_fixed_intrusive_pool_free(&ctx->tensor_pool, t);
+}
 
 static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const int64_t* dims, int64_t rank, mag_tensor_t* view, size_t view_offs) {
     uintptr_t tr_id = mag_thread_id();
     mag_assert(tr_id == ctx->tr_id, "%" PRIx64 " != %" PRIx64 " Tensor must be created on the same thread as the context.", tr_id, ctx->tr_id);
     mag_assert(dims != NULL && rank >= 0 && rank <= MAG_MAX_DIMS, "Rank must be within (0, %d]", MAG_MAX_DIMS);
-    mag_assert2(view_offs == 0); /* NYI. TODO */
     if (view) {
         if (view->view_uplink) { /* Traverse view chain and accumulate offset */
             view_offs += view->view_offs;
             view = view->view_uplink;
         }
-        mag_tensor_incref(view); /* Increment view tensor strong RC */
     }
     int64_t dts = mag_dtype_meta_of(type)->size;
     int64_t numel = 1;
@@ -1948,20 +1828,17 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
     int64_t numbytes = numel*dts;
     mag_assert2(!view || !numbytes || numbytes + view_offs <= mag_tensor_get_data_size(view)); /* Slice must be within viewed tensor data range. *//* Allocate memory for tensor struct on CPU RAM. */
     mag_tensor_t* t = mag_fixed_intrusive_pool_malloc(&ctx->tensor_pool);
-    memset(t, 0, sizeof(*t));
+    #ifndef NDEBUG
+        memset(t, 0, sizeof(*t));
+    #endif
     *t = (mag_tensor_t) {
-        .rcb = {
-            .rc_strong = 0,
-            #ifdef MAG_DEBUG
-                .dtor = &mag_tensor_sanitize_dtor
-            #endif
-        },
         .ctx = ctx,
+        .rc_control = mag_rc_control_init(t, &mag_tensor_dtor),
         .rank = rank,
         .shape = {0},
         .strides = {0},
         .dtype = type,
-        .storage = {0},
+        .storage = NULL,
         .numel = numel,
         .flags = (view ? MAG_TFLAG_VIEW : MAG_TFLAG_OWNER) | (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER ? MAG_TFLAG_REQUIRES_GRAD : 0),
         .op = MAG_OP_NOP,
@@ -1975,18 +1852,19 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
         .name = "",
         .ud = NULL
     };
-    mag_tensor_incref(t); /* First strong RC=1 */
+    ++ctx->num_tensors;
     /* Allocate device memory */
     mag_compute_device_t* dvc = ctx->device;
-    void (*allocator)(mag_compute_device_t*, mag_storage_buffer_t*, size_t, mag_dtype_t) = dvc->alloc_storage;
-    if (view) t->storage = view->storage;                   /* Reference memory from view */
-    else (*allocator)(dvc, &t->storage, numbytes, type);    /* Allocate new device memory */
-    #pragma GCC unroll 6
-    for (uint32_t i=0; i < MAG_MAX_DIMS; ++i)    /* Copy dimensions and set unused to identity. */
+    void (*allocator)(mag_compute_device_t*, mag_storage_buffer_t**, size_t, mag_dtype_t) = dvc->alloc_storage;
+    if (view) { /* Reference memory from view */
+        t->storage = view->storage;
+        mag_rc_control_incref(&view->storage->rc_control);
+    }
+    else (*allocator)(dvc, &t->storage, numbytes, type); /* Else allocate new device memory */
+    for (int i=0; i < MAG_MAX_DIMS; ++i)    /* Copy dimensions and set unused to identity. */
         t->shape[i] = i < rank ? dims[i] : 1;
     *t->strides = 1;
-    #pragma GCC unroll 5
-    for (uint32_t i=1; i < MAG_MAX_DIMS; ++i)    /* Calculate strides and check for overflow. */
+    for (int i=1; i < MAG_MAX_DIMS; ++i)    /* Calculate strides and check for overflow. */
         mag_assert2(!mag_imull64_ov(t->strides[i-1], t->shape[i-1], t->strides+i));
 #ifdef MAG_DEBUG /* If tensor RC sanitize is enabled, insert into tracking list */
     mag_tensor_node_t** head = &ctx->rc_tracked;
@@ -2000,50 +1878,12 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
     return t;
 }
 
-static void mag_tensor_destroy(mag_tensor_t* t) {
-    mag_ctx_t* ctx = t->ctx;
-#ifdef MAG_DEBUG  /* If tensor RC sanitize is enabled, invoke destructor and erase from tracking list */
-    void (*dtor)(mag_tensor_t*) = t->rcb.dtor;  /* Invoke Debug destructor. */
-    if (dtor) (*dtor)(t);
-    mag_tensor_node_t** head = &ctx->rc_tracked;
-    if (*head) {
-        mag_tensor_node_t* curr = *head, *prev = NULL;
-        if (curr->tensor == t) { /* Head itself holds key */
-            *head = curr->next;
-            (*mag_alloc)(curr, 0);
-        } else {
-            while (curr && curr->tensor != t) { /* Find node */
-                prev = curr;
-                curr = curr->next;
-            }
-            if (curr) { /* Found node */
-                prev->next = curr->next;
-                (*mag_alloc)(curr, 0); /* Free node */
-            }
-        }
-    }
-#endif
-    if (t->flags & MAG_TFLAG_OWNER) { /* Free device memory if tensor owns it. */
-        mag_compute_device_t* dvc = t->ctx->device;
-        void (*dtor)(mag_compute_device_t*, mag_storage_buffer_t*) = dvc->free_storage;
-        (*dtor)(dvc, &t->storage);
-    }
-    mag_fixed_intrusive_pool_free(&ctx->tensor_pool, t);
-}
-
 void mag_tensor_incref(mag_tensor_t* t) {
-    mag_assert2(t->rcb.rc_strong < UINT32_MAX);
-    ++t->rcb.rc_strong;
+    mag_rc_control_incref(&t->rc_control);
 }
 
 bool mag_tensor_decref(mag_tensor_t* t) {
-    //TODO  if (t->view_uplink) mag_tensor_decref(t->view_uplink);  /* If tensor is a view, decrement base RC and free tensor chain */
-    //TODO if (t->grad) mag_tensor_decref(t->grad);                /* Decrement gradient tensor RC */
-    if (!--t->rcb.rc_strong) {                              /* Strong RC reaches zero, destroy. */
-        //mag_tensor_destroy(t);
-        return true;
-    }
-    return false;
+    return mag_rc_control_decref(&t->rc_control);
 }
 
 mag_tensor_t* mag_tensor_create_1d(mag_ctx_t* ctx, mag_dtype_t type, int64_t d1) {
@@ -2095,22 +1935,25 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
     mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_opp_t*) = meta->r_alloc;
     bool (*validate_op)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_opp_t*) = meta->validator;
     mag_tensor_t* R = (inplace && numin && meta->inplace)                                                       /* Inplace requested? */
-        ? mag_tensor_create(ctx, (*inputs)->dtype, (*inputs)->shape, (*inputs)->rank, *inputs, 0)       /* View R <- X for inplace aliasing op. */
-        : (*r_alloc)(inputs, opps);                                                                           /* Construct new result tensor. */
-    mag_assert((*validate_op)(op, R, inputs, opps), "Invalid operation %s.", meta->mnemonic);                 /* Validate operation */
+        ? mag_tensor_create(ctx, (*inputs)->dtype, (*inputs)->shape, (*inputs)->rank, *inputs, 0)      /* View R <- X for inplace aliasing op. */
+        : (*r_alloc)(inputs, opps);                                                                             /* Construct new result tensor. */
+    mag_assert((*validate_op)(op, R, inputs, opps), "Invalid operation %s.", meta->mnemonic);                   /* Validate operation */
     R->op = op;                                                                                                 /* Set operation for deferred execution mode. */
+    mag_assert2(numin <= MAG_MAX_OP_INPUTS);
     for (uint32_t i=0; i < numin; ++i) {                                                                        /* Set input tensors and flags. */
         mag_tensor_t* input = inputs[i];
         R->op_inputs[i] = input;
-        if (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)
+        if (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER) { /* Gradient recording is enabled */
             R->flags |= input->flags & MAG_TFLAG_REQUIRES_GRAD;
+            mag_tensor_incref(input); /* Input must stay alive for backward pass. */
+        }
     }
-    if (opps) memcpy(R->op_params, opps, sizeof(*opps));      /* Copy operation parameters */
-    if (mag_likely(ctx->exec_mode == MAG_EXEC_MODE_EAGER)) {        /* In eager execution mode, we execute immediately. */
-        mag_op_exec(R, ctx->device, gra);                           /* Execute the operation immediately. */
-        if (!(ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER))             /* If not recording gradients, free graph tensors. */
-            for (uint32_t i=0; i < numin; ++i)
-                R->op_inputs[i] = NULL;
+    if (opps) memcpy(R->op_params, opps, numopps*sizeof(*opps));        /* Copy operation parameters */
+    if (mag_likely(ctx->exec_mode == MAG_EXEC_MODE_EAGER)) {            /* In eager execution mode, we execute immediately. */
+        mag_op_exec(R, ctx->device, gra);                               /* Execute the operation immediately. */
+        if (!(ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)) {               /* If not recording gradients, free parent tensors. */
+            memset(R->op_inputs, 0, sizeof(R->op_inputs));
+        }
     }
     return R;
 }
@@ -2453,18 +2296,18 @@ mag_tensor_t* mag_repeat_back(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_tensor_get_arg(const mag_tensor_t* t, size_t slot) {
-    mag_assert(slot < MAG_MAX_INPUT_TENSORS, "Slot must be within [0, %d)", MAG_MAX_INPUT_TENSORS);
+    mag_assert(slot < MAG_MAX_OP_INPUTS, "Slot must be within [0, %d)", MAG_MAX_OP_INPUTS);
     return t->op_inputs[slot];
 }
 
 void mag_tensor_set_arg(mag_tensor_t* t, size_t slot, mag_tensor_t* arg) {
-    mag_assert(slot < MAG_MAX_INPUT_TENSORS, "Slot must be within [0, %d)", MAG_MAX_INPUT_TENSORS);
+    mag_assert(slot < MAG_MAX_OP_INPUTS, "Slot must be within [0, %d)", MAG_MAX_OP_INPUTS);
     mag_assert(t->op_inputs[slot] == NULL, "Argument at slot #%zu already set", slot);
     t->op_inputs[slot] = arg;
 }
 
 void mag_tensor_copy_buffer_from(mag_tensor_t* t, const void* data, size_t size) {
-    mag_storage_buffer_t* sto = &t->storage;
+    mag_storage_buffer_t* sto = t->storage;
     (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CVT_E8M23, 0, (void*)data, size);
 }
 
@@ -2490,9 +2333,8 @@ void mag_tensor_fill_random_normal(mag_tensor_t* t, mag_e8m23_t mean, mag_e8m23_
     mag_op_exec(t, t->ctx->device, MAG_GRA_INIT);
 }
 
-uint32_t mag_tensor_get_refcount(const mag_tensor_t* t) {
-    return t->rcb.rc_strong;
-}
+uint64_t mag_tensor_get_refcount(const mag_tensor_t* t) { return t->rc_control.rc; }
+uint64_t mag_tensor_get_storage_refcount(const mag_tensor_t* t) { return t->storage->rc_control.rc; }
 
 size_t mag_tensor_get_memory_usage(const mag_tensor_t* t) {
     return sizeof(*t) + mag_tensor_get_data_size(t);
@@ -2518,15 +2360,12 @@ int64_t mag_tensor_get_rank(const mag_tensor_t* t) { return t->rank; }
 const int64_t* mag_tensor_get_shape(const mag_tensor_t* t) { return t->shape; }
 const int64_t* mag_tensor_get_strides(const mag_tensor_t* t) { return t->strides; }
 mag_dtype_t mag_tensor_get_dtype(const mag_tensor_t* t) { return t->dtype; }
-
-void* mag_tensor_get_data_ptr(const mag_tensor_t* t) {
-    return (void*)t->storage.base;
-}
+void* mag_tensor_get_data_ptr(const mag_tensor_t* t) { return (void*)t->storage->base; }
 
 mag_e8m23_t* mag_tensor_to_float_array(mag_tensor_t* t) {
     size_t size = t->numel*sizeof(mag_e8m23_t);
     mag_e8m23_t* dst = (*mag_alloc)(NULL, size); /* TODO: Use dynamic scratch buffer */
-    mag_storage_buffer_t* sto = &t->storage;
+    mag_storage_buffer_t* sto = t->storage;
     (*sto->transfer)(sto, MAG_TRANSFER_DIR_D2H, MAG_TRANSFER_OP_CVT_E8M23, 0, dst, size);
     return dst;
 }
@@ -2545,7 +2384,7 @@ bool mag_tensor_are_strides_eq(const mag_tensor_t* x, const mag_tensor_t* y) {
 
 bool mag_tensor_can_broadcast(const mag_tensor_t* x, const mag_tensor_t* y) {
     #pragma GCC unroll 6
-    for (uint32_t i=0; i < MAG_MAX_DIMS; ++i)
+    for (int i=0; i < MAG_MAX_DIMS; ++i)
         if ((y->shape[i] % x->shape[i]) != 0)
             return false;
     return true;
@@ -2555,7 +2394,7 @@ bool mag_tensor_is_transposed(const mag_tensor_t* t) { return t->strides[0] > t-
 
 bool mag_tensor_is_permuted(const mag_tensor_t* t) {
     #pragma GCC unroll 5
-    for (uint32_t i=0; i < MAG_MAX_DIMS-1; ++i)
+    for (int i=0; i < MAG_MAX_DIMS-1; ++i)
         if (t->strides[i] > t->strides[i+1])
             return true;
     return false;
@@ -2567,6 +2406,7 @@ bool mag_tensor_is_contiguous(const mag_tensor_t* t) {
 
 mag_tensor_t* mag_tensor_get_grad(const mag_tensor_t* t) {
     mag_assert2(t->flags & MAG_TFLAG_REQUIRES_GRAD);
+    if (t->grad) mag_tensor_incref(t->grad);
     return t->grad;
 }
 
@@ -2635,7 +2475,7 @@ static void mag_collect_topo_iterative(mag_tensor_t* root, mag_tensor_array_t* o
     while (sta_len) { /* Iterative DFS */
         mag_topo_stack_record_t* top = &stack[sta_len - 1];
         mag_tensor_t* cur_tensor = top->tensor;
-        if (top->next_child_idx < mag_op_meta_of(cur_tensor->op)->argcount) {
+        if (top->next_child_idx < mag_op_meta_of(cur_tensor->op)->numin) {
             mag_tensor_t* child = cur_tensor->op_inputs[top->next_child_idx++];
             if (child && (child->flags & MAG_TFLAG_REQUIRES_GRAD)) {
                 if (!mag_hashset_contains_key(&visited, child)) {
@@ -2683,13 +2523,13 @@ void mag_tensor_backward(mag_tensor_t* root) {
             mag_tensor_patch_grad(child, grad);
         }
         if (mag_unlikely(child->op == MAG_OP_NOP)) continue;
-        mag_tensor_t* grads[MAG_MAX_OP_PARAMS] = {0};
+        mag_tensor_t* grads[MAG_MAX_OP_INPUTS] = {0};
         void (*op_bwd)(mag_tensor_t*, mag_tensor_t**) = meta->backward;
         mag_assert2(op_bwd);
         (*op_bwd)(child, grads);
-        uint32_t numin = meta->argcount;
-        mag_assert2(numin <= MAG_MAX_OP_PARAMS);
-        for (uint32_t i = 0; i < numin; ++i) {
+        uint32_t numin = meta->numin;
+        mag_assert2(numin <= MAG_MAX_OP_INPUTS);
+        for (uint32_t i=0; i < numin; ++i) {
             mag_tensor_t* input = child->op_inputs[i];
             mag_assert2(input);
             if (!(input->flags & MAG_TFLAG_REQUIRES_GRAD)) continue;
@@ -2698,7 +2538,7 @@ void mag_tensor_backward(mag_tensor_t* root) {
             if (!input->grad) {
                 mag_tensor_patch_grad(input, gri);
             } else {
-                mag_tensor_t* acc = mag_add_(gri, input->grad);
+                mag_tensor_t* acc = mag_add(gri, input->grad);
                 mag_tensor_decref(input->grad);
                 mag_tensor_patch_grad(input, acc);
                 mag_tensor_decref(gri);
@@ -2718,7 +2558,7 @@ void mag_tensor_zero_grad(mag_tensor_t* t) {
 mag_e8m23_t mag_tensor_subscript_get_multi(mag_tensor_t* t, int64_t i0, int64_t i1, int64_t i2, int64_t i3, int64_t i4, int64_t i5) {
     mag_static_assert(MAG_MAX_DIMS == 6);
     mag_load_local_storage_group(t, s, strides);
-    mag_storage_buffer_t* sto = &t->storage;
+    mag_storage_buffer_t* sto = t->storage;
     mag_e8m23_t val;
     (*sto->transfer)(sto, MAG_TRANSFER_DIR_D2H, MAG_TRANSFER_OP_CVT_E8M23, sto->granularity*mag_address_dotprod6(i, s), &val, sizeof(val));
     return val;
@@ -2727,7 +2567,7 @@ mag_e8m23_t mag_tensor_subscript_get_multi(mag_tensor_t* t, int64_t i0, int64_t 
 void mag_tensor_subscript_set_multi(mag_tensor_t* t, int64_t i0, int64_t i1, int64_t i2, int64_t i3, int64_t i4, int64_t i5, mag_e8m23_t val) {
     mag_static_assert(MAG_MAX_DIMS == 6);
     mag_load_local_storage_group(t, s, strides);
-    mag_storage_buffer_t* sto = &t->storage;
+    mag_storage_buffer_t* sto = t->storage;
     (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CVT_E8M23, sto->granularity*mag_address_dotprod6(i, s), &val, sizeof(val));
 }
 
@@ -2748,7 +2588,7 @@ mag_e8m23_t mag_tensor_subscript_get_flattened(mag_tensor_t* t, int64_t idx) {
         mag_tensor_unravel_index(t, idx, &pidx);
         return mag_tensor_subscript_get_multi(t, pidx[0], pidx[1], pidx[2], pidx[3], pidx[4], pidx[5]);
     }
-    mag_storage_buffer_t* sto = &t->storage;
+    mag_storage_buffer_t* sto = t->storage;
     mag_e8m23_t val;
     (*sto->transfer)(sto, MAG_TRANSFER_DIR_D2H, MAG_TRANSFER_OP_CVT_E8M23, sto->granularity*idx, &val, sizeof(val));
     return val;
@@ -2761,7 +2601,7 @@ void mag_tensor_subscript_set_flattened(mag_tensor_t* t, int64_t idx, mag_e8m23_
         mag_tensor_subscript_set_multi(t, pidx[0], pidx[1], pidx[2], pidx[3], pidx[4], pidx[5], val);
         return;
     }
-    mag_storage_buffer_t* sto = &t->storage;
+    mag_storage_buffer_t* sto = t->storage;
     (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CVT_E8M23, sto->granularity*idx, &val, sizeof(val));
 }
 
@@ -2853,7 +2693,7 @@ void mag_tensor_img_draw_text(mag_tensor_t* t, int32_t x, int32_t y, int32_t siz
     mag_assert(t->rank == 3, "Tensor must be a 3D image tensor");
     mag_assert2(x >= 0 && y >= 0 && size >= 8 && txt && *txt);
     mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
-    mag_e8m23_t* buf = (mag_e8m23_t*)t->storage.base;
+    mag_e8m23_t* buf = (mag_e8m23_t*)t->storage->base;
     int32_t w = (int32_t)mag_tensor_get_width(t);
     int32_t h = (int32_t)mag_tensor_get_height(t);
     int32_t c = (int32_t)mag_tensor_get_channels(t);
@@ -3408,7 +3248,7 @@ static MAG_COLDPROC void mag_graphviz_dump(const mag_tensor_t* node, FILE *fp, m
     if (mag_hashset_contains_key(visited, node)) return;
     mag_hashset_insert(visited, node);
     bool is_input = true;
-    for (unsigned i = 0; i < MAG_MAX_INPUT_TENSORS; ++i) {
+    for (unsigned i = 0; i < MAG_MAX_OP_INPUTS; ++i) {
         if (node->op_inputs[i] != NULL) {
             is_input = false;
             break;
@@ -3428,7 +3268,7 @@ static MAG_COLDPROC void mag_graphviz_dump(const mag_tensor_t* node, FILE *fp, m
         node->flags,
         fillcolor
     );
-    for (unsigned i=0; i < MAG_MAX_INPUT_TENSORS; ++i) {
+    for (unsigned i=0; i < MAG_MAX_OP_INPUTS; ++i) {
         mag_tensor_t* input = node->op_inputs[i];
         if (!input) continue;
         char name[128];
@@ -3482,7 +3322,7 @@ MAG_COLDPROC void mag_tensor_export_backward_graph_graphviz(mag_tensor_t* t, con
     for (size_t i=0; i < post_order.size; ++i) {
         mag_tensor_t* node = post_order.data[i];
         const mag_op_meta_t* meta = mag_op_meta_of(node->op);
-        for (uint32_t j = 0; j < meta->argcount; ++j) {
+        for (uint32_t j = 0; j < meta->numin; ++j) {
             mag_tensor_t* input = node->op_inputs[j];
             if (input) {
                 fprintf(fp, "    \"%p\" -> \"%p\" [label=\"input %u\"];\n", node, input, j);

@@ -170,6 +170,7 @@ static const mag_cpu_op_info_t mag_cpu_op_infos[MAG_OP__NUM] = {
     [MAG_OP_MULS]           = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
     [MAG_OP_DIVS]           = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
     [MAG_OP_MATMUL]         = {.mt_support = true,  .growth = 3.0, .threshold =  10000},
+    [MAG_OP_REPEAT_BACK]    = {.mt_support = false, .growth = 3.0, .threshold =  10000},
 };
 
 typedef struct mag_worker_t mag_worker_t;
@@ -476,10 +477,23 @@ mag_static_assert((MAG_CPU_BUF_ALIGN & 15)==0);
 mag_static_assert((MAG_CPU_BUF_ALIGN & 31)==0);
 mag_static_assert((MAG_CPU_BUF_ALIGN & 63)==0);
 
-static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer_t* out, size_t size, mag_dtype_t dtype) {
-    mag_assert2(size);
+static void mag_cpu_storage_dtor(void* self) {
+    mag_storage_buffer_t* buf = self;
+    mag_ctx_t* ctx = buf->ctx;
+    mag_assert(ctx->num_storages > 0, "double freed storage");
+    --ctx->num_storages;
+    mag_free_aligned((void*)buf->base);
+    mag_fixed_intrusive_pool_free(&ctx->storage_pool, buf);
+}
+
+static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer_t** out, size_t size, mag_dtype_t dtype) {
+    mag_assert(size, "storage size must be > 0");
+    mag_ctx_t* ctx = host->ctx;
     void* block = mag_alloc_aligned(size, MAG_CPU_BUF_ALIGN);
-    *out = (mag_storage_buffer_t){ /* Set up storage buffer. */
+    *out = mag_fixed_intrusive_pool_malloc(&ctx->storage_pool);
+    **out = (mag_storage_buffer_t){ /* Set up storage buffer. */
+        .ctx = host->ctx,
+        .rc_control = mag_rc_control_init(*out, &mag_cpu_storage_dtor),
         .base = (uintptr_t)block,
         .size = size,
         .alignment = MAG_CPU_BUF_ALIGN,
@@ -489,11 +503,7 @@ static void mag_cpu_alloc_storage(mag_compute_device_t* host, mag_storage_buffer
         .broadcast = &mag_cpu_buf_broadcast,
         .transfer = &mag_cpu_transfer
     };
-}
-
-static void mag_cpu_free_storage(mag_compute_device_t* dvc, mag_storage_buffer_t* buf) {
-    mag_free_aligned((void*)buf->base);
-    memset(buf, 0, sizeof(*buf)); /* Set to zero. */
+    ++host->ctx->num_storages;
 }
 
 static mag_cpu_device_t* mag_cpu_init_device(mag_ctx_t* ctx, uint32_t num_threads) {
@@ -541,6 +551,7 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num
     mag_cpu_device_t* cpu_dvc = mag_cpu_init_device(ctx, num_threads);
     mag_compute_device_t* dvc = (*mag_alloc)(NULL, sizeof(*dvc));
     *dvc = (mag_compute_device_t){ /* Initialize device interface */
+        .ctx = ctx,
         .name = "CPU",
         .impl = cpu_dvc,
         .is_async = false,
@@ -549,7 +560,6 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num
         .eager_exec_fwd = &mag_cpu_exec_fwd,
         .eager_exec_bwd = &mag_cpu_exec_bwd,
         .alloc_storage = &mag_cpu_alloc_storage,
-        .free_storage = &mag_cpu_free_storage,
     };
     snprintf(dvc->name, sizeof(dvc->name), "%s", ctx->machine.cpu_name);
     return dvc;

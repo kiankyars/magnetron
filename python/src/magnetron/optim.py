@@ -1,8 +1,9 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+
 from abc import ABC, abstractmethod
 
 from magnetron import Tensor
-from magnetron.module import Parameter
+from magnetron.nn import Parameter
 
 
 class PolynomialDecayLRScheduler:
@@ -15,11 +16,6 @@ class PolynomialDecayLRScheduler:
     def step(self, iter: float) -> float:
         y: float = iter / self.max_iter
         return max(self.initial_lr * (1 - y) ** 2, 1.0e-7)
-
-
-def mse_loss(y_hat: Tensor, y: Tensor) -> Tensor:
-    delta = y_hat - y
-    return (delta * delta).mean()
 
 
 class Optimizer(ABC):

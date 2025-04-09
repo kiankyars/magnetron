@@ -150,10 +150,10 @@ static MAG_AINLINE mag_e8m23_t mag_e5m10_cvt_e8m23(mag_e5m10_t x) {
     #endif
 }
 
-#define mag_e8m23p(t) ((const mag_e8m23_t*)(t)->storage.base)
-#define mag_e8m23p_mut(t) ((mag_e8m23_t*)(t)->storage.base)
-#define mag_e5m10p(t) ((const mag_e5m10_t*)(t)->storage.base)
-#define mag_e5m10p_mut(t) ((mag_e5m10_t*)(t)->storage.base)
+#define mag_e8m23p(t) ((const mag_e8m23_t*)(t)->storage->base)
+#define mag_e8m23p_mut(t) ((mag_e8m23_t*)(t)->storage->base)
+#define mag_e5m10p(t) ((const mag_e5m10_t*)(t)->storage->base)
+#define mag_e5m10p_mut(t) ((mag_e5m10_t*)(t)->storage->base)
 
 static void MAG_HOTPROC mag_vector_cast_mag_e8m23_cvt_e5m10(int64_t n, const mag_e8m23_t* __restrict src, mag_e5m10_t* __restrict dst) {
     int64_t i=0;
