@@ -2248,92 +2248,40 @@ static void MAG_HOTPROC mag_blas_sum_e5m10(const mag_compute_payload_t* payload,
         mag_v##name##s_##T(vmel, pr, px, xi); \
     }
 
-#define mag_cpu_blas_impl_binary(T, name, op) \
-    static void MAG_HOTPROC mag_blas_##name##_##T(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) { \
-        (void)ctx; \
-        mag_tensor_t* r = payload->node; \
-        const mag_tensor_t* x = r->op_inputs[0]; \
-        const mag_tensor_t* y = r->op_inputs[1]; \
-        mag_##T##_t* br = mag_##T##p_mut(r); \
-        const mag_##T##_t* bx = mag_##T##p(x); \
-        const mag_##T##_t* by = mag_##T##p(y); \
-        mag_load_local_storage_group(r, rd, shape); \
-        mag_load_local_storage_group(r, rs, strides); \
-        mag_load_local_storage_group(x, xd, shape); \
-        mag_load_local_storage_group(x, xs, strides); \
-        mag_load_local_storage_group(y, yd, shape); \
-        mag_load_local_storage_group(y, ys, strides); \
-        int64_t tc = payload->thread_num; \
-        int64_t ti = payload->thread_idx; \
-        if (xd0==yd0 && xd1==yd1 && xd2==yd2 && xd3==yd3 && xd4==yd4 && xd5==yd5) { \
-            int64_t numel = r->numel; \
-            int64_t chunk = (numel + tc - 1)/tc; \
-            int64_t ra = ti*chunk; \
-            int64_t vmel = mag_xmin(ra + chunk, numel) - ra; \
-            if (mag_unlikely(vmel <= 0)) return; \
-            mag_##T##_t* pr = br + ra; \
-            const mag_##T##_t* px = bx + ra; \
-            const mag_##T##_t* py = by + ra; \
-            mag_bnd_chk(pr, br, mag_tensor_get_data_size(r)); \
-            mag_bnd_chk(px, bx, mag_tensor_get_data_size(x)); \
-            mag_bnd_chk(py, by, mag_tensor_get_data_size(y)); \
-            mag_v##name##_##T(vmel, pr, px, py); \
-            return; \
-        } \
-        int64_t numel = xd5*xd4*xd3*xd2*xd1; \
-        int64_t chunk = (numel + tc - 1)/tc; \
-        int64_t ra = chunk*ti; \
-        int64_t rb = mag_xmin(ra+chunk, numel); \
-        if (ys0 == 1) { \
-            for (int64_t ri=ra; ri < rb; ++ri) { \
-                int64_t ro = ri; \
-                int64_t xi1 = ro % xd1; ro /= xd1; \
-                int64_t xi2 = ro % xd2; ro /= xd2; \
-                int64_t xi3 = ro % xd3; ro /= xd3; \
-                int64_t xi4 = ro % xd4; ro /= xd4; \
-                int64_t xi5 = ro; \
-                int64_t yi5 = xi5 % yd5; \
-                int64_t yi4 = xi4 % yd4; \
-                int64_t yi3 = xi3 % yd3; \
-                int64_t yi2 = xi2 % yd2; \
-                int64_t yi1 = xi1 % yd1; \
-                mag_##T##_t* pr = br + xi5*rs5 + xi4*rs4 + xi3*rs3 + xi2*rs2 + xi1*rs1; \
-                const mag_##T##_t* px = bx + xi5*xs5 + xi4*xs4 + xi3*xs3 + xi2*xs2 + xi1*xs1; \
-                const mag_##T##_t* py = by + yi5*ys5 + yi4*ys4 + yi3*ys3 + yi2*ys2 + yi1*ys1; \
-                mag_bnd_chk(py, by, mag_tensor_get_data_size(y)); \
-                int64_t yor = xd0 / yd0; \
-                for (int64_t i=0; i < yor; ++i) { \
-                    mag_##T##_t* ppr = pr + i*yd0; \
-                    const mag_##T##_t* ppx = px + i*yd0; \
-                    mag_bnd_chk(ppr, br, mag_tensor_get_data_size(r)); \
-                    mag_bnd_chk(ppx, bx, mag_tensor_get_data_size(x)); \
-                    mag_v##name##_##T(yd0, ppr, ppx, py); \
-                } \
-            } \
-        } else { \
-            for (int64_t ri=ra; ri < rb; ++ri) { \
-                int64_t ro = ri; \
-                int64_t xi1 = ro % xd1; ro /= xd1; \
-                int64_t xi2 = ro % xd2; ro /= xd2; \
-                int64_t xi3 = ro % xd3; ro /= xd3; \
-                int64_t xi4 = ro % xd4; ro /= xd4; \
-                int64_t xi5 = ro; \
-                int64_t yi5 = xi5 % yd5; \
-                int64_t yi4 = xi4 % yd4; \
-                int64_t yi3 = xi3 % yd3; \
-                int64_t yi2 = xi2 % yd2; \
-                int64_t yi1 = xi1 % yd1; \
-                mag_##T##_t* pr = br + xi5*rs5 + xi4*rs4 + xi3*rs3 + xi2*rs2 + xi1*rs1; \
-                const mag_##T##_t* px = bx + xi5*xs5 + xi4*xs4 + xi3*xs3 + xi2*xs2 + xi1*xs1; \
-                for (int64_t i=0; i < rd0; ++i) { \
-                    const mag_##T##_t* py = by + yi5*ys5 + yi4*ys4 + yi3*ys3 + yi2*ys2 + yi1*ys1 + i%yd0*ys0; \
-                    mag_bnd_chk(pr+i, br, mag_tensor_get_data_size(r)); \
-                    mag_bnd_chk(px+i, bx, mag_tensor_get_data_size(x)); \
-                    mag_bnd_chk(py, by, mag_tensor_get_data_size(y)); \
-                    pr[i] = op((px[i]), (*py)); \
-                } \
-            } \
-        } \
+#define mag_cpu_blas_impl_binary(T, name, OP)                                   \
+    static void MAG_HOTPROC mag_blas_##name##_##T(                              \
+        const mag_compute_payload_t* payload, mag_kernel_context_t* ctx)        \
+    {                                                                           \
+        (void) ctx;                                                            \
+        mag_tensor_t*       r = payload->node;                                 \
+        const mag_tensor_t* x = r->op_inputs[0];                               \
+        const mag_tensor_t* y = r->op_inputs[1];                               \
+        mag_##T##_t*       br = mag_##T##p_mut(r);                             \
+        const mag_##T##_t* bx = mag_##T##p(x);                                 \
+        const mag_##T##_t* by = mag_##T##p(y);                                 \
+        int64_t tc     = payload->thread_num;                                  \
+        int64_t ti     = payload->thread_idx;                                  \
+        int64_t total  = r->numel;                                             \
+        int64_t chunk  = (total + tc - 1) / tc;                                \
+        int64_t start  = ti * chunk;                                           \
+        int64_t end    = mag_xmin(start + chunk, total);                       \
+        for (int64_t idx = start; idx < end; idx++) {                          \
+            int64_t tmp = idx;                                                \
+            int64_t roff = 0;                                                 \
+            int64_t xoff = 0;                                                 \
+            int64_t yoff = 0;                                                 \
+            for (int d = (int)r->rank - 1; d >= 0; d--) {                      \
+                int64_t coord = tmp % r->shape[d];                             \
+                tmp /= r->shape[d];                                            \
+                int64_t xcoord = (x->shape[d] == 1) ? 0 : coord;               \
+                int64_t ycoord = (y->shape[d] == 1) ? 0 : coord;               \
+                roff += coord  * r->strides[d];                                \
+                xoff += xcoord * x->strides[d];                                \
+                yoff += ycoord * y->strides[d];                                \
+            }                                                                  \
+                                                                               \
+            br[roff] = OP(bx[xoff], by[yoff]);                                 \
+        }                                                                      \
     }
 
 #define mag_sadd(x, y) ((x)+(y))
@@ -2423,308 +2371,170 @@ mag_cpu_blas_impl_binary(e5m10, div, mag_sdiv)
 #undef mag_cpu_blas_impl_unary_scalar
 #undef mag_cpu_blas_impl_unary
 #undef mag_cpu_blas_impl_binary
+/* ---------- helpers --------------------------------------------------- */
+/* right‑aligned offset: works for rank 1‑3                               */
+static inline int64_t mag_offset_rmn(const mag_tensor_t* t,
+                                     int64_t batch, int64_t i, int64_t j)
+{
+    int r = (int)t->rank;               /* 1, 2 or 3 */
 
-#if defined(MAG_OPENBLAS) || defined(MAG_ACCELERATE)
+    int64_t off = 0;
+    if (r == 3) off += batch * t->strides[0],
+                  off += i     * t->strides[1],
+                  off += j     * t->strides[2];
+    else if (r == 2) off += i  * t->strides[0],
+                     off += j  * t->strides[1];
+    else              off += i  * t->strides[0];      /* rank 1: j == 0 */
 
-static void MAG_HOTPROC mag_blas_matmul_e8m23(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
-    mag_tensor_t* r = payload->node;
-    const mag_tensor_t* x = r->op_inputs[0];
-    const mag_tensor_t* y = r->op_inputs[1];
-    mag_e8m23_t* br = mag_e8m23p_mut(r);
+    return off;
+}
+
+/* ----------------- fixed matmul --------------------------------------- */
+static void MAG_HOTPROC
+mag_blas_matmul_e8m23(const mag_compute_payload_t* payload,
+                      mag_kernel_context_t*       ctx)
+{
+    (void)ctx;
+    if (payload->thread_idx != 0) return;             /* single thread */
+
+    mag_tensor_t*       r  = payload->node;           /* result */
+    const mag_tensor_t* x  = r->op_inputs[0];         /* left   */
+    const mag_tensor_t* y  = r->op_inputs[1];         /* right  */
+
+    mag_e8m23_t*       br = mag_e8m23p_mut(r);
     const mag_e8m23_t* bx = mag_e8m23p(x);
     const mag_e8m23_t* by = mag_e8m23p(y);
-    mag_load_local_storage_group(r, rd, shape);
-    mag_load_local_storage_group(r, rs, strides);
-    mag_load_local_storage_group(x, xd, shape);
-    mag_load_local_storage_group(x, xs, strides);
-    mag_load_local_storage_group(y, yd, shape);
-    mag_load_local_storage_group(y, ys, strides);
-    int64_t ti = payload->thread_idx;
-    if (ti != 0) return;
-    mag_assert2(mag_tensor_is_contiguous(x) && mag_tensor_is_contiguous(y) && mag_tensor_is_contiguous(r));
-    bool trans_a = mag_tensor_is_transposed(x);
-    if (x->op == MAG_OP_CLONE && x->op_inputs[0]) trans_a |= mag_tensor_is_transposed(x->op_inputs[0]);
-    bool trans_b = mag_tensor_is_transposed(y);
-    if (y->op == MAG_OP_CLONE && y->op_inputs[0]) trans_b |= mag_tensor_is_transposed(y->op_inputs[0]);
-    int64_t b2 = yd2/xd2;
-    int64_t b3 = yd3/xd3;
-    int64_t b4 = yd4/xd4;
-    int64_t b5 = yd5/xd5;
-    for (int64_t i5=0; i5 < xd5; ++i5) {
-        for (int64_t i4=0; i4 < xd4; ++i4) {
-            for (int64_t i3=0; i3 < xd3; ++i3) {
-                for (int64_t i2=0; i2 < xd2; ++i2) {
-                    int64_t xi5 = i5/b5;
-                    int64_t xi4 = i4/b4;
-                    int64_t xi3 = i3/b3;
-                    int64_t xi2 = i2/b2;
-                    const mag_e8m23_t* px = bx + xi5*xs5 + xi4*xs4 + xi3*xs3 + xi2*xs2;
-                    const mag_e8m23_t* py = by + i5*ys5 + i4*ys4 + i3*ys3 + i2*ys2;
-                    mag_e8m23_t* pr = br + i5*rs5 + i4*rs4 + i3*rs3 + i2*rs2;
-                    mag_bnd_chk(pr, br, mag_tensor_get_data_size(r));
-                    mag_bnd_chk(px, bx, mag_tensor_get_data_size(x));
-                    mag_bnd_chk(py, by, mag_tensor_get_data_size(y));
-                    cblas_sgemm(
-                        CblasRowMajor,
-                        trans_a ? CblasTrans : CblasNoTrans,
-                        trans_b ? CblasTrans : CblasNoTrans,
-                        rd0,
-                        yd1,
-                        xd1,
-                        1.0f,
-                        px, xd1,
-                        py, yd1,
-                        0.0f,
-                        pr, yd1
-                    );
-                }
-            }
+
+    /* -------- determine M,K,N and batch ------------------------------ */
+    int64_t M, N, K;
+    if (r->rank == 1) {          /* vector result */
+        M = r->shape[0];  N = 1;
+    } else {                     /* rank 2 or 3 */
+        M = r->shape[r->rank-2];
+        N = r->shape[r->rank-1];
+    }
+    K = x->shape[x->rank-1];
+
+    int64_t batch = (r->rank == 3) ? r->shape[0] : 1;
+    int64_t bx_batch = (x->rank == 3) ? x->shape[0] : 1;
+    int64_t by_batch = (y->rank == 3) ? y->shape[0] : 1;
+
+    /* -------- BLAS requires contiguous row‑major --------------------- */
+    bool x_row = mag_tensor_is_contiguous(x) && x->strides[x->rank-1]==1;
+    bool y_row = mag_tensor_is_contiguous(y) && (y->rank==1 || y->strides[y->rank-1]==1);
+    bool r_row = mag_tensor_is_contiguous(r) && (r->rank==1 || r->strides[r->rank-1]==1);
+
+    mag_e8m23_t* xbuf = (*mag_alloc)(0, sizeof(mag_e8m23_t)*M*K);
+    mag_e8m23_t* ybuf = (*mag_alloc)(0, sizeof(mag_e8m23_t)*K*N);
+    mag_e8m23_t* rbuf = (*mag_alloc)(0, sizeof(mag_e8m23_t)*M*N);
+
+    for (int64_t b = 0; b < batch; ++b) {
+
+        int64_t xb = (bx_batch == 1) ? 0 : b;
+        int64_t yb = (by_batch == 1) ? 0 : b;
+
+        const mag_e8m23_t* px = bx + mag_offset_rmn(x, xb, 0, 0);
+        const mag_e8m23_t* py = by + mag_offset_rmn(y, yb, 0, 0);
+        mag_e8m23_t*       pr = br + mag_offset_rmn(r,  b,  0, 0);
+
+        const mag_e8m23_t* A = px;
+        const mag_e8m23_t* B = py;
+        int lda = K, ldb = N, ldc = N;
+
+        if (!x_row) {
+            for (int64_t i=0;i<M;++i)
+                for (int64_t k=0;k<K;++k)
+                    xbuf[i*K+k] = px[mag_offset_rmn(x, xb, i, k)];
+            A = xbuf;
+        }
+        if (!y_row) {
+            for (int64_t k=0;k<K;++k)
+                for (int64_t n=0;n<N;++n)
+                    ybuf[k*N+n] = (y->rank==1)
+                                   ? py[k]                    /* vector */
+                                   : py[mag_offset_rmn(y, yb, k, n)];
+            B = ybuf;
+        }
+
+        if (!r_row) {
+            cblas_sgemm(CblasRowMajor,CblasNoTrans,CblasNoTrans,
+                        (int)M,(int)N,(int)K,1.0f,(const float*)A,lda,
+                                            (const float*)B,ldb,
+                                            0.0f,(float*)rbuf,N);
+            for (int64_t i=0;i<M;++i)
+                pr[mag_offset_rmn(r,b,i,0)] = rbuf[i*N];
+        } else {
+            cblas_sgemm(CblasRowMajor,CblasNoTrans,CblasNoTrans,
+                        (int)M,(int)N,(int)K,1.0f,(const float*)A,lda,
+                                            (const float*)B,ldb,
+                                            0.0f,(float*)pr,ldc);
         }
     }
+
+    (*mag_alloc)(xbuf, 0);
+    (*mag_alloc)(ybuf, 0);
+    (*mag_alloc)(rbuf, 0);
 }
 
-#else
-
-static void MAG_HOTPROC mag_sgemm(
-    const bool trans_a, const bool trans_b,
-    const int64_t M, const int64_t N, const int64_t K,
-    const mag_e8m23_t* A, const int64_t lda,
-    const mag_e8m23_t* B, const int64_t ldb,
-    mag_e8m23_t* C, const int64_t ldc
-) {
-    for (int64_t i=0; i < M; i++) {
-        for (int64_t j=0; j < N; j++) {
-            mag_e8m23_t sum = 0.0f;
-            if (!trans_a && !trans_b) {
-                for (int64_t p=0; p < K; p++) {
-                    sum += A[i*lda + p] * B[p*ldb + j];
-                }
-            } else if (!trans_a && trans_b) {
-                for (int64_t p=0; p < K; p++) {
-                    sum += A[i*lda + p] * B[j*ldb + p];
-                }
-            } else if (trans_a && !trans_b) {
-                for (int64_t p=0; p < K; p++) {
-                    sum += A[p*lda + i] * B[p*ldb + j];
-                }
-            } else {
-                for (int64_t p=0; p < K; p++) {
-                    sum += A[p*lda + i] * B[j*ldb + p];
-                }
-            }
-            C[i*ldc + j] = sum * C[i*ldc + j];
-        }
+static inline int64_t mag_offset_from_flat(const mag_tensor_t* t, int64_t idx)
+{
+    int64_t off = 0;
+    for (int d = (int)t->rank - 1; d >= 0; --d) {
+        int64_t coord = idx % t->shape[d];
+        idx          /= t->shape[d];
+        off += coord * t->strides[d];
     }
+    return off;
 }
 
-static void MAG_HOTPROC mag_blas_matmul_e8m23(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
-    mag_tensor_t* r = payload->node;
-    const mag_tensor_t* x = r->op_inputs[0];
-    const mag_tensor_t* y = r->op_inputs[1];
-    mag_e8m23_t* br = mag_e8m23p_mut(r);
+
+static void MAG_HOTPROC
+mag_blas_repeat_back_e8m23(const mag_compute_payload_t* payload,
+                           mag_kernel_context_t*       ctx)
+{
+    (void)ctx;
+    if (payload->thread_idx != 0) return;           /* single thread */
+
+    mag_tensor_t*       r = payload->node;          /* small grad dst */
+    const mag_tensor_t* x = r->op_inputs[0];        /* big   grad src */
+
+    mag_e8m23_t*       br = mag_e8m23p_mut(r);
     const mag_e8m23_t* bx = mag_e8m23p(x);
-    const mag_e8m23_t* by = mag_e8m23p(y);
-    mag_load_local_storage_group(r, rd, shape);
-    mag_load_local_storage_group(r, rs, strides);
-    mag_load_local_storage_group(x, xd, shape);
-    mag_load_local_storage_group(x, xs, strides);
-    mag_load_local_storage_group(y, yd, shape);
-    mag_load_local_storage_group(y, ys, strides);
-    int64_t ti = payload->thread_idx;
-    if (ti != 0) return;
-    bool trans_a = mag_tensor_is_transposed(x);
-    if (x->op == MAG_OP_CLONE && x->op_inputs[0]) trans_a |= mag_tensor_is_transposed(x->op_inputs[0]);
-    bool trans_b = mag_tensor_is_transposed(y);
-    if (y->op == MAG_OP_CLONE && y->op_inputs[0]) trans_b |= mag_tensor_is_transposed(y->op_inputs[0]);
-    memset(br, 0, mag_tensor_get_data_size(r));
-    int64_t b2 = yd2/xd2;
-    int64_t b3 = yd3/xd3;
-    int64_t b4 = yd4/xd4;
-    int64_t b5 = yd5/xd5;
-    for (int64_t i5=0; i5 < xd5; ++i5) {
-        for (int64_t i4=0; i4 < xd4; ++i4) {
-            for (int64_t i3=0; i3 < xd3; ++i3) {
-                for (int64_t i2=0; i2 < xd2; ++i2) {
-                    int64_t xi5 = i5/b5;
-                    int64_t xi4 = i4/b4;
-                    int64_t xi3 = i3/b3;
-                    int64_t xi2 = i2/b2;
-                    const mag_e8m23_t* px = bx + xi5*xs5 + xi4*xs4 + xi3*xs3 + xi2*xs2;
-                    const mag_e8m23_t* py = by + i5*ys5 + i4*ys4 + i3*ys3 + i2*ys2;
-                    mag_e8m23_t* pr = br + i5*rs5 + i4*rs4 + i3*rs3 + i2*rs2;
-                    mag_bnd_chk(pr, br, mag_tensor_get_data_size(r));
-                    mag_bnd_chk(px, bx, mag_tensor_get_data_size(x));
-                    mag_bnd_chk(py, by, mag_tensor_get_data_size(y));
-                    mag_sgemm(
-                        trans_a,
-                        trans_b,
-                        rd0,
-                        yd1,
-                        xd1,
-                        px, xd1,
-                        py, yd1,
-                        pr, yd1
-                    );
-                }
+
+    /* 0. clear result -------------------------------------------------- */
+    for (int64_t i = 0; i < r->numel; ++i)
+        br[mag_offset_from_flat(r, i)] = 0;
+
+    /* 1. pre‑compute right‑align shift -------------------------------- */
+    int rx = (int)r->rank;
+    int xx = (int)x->rank;
+    int shift = xx - rx;            /* how many leading dims x has */
+
+    /* 2. accumulate ---------------------------------------------------- */
+    for (int64_t flat = 0; flat < x->numel; ++flat) {
+
+        /* a) coordinates for x (right‑most first) -------------------- */
+        int64_t tmp   = flat;
+        int64_t xoff  = 0;
+        int64_t roff  = 0;
+
+        for (int d = xx - 1; d >= 0; --d) {
+            int64_t coord = tmp % x->shape[d];
+            tmp          /= x->shape[d];
+
+            xoff += coord * x->strides[d];
+
+            /* map to r’s dims (if any) ------------------------------- */
+            int rd = d - shift;
+            if (rd >= 0) {                             /* dim exists in r */
+                int64_t rcoord = coord % r->shape[rd]; /* fold */
+                roff += rcoord * r->strides[rd];
             }
         }
+        br[roff] += bx[xoff];
     }
 }
 
-#endif
-
-static void MAG_HOTPROC mag_hgemm(
-    const bool trans_a, const bool trans_b,
-    const int64_t M, const int64_t N, const int64_t K,
-    const mag_e5m10_t* A, const int64_t lda,
-    const mag_e5m10_t* B, const int64_t ldb,
-    mag_e5m10_t* C, const int64_t ldc
-) {
-    for (int64_t i=0; i < M; i++) {
-        for (int64_t j=0; j < N; j++) {
-            mag_e8m23_t sum = 0.0f;
-            if (!trans_a && !trans_b) {
-                for (int64_t p=0; p < K; p++) {
-                    sum += mag_e5m10_cvt_e8m23(A[i*lda + p]) * mag_e5m10_cvt_e8m23(B[p*ldb + j]);
-                }
-            } else if (!trans_a && trans_b) {
-                for (int64_t p=0; p < K; p++) {
-                    sum += mag_e5m10_cvt_e8m23(A[i*lda + p]) * mag_e5m10_cvt_e8m23(B[j*ldb + p]);
-                }
-            } else if (trans_a && !trans_b) {
-                for (int64_t p=0; p < K; p++) {
-                    sum += mag_e5m10_cvt_e8m23(A[p*lda + i]) * mag_e5m10_cvt_e8m23(B[p*ldb + j]);
-                }
-            } else {
-                for (int64_t p=0; p < K; p++) {
-                    sum += mag_e5m10_cvt_e8m23(A[p*lda + i]) * mag_e5m10_cvt_e8m23(B[j*ldb + p]);
-                }
-            }
-            C[i*ldc + j] = mag_e8m23_cvt_e5m10(sum * mag_e5m10_cvt_e8m23(C[i*ldc + j]));
-        }
-    }
-}
-static void MAG_HOTPROC mag_blas_matmul_e5m10(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
-    mag_tensor_t* r = payload->node;
-    const mag_tensor_t* x = r->op_inputs[0];
-    const mag_tensor_t* y = r->op_inputs[1];
-    mag_e5m10_t* br = mag_e5m10p_mut(r);
-    const mag_e5m10_t* bx = mag_e5m10p(x);
-    const mag_e5m10_t* by = mag_e5m10p(y);
-    mag_load_local_storage_group(r, rd, shape);
-    mag_load_local_storage_group(r, rs, strides);
-    mag_load_local_storage_group(x, xd, shape);
-    mag_load_local_storage_group(x, xs, strides);
-    mag_load_local_storage_group(y, yd, shape);
-    mag_load_local_storage_group(y, ys, strides);
-    int64_t ti = payload->thread_idx;
-    if (ti != 0) return;
-    bool trans_a = mag_tensor_is_transposed(x);
-    if (x->op == MAG_OP_CLONE && x->op_inputs[0]) trans_a |= mag_tensor_is_transposed(x->op_inputs[0]);
-    bool trans_b = mag_tensor_is_transposed(y);
-    if (y->op == MAG_OP_CLONE && y->op_inputs[0]) trans_b |= mag_tensor_is_transposed(y->op_inputs[0]);
-    memset(br, 0, mag_tensor_get_data_size(r));
-    int64_t b2 = yd2/xd2;
-    int64_t b3 = yd3/xd3;
-    int64_t b4 = yd4/xd4;
-    int64_t b5 = yd5/xd5;
-    for (int64_t i5=0; i5 < xd5; ++i5) {
-        for (int64_t i4=0; i4 < xd4; ++i4) {
-            for (int64_t i3=0; i3 < xd3; ++i3) {
-                for (int64_t i2=0; i2 < xd2; ++i2) {
-                    int64_t xi5 = i5/b5;
-                    int64_t xi4 = i4/b4;
-                    int64_t xi3 = i3/b3;
-                    int64_t xi2 = i2/b2;
-                    const mag_e5m10_t* px = bx + xi5*xs5 + xi4*xs4 + xi3*xs3 + xi2*xs2;
-                    const mag_e5m10_t* py = by + i5*ys5 + i4*ys4 + i3*ys3 + i2*ys2;
-                    mag_e5m10_t* pr = br + i5*rs5 + i4*rs4 + i3*rs3 + i2*rs2;
-                    mag_bnd_chk(pr, br, mag_tensor_get_data_size(r));
-                    mag_bnd_chk(px, bx, mag_tensor_get_data_size(x));
-                    mag_bnd_chk(py, by, mag_tensor_get_data_size(y));
-                    mag_hgemm(
-                        trans_a,
-                        trans_b,
-                        rd0,
-                        yd1,
-                        xd1,
-                        px, xd1,
-                        py, yd1,
-                        pr, yd1
-                    );
-                }
-            }
-        }
-    }
-}
-
-
-static void MAG_HOTPROC mag_blas_repeat_back_e8m23(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
-    mag_tensor_t* r = payload->node;
-    const mag_tensor_t* x = r->op_inputs[0];
-    mag_e8m23_t* br = mag_e8m23p_mut(r);
-    const mag_e8m23_t* bx = mag_e8m23p(x);
-    mag_load_local_storage_group(r, rd, shape);
-    mag_load_local_storage_group(r, rs, strides);
-    mag_load_local_storage_group(x, xd, shape);
-    mag_load_local_storage_group(x, xs, strides);
-    /* TODO: support transposed tensors */
-    mag_assert2(rs0 == 1);
-    mag_assert2(xs0 == 1)
-    const int64_t rc0 = xd0/rd0;
-    const int64_t rc1 = xd1/rd1;
-    const int64_t rc2 = xd2/rd2;
-    const int64_t rc3 = xd3/rd3;
-    const int64_t rc4 = xd4/rd4;
-    const int64_t rc5 = xd5/rd5;
-    if (mag_tensor_is_contiguous(r)) {
-        mag_vfill_e8m23(r->numel, br, 0);
-    } else {
-        for (int64_t i5=0; i5 < rd5; ++i5) {
-            for (int64_t i4=0; i4 < rd4; ++i4) {
-                for (int64_t i3=0; i3 < rd3; ++i3) {
-                    for (int64_t i2=0; i2 < rd2; ++i2) {
-                        for (int64_t i1=0; i1 < rd1; ++i1) {
-                            mag_e8m23_t* p_r = br + i5*rs5 + i4*rs4 + i3*rs3 + i2*rs2 + i1*rs1;
-                            mag_bnd_chk(p_r, br, mag_tensor_get_data_size(r));
-                            mag_vfill_e8m23(rd0, p_r, 0);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    for (int64_t i5=0; i5 < rc5; ++i5) {
-        for (int64_t k5=0; k5 < rd5; ++k5) {
-            for (int64_t i4=0; i4 < rc4; ++i4) {
-                for (int64_t k4=0; k4 < rd4; ++k4) {
-                    for (int64_t i3=0; i3 < rc3; ++i3) {
-                        for (int64_t k3=0; k3 < rd3; ++k3) {
-                            for (int64_t i2=0; i2 < rc2; ++i2) {
-                                for (int64_t k2=0; k2 < rd2; ++k2) {
-                                    for (int64_t i1=0; i1 < rc1; ++i1) {
-                                        for (int64_t k1=0; k1 < rd1; ++k1) {
-                                            for (int64_t i0=0; i0 < rc0; ++i0) {
-                                                mag_e8m23_t* p_r = br + k5*rs5+ k4*rs4 + k3*rs3 + k2*rs2 + k1*rs1;
-                                                const mag_e8m23_t* p_x = bx
-                                                + (i5*rd5 + k5)*xs5 + (i4*rd4 + k4)*xs4
-                                                + (i3*rd3 + k3)*xs3 + (i2*rd2 + k2)*xs2
-                                                + (i1*rd1 + k1)*xs1 + (i0*rd0)     *xs0;
-                                                mag_bnd_chk(p_r, br, mag_tensor_get_data_size(r));
-                                                mag_bnd_chk(p_x, bx, mag_tensor_get_data_size(x));
-                                                mag_vacc_e8m23(rd0, p_r, p_x);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 static void MAG_HOTPROC mag_blas_repeat_back_e5m10(const mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
     mag_panic("NYI");
@@ -3075,7 +2885,7 @@ static void (*const mag_blas_lut_forward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(c
     },
     [MAG_OP_MATMUL] = {
         [MAG_DTYPE_E8M23] = &mag_blas_matmul_e8m23,
-        [MAG_DTYPE_E5M10] = &mag_blas_matmul_e5m10,
+        [MAG_DTYPE_E5M10] = NULL,
     },
     [MAG_OP_REPEAT_BACK] = {
         [MAG_DTYPE_E8M23] = &mag_blas_repeat_back_e8m23,
@@ -3336,7 +3146,7 @@ static void (*const mag_blas_lut_backward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(
     },
     [MAG_OP_MATMUL] = {
         [MAG_DTYPE_E8M23] = &mag_blas_matmul_e8m23,
-        [MAG_DTYPE_E5M10] = &mag_blas_matmul_e5m10,
+        [MAG_DTYPE_E5M10] = NULL,
     },
     [MAG_OP_REPEAT_BACK] = {
         [MAG_DTYPE_E8M23] = &mag_blas_repeat_back_e8m23,

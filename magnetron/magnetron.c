@@ -1861,11 +1861,14 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
         mag_rc_control_incref(&view->storage->rc_control);
     }
     else (*allocator)(dvc, &t->storage, numbytes, type); /* Else allocate new device memory */
-    for (int i=0; i < MAG_MAX_DIMS; ++i)    /* Copy dimensions and set unused to identity. */
+    for (int i=0; i < MAG_MAX_DIMS; ++i)  {   /* Copy dimensions and set unused to identity. */
         t->shape[i] = i < rank ? dims[i] : 1;
-    *t->strides = 1;
-    for (int i=1; i < MAG_MAX_DIMS; ++i)    /* Calculate strides and check for overflow. */
-        mag_assert2(!mag_imull64_ov(t->strides[i-1], t->shape[i-1], t->strides+i));
+        t->strides[i] = 1;
+    }
+    t->strides[rank-1] = 1;
+    for (int64_t i=rank-2; i >= 0; --i) {
+        mag_assert(!mag_imull64_ov(t->strides[i+1], t->shape[i+1], t->strides+i), "Overflow while computing strides");
+    }
 #ifdef MAG_DEBUG /* If tensor RC sanitize is enabled, insert into tracking list */
     mag_tensor_node_t** head = &ctx->rc_tracked;
     mag_tensor_node_t* node = (*mag_alloc)(NULL, sizeof(*node));
@@ -2401,7 +2404,17 @@ bool mag_tensor_is_permuted(const mag_tensor_t* t) {
 }
 
 bool mag_tensor_is_contiguous(const mag_tensor_t* t) {
-    return *t->strides == 1;
+    int64_t expected_stride = 1;
+    for (int d = (int)t->rank - 1; d >= 0; --d) {
+        int64_t size_d = t->shape[d];
+        if (size_d == 1) {
+            continue;
+        }
+        if (t->strides[d] != expected_stride)
+            return false;
+        expected_stride *= size_d;
+    }
+    return true;
 }
 
 mag_tensor_t* mag_tensor_get_grad(const mag_tensor_t* t) {
