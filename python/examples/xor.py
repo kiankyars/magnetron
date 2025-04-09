@@ -1,51 +1,36 @@
-# (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+import magnetron as mag
+import magnetron.nn as nn
+import magnetron.optim as optim
 
-from magnetron import Tensor
-from magnetron.model import SequentialModel, DenseLayer
-import matplotlib.pyplot as plt
 
-EPOCHS: int = 10000
-RATE: float = 0.1
+class XOR(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.l1 = nn.Linear(2, 2)
+        self.l2 = nn.Linear(2, 1)
 
-# Inputs: shape (4, 2)
-inputs = Tensor.const([
-    [0.0, 0.0],
-    [0.0, 1.0],
-    [1.0, 0.0],
-    [1.0, 1.0]
-])
+    def forward(self, x: mag.Tensor) -> mag.Tensor:
+        x = self.l1(x).tanh()
+        x = self.l2(x).tanh()
+        return x
 
-# Targets: shape (4, 1)
-targets = Tensor.const([
-    [0.0],
-    [1.0],
-    [1.0],
-    [0.0]
-])
 
-mlp = SequentialModel([
-    DenseLayer(2, 8),
-    DenseLayer(8, 1)
-])
+model = XOR()
+optimizer = optim.SGD(model.parameters(), lr=1e-1)
+criterion = nn.MSELoss()
 
-# Train
-losses = mlp.train(inputs, targets, epochs=EPOCHS, rate=RATE)
+x = mag.Tensor.const([[0, 0], [0, 1], [1, 0], [1, 1]])
+y = mag.Tensor.const([[0], [1], [1], [0]])
 
-# Inference
-test_points = [
-    (0.0, 0.0),
-    (0.0, 1.0),
-    (1.0, 0.0),
-    (1.0, 1.0),
-]
+for epoch in range(2000):
+    y_hat = model(x)
+    loss = criterion(y_hat, y)
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()
+    if epoch % 100 == 0:
+        print(f'Epoch: {epoch}, Loss: {loss.item()}')
 
-for (x_val, y_val) in test_points:
-    result = mlp.forward(Tensor.const([[x_val], [y_val]]))[0]
-    print(f"{x_val} XOR {y_val} => {result:.4f}")
-
-# Plot MSE loss
-plt.plot(list(range(0, EPOCHS)), losses)
-plt.xlabel('Epochs')
-plt.ylabel('MSE Loss')
-plt.title('XOR Problem')
-plt.show()
+with mag.no_grad():
+    y_hat = model(x)
+    print(y_hat.tolist())

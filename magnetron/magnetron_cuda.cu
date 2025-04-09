@@ -1,11 +1,14 @@
 /* (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com> */
 
-#include "magnetron_cuda.cuh"
-
-#include <bit>
+#include <array>
+#include <cstdint>
 #include <algorithm>
 #include <cstdio>
 #include <vector>
+
+#include <cuda.h>
+
+#include  "magnetron_internal.h"
 
 namespace mag::cuda {
     /* Driver result check. */
@@ -26,61 +29,145 @@ namespace mag::cuda {
             } \
         } while (0)
 
-    #define mag_cu_assert(expr, msg, ...) \
-        if (!(expr)) [[unlikely]] { \
-            mag_panic("%s:%d Assertion failed: " #expr " <- " msg, __FILE__, __LINE__, ## __VA_ARGS__);\
-        }
-    #define mag_cu_assert2(expr) mag_cu_assert(expr, "")
+    constexpr std::size_t max_devices = 32;
 
-    static constinit bool s_is_init {};
-    static constinit std::int32_t active_device_id {};
-    static std::vector<physical_device> s_devices {};
+    struct physical_device final {
+        std::int32_t id {};             /* Device ID */
+        std::array<char, 128> name {};  /* Device name */
+        std::size_t vram {};            /* Video memory in bytes */
+        std::uint32_t cl {};            /* Compute capability */
+        std::uint32_t nsm {};           /* Number of SMs */
+        std::uint32_t ntpb {};          /* Number of threads per block */
+        std::size_t smpb {};            /* Shared memory per block */
+        std::size_t smpb_opt {};        /* Shared memory per block opt-in */
+        bool has_vmm {};                /* Has virtual memory management */
+        std::size_t vmm_granularity {}; /* Virtual memory management granularity */
+    };
 
-    auto mag_init_device_cuda([[maybe_unused]] mag_ctx_t* ctx) -> mag_compute_device_t* {
-        std::int32_t active_device_id {0}; // TODO: Implement device selection.
-        const physical_device* device {cuda_init(active_device_id)};
-        if (!device) [[unlikely]] { /* No devices available or initialization failed, let runtime fallback to other compute device. */
-            mag_log_error("No CUDA devices with id %d available, using CPU processing", active_device_id);
-            return nullptr;
+    namespace kernels {
+        template <typename T>
+        static __global__ auto broadcast(std::int64_t numel, T* px, T x) -> void {
+            for (std::int64_t i {blockIdx.x*blockDim.x + threadIdx.x}; i < numel; i += gridDim.x*blockDim.x)
+                px[i] = x;
         }
-        auto* dvc {static_cast<mag_compute_device_t*>((*mag_alloc)(nullptr, sizeof(mag_compute_device_t)))};
-        new (dvc) mag_compute_device_t {
-            .name = "GPU",
-            .impl = nullptr,
-            .is_async = true,
-            .type = MAG_COMPUTE_DEVICE_TYPE_GPU_CUDA,
-            .eager_exec_fwd = nullptr,
-            .eager_exec_bwd = nullptr,
-            .alloc_storage = nullptr,
-            .free_storage = nullptr
+
+        template <typename T>
+        static __global__ auto add(std::int64_t numel, T* pr, const T* px, const T* py) -> void {
+            for (std::int64_t i {blockIdx.x*blockDim.x + threadIdx.x}; i < numel; i += gridDim.x*blockDim.x)
+                pr[i] = px[i] + py[i];
+        }
+    }
+
+    static auto add(mag_tensor_t* r) -> void {
+        mag_tensor_t* x {r->op_inputs[0]};
+        mag_tensor_t* y {r->op_inputs[1]};
+        mag_assert2(x->numel == y->numel);
+        mag_assert2(x->numel == r->numel);
+        std::int64_t block_size {256};
+        std::int64_t num_blocks {(r->numel + block_size - 1)/block_size};
+        auto* pr {reinterpret_cast<mag_e8m23_t*>(r->storage.base)};
+        auto* px {reinterpret_cast<mag_e8m23_t*>(x->storage.base)};
+        auto* py {reinterpret_cast<mag_e8m23_t*>(y->storage.base)};
+        kernels::add<<<num_blocks, block_size>>>(r->numel, pr, px, py);
+    }
+
+    static constexpr auto (*const forward_kernels[MAG_OP__NUM])(mag_tensor_t*) -> void = {
+        [MAG_OP_NOP] = nullptr,
+        [MAG_OP_CLONE] = nullptr,
+        [MAG_OP_VIEW] = nullptr,
+        [MAG_OP_TRANSPOSE] = nullptr,
+        [MAG_OP_PERMUTE] = nullptr,
+        [MAG_OP_MEAN] = nullptr,
+        [MAG_OP_MIN] = nullptr,
+        [MAG_OP_MAX] = nullptr,
+        [MAG_OP_SUM] = nullptr,
+        [MAG_OP_ABS] = nullptr,
+        [MAG_OP_NEG] = nullptr,
+        [MAG_OP_LOG] = nullptr,
+        [MAG_OP_SQR] = nullptr,
+        [MAG_OP_SQRT] = nullptr,
+        [MAG_OP_SIN] = nullptr,
+        [MAG_OP_COS] = nullptr,
+        [MAG_OP_STEP] = nullptr,
+        [MAG_OP_EXP] = nullptr,
+        [MAG_OP_SOFTMAX] = nullptr,
+        [MAG_OP_SOFTMAX_DV] = nullptr,
+        [MAG_OP_SIGMOID] = nullptr,
+        [MAG_OP_SIGMOID_DV] = nullptr,
+        [MAG_OP_HARD_SIGMOID] = nullptr,
+        [MAG_OP_SILU] = nullptr,
+        [MAG_OP_SILU_DV] = nullptr,
+        [MAG_OP_TANH] = nullptr,
+        [MAG_OP_TANH_DV] = nullptr,
+        [MAG_OP_RELU] = nullptr,
+        [MAG_OP_RELU_DV] = nullptr,
+        [MAG_OP_GELU] = nullptr,
+        [MAG_OP_GELU_DV] = nullptr,
+        [MAG_OP_ADD] = &add,
+        [MAG_OP_SUB] = nullptr,
+        [MAG_OP_MUL] = nullptr,
+        [MAG_OP_DIV] = nullptr,
+        [MAG_OP_ADDS] = nullptr,
+        [MAG_OP_SUBS] = nullptr,
+        [MAG_OP_MULS] = nullptr,
+        [MAG_OP_DIVS] = nullptr,
+        [MAG_OP_POWS] = nullptr,
+        [MAG_OP_MATMUL] = nullptr,
+    };
+
+    static auto broadcast_storage_buffer(mag_storage_buffer_t* sto, size_t offs, const void* src, size_t stride) {
+        mag_assert2(stride == 4);
+        auto numel {static_cast<std::int64_t>(sto->size/4)};
+        std::int64_t block_size {256};
+        std::int64_t num_blocks {(numel + block_size - 1)/block_size};
+        mag_e8m23_t* dst {reinterpret_cast<mag_e8m23_t*>(sto->base+offs)};
+        mag_e8m23_t x {*reinterpret_cast<const mag_e8m23_t*>(src)};
+        kernels::broadcast<<<num_blocks, block_size>>>(numel, dst+offs, x);
+        cudaDeviceSynchronize();
+    }
+
+    static auto cpy_host_device(mag_storage_buffer_t* sto, size_t offs, const void* src, size_t sz) -> void {
+        mag_cu_chk_rt(cudaMemcpy(reinterpret_cast<void*>(sto->base+offs), src, sz, cudaMemcpyHostToDevice));
+    }
+
+    static auto cpy_device_host(mag_storage_buffer_t* sto, size_t offs, void* dst, size_t sz) -> void {
+        mag_cu_chk_rt(cudaMemcpy(dst, reinterpret_cast<void*>(sto->base+offs), sz, cudaMemcpyDeviceToHost));
+    }
+
+    static auto alloc_storage_buffer(mag_compute_device_t* dvc, mag_storage_buffer_t* out, std::size_t sz) -> void {
+        void* base;
+        mag_cu_chk_rt(cudaMalloc(&base, sz));
+        *out = mag_storage_buffer_t {
+            .base = reinterpret_cast<std::uintptr_t>(base),
+            .size = sz,
+            .alignment = 256,
+            .granularity = 0, // TODO
+            .dtype = MAG_DTYPE_E8M23, // TODO
+            .host = dvc,
+            .broadcast = &broadcast_storage_buffer,
+            .transfer = nullptr // TODO
         };
-        double vram;
-        const char* unit;
-        mag_humanize_memory_size(device->vram, &vram, &unit);
-        std::snprintf(dvc->name, sizeof(dvc->name), "%s - %s - %.03f %s VRAM", mag_device_type_get_name(dvc->type), device->name.data(), vram, unit);
-        return dvc;
     }
 
-    void mag_destroy_device_cuda(mag_compute_device_t* dvc) {
-        s_is_init = false;
-        s_devices.clear();
-        dvc->~mag_compute_device_t();
-        (*mag_alloc)(dvc, 0);
+    static auto free_tensor_buffer(mag_compute_device_t* dvc, mag_storage_buffer_t* buf) -> void {
+        mag_cu_chk_rt(cudaFree(reinterpret_cast<void*>(buf->base)));
     }
 
-    /*
-    ** Initialize CUDA runtime. Returns empty span if initialization failed or not devices are available.
-    ** Normally, we panic when some CUDA runtime function fails, but in this case we just return an empty span,
-    ** to allow the runtime to fall back to CPU processing, if no CUDA devices are available.
-    */
-    auto cuda_init(std::int32_t use_device) -> const physical_device* {
-        if (s_is_init) return &s_devices[active_device_id];
+    static auto exec_fwd(mag_compute_device_t* dvc, mag_tensor_t* root) -> void {
+        mag_assert2(root->op < MAG_OP__NUM);
+        (*forward_kernels[root->op])(root);
+        cudaDeviceSynchronize();
+    }
+
+    extern "C" auto mag_init_device_cuda([[maybe_unused]] mag_ctx_t* ctx) -> mag_compute_device_t* {
+        std::int32_t requested_device_id {0};
         std::int32_t numgpus {};
         if (cudaGetDeviceCount(&numgpus) != cudaSuccess) [[unlikely]] return nullptr;
         if (numgpus < 1 || numgpus > max_devices) [[unlikely]] return nullptr;
-        s_devices.reserve(numgpus);
+        std::vector<physical_device> device_list {};
+        device_list.reserve(numgpus);
         for (std::int32_t id {}; id < numgpus; ++id) { /* Iterate over devices */
-            physical_device& dvc {s_devices.emplace_back()};
+            physical_device& dvc {device_list.emplace_back()};
             CUdevice cu_dvc {};
             std::int32_t vmm_support {};
             if (cuDeviceGet(&cu_dvc, id) != CUDA_SUCCESS) [[unlikely]] continue; /* Get device handle */
@@ -95,8 +182,8 @@ namespace mag::cuda {
             dvc.has_vmm = !!vmm_support;
             cudaDeviceProp props {};
             if (cudaGetDeviceProperties(&props, id) != cudaSuccess) [[unlikely]] continue; /* Get device properties */
+            std::snprintf(dvc.name.data(), dvc.name.size(), "%s", props.name);
             dvc.id = id;
-            dvc.name = std::bit_cast<decltype(dvc.name)>(props.name);
             dvc.nsm = props.multiProcessorCount;
             dvc.smpb = props.sharedMemPerBlock;
             dvc.smpb_opt = props.sharedMemPerBlockOptin;
@@ -104,55 +191,31 @@ namespace mag::cuda {
             dvc.ntpb = props.maxThreadsPerBlock;
             dvc.vram = props.totalGlobalMem;
         }
-        active_device_id = std::clamp(use_device, 0, numgpus-1);
-        s_is_init = true;
-        return &s_devices[active_device_id];
-    }
-
-    vm_pool::vm_pool(const physical_device& dvc) {
-        m_granularity = dvc.vmm_granularity;
-        m_dvc_id = dvc.id;
-    }
-
-    vm_pool::~vm_pool() {
-        if (m_dvc_address) {
-            mag_cu_chk_rdv(cuMemUnmap(m_dvc_address, m_cap));
-            mag_cu_chk_rdv(cuMemAddressFree(m_dvc_address, max_size));
+        if (device_list.empty()) [[unlikely]] { /* No devices available or initialization failed, let runtime fallback to other compute device. */
+            mag_log_error("No CUDA devices with id %d available, using CPU processing", requested_device_id);
+            return nullptr;
         }
+        auto& active_device {device_list[std::clamp(requested_device_id, 0, numgpus-1)]};
+        auto* dvc {static_cast<mag_compute_device_t*>((*mag_alloc)(nullptr, sizeof(mag_compute_device_t)))};
+        new (dvc) mag_compute_device_t {
+            .name = "GPU",
+            .impl = nullptr,
+            .is_async = true,
+            .type = MAG_COMPUTE_DEVICE_TYPE_GPU_CUDA,
+            .eager_exec_fwd = &exec_fwd,
+            .eager_exec_bwd = nullptr,
+            .alloc_storage = nullptr, // todo
+            .free_storage = nullptr // todo
+        };
+        double vram;
+        const char* unit;
+        mag_humanize_memory_size(active_device.vram, &vram, &unit);
+        std::snprintf(dvc->name, sizeof(dvc->name), "%s - %s - %.03f %s VRAM", mag_device_type_get_name(dvc->type), active_device.name.data(), vram, unit);
+        return dvc;
     }
 
-    auto vm_pool::alloc(std::size_t sz, std::size_t align, std::size_t& out_sz) -> void* {
-        sz = (sz+align-1)&-align; /* Overallocate to ensure alignment. */
-        if (std::size_t free {m_cap-m_needle}; sz > free) {
-            std::size_t reserve {sz-free};
-            reserve = (reserve+m_granularity-1)&-m_granularity; /* Align to granularity. */
-            mag_cu_assert2(m_cap+reserve <= max_size);
-            CUmemAllocationProp prop {};
-            prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
-            prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
-            prop.location.id = m_dvc_id;
-            CUmemGenericAllocationHandle handle {};
-            mag_cu_chk_rdv(cuMemCreate(&handle, reserve, &prop, 0));
-            if (!m_dvc_address) /* Reserve virtual memory */
-                mag_cu_chk_rdv(cuMemAddressReserve(&m_dvc_address, max_size, 0, 0, 0));
-            mag_cu_chk_rdv(cuMemMap(m_dvc_address+m_cap, reserve, 0, handle, 0));
-            mag_cu_chk_rdv(cuMemRelease(handle)); /* Release handle */
-            CUmemAccessDesc access {};
-            access.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
-            access.location.id = m_dvc_id;
-            access.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
-            mag_cu_chk_rdv(cuMemSetAccess(m_dvc_address+m_cap, reserve, &access, 1)); /* Set access */
-            m_cap += reserve;
-        }
-        mag_cu_assert2(m_dvc_address);
-        auto* p {reinterpret_cast<void*>(m_dvc_address+m_needle)};
-        out_sz = sz;
-        m_needle += sz;
-        return p;
-    }
-
-    auto vm_pool::free(void* ptr, std::size_t sz) -> void {
-        m_needle -= sz;
-        mag_cu_assert2(ptr == reinterpret_cast<void*>(m_dvc_address + m_needle));
+    extern "C" auto mag_destroy_device_cuda(mag_compute_device_t* dvc) -> void {
+        dvc->~mag_compute_device_t();
+        (*mag_alloc)(dvc, 0);
     }
 }

@@ -1,7 +1,0 @@
-cffi
-wheel
-setuptools
-pytest
-numpy
-matplotlib
-cycler

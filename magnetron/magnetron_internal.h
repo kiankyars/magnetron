@@ -3,8 +3,9 @@
 #ifndef MAGNETRON_INTERNAL_H
 #define MAGNETRON_INTERNAL_H
 
-#include "magnetron.h"
+#include <magnetron/magnetron.h>
 
+#include <math.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,9 +52,17 @@
 extern "C" {
 #endif
 
+#define mag_assert_name2(name, line) name ## line
+#define mag_assert_name(line) mag_assert_name2(_assert_, line)
+#define mag_static_assert(expr) extern void mag_assert_name(__LINE__)(bool STATIC_ASSERTION_FAILED[((expr)?1:-1)])
+#define MAG_SEP ,
+
 #define MAG_GELU_COEFF 0.044715f
-#define MAG_GRA_FWD MAG_GRAPH_EVAL_ORDER_FORWARD
-#define MAG_GRA_BWD MAG_GRAPH_EVAL_ORDER_REVERSE
+typedef enum mag_gra_eval_t {
+    MAG_GRA_FWD,
+    MAG_GRA_BWD,
+    MAG_GRA_INIT
+} mag_gra_eval_t;
 #define MAG_GRA_LEN 2
 #define MAG_MAX_CPUS 8192
 #define MAG_MAX_NUMA_NODES 64
@@ -209,6 +218,16 @@ static MAG_AINLINE bool mag_atomic_compare_exchange_strong(volatile mag_atomic_t
 mag_static_assert(sizeof(0u) == 4);
 mag_static_assert(sizeof(0ull) == 8);
 
+/*
+** Because multiple floating-point formats with the same bit width exist (e.g. f16, bf16), all floats are described by their exponent (E) and mantissa (M) bits.
+** The builtin float keyword is only used for the public API in magnetron.h. The internal code uses the following types:
+*/
+typedef double mag_e11m52_t;            /* IEEE 754 double precision float. */
+typedef float mag_e8m23_t;              /* IEEE 754 single precision float. */
+typedef struct mag_e5m10_t { uint16_t bits; } mag_e5m10_t;  /* IEEE 754 half precision float. */
+
+#define mag_u64x(hi, lo) (((uint64_t)0x##hi<<32)+(uint64_t)0x##lo)
+
 #ifdef __BYTE_ORDER
 #if defined(__BIG_ENDIAN) && (__BYTE_ORDER == __BIG_ENDIAN)
 #define MAG_BE
@@ -253,12 +272,12 @@ defined(__WIN32__) || defined(__TOS_WIN__) || defined(__WINDOWS__)
 #endif
 
 #ifdef __cpp_lib_hardware_interference_size
-/* Hardware destructive interference size. */
-#define MAG_CACHE_LINE_SIZE hardware_destructive_interference_size
+#define MAG_DESTRUCTIVE_INTERFERENCE_SIZE hardware_destructive_interference_size
 #else
-/* Hardware destructive interference size. */
-#define MAG_CACHE_LINE_SIZE 64
+#define MAG_DESTRUCTIVE_INTERFERENCE_SIZE 64
 #endif
+#define MAG_PAGE_SIZE_4K 0x1000
+#define MAG_PAGE_SIZE_2M 0x200000
 
 static uint32_t MAG_AINLINE mag_bswap32(uint32_t x) { /* Swap bytes for endianess switch. Should be optimized to a (bswap/rev) instruction on modern compilers. */
     #ifdef MAG_BE
@@ -297,7 +316,7 @@ extern MAG_EXPORT bool mag_log_enabled;
 extern MAG_EXPORT void* (*mag_alloc)(void* blk, size_t size);
 extern MAG_EXPORT void* mag_alloc_aligned(size_t size, size_t align);
 extern MAG_EXPORT void mag_free_aligned(void* blk);
-extern MAG_EXPORT void mag_humanize_memory_size(size_t n, double* out, const char** unit);
+extern MAG_EXPORT void mag_humanize_memory_size(size_t n, mag_e11m52_t* out, const char** unit);
 extern MAG_EXPORT uintptr_t mag_thread_id(void);
 
 #define mag_swap(T, a, b) do { T tmp = (a); (a) = (b); (b) = tmp; } while (0)
@@ -341,16 +360,56 @@ extern MAG_EXPORT uintptr_t mag_thread_id(void);
 #define mag_dassert mag_assert
 #define mag_dassert2 mag_assert2
 #else
-#define mag_bnd_chk(ptr, base, n)
+#define mag_bnd_chk(ptr, base, nb_src)
 #define mag_dassert(...)
 #define mag_dassert2(...)
 #endif
 
 /* Increment pointer or size with correct type alignment. */
-static MAG_AINLINE void* mag_pincr(void** p, size_t sz, size_t align) {
+static inline void* mag_pincr(void** p, size_t sz, size_t align) {
     void* pp = (void*)(((uintptr_t)*p+align-1)&-align);
     *p = (void*)((uint8_t*)pp+sz);
     return pp;
+}
+
+/*
+**  Fast u32 division and remainder. Paper:
+**  Torbjörn Granlund and Peter L. Montgomery, "Division by Invariant Integers Using Multiplication", ACM SIGPLAN Notices, Issue 6, Vol 29, 61-72, June 1994.
+**	http://gmplib.org/~tege/divcnst-pldi94.pdf
+*/
+
+typedef struct mag_ivdiv_t {
+    uint32_t s1;
+    uint32_t s2;
+    uint32_t d;
+} mag_ivdiv_t;
+
+#ifdef _MSC_VER
+static inline DWORD mag_clz(DWORD x) {
+    DWORD z = 0;
+    return _BitScanForward(&z, x) ? z : 32;
+}
+#else
+#define mag_clz(x) __builtin_clz(x)
+#endif
+
+static inline mag_ivdiv_t mag_ivdiv_mkdi(uint32_t d) { /* Create packed division info from devisor. */
+    uint32_t l = (d-1) ? 32 - mag_clz((d-1)) : 0;
+    uint32_t s1 = l > 1 ? 1 : l&0xff;
+    uint32_t s2 = !l ? 0 : (l-1)&0xff;
+    mag_ivdiv_t r;
+    r.s1 = s1;
+    r.s2 = s2;
+    r.d = (uint32_t)(((1ull<<l) - d)*0x100000000ull)/d + 1;
+    return r;
+}
+static inline uint32_t mag_ivdiv32(uint32_t x, uint32_t y, mag_ivdiv_t di) { /* r = x / y. Fast division using invariant multiplication. Up to 40x times faster on some chips. */
+    (void)y;
+    uint32_t t = (uint64_t)x*(di.d)>>32;
+    return (t + ((x - t)>>((di.s1)&0xff)))>>(di.s2);
+}
+static inline uint32_t mag_ivrem32(uint32_t x, uint32_t y, mag_ivdiv_t ctx) { /* r = x % y. Fast remainder using invariant multiplication */
+    return x - y*mag_ivdiv32(x, y, ctx);
 }
 
 #ifdef _WIN32
@@ -431,6 +490,7 @@ typedef enum mag_op_t {
     MAG_OP_SIN,
     MAG_OP_COS,
     MAG_OP_STEP,
+    MAG_OP_EXP,
     MAG_OP_SOFTMAX,
     MAG_OP_SOFTMAX_DV,
     MAG_OP_SIGMOID,
@@ -452,39 +512,110 @@ typedef enum mag_op_t {
     MAG_OP_SUBS,
     MAG_OP_MULS,
     MAG_OP_DIVS,
+    MAG_OP_POWS,
     MAG_OP_MATMUL,
+    MAG_OP_REPEAT_BACK,
     MAG_OP__NUM
 } mag_op_t;
 mag_static_assert(MAG_OP_NOP == 0);
-mag_static_assert(MAG_OP_MATMUL+1 == MAG_OP__NUM);
+mag_static_assert(MAG_OP_REPEAT_BACK+1 == MAG_OP__NUM);
 mag_static_assert(MAG_OP__NUM <= 0xff);
 
-typedef enum mag_op_param_type_t {
-    MAG_OP_TPARAM_NONE  = 0,
-    MAG_OP_TPARAM_F32   = 1,
-    MAG_OP_TPARAM_I32   = 2,
-    MAG_OP_TPARAM_U32   = 3,
+typedef enum mag_init_op_t {
+    MAG_IOP_NOP,
+    MAG_IOP_BROADCAST,
+    MAG_IOP_RAND_UNIFORM,
+    MAG_IOP_RAND_NORMAL,
+    MAG_IOP__NUM
+} mag_init_op_t;
 
-    MAG_OP_TPARAM__NUM
-} mag_op_param_type_t;
+typedef enum mag_opp_type_t {
+    MAG_OPP_NONE  = 0,
+    MAG_OPP_E8M23 = 1,    /* fp32 */
+    MAG_OPP_I62   = 2,    /* 62-bit signed integer. Top 2-bits (MSB) will be truncated and must be 0. */
+    MAG_OPP_U62   = 3,    /* 62-bit unsigned integer. Top 2-bits (MSB) will be truncated and must be 0. */
 
-typedef struct mag_op_param_t {
-    mag_op_param_type_t type : 8; /* Parameter type */
-    union {
-        float f32;
-        int32_t i32;
-        uint32_t u32;
-    } x;
-} mag_op_param_t;
+    MAG_OPP__NUM
+} mag_opp_type_t;
+mag_static_assert(MAG_OPP__NUM-1 <= 3); /* Must fit in 2 bits */
+
+/* Operation parameter.
+** Contains a variant of e8m23, int62 and uint62 and contains different data for a specific op.
+*/
+typedef uint64_t mag_opp_t;
+static MAG_AINLINE mag_opp_t mag_opp_pack(uint64_t dat, mag_opp_type_t t) {
+    mag_assert(dat>>(64-2)==0 || (t==MAG_OPP_I62 && (dat>>(64-2) == 3)), "contained value must be a 2-bit integer: %" PRIx64, dat);
+    return (dat<<2)|(3&t);
+}
+static MAG_AINLINE mag_opp_t mag_opp_pack_none(void) { return 0; }
+static MAG_AINLINE mag_opp_t mag_opp_pack_e8m23(mag_e8m23_t x) {
+    union { uint32_t u32; mag_e8m23_t e8m23; } castor = {.e8m23=x};
+    return mag_opp_pack(castor.u32, MAG_OPP_E8M23);
+}
+static MAG_AINLINE mag_opp_t mag_opp_pack_i62(int64_t x) {
+    mag_assert(x >= -(1ll<<61) && x <= ((1ll<<61)-1), "int62 out of range: %" PRIi64, x);
+    return mag_opp_pack(x&((1ull<<62)-1), MAG_OPP_I62);
+}
+static MAG_AINLINE mag_opp_t mag_opp_pack_u62(uint64_t x) { return mag_opp_pack(x, MAG_OPP_U62); }
+static MAG_AINLINE mag_opp_type_t mag_opp_unpack_type(mag_opp_t pa) { return (mag_opp_type_t)(3&pa); }
+static MAG_AINLINE uint64_t mag_opp_unpack_raw_value(mag_opp_t pa) { return pa>>2; }
+static MAG_AINLINE bool mag_opp_is_type(mag_opp_t pa, mag_opp_type_t type) { return (3&pa) == type; }
+static MAG_AINLINE mag_e8m23_t mag_opp_unpack_e8m23_or_panic(mag_opp_t pa) {
+    mag_assert(mag_opp_is_type(pa, MAG_OPP_E8M23), "invalid op param type: %d", mag_opp_unpack_type(pa))
+    union { uint32_t u32; mag_e8m23_t e8m23; } castor = {.u32=(uint32_t)mag_opp_unpack_raw_value(pa)};
+    return castor.e8m23;
+}
+static MAG_AINLINE int64_t mag_opp_unpack_i62_or_panic(mag_opp_t pa) {
+    mag_assert(mag_opp_is_type(pa, MAG_OPP_I62), "invalid op param type: %d", mag_opp_unpack_type(pa))
+    uint64_t v = mag_opp_unpack_raw_value(pa);
+    if (v & (1ull<<61)) v|=(3ull<<62);
+    return (int64_t)v;
+}
+static MAG_AINLINE uint64_t mag_opp_unpack_u62_or_panic(mag_opp_t pa) {
+    mag_assert(mag_opp_is_type(pa, MAG_OPP_U62), "invalid op param type: %d", mag_opp_unpack_type(pa))
+    return mag_opp_unpack_raw_value(pa);
+}
+static MAG_AINLINE mag_e8m23_t mag_opp_unpack_e8m23_or(mag_opp_t pa, mag_e8m23_t fallback) {
+    return mag_opp_is_type(pa, MAG_OPP_E8M23) ? mag_opp_unpack_e8m23_or_panic(pa) : fallback;
+}
+static MAG_AINLINE int64_t mag_opp_unpack_i62_or(mag_opp_t pa, int64_t fallback) {
+    return mag_opp_is_type(pa, MAG_OPP_I62) ? mag_opp_unpack_i62_or_panic(pa) : fallback;
+}
+static MAG_AINLINE uint64_t mag_opp_unpack_u62_or(mag_opp_t pa, uint64_t fallback) {
+    return mag_opp_is_type(pa, MAG_OPP_U62) ? mag_opp_unpack_u62_or_panic(pa) : fallback;
+}
+
+typedef struct mag_rc_control_block_t {
+    uint64_t rc;
+    void* self;
+    void (*dtor)(void*);
+} mag_rc_control_block_t;
+
+static MAG_AINLINE mag_rc_control_block_t mag_rc_control_init(void* self, void (*dtor)(void*)) {
+    mag_assert2(self && dtor); /* Self and destructor must be set. */
+    return (mag_rc_control_block_t){.rc=1, .self=self, .dtor=dtor};
+}
+static MAG_AINLINE void mag_rc_control_incref(mag_rc_control_block_t* rcb) {
+    mag_assert(++rcb->rc < 0xffffffffu, "Reference count overflow");
+}
+static MAG_AINLINE bool mag_rc_control_decref(mag_rc_control_block_t* rcb) {
+    mag_assert(rcb->rc, "Reference count underflow (double free)");
+    if (--rcb->rc == 0) { /* Call destructor. */
+        (*rcb->dtor)(rcb->self);
+        return true; /* Object was destroyed. */
+    }
+    return false;
+}
 
 typedef struct mag_op_meta_t {
     const char* mnemonic;                                   /* Operation mnemonic */
-    uint8_t argcount;                                       /* Number of arguments */
+    uint8_t numin;                                          /* Number of inputs */
     uint8_t paramcount;                                     /* Number of parameters */
-    mag_op_param_type_t param_types[MAG_MAX_OP_PARAMS];     /* Parameter types */
+    mag_opp_type_t opp_types[MAG_MAX_OP_PARAMS];            /* Parameter types */
     bool inplace;                                           /* Supports inplace execution */
-    mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_op_param_t*);
-    bool (*validator)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_op_param_t*);
+    void (*backward)(mag_tensor_t*, mag_tensor_t**);        /* Backward pass */
+    mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_opp_t*);
+    bool (*validator)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_opp_t*);
 } mag_op_meta_t;
 extern MAG_EXPORT const mag_op_meta_t* mag_op_meta_of(mag_op_t type);
 
@@ -518,28 +649,56 @@ extern MAG_EXPORT void mag_fixed_intrusive_pool_print_info(mag_fixed_intrusive_p
 /* Device interface to any compute backend device (CPU, GPU, TPU etc..) */
 typedef struct mag_compute_device_t mag_compute_device_t;
 
+typedef enum mag_transfer_dir_t {
+    MAG_TRANSFER_DIR_H2D,   /* Host to device (Host -> Device). */
+    MAG_TRANSFER_DIR_D2H    /* Device to host (Device -> Host). */
+} mag_transfer_dir_t;
+
+typedef enum mag_transfer_op_t {
+    MAG_TRANSFER_OP_CPY,        /* Copy data bytewise to output. */
+    MAG_TRANSFER_OP_CVT_E8M23   /* Convert data to f32 when writing to output. */
+} mag_transfer_op_t;
+
 /* Buffer interface on a compute device */
 typedef struct mag_storage_buffer_t mag_storage_buffer_t;
 struct mag_storage_buffer_t {
-    uintptr_t base;                                                                                 /* Pointer to buffer on device. Might point to GPU or any other device memory. */
-    size_t size;                                                                                    /* Size of buffer in bytes. */
-    size_t alignment;                                                                               /* Alignment of buffer. */
-    mag_compute_device_t* host;                                                                     /* Host device. */
-    void (*set)(mag_storage_buffer_t* sto, size_t offs, uint8_t x);                                 /* Memset buffer. */
-    void (*cpy_host_device)(mag_storage_buffer_t* sto, size_t offs, const void* src, size_t n);     /* Copy data from host to device. */
-    void (*cpy_device_host)(mag_storage_buffer_t* sto, size_t offs, void* dst, size_t n);           /* Copy data from device to host. */
+    mag_ctx_t* ctx;
+    mag_rc_control_block_t rc_control;  /* Reference count control block. */
+    uintptr_t base;                     /* Pointer to buffer on device. Might point to GPU or any other device memory. */
+    size_t size;                        /* Size of buffer in bytes. */
+    size_t alignment;                   /* Alignment of buffer. */
+    size_t granularity;                 /* Element size granularity. */
+    mag_dtype_t dtype;                  /* Data type of buffer. */
+    mag_compute_device_t* host;         /* Host device. */
+    /* Broadcast (fill) buffer with x. */
+    void (*broadcast)(
+        mag_storage_buffer_t* sto,
+        size_t offs,
+        const void* src,
+        size_t stride
+    );
+    /* Transfer data between host and device. */
+    void (*transfer)(
+        mag_storage_buffer_t* sto,
+        mag_transfer_dir_t dir,
+        mag_transfer_op_t op,
+        size_t offs,
+        void* inout,        /* Source or destination buffer. Must point to nb bytes. */
+        size_t inout_size   /* Size of input/output buffer. */
+    );
 };
 
 /* Device interface to any compute backend device (CPU, GPU, TPU etc..) */
 struct mag_compute_device_t {
-    char name[128];                                                             /* Device name. */
-    void* impl;                                                                 /* Device specific implementation, if applicable. */
-    bool is_async;                                                              /* If device is async. */
-    mag_compute_device_type_t type;                                             /* Device type enum. */
-    void (*eager_exec_fwd)(mag_compute_device_t* dvc, mag_tensor_t* root);      /* Execute a single op forward. */
-    void (*eager_exec_bwd)(mag_compute_device_t* dvc, mag_tensor_t* root);      /* Execute a single op backwards. */
-    void (*alloc_storage)(mag_compute_device_t* dvc, mag_storage_buffer_t* out, size_t size);
-    void (*free_storage)(mag_compute_device_t* dvc, mag_storage_buffer_t* buf);
+    mag_ctx_t* ctx;
+    char name[128];                                                                                                 /* Device name. */
+    void* impl;                                                                                                     /* Device specific implementation, if applicable. */
+    bool is_async;                                                                                                  /* If device is async. */
+    mag_compute_device_type_t type;                                                                                 /* Device type enum. */
+    void (*eager_exec_init)(mag_compute_device_t* dvc, mag_tensor_t* root);                                         /* Execute a single init op. */
+    void (*eager_exec_fwd)(mag_compute_device_t* dvc, mag_tensor_t* root);                                          /* Execute a single op forward. */
+    void (*eager_exec_bwd)(mag_compute_device_t* dvc, mag_tensor_t* root);                                          /* Execute a single op backwards. */
+    void (*alloc_storage)(mag_compute_device_t* dvc, mag_storage_buffer_t** out, size_t size, mag_dtype_t dtype);   /* Allocate storage buffer in device memory */
 };
 
 /* Device creation and destruction. */
@@ -551,19 +710,6 @@ typedef struct mag_device_factory_t {
 /* Global device factories. Implemented in magnetron_device_registry.c */
 extern mag_compute_device_t* mag_init_dynamic_device(mag_ctx_t* ctx, const mag_device_descriptor_t* desc);
 extern void mag_destroy_dynamic_device(mag_compute_device_t* dvc);
-
-/* Profiling performance monitor per op. */
-typedef struct mag_perf_mon_t {
-    uint64_t elapsed_ns;
-    uint64_t elapsed_ns_acc;
-    uint64_t n_execs;
-} mag_perf_mon_t;
-
-/* Performance monitor for profiler session. */
-typedef struct mag_op_perf_info_t {
-    uint64_t elapsed_ns_acc;
-    uint64_t n_execs;
-} mag_op_perf_info_t;
 
 #ifdef MAG_DEBUG
 typedef struct mag_tensor_node_t mag_tensor_node_t;
@@ -658,6 +804,11 @@ extern const char* const mag_arm64_cap_names[MAG_ARM64_CAP__NUM];
 
 #endif
 
+typedef enum mag_ctx_flags_t {
+    MAG_CTX_FLAG_NONE = 0,
+    MAG_CTX_FLAG_GRAD_RECORDER = 1<<0,     /* Gradient recording */
+} mag_ctx_flags_t;
+
 /*
 ** Context contains all isolated state and data.
 ** Lifetimes of tensors and compute graphs are bound to the context - the context is the owner.
@@ -665,58 +816,44 @@ extern const char* const mag_arm64_cap_names[MAG_ARM64_CAP__NUM];
 */
 struct mag_ctx_t {
     struct {
-        char os_name[128];                          /* OS name. */
-        char cpu_name[128];                         /* CPU name. */
-        uint32_t cpu_virtual_cores;                 /* Virtual CPUs. */
-        uint32_t cpu_physical_cores;                /* Physical CPU cores. */
-        uint32_t cpu_sockets;                       /* CPU sockets. */
-        uint64_t phys_mem_total;                    /* Total physical memory in bytes. */
-        uint64_t phys_mem_free;                     /* Free physical memory in bytes. */
+        char os_name[128];                              /* OS name. */
+        char cpu_name[128];                             /* CPU name. */
+        uint32_t cpu_virtual_cores;                     /* Virtual CPUs. */
+        uint32_t cpu_physical_cores;                    /* Physical CPU cores. */
+        uint32_t cpu_sockets;                           /* CPU sockets. */
+        uint64_t phys_mem_total;                        /* Total physical memory in bytes. */
+        uint64_t phys_mem_free;                         /* Free physical memory in bytes. */
 #if defined(__x86_64__) || defined(_M_X64)
-        uint64_t amd64_cpu_caps;                    /* x86-64 CPU features. Bitset of 1ull<<MAG_AMD64_CAP_* */
+        uint64_t amd64_cpu_caps;                        /* x86-64 CPU features. Bitset of 1ull<<MAG_AMD64_CAP_* */
+        bool is_amd;                                    /* Is AMD CPU? */
 #elif defined (__aarch64__)
-        uint64_t arm64_cpu_caps;                    /* ARM64 CPU features. */
-        int64_t arm64_cpu_sve_width;                /* ARM64 SVE vector register width. */
+        uint64_t arm64_cpu_caps;                        /* ARM64 CPU features. */
+        int64_t arm64_cpu_sve_width;                    /* ARM64 SVE vector register width. */
 #endif
     } machine;
-#ifdef MAG_DEBUG
-    mag_tensor_node_t* rc_tracked;                  /* Linked list of RC tensors for sanitize. */
-#endif
-    mag_fixed_intrusive_pool tensor_pool;           /* Fixed-size memory pool for tensors. */
-    mag_exec_mode_t exec_mode;
-    bool profiler_enabled;
-    mag_op_perf_info_t op_perf_mons_total[MAG_OP__NUM];
-    union {
-        struct {
-            uint64_t state;
-            uint64_t inc;
-        } pcg;
-        struct {
-            uint32_t remaining;
-            uint32_t next;
-            uint32_t state[624];
-        } mersenne;
-    } prng;
-    mag_prng_algorithm_t prng_algorithm;                /* PRNG algorithm. */
+    size_t num_tensors;                                 /* Total tensor instances allocated. */
+    size_t num_storages;                                /* Total storage buffers allocated. */
+    mag_fixed_intrusive_pool tensor_pool;               /* Tensor struct memory pool. */
+    mag_fixed_intrusive_pool storage_pool;              /* Storage struct memory pool. */
+    mag_exec_mode_t exec_mode;                          /* Execution mode. */
+    mag_ctx_flags_t flags;                              /* Context flags. */
+    mag_prng_algorithm_t prng_algo;                     /* Active PRNG algorithm. */
     uintptr_t tr_id;                                    /* Host thread ID. */
     size_t sh_len;                                      /* Number of shutdown hooks. */
     size_t sh_cap;                                      /* Maximum number of shutdown hooks. */
     mag_compute_device_type_t device_type;              /* Active compute device. */
     mag_compute_device_t* device;                       /* Active compute device. */
-    uint8_t* (*image_load_fn)(const char*, uint32_t(*)[3], mag_color_channels_t);    /* Image loader. stb_image by default, you can plug-in your own. */
-    void (*image_load_free_fn)(uint8_t*);                                           /* Image loader free function.  stb_image by default, you can plug-in your own. */
-    bool (*image_save_fn)(const char*, const uint8_t*, const uint32_t(*)[3]);       /* Image saver. stb_image by default, you can plug-in your own. */
     void* ud; /* User data. */
 };
 
 typedef enum mag_tensor_flags_t {
     MAG_TFLAG_NONE = 0,
-    MAG_TFLAG_OWNER = 1<<0,         /* Tensor is the owner of the buffer. */
-    MAG_TFLAG_VIEW = 1<<1,          /* Tensor is a view. */
-    MAG_FLAG_GRAD = 1<<2,           /* Tensor is a gradient. */
-    MAG_TFLAG_EXEC_EAGER = 1<<3,    /* Tensor is executed eagerly. */
+    MAG_TFLAG_OWNER = 1<<0,             /* Tensor is the owner of the buffer. */
+    MAG_TFLAG_VIEW = 1<<1,              /* Tensor is a view. */
+    MAG_TFLAG_IS_GRAD = 1<<2,           /* Tensor is a gradient. */
+    MAG_TFLAG_REQUIRES_GRAD = 1<<3,     /* Tensor requires gradient. */
 
-    MAG_TFLAG_LEN = 4
+    MAG_TFLAG_LEN = 4                   /* Number of flags. */
 } mag_tensor_flags_t;
 mag_static_assert(MAG_TFLAG_LEN <= 0xff);
 
@@ -724,30 +861,25 @@ mag_static_assert(MAG_TFLAG_LEN <= 0xff);
 ** Tensor with up to 6 Dimensions.
 */
 struct mag_tensor_t {
-    struct {
-        uint32_t rc_strong;                         /* Strong reference count. */
-        uint32_t rc_weak;                           /* Weak reference count. */
-#ifdef MAG_DEBUG
-        void (*dtor)(mag_tensor_t*);                 /* Debug destructor. */
-#endif
-    } rcb;                                          /* Reference count control block. */
-    mag_ctx_t* ctx;                                  /* Host context. */
-    int64_t rank;                                   /* Number of active dimensions. [1, MAX_DIMS] */
-    int64_t shape[MAG_MAX_DIMS];                     /* Shape of the tensor. */
-    int64_t strides[MAG_MAX_DIMS];                   /* Strides of the tensor. We store the strides in element counts and NOT in bytes. */
-    mag_dtype_t dtype;                               /* Data type of the tensor. */
-    mag_storage_buffer_t storage;                      /* Storage buffer. */
-    int64_t numel;                                  /* Number of elements in the tensor. */
-    mag_tensor_flags_t flags;                        /* Tensor flags. */
-    mag_op_t op;                                     /* Opcode for operators. */
-    mag_tensor_t* op_inputs[MAG_MAX_INPUT_TENSORS];   /* Input tensors for operators. */
-    mag_op_param_t op_params[MAG_MAX_OP_PARAMS];      /* Operator parameters. */
-    mag_tensor_t* view_uplink;                       /* View base tensor. */
-    size_t view_offs;                               /* Offset in view tensor. */
-    mag_tensor_t* grad;                              /* ∇f - Gradient tensor. */
-    mag_perf_mon_t pmon;                             /* Performance monitor. */
-    char name[MAG_MAX_TENSOR_NAME_LEN];              /* Tensor debug name. */
-    void* ud;                                       /* User data. */
+    mag_ctx_t* ctx;                                     /* Host context. */
+    mag_rc_control_block_t rc_control;                  /* Reference counting control block. */
+    int64_t rank;                                       /* Number of active dimensions. [1, MAX_DIMS] */
+    int64_t shape[MAG_MAX_DIMS];                        /* Shape of the tensor. */
+    int64_t strides[MAG_MAX_DIMS];                      /* Strides of the tensor. We store the strides in element counts and NOT in bytes. */
+    mag_dtype_t dtype;                                  /* Data type of the tensor. */
+    mag_storage_buffer_t* storage;                      /* Storage buffer. */
+    int64_t numel;                                      /* Number of elements in the tensor. */
+    mag_tensor_flags_t flags;                           /* Tensor flags. */
+    mag_op_t op;                                        /* Opcode for operators. */
+    mag_tensor_t* op_inputs[MAG_MAX_OP_INPUTS];     /* Input tensors for operators. */
+    mag_opp_t op_params[MAG_MAX_OP_PARAMS];             /* Operator parameters. */
+    mag_init_op_t init_op;                              /* Initialization op */
+    mag_opp_t init_op_params[MAG_MAX_OP_PARAMS];        /* Init operator parameters */
+    mag_tensor_t* view_uplink;                          /* View base tensor. */
+    size_t view_offs;                                   /* Offset in view tensor. */
+    mag_tensor_t* grad;                                 /* ∇f - Gradient tensor. */
+    char name[MAG_MAX_TENSOR_NAME_LEN];                 /* Tensor debug name. */
+    void* ud;                                           /* User data. */
 };
 
 #define mag_load_local_storage_group_arr(arr, prefix) \
@@ -764,15 +896,49 @@ struct mag_tensor_t {
     (void)prefix##4; \
     (void)prefix##5
 
-typedef struct mag_compute_payload_t {
+#define mag_address_dotprod6(x,y) ((x##0*y##0)+(x##1*y##1)+(x##2*y##2)+(x##3*y##3)+(x##4*y##4)+(x##5*y##5))
+
+typedef struct mag_prng_state_t {
+    union { /* PRNG state of active algo. */
+        struct {
+            uint64_t state;
+            uint64_t inc;
+        } pcg;
+        struct {
+            uint32_t remaining;
+            uint32_t next;
+            uint32_t state[624];
+        } mersenne;
+    };
+    mag_prng_algorithm_t algo; /* PRNG algorithm. */
+} mag_prng_state_t;
+void mag_prng_init(mag_prng_state_t* prng, mag_prng_algorithm_t algo, uint64_t seed);
+
+typedef struct mag_compute_payload_t { /* Compute payload for kernel execution. */
     int64_t thread_num;
     int64_t thread_idx;
     mag_tensor_t* node;
+    mag_gra_eval_t gra_eval;
+    mag_prng_state_t* local_prng;
 } mag_compute_payload_t;
 
-typedef struct mag_kernel_registry_t {
-    void (*fwd[MAG_OP__NUM])(const mag_compute_payload_t*);
-    void (*bwd[MAG_OP__NUM])(const mag_compute_payload_t*);
+typedef struct mag_kernel_context_t { /* General op kernel context. */
+    mag_tensor_t* node;
+    int64_t alloced_threads;
+    union {
+       int dummy;
+    } per_op; /* Per-op data is added here */
+} mag_kernel_context_t;
+
+typedef struct mag_kernel_registry_t { /* Kernel registry for operators. */
+    void (*init[MAG_IOP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
+    uint32_t (*fwd_pre[MAG_OP__NUM])(mag_kernel_context_t*);
+    void (*fwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
+    void (*fwd_post[MAG_OP__NUM])(mag_kernel_context_t*);
+    uint32_t (*bwd_pre[MAG_OP__NUM])(mag_kernel_context_t*);
+    void (*bwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
+    void (*bwd_post[MAG_OP__NUM])(mag_kernel_context_t*);
+    void (*vector_cast)(size_t nb, const void* src, mag_dtype_t src_t, void* dst, mag_dtype_t dst_t);
 } mag_kernel_registry_t;
 
 #define mag_load_local_storage_group(xk, prefix, var) mag_load_local_storage_group_arr((xk)->var, prefix)
