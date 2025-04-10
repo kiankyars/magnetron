@@ -35,16 +35,34 @@ class PRNGAlgorithm(Enum):
     PCG = C.MAG_PRNG_PCG
 
 
-@dataclass
-class DType:
+@dataclass(frozen=True)
+class DataType:
     value: int
     size: int
     name: str
-    is_fp: bool
+    is_floating_point: bool
+
+    @property
+    def bit_size(self) -> int:
+        return self.size * 8
+
+    @property
+    def is_integer(self) -> bool:
+        return not self.is_floating_point
+
+    @property
+    def alignment(self) -> int:
+        return self.size
+
+    def __str__(self) -> str:
+        return self.name
 
 
-e8m23 = f32 = DType(C.MAG_DTYPE_E8M23, 4, 'e8m23', True)
-e5m10 = f16 = DType(C.MAG_DTYPE_E5M10, 2, 'e5m10', True)
+e8m23: DataType = DataType(C.MAG_DTYPE_E8M23, 4, 'e8m23', True)
+e5m10: DataType = DataType(C.MAG_DTYPE_E5M10, 2, 'e5m10', True)
+
+f32: DataType = e8m23
+f16: DataType = e5m10
 
 
 @dataclass
@@ -208,7 +226,7 @@ class Tensor:
         ctx: Context,
         *,
         shape: tuple[int, ...],
-        dtype: DType = Context.primary().default_dtype,
+        dtype: DataType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> None:
@@ -225,7 +243,7 @@ class Tensor:
         cls,
         shape: tuple[int, ...],
         *,
-        dtype: DType = Context.primary().default_dtype,
+        dtype: DataType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
@@ -245,7 +263,7 @@ class Tensor:
         shape: tuple[int, ...],
         *,
         fill_value: float,
-        dtype: DType = Context.primary().default_dtype,
+        dtype: DataType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
@@ -265,7 +283,7 @@ class Tensor:
         cls,
         data: list[float, ...],
         *,
-        dtype: DType = Context.primary().default_dtype,
+        dtype: DataType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
@@ -306,7 +324,7 @@ class Tensor:
         cls,
         shape: tuple[int, ...],
         *,
-        dtype: DType = Context.primary().default_dtype,
+        dtype: DataType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
@@ -320,7 +338,7 @@ class Tensor:
         shape: tuple[int, ...],
         *,
         interval: (float, float) = (-1.0, 1.0),
-        dtype: DType = Context.primary().default_dtype,
+        dtype: DataType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
@@ -344,6 +362,7 @@ class Tensor:
         *,
         mean: float = 0.0,
         stddev: float = 1.0,
+        dtype: DataType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
@@ -351,7 +370,7 @@ class Tensor:
         tensor._new(
             Context.primary(),
             shape=shape,
-            dtype=DType.F32,
+            dtype=dtype,
             requires_grad=requires_grad,
             name=name,
         )
@@ -388,8 +407,8 @@ class Tensor:
         return tuple(ffi.unpack(C.mag_tensor_get_strides(self._ptr), self.rank))
 
     @property
-    def dtype(self) -> DType:
-        return DType(C.mag_tensor_get_dtype(self._ptr))
+    def dtype(self) -> DataType:
+        return DataType(C.mag_tensor_get_dtype(self._ptr))
 
     @property
     def data_ptr(self) -> int:
