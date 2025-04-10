@@ -922,22 +922,10 @@ typedef struct mag_compute_payload_t { /* Compute payload for kernel execution. 
     mag_prng_state_t* local_prng;
 } mag_compute_payload_t;
 
-typedef struct mag_kernel_context_t { /* General op kernel context. */
-    mag_tensor_t* node;
-    int64_t alloced_threads;
-    union {
-       int dummy;
-    } per_op; /* Per-op data is added here */
-} mag_kernel_context_t;
-
 typedef struct mag_kernel_registry_t { /* Kernel registry for operators. */
-    void (*init[MAG_IOP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
-    uint32_t (*fwd_pre[MAG_OP__NUM])(mag_kernel_context_t*);
-    void (*fwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
-    void (*fwd_post[MAG_OP__NUM])(mag_kernel_context_t*);
-    uint32_t (*bwd_pre[MAG_OP__NUM])(mag_kernel_context_t*);
-    void (*bwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
-    void (*bwd_post[MAG_OP__NUM])(mag_kernel_context_t*);
+    void (*init[MAG_IOP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*);
+    void (*fwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*);
+    void (*bwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*);
     void (*vector_cast)(size_t nb, const void* src, mag_dtype_t src_t, void* dst, mag_dtype_t dst_t);
 } mag_kernel_registry_t;
 
