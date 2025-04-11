@@ -52,33 +52,44 @@ def index(request: HttpRequest) -> HttpResponse:
     return render(request, 'index.html')
 
 
-def resize_and_center(
-    image: Image.Image, target_size: int = 28, padding: int = 4
-) -> Image.Image:
-    """
-    Crops the image to its bounding box of non-background pixels,
-    then resizes it while preserving the aspect ratio and centers it
-    in a new image of size target_size x target_size.
-    - A new PIL Image of size (target_size, target_size).
-    """
+def resize_and_center(image: Image.Image, target_size: int = 28, padding: int = 4) -> Image.Image:
+    """Enhanced version with better normalization"""
+    # Convert to numpy array
     arr = np.array(image)
-    threshold = 10
+
+    # Dynamic thresholding (Otsu's method would be better)
+    threshold = np.percentile(arr, 90)  # More adaptive than fixed value
+
+    # Find bounding box
     coords = np.column_stack(np.nonzero(arr > threshold))
     if coords.size == 0:
-        return image.resize((target_size, target_size))
+        return Image.new('L', (target_size, target_size), 0)
+
+    # Add some padding to the bounding box
     top, left = coords.min(axis=0)
     bottom, right = coords.max(axis=0)
+    padding_px = 2
+    top = max(0, top - padding_px)
+    left = max(0, left - padding_px)
+    bottom = min(arr.shape[0] - 1, bottom + padding_px)
+    right = min(arr.shape[1] - 1, right + padding_px)
+
+    # Crop and resize
     cropped = image.crop((left, top, right + 1, bottom + 1))
     cropped_width, cropped_height = cropped.size
-    new_size = target_size - 2 * padding
-    scale = new_size / max(cropped_width, cropped_height)
+
+    # Maintain aspect ratio
+    scale = (target_size - 2 * padding) / max(cropped_width, cropped_height)
     new_width = int(cropped_width * scale)
     new_height = int(cropped_height * scale)
-    resized = cropped.resize((new_width, new_height))
+    resized = cropped.resize((new_width, new_height), Image.LANCZOS)  # Better resampling
+
+    # Center in target image
     new_image = Image.new('L', (target_size, target_size), 0)
     x_offset = (target_size - new_width) // 2
     y_offset = (target_size - new_height) // 2
     new_image.paste(resized, (x_offset, y_offset))
+
     return new_image
 
 

@@ -1,143 +1,240 @@
-{% load static %}
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MNIST Digit Recognizer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    /* Global Styles */
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+    
     body {
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: #ffffff;
-      color: #333;
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
     }
-    .container {
-      max-width: 600px;
-      margin: 50px auto;
-      padding: 40px 20px;
-      text-align: center;
+    
+    .canvas-container {
+      position: relative;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      border-radius: 16px;
+      overflow: hidden;
+      background: white;
     }
-    header {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin-bottom: 40px;
+    
+    canvas {
+      display: block;
+      background: black;
+      cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'></circle></svg>") 12 12, auto;
     }
-    header img.logo {
-      width: 120px;
-      margin-bottom: 20px;
+    
+    .prediction-display {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
     }
-    header h1 {
-      margin: 0;
-      font-size: 2em;
-      font-weight: 600;
-    }
-    /* Canvas styles */
-    #canvas {
-      background: #fff;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      margin-bottom: 20px;
-      touch-action: none;
-    }
-    /* Button Styles */
-    button {
-      background-color: #f0f0f0;
-      border: none;
-      border-radius: 4px;
-      padding: 10px 20px;
-      font-size: 1em;
-      cursor: pointer;
-      margin: 0 10px;
-      transition: background-color 0.3s ease;
-    }
-    button:hover {
-      background-color: #e0e0e0;
-    }
+    
     .btn-primary {
-      background-color: #5c6ac4;
-      color: #fff;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
+    
     .btn-primary:hover {
-      background-color: #4a55b5;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
     }
-    /* Result text styling */
-    #result {
-      margin-top: 20px;
-      font-size: 1.2em;
+    
+    .btn-secondary {
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+    
+    .btn-secondary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    .glow {
+      animation: glow 2s infinite alternate;
+    }
+    
+    @keyframes glow {
+      from {
+        box-shadow: 0 0 5px rgba(102, 126, 234, 0.5);
+      }
+      to {
+        box-shadow: 0 0 20px rgba(102, 126, 234, 0.8);
+      }
+    }
+    
+    .tooltip {
+      position: relative;
+    }
+    
+    .tooltip:before {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    
+    .tooltip:hover:before {
+      opacity: 1;
     }
   </style>
 </head>
-<body>
-  <div class="container">
-    <header>
-      <img src="{% static 'img/logo.png' %}" alt="Logo" class="logo">
-      <h1>MNIST Digit Recognizer</h1>
+<body class="flex flex-col items-center justify-center p-4">
+  <div class="w-full max-w-2xl mx-auto">
+    <header class="text-center mb-10">
+      <div class="flex justify-center mb-4">
+        <div class="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-3xl shadow-lg">
+          <i class="fas fa-brain"></i>
+        </div>
+      </div>
+      <h1 class="text-4xl font-bold text-gray-800 mb-2">MNIST Digit Recognizer</h1>
+      <p class="text-gray-600">Draw a digit (0-9) below and let our AI predict what it is</p>
     </header>
-    <canvas id="canvas" width="280" height="280"></canvas>
-    <br>
-    <button id="clearBtn">Clear</button>
-    <button id="predictBtn" class="btn-primary">Predict</button>
-    <h2 id="result"></h2>
+    
+    <div class="flex flex-col items-center mb-8">
+      <div class="canvas-container mb-6">
+        <canvas id="canvas" width="280" height="280" class="rounded-lg"></canvas>
+      </div>
+      
+      <div class="flex space-x-4 mb-8">
+        <button id="clearBtn" class="btn-secondary px-6 py-3 rounded-full bg-white text-gray-700 font-medium flex items-center">
+          <i class="fas fa-eraser mr-2"></i> Clear
+        </button>
+        <button id="predictBtn" class="btn-primary px-6 py-3 rounded-full text-white font-medium flex items-center glow">
+          <i class="fas fa-magic mr-2"></i> Predict Digit
+        </button>
+      </div>
+      
+      <div id="result" class="text-center">
+        <div class="text-sm text-gray-500 mb-1">Prediction will appear here</div>
+        <div class="prediction-display text-8xl font-bold h-32 flex items-center justify-center">
+          <span id="predictionValue">?</span>
+        </div>
+        <div id="confidence" class="text-gray-600 mt-2"></div>
+      </div>
+    </div>
   </div>
 
   <script>
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
+    const predictionValue = document.getElementById('predictionValue');
+    const confidenceDisplay = document.getElementById('confidence');
     let drawing = false;
+    let lastX = 0;
+    let lastY = 0;
 
+    // Set canvas background to black
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // Drawing styles
     ctx.strokeStyle = "white";
     ctx.lineWidth = 15;
     ctx.lineCap = "round";
+    ctx.lineJoin = "round";
 
-    canvas.addEventListener('mousedown', function(e) {
+    // Mouse events
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+
+    // Touch events
+    canvas.addEventListener('touchstart', handleTouchStart);
+    canvas.addEventListener('touchmove', handleTouchMove);
+    canvas.addEventListener('touchend', stopDrawing);
+
+    // Button events
+    document.getElementById('clearBtn').addEventListener('click', clearCanvas);
+    document.getElementById('predictBtn').addEventListener('click', predictDigit);
+
+    function startDrawing(e) {
       drawing = true;
-      ctx.beginPath();
-      ctx.moveTo(e.offsetX, e.offsetY);
-    });
-    canvas.addEventListener('mousemove', function(e) {
-      if (drawing) {
-        ctx.lineTo(e.offsetX, e.offsetY);
-        ctx.stroke();
-      }
-    });
-    canvas.addEventListener('mouseup', function() { drawing = false; });
-    canvas.addEventListener('mouseout', function() { drawing = false; });
+      const pos = getMousePos(canvas, e);
+      lastX = pos.x;
+      lastY = pos.y;
+    }
 
-    canvas.addEventListener('touchstart', function(e) {
-      e.preventDefault();
-      let touch = e.touches[0];
-      let rect = canvas.getBoundingClientRect();
+    function draw(e) {
+      if (!drawing) return;
+      
+      const pos = getMousePos(canvas, e);
+      
       ctx.beginPath();
-      ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
-      drawing = true;
-    });
-    canvas.addEventListener('touchmove', function(e) {
-      e.preventDefault();
-      if (drawing) {
-        let touch = e.touches[0];
-        let rect = canvas.getBoundingClientRect();
-        ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
-        ctx.stroke();
-      }
-    });
-    canvas.addEventListener('touchend', function() { drawing = false; });
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      
+      lastX = pos.x;
+      lastY = pos.y;
+    }
 
-    document.getElementById('clearBtn').addEventListener('click', function() {
+    function stopDrawing() {
+      drawing = false;
+    }
+
+    function handleTouchStart(e) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const mouseEvent = new MouseEvent("mousedown", {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      });
+      startDrawing(mouseEvent);
+    }
+
+    function handleTouchMove(e) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const mouseEvent = new MouseEvent("mousemove", {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      });
+      draw(mouseEvent);
+    }
+
+    function getMousePos(canvas, evt) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (evt.clientX - rect.left) / (rect.right - rect.left) * canvas.width,
+        y: (evt.clientY - rect.top) / (rect.bottom - rect.top) * canvas.height
+      };
+    }
+
+    function clearCanvas() {
       ctx.fillStyle = "black";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      document.getElementById('result').innerText = "";
-    });
+      predictionValue.textContent = "?";
+      confidenceDisplay.textContent = "";
+    }
 
-    document.getElementById('predictBtn').addEventListener('click', function() {
+    function predictDigit() {
       const dataURL = canvas.toDataURL('image/png');
+      
+      // Show loading state
+      predictionValue.textContent = "...";
+      predictionValue.className = "text-6xl";
+      confidenceDisplay.textContent = "Analyzing...";
+      
       fetch('/predict/', {
         method: 'POST',
         headers: {
@@ -149,22 +246,57 @@
       .then(response => response.json())
       .then(data => {
         if (data.prediction !== undefined) {
-          document.getElementById('result').innerText = "Predicted digit: " + data.prediction;
+          // Animation effect
+          let count = 0;
+          const randomNumbers = setInterval(() => {
+            predictionValue.textContent = Math.floor(Math.random() * 10);
+            count++;
+            if (count > 10) {
+              clearInterval(randomNumbers);
+              displayFinalResult(data);
+            }
+          }, 80);
         } else {
-          document.getElementById('result').innerText = "Error: " + JSON.stringify(data);
+          showError(data);
         }
       })
       .catch(error => {
         console.error('Error:', error);
+        showError({error: "Network error. Please try again."});
       });
-    });
+    }
+
+    function displayFinalResult(data) {
+      predictionValue.textContent = data.prediction;
+      predictionValue.className = "text-8xl font-bold prediction-display";
+      
+      if (data.confidence) {
+        const confidencePercent = Math.round(data.confidence * 100);
+        confidenceDisplay.textContent = `Confidence: ${confidencePercent}%`;
+        
+        // Visual confidence indicator
+        const confidenceBar = document.createElement('div');
+        confidenceBar.className = 'w-full bg-gray-200 rounded-full h-2.5 mt-2';
+        confidenceBar.innerHTML = `
+          <div class="bg-gradient-to-r from-blue-500 to-purple-600 h-2.5 rounded-full" 
+               style="width: ${confidencePercent}%"></div>
+        `;
+        confidenceDisplay.appendChild(confidenceBar);
+      }
+    }
+
+    function showError(error) {
+      predictionValue.textContent = "!";
+      predictionValue.className = "text-8xl font-bold text-red-500";
+      confidenceDisplay.textContent = "Error: " + (error.error || "Unknown error occurred");
+    }
 
     function getCookie(name) {
       let cookieValue = null;
       if (document.cookie && document.cookie !== '') {
-        let cookies = document.cookie.split(';');
+        const cookies = document.cookie.split(';');
         for (let i = 0; i < cookies.length; i++) {
-          let cookie = cookies[i].trim();
+          const cookie = cookies[i].trim();
           if (cookie.substring(0, name.length + 1) === (name + '=')) {
             cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
             break;

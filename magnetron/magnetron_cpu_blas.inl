@@ -529,7 +529,6 @@ mag_cpu_blas_impl_unary(e8m23, sin)
 mag_cpu_blas_impl_unary(e8m23, cos)
 mag_cpu_blas_impl_unary(e8m23, step)
 mag_cpu_blas_impl_unary(e8m23, exp)
-mag_cpu_blas_impl_unary(e8m23, softmax)
 mag_cpu_blas_impl_unary(e8m23, softmax_dv)
 mag_cpu_blas_impl_unary(e8m23, sigmoid)
 mag_cpu_blas_impl_unary(e8m23, sigmoid_dv)
@@ -570,6 +569,38 @@ mag_cpu_blas_impl_reduce( \
     e8m23, max, mag_e8m23_t, -INFINITY, \
     acc = fmaxf(acc, bx[off]);, \
     *br = acc; )
+
+static void MAG_HOTPROC mag_blas_softmax_e8m23(const mag_compute_payload_t* payload) {
+        mag_tensor_t* r = payload->node;
+        const mag_tensor_t* x = r->op_inputs[0];
+        mag_e8m23_t* br = mag_e8m23p_mut(r);
+        const mag_e8m23_t* bx = mag_e8m23p(x);
+        int64_t last_dim = r->shape[r->rank-1];
+        int64_t num_rows = r->numel / last_dim;
+        int64_t tc = payload->thread_num;
+        int64_t ti = payload->thread_idx;
+        int64_t rows_per_thread = (num_rows + tc - 1)/tc;
+        int64_t start_row = ti * rows_per_thread;
+        int64_t end_row = (start_row + rows_per_thread) < num_rows ? (start_row + rows_per_thread) : num_rows;
+        for (int64_t row = start_row; row < end_row; ++row) {
+            const mag_e8m23_t* row_in = bx + row * last_dim;
+            mag_e8m23_t* row_out = br + row * last_dim;
+            mag_e8m23_t max_val = row_in[0];
+            for (int64_t i = 1; i < last_dim; ++i) {
+                if (row_in[i] > max_val) {
+                    max_val = row_in[i];
+                }
+            }
+            mag_e8m23_t sum = 0.0f;
+            for (int64_t i=0; i < last_dim; ++i) {
+                row_out[i] = expf(row_in[i] - max_val);
+                sum += row_out[i];
+            }
+            for (int64_t i=0; i < last_dim; ++i) {
+                row_out[i] /= sum;
+            }
+        }
+    }
 
 #define mag_e5m10_sadd(x, y) mag_e8m23_cvt_e5m10(mag_e8m23_sadd(mag_e5m10_cvt_e8m23(x), mag_e5m10_cvt_e8m23(y)))
 #define mag_e5m10_ssub(x, y) mag_e8m23_cvt_e5m10(mag_e8m23_ssub(mag_e5m10_cvt_e8m23(x), mag_e5m10_cvt_e8m23(y)))
