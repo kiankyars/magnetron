@@ -4,7 +4,6 @@ import contextlib
 import faulthandler
 import threading
 import typing
-import weakref
 from dataclasses import dataclass
 from enum import Enum, auto, unique
 from functools import lru_cache
@@ -66,11 +65,14 @@ f16: DataType = e5m10
 
 
 @dataclass
-class GlobalConfig:
+class Config:
     verbose: bool = getenv('MAGNETRON_VERBOSE', '0') == '1'
     compute_device: ComputeDevice.CPU | ComputeDevice.CUDA = ComputeDevice.CPU()
+    default_dtype: DataType = e8m23
+
 
 _MAIN_TID: int = threading.get_native_id()
+
 
 @typing.final
 class Context:
@@ -80,11 +82,15 @@ class Context:
     @lru_cache(maxsize=1)
     def primary() -> 'Context':
         """Get global context singleton."""
-        _C.mag_set_log_mode(GlobalConfig.verbose)
-        return Context(GlobalConfig.compute_device)
+        _C.mag_set_log_mode(Config.verbose)
+        return Context()
 
-    def __init__(self, device: ComputeDevice.CPU | ComputeDevice.CUDA) -> None:
-        assert _MAIN_TID == threading.get_native_id(), 'Context must be created in the main thread'
+    def __init__(
+        self, device: ComputeDevice.CPU | ComputeDevice.CUDA = Config.compute_device
+    ) -> None:
+        assert _MAIN_TID == threading.get_native_id(), (
+            'Context must be created in the main thread'
+        )
         descriptor: _ffi.CData = _ffi.new('mag_device_descriptor_t*')
         if isinstance(device, ComputeDevice.CPU):
             descriptor.type = 0
@@ -93,11 +99,13 @@ class Context:
             descriptor.type = 1
             descriptor.cuda_device_id = abs(device.device_id)
         self._ptr = _C.mag_ctx_create2(descriptor)
-        self.default_dtype = e8m23
+        self.default_dtype = Config.default_dtype
 
     @property
     def compute_device_name(self) -> str:
-        return _ffi.string(_C.mag_ctx_get_compute_device_name(self._ptr)).decode('utf-8')
+        return _ffi.string(_C.mag_ctx_get_compute_device_name(self._ptr)).decode(
+            'utf-8'
+        )
 
     @property
     def prng_algorithm(self) -> PRNGAlgorithm:
@@ -147,27 +155,6 @@ class Context:
         return _C.mag_ctx_is_numa_system(self._ptr)
 
     @property
-    def total_allocated_pool_memory(self) -> int:
-        return _C.mag_ctx_total_allocated_pool_memory(self._ptr)
-
-    @property
-    def total_tensors_created(self) -> int:
-        return _C.mag_ctx_get_total_tensors_created(self._ptr)
-
-    @property
-    def total_tensors_allocated(self) -> int:
-        return _C.mag_ctx_get_total_tensors_allocated(self._ptr)
-
-    def start_profiler(self) -> None:
-        _C.mag_ctx_profiler_start(self._ptr)
-
-    def stop_profiler(self, export_csv_file: str | None = None) -> None:
-        csv_file: _ffi.CData | bytes = (
-            _ffi.NULL if export_csv_file is None else bytes(export_csv_file, 'utf-8')
-        )
-        _C.mag_ctx_profiler_end(self._ptr, csv_file)
-
-    @property
     def is_profiling(self) -> bool:
         return _C.mag_ctx_profiler_is_running(self._ptr)
 
@@ -215,7 +202,9 @@ class Tensor:
     __slots__ = ('__weakref__', '_ctx', '_ptr')
 
     def __init__(self, ptr: _ffi.CData | None = None) -> None:
-        assert _MAIN_TID == threading.get_native_id(), 'Context must be created in the main thread'
+        assert _MAIN_TID == threading.get_native_id(), (
+            'Context must be created in the main thread'
+        )
         self._ctx = None
         self._ptr = ptr
 
@@ -235,7 +224,7 @@ class Tensor:
     ) -> None:
         assert 0 < len(shape) <= MAX_DIMS, f'Invalid number of dimensions: {len(shape)}'
         assert all(0 < dim <= DIM_MAX for dim in shape), 'Invalid dimension size'
-        self._ctx = weakref.ref(ctx)
+        self._ctx = ctx
         self._ptr = _ALLOC_DISPATCH[len(shape)](ctx._ptr, dtype.value, *shape)
         self.requires_grad = requires_grad
         if name:

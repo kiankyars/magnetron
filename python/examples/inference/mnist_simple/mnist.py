@@ -5,6 +5,7 @@ import magnetron.nn as nn
 import numpy as np
 from matplotlib import pyplot as plt
 
+
 class MNIST(nn.Module):
     def __init__(self, data_file: str) -> None:
         super().__init__()
@@ -29,16 +30,18 @@ class MNIST(nn.Module):
         y_hat: mag.Tensor = self(x)
         flat: list[float] = y_hat.tolist()
         rows, cols = y_hat.shape
-        nested: list[float] = [flat[i * cols:(i + 1) * cols] for i in range(rows)]
+        nested: list[float] = [flat[i * cols : (i + 1) * cols] for i in range(rows)]
         preds = []
         for row in nested:
             preds.append(max(range(10), key=row.__getitem__))
         return preds
 
+
 def load_test_data() -> mag.Tensor:
     with open('mnist_test_images.pkl', 'rb') as f:
         test_images = pickle.load(f)
     return mag.Tensor.const(test_images, name='test_images')
+
 
 def plot_predictions(y_hat: list[int], test_data: mag.Tensor) -> None:
     images = np.array(test_data.tolist()).reshape(-1, 28, 28)
@@ -48,10 +51,11 @@ def plot_predictions(y_hat: list[int], test_data: mag.Tensor) -> None:
     for i in range(n_show):
         plt.subplot(nrows, ncols, i + 1)
         plt.imshow(images[i], cmap='gray')
-        plt.title(f"Pred: {y_hat[i]}")
-        plt.axis("off")
+        plt.title(f'Pred: {y_hat[i]}')
+        plt.axis('off')
     plt.tight_layout()
     plt.show()
+
 
 if __name__ == '__main__':
     model = MNIST('mnist_mlp_weights.pkl')
@@ -60,4 +64,3 @@ if __name__ == '__main__':
     with mag.no_grad():
         y_hat: list[int] = model.predict(test_data)
         plot_predictions(y_hat, test_data)
-
