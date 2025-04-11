@@ -13,7 +13,11 @@ readme = "README.md"
 dependencies = ["cffi"]
 
 [project.optional-dependencies]
+# Optional dev dependencies for development and testing of Magnetron itself (don't install these when using Magnetron as a library)
 dev = ["pytest", "matplotlib", "sphinx", "sphinx-autoapi", "sphinx-rtd-theme", "torch", "numpy", "pre-commit", "ruff"]
+
+# Optional dependencies for complex examples (install if you want to run the examples)
+examples = ["numpy", "matplotlib", "django"]
 
 [tool.ruff]
 line-length = 120
