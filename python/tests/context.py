@@ -2,7 +2,7 @@
 
 from magnetron import *
 
-GlobalConfig.verbose = True
+Context.verbose = True
 
 
 def test_context_creation() -> None:

@@ -19,8 +19,8 @@ model = XOR()
 optimizer = optim.SGD(model.parameters(), lr=1e-1)
 criterion = nn.MSELoss()
 
-x = mag.Tensor.const([[0, 0], [0, 1], [1, 0], [1, 1]])
-y = mag.Tensor.const([[0], [1], [1], [0]])
+x = mag.Tensor.from_data([[0, 0], [0, 1], [1, 0], [1, 1]])
+y = mag.Tensor.from_data([[0], [1], [1], [0]])
 
 for epoch in range(2000):
     y_hat = model(x)

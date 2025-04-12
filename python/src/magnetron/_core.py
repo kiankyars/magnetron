@@ -196,6 +196,24 @@ _ALLOC_DISPATCH: list[int, _ffi.CData] = {
 assert len(_ALLOC_DISPATCH) == MAX_DIMS
 
 
+def _flatten_nested_lists(nested: object) -> tuple[tuple[int, ...], list[float]]:
+    """Flatten a nested list and return its shape and flattened data."""
+    if not isinstance(nested, list):
+        return (), [nested]
+    elif len(nested) == 0:
+        return (0,), []
+    else:
+        shapes = []
+        flattened = []
+        for item in nested:
+            shape_lst, flat = _flatten_nested_lists(item)
+            shapes.append(shape_lst)
+            flattened += flat
+        first_shape = shapes[0]
+        for s in shapes:
+            assert s == first_shape, 'All sub-lists must have the same shape'
+        return (len(nested),) + first_shape, flattened
+
 class Tensor:
     """A 1-6 dimensional tensor with support for automatic differentiation."""
 
@@ -271,7 +289,7 @@ class Tensor:
         return tensor
 
     @classmethod
-    def const(
+    def from_data(
         cls,
         data: list[float, ...],
         *,
@@ -279,24 +297,7 @@ class Tensor:
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
-        def flatten_nested_lists(nested: object) -> tuple[tuple[int, ...], list[float]]:
-            if not isinstance(nested, list):
-                return (), [nested]
-            elif len(nested) == 0:
-                return (0,), []
-            else:
-                shapes = []
-                flattened = []
-                for item in nested:
-                    shape_lst, flat = flatten_nested_lists(item)
-                    shapes.append(shape_lst)
-                    flattened += flat
-                first_shape = shapes[0]
-                for s in shapes:
-                    assert s == first_shape, 'All sub-lists must have the same shape'
-                return (len(nested),) + first_shape, flattened
-
-        shape, flattened_data = flatten_nested_lists(data)
+        shape, flattened_data = _flatten_nested_lists(data)
         tensor = cls(None)
         tensor._new(
             Context.primary(),

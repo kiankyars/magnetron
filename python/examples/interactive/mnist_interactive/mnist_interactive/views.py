@@ -21,10 +21,10 @@ class MNIST(nn.Module):
         with open(data_file, 'rb') as f:
             dat = pickle.load(f)
 
-        self.fc1.weight.x = mag.Tensor.const(dat['fc1_w'], name='fc1_w').T
-        self.fc1.bias.x = mag.Tensor.const(dat['fc1_b'], name='fc1_b')
-        self.fc2.weight.x = mag.Tensor.const(dat['fc2_w'], name='fc2_w').T
-        self.fc2.bias.x = mag.Tensor.const(dat['fc2_b'], name='fc2_b')
+        self.fc1.weight.x = mag.Tensor.from_data(dat['fc1_w'], name='fc1_w').T
+        self.fc1.bias.x = mag.Tensor.from_data(dat['fc1_b'], name='fc1_b')
+        self.fc2.weight.x = mag.Tensor.from_data(dat['fc2_w'], name='fc2_w').T
+        self.fc2.bias.x = mag.Tensor.from_data(dat['fc2_b'], name='fc2_b')
         self.eval()
 
     def forward(self, x: mag.Tensor) -> mag.Tensor:
@@ -66,7 +66,7 @@ def predict_digit(request: HttpRequest) -> JsonResponse:
     image = post_process_image(image, target_size=28, padding=4)
     arr = np.array(image, dtype=np.float32) / 255.0
     flat_arr: list[float] = arr.flatten().tolist()
-    test_tensor: mag.Tensor = mag.Tensor.const([flat_arr], name='input')
+    test_tensor: mag.Tensor = mag.Tensor.from_data([flat_arr], name='input')
     pred = model.predict(test_tensor)
     digit: int = pred[0]
     return JsonResponse({'prediction': digit})

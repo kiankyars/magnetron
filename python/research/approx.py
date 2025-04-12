@@ -20,7 +20,7 @@ def plot_approximation_error(
     x_values = [i * step for i in range(int(domain[0] / step), int(domain[1] / step))]
     exact = [exact_func(x) for x in x_values]
     approx = mag.Tensor.operator(
-        approx_op, False, None, mag.Tensor.const(x_values)
+        approx_op, False, None, mag.Tensor.from_data(x_values)
     ).data_as_f32()
     errors = [abs(exact[i] - approx[i]) for i in range(len(exact))]
     assert len(exact) == len(approx) == len(errors) == len(x_values)

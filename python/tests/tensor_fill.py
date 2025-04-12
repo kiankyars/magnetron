@@ -49,7 +49,7 @@ def test_tensor_fill_normal() -> None:
 
 def test_tensor_fill_const_1d() -> None:
     init = [1, 2, 3, 4]
-    tensor = Tensor.const(init)
+    tensor = Tensor.from_data(init)
     assert tensor.shape == (4,)
     assert tensor.numel == 4
     assert tensor.rank == 1
@@ -59,7 +59,7 @@ def test_tensor_fill_const_1d() -> None:
 
 def test_tensor_fill_const_2d() -> None:
     init = [[1, 2], [3, 4]]
-    tensor = Tensor.const(init)
+    tensor = Tensor.from_data(init)
     assert tensor.shape == (2, 2)
     assert tensor.numel == 4
     assert tensor.rank == 2
@@ -69,7 +69,7 @@ def test_tensor_fill_const_2d() -> None:
 
 def test_tensor_fill_const_3d() -> None:
     init = [[[1, 2], [3, 4]], [[1, 2], [3, 4]]]
-    tensor = Tensor.const(init)
+    tensor = Tensor.from_data(init)
     assert tensor.shape == (2, 2, 2)
     assert tensor.numel == 8
     assert tensor.rank == 3
@@ -79,7 +79,7 @@ def test_tensor_fill_const_3d() -> None:
 
 def test_tensor_fill_const_4d() -> None:
     init = [[[[1, 2], [3, 4]], [[1, 2], [3, 4]]], [[[1, 2], [3, 4]], [[1, 2], [3, 4]]]]
-    tensor = Tensor.const(init)
+    tensor = Tensor.from_data(init)
     assert tensor.shape == (2, 2, 2, 2)
     assert tensor.numel == 16
     assert tensor.rank == 4
@@ -92,7 +92,7 @@ def test_tensor_fill_const_5d() -> None:
         [[[[1, 2], [3, 4]], [[1, 2], [3, 4]]], [[[1, 2], [3, 4]], [[1, 2], [3, 4]]]],
         [[[[1, 2], [3, 4]], [[1, 2], [3, 4]]], [[[1, 2], [3, 4]], [[1, 2], [3, 4]]]],
     ]
-    tensor = Tensor.const(init)
+    tensor = Tensor.from_data(init)
     assert tensor.shape == (2, 2, 2, 2, 2)
     assert tensor.numel == 32
     assert tensor.rank == 5
@@ -156,7 +156,7 @@ def test_tensor_fill_const_6d() -> None:
             ],
         ],
     ]
-    tensor = Tensor.const(init)
+    tensor = Tensor.from_data(init)
     assert tensor.shape == (2, 2, 2, 2, 2, 2)
     assert tensor.numel == 64
     assert tensor.rank == 6

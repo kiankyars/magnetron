@@ -65,8 +65,8 @@ def xor_nn_np() -> None:
 
 
 def xor_nn_mag() -> None:
-    x = Tensor.const(INPUT)
-    y = Tensor.const(TARGET)
+    x = Tensor.from_data(INPUT)
+    y = Tensor.from_data(TARGET)
 
     def sigmoid_derivative(x: Tensor) -> Tensor:
         return x * (1 - x)
@@ -105,7 +105,7 @@ def xor_nn_mag() -> None:
         a2 = z2.sigmoid()
         return a2
 
-    return [predict(Tensor.const([xr]))[0] for xr in INPUT]
+    return [predict(Tensor.from_data([xr]))[0] for xr in INPUT]
 
 
 """

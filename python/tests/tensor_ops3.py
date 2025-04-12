@@ -37,7 +37,7 @@ def test_simple_ff() -> None:
 
     mag_data = []
     for x in truth_table:
-        x = Tensor.const([x])
+        x = tensor([x])
 
         z1 = x @ W1 + b1
         a1 = z1.sigmoid()

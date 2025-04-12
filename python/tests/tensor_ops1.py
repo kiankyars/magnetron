@@ -4,7 +4,7 @@ from magnetron import *
 
 
 def test_tensor_clone() -> None:
-    a = Tensor.const([[1, 2], [3, 4]])
+    a = Tensor.from_data([[1, 2], [3, 4]])
     b = a.clone()
     assert a.shape == b.shape
     assert a.numel == b.numel
