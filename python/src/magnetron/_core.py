@@ -36,7 +36,7 @@ class PRNGAlgorithm(Enum):
 
 @dataclass(frozen=True)
 class DataType:
-    value: int
+    enum_value: int
     size: int
     name: str
     is_floating_point: bool
@@ -243,7 +243,7 @@ class Tensor:
         assert 0 < len(shape) <= MAX_DIMS, f'Invalid number of dimensions: {len(shape)}'
         assert all(0 < dim <= DIM_MAX for dim in shape), 'Invalid dimension size'
         self._ctx = ctx
-        self._ptr = _ALLOC_DISPATCH[len(shape)](ctx._ptr, dtype.value, *shape)
+        self._ptr = _ALLOC_DISPATCH[len(shape)](ctx._ptr, dtype.enum_value, *shape)
         self.requires_grad = requires_grad
         if name:
             self.name = name
@@ -401,7 +401,13 @@ class Tensor:
 
     @property
     def dtype(self) -> DataType:
-        return DataType(_C.mag_tensor_get_dtype(self._ptr))
+        dtype_value: int = _C.mag_tensor_get_dtype(self._ptr)
+        if dtype_value == e8m23.enum_value:
+            return e8m23
+        elif dtype_value == e5m10.enum_value:
+            return e5m10
+        else:
+            raise ValueError(f'Unsupported dtype value: {dtype_value}')
 
     @property
     def data_ptr(self) -> int:
@@ -767,6 +773,12 @@ class Tensor:
     def __str__(self) -> str:
         self.print(False, True)
         return ''
+
+    def __repr__(self) -> str:
+        if self.name is not None and self.name != '':
+            return f'Tensor(name={self.name}, shape={self.shape}, dtype={self.dtype})'
+        else:
+            return f'Tensor(shape={self.shape}, dtype={self.dtype})'
 
     def __getitem__(self, indices: int | tuple[int, ...]) -> float:
         if isinstance(indices, int):
