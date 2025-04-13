@@ -5,13 +5,13 @@ import faulthandler
 import threading
 import typing
 from dataclasses import dataclass
-from enum import Enum, auto, unique
+from enum import Enum, unique
 from functools import lru_cache
 from os import getenv
-
-from magnetron._lib_loader import load_native_module
+from magnetron._bootstrap import load_native_module
 
 faulthandler.enable()
+
 _ffi, _C = load_native_module()
 
 MAX_DIMS: int = 6

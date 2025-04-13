@@ -931,6 +931,13 @@ typedef struct mag_kernel_registry_t { /* Kernel registry for operators. */
 
 #define mag_load_local_storage_group(xk, prefix, var) mag_load_local_storage_group_arr((xk)->var, prefix)
 
+static inline void mag_hash_combine(uint32_t* seed, uint32_t value) {
+    *seed ^= value + 0x9e3779b9 + (*seed<<6) + (*seed>>2);
+}
+
+extern uint32_t mag_hash(const void* key, size_t len, uint32_t seed); /* compute murmur3_32 hash */
+extern uint32_t mag_crc32c(const void* buffer, size_t size); /* Compute CRC32 checksum with CRC32c polynomial. */
+
 #ifdef __cplusplus
 }
 #endif

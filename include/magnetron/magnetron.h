@@ -394,6 +394,7 @@ extern MAG_EXPORT void mag_tensor_to_float_array_free_data(float* _Nonnull ret_v
 
 extern MAG_EXPORT void mag_tensor_incref(mag_tensor_t* _Nonnull t);
 extern MAG_EXPORT bool mag_tensor_decref(mag_tensor_t* _Nonnull t);
+extern MAG_EXPORT uint32_t mag_tensor_weak_hash(const mag_tensor_t* _Nonnull t); /* Returns hash of the tensor properties, not including data. */
 extern MAG_EXPORT char* _Nonnull mag_tensor_to_string(const mag_tensor_t* _Nonnull t, bool with_header, size_t from_start_count, size_t from_end_count);
 extern MAG_EXPORT void mag_tensor_to_string_free_data(char* _Nonnull ret_val);
 extern MAG_EXPORT void mag_tensor_img_draw_box(mag_tensor_t* _Nonnull t, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t wi, uint32_t rgb);
@@ -402,6 +403,18 @@ extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_load_image(mag_ctx_t* _Nonnu
 extern MAG_EXPORT void mag_tensor_save_image(const mag_tensor_t* _Nonnull t, const char* _Nonnull file);                                                                                    /* Save tensor data as an image */
 extern MAG_EXPORT void mag_tensor_export_forward_graph_graphviz(mag_tensor_t* _Nonnull t, const char* _Nonnull file);                                                                      /* Export tensor computation graph as Graphviz DOT file *//* Get image channels from tensor */
 extern MAG_EXPORT void mag_tensor_export_backward_graph_graphviz(mag_tensor_t* _Nonnull t, const char* _Nonnull file);
+
+/* ============ Magnetron (.mag) file read/write API. ============ */
+
+typedef struct mag_storage_stream_t mag_storage_stream_t;
+
+extern MAG_EXPORT mag_storage_stream_t* _Nonnull mag_storage_stream_new(void);
+extern MAG_EXPORT mag_storage_stream_t* _Nonnull mag_storage_stream_open(const char* _Nonnull file);
+extern MAG_EXPORT bool mag_storage_stream_serialize(mag_storage_stream_t* _Nonnull st, const char* _Nonnull file);
+extern MAG_EXPORT void mag_storage_stream_close(mag_storage_stream_t* _Nonnull st);
+
+extern MAG_EXPORT bool mag_storage_stream_put_tensor(mag_storage_stream_t* _Nonnull st, const char* _Nonnull key, mag_tensor_t* _Nonnull t);
+extern MAG_EXPORT mag_tensor_t* _Nullable mag_storage_stream_get_tensor(mag_storage_stream_t* _Nonnull st, const char* _Nonnull key);
 
 #ifdef __cplusplus
 }

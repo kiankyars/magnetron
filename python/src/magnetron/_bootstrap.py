@@ -1,3 +1,4 @@
+from functools import lru_cache
 from pathlib import Path
 from magnetron._ffi_cdecl_generated import __MAG_CDECLS
 from cffi import FFI
@@ -10,7 +11,7 @@ MAG_LIBS: list[tuple[str, str]] = [
     ('darwin', 'libmagnetron.dylib'),
 ]
 
-
+@lru_cache(maxsize=1)
 def load_native_module() -> tuple[FFI, object]:
     platform = sys.platform
     lib_name = next((lib for os, lib in MAG_LIBS if platform.startswith(os)), None)
