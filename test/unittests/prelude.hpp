@@ -265,7 +265,7 @@ namespace magnetron::test {
             }
 
             [[nodiscard]] auto operator()(tensor x) const -> tensor {
-                tensor y {x & weight->T().clone()};
+                tensor y {x & weight->T()};
                 if (bias.has_value())
                     y = y + *bias;
                 return y;
