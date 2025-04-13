@@ -312,13 +312,25 @@ static void MAG_HOTPROC mag_prng_gen_normal_vec_e5m10(mag_prng_state_t* prng, ma
 
 static void mag_blas_nop(const mag_compute_payload_t* payload) { (void)payload; }
 
+static inline int64_t mag_offset_from_flat(const mag_tensor_t* t, int64_t idx) {
+    int64_t off = 0;
+    for (int64_t d=t->rank-1; d >= 0; --d) {
+        int64_t coord = idx % t->shape[d];
+        idx /= t->shape[d];
+        off += coord * t->strides[d];
+    }
+    return off;
+}
+
 static void mag_blas_clone(const mag_compute_payload_t* payload) {
-    mag_tensor_t* r = payload->node;
-    const mag_tensor_t* x = r->op_inputs[0];
-    mag_assert2(mag_tensor_is_shape_eq(x, r));
-    mag_e8m23_t* b_r = mag_e8m23p_mut(r);
-    const mag_e8m23_t* b_x = mag_e8m23p(x);
-    memcpy(b_r, b_x, mag_tensor_get_data_size(r));
+    mag_tensor_t*  r  = payload->node;
+    const mag_tensor_t* x  = r->op_inputs[0];
+    mag_e8m23_t* br = mag_e8m23p_mut(r);
+    const mag_e8m23_t* bx = mag_e8m23p(x);
+    for (int64_t i=0; i < r->numel; ++i) {
+        int64_t off_src = mag_offset_from_flat(x, i);
+        br[i] = bx[off_src];
+    }
 }
 
 static void mag_blas_init_broadcast_e8m23(const mag_compute_payload_t* payload) {
@@ -377,16 +389,6 @@ static void mag_blas_init_rand_normal_e5m10(const mag_compute_payload_t* payload
     mag_e5m10_t* b_r = mag_e5m10p_mut(r);
     int64_t numel = r->numel;
     mag_prng_gen_normal_vec_e5m10(payload->local_prng, b_r, numel, mean, stddev);
-}
-
-static inline int64_t mag_offset_from_flat(const mag_tensor_t* t, int64_t idx) {
-    int64_t off = 0;
-    for (int64_t d=t->rank-1; d >= 0; --d) {
-        int64_t coord = idx % t->shape[d];
-        idx /= t->shape[d];
-        off += coord * t->strides[d];
-    }
-    return off;
 }
 
 #define mag_cpu_blas_impl_binary(T, OP) \
