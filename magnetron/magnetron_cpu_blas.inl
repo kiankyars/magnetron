@@ -322,11 +322,22 @@ static inline int64_t mag_offset_from_flat(const mag_tensor_t* t, int64_t idx) {
     return off;
 }
 
-static void mag_blas_clone(const mag_compute_payload_t* payload) {
+static void mag_blas_clone_e8m23(const mag_compute_payload_t* payload) {
     mag_tensor_t*  r  = payload->node;
     const mag_tensor_t* x  = r->op_inputs[0];
     mag_e8m23_t* br = mag_e8m23p_mut(r);
     const mag_e8m23_t* bx = mag_e8m23p(x);
+    for (int64_t i=0; i < r->numel; ++i) {
+        int64_t off_src = mag_offset_from_flat(x, i);
+        br[i] = bx[off_src];
+    }
+}
+
+static void mag_blas_clone_e5m10(const mag_compute_payload_t* payload) {
+    mag_tensor_t* r = payload->node;
+    const mag_tensor_t* x  = r->op_inputs[0];
+    mag_e5m10_t* br = mag_e5m10p_mut(r);
+    const mag_e5m10_t* bx = mag_e5m10p(x);
     for (int64_t i=0; i < r->numel; ++i) {
         int64_t off_src = mag_offset_from_flat(x, i);
         br[i] = bx[off_src];
@@ -977,8 +988,8 @@ static void (*const mag_blas_lut_forward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(c
         [MAG_DTYPE_E5M10] = &mag_blas_nop,
     },
     [MAG_OP_CLONE] = {
-        [MAG_DTYPE_E8M23] = &mag_blas_clone,
-        [MAG_DTYPE_E5M10] = &mag_blas_clone,
+        [MAG_DTYPE_E8M23] = &mag_blas_clone_e8m23,
+        [MAG_DTYPE_E5M10] = &mag_blas_clone_e5m10,
     },
     [MAG_OP_VIEW] = {
         [MAG_DTYPE_E8M23] = &mag_blas_nop,
@@ -1148,8 +1159,8 @@ static void (*const mag_blas_lut_backward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(
         [MAG_DTYPE_E5M10] = &mag_blas_nop,
     },
     [MAG_OP_CLONE] = {
-        [MAG_DTYPE_E8M23] = &mag_blas_clone,
-        [MAG_DTYPE_E5M10] = &mag_blas_clone,
+        [MAG_DTYPE_E8M23] = &mag_blas_clone_e8m23,
+        [MAG_DTYPE_E5M10] = &mag_blas_clone_e5m10,
     },
     [MAG_OP_VIEW] = {
         [MAG_DTYPE_E8M23] = &mag_blas_nop,
