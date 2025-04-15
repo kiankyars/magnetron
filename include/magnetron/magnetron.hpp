@@ -248,7 +248,7 @@ namespace magnetron {
         tensor(context& ctx, dtype type, S&&... shape) : tensor{ctx, type, std::array{static_cast<std::int64_t>(shape)...}} {}
 
         tensor(context& ctx, std::span<const std::int64_t> shape, std::span<const float> data) : tensor{ctx, dtype::f32, shape} {
-            copy_buffer_from(data);
+            fill_from(data);
         }
 
         tensor(const tensor& other) {
@@ -374,11 +374,6 @@ namespace magnetron {
         [[nodiscard]] auto operator / (float other) const noexcept -> tensor { return div(other); }
         auto operator /= (tensor other) const noexcept -> tensor { return div_(other); }
         [[nodiscard]] auto operator & (tensor other) const noexcept -> tensor { return matmul(other); } // we use the & operator for matmul in C++, as @ is not allowed
-
-        template <typename T> requires std::is_arithmetic_v<T>
-        auto copy_buffer_from(std::span<const T> buf) -> void {
-            mag_tensor_fill_from_floats(m_tensor, buf.data(), buf.size_bytes());
-        }
 
         auto fill_from(const void* buf, std::size_t nb) -> void {
             mag_tensor_fill_from_raw_bytes(m_tensor, buf, nb);

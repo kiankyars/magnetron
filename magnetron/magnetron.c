@@ -2373,20 +2373,20 @@ size_t mag_tensor_get_memory_usage(const mag_tensor_t* t) {
     return sizeof(*t) + mag_tensor_get_data_size(t);
 }
 
+mag_static_assert(sizeof(char) == sizeof(uint8_t));
 void mag_tensor_set_name(mag_tensor_t* t, const char* name) {
-    strncpy(t->name, name, MAG_MAX_TENSOR_NAME_LEN);
-    t->name[MAG_MAX_TENSOR_NAME_LEN-1] = '\0';
+    snprintf((char*)t->name, MAG_MAX_TENSOR_NAME_LEN, "%s", name);
 }
 
 void mag_tensor_fmt_name(mag_tensor_t* t, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    vsnprintf(t->name, sizeof(t->name), fmt, args);
+    vsnprintf((char*)t->name, sizeof(t->name), fmt, args);
     va_end(args);
 }
 
 const char* mag_tensor_get_name(const mag_tensor_t* t) {
-    return t->name;
+    return (const char*)t->name;
 }
 
 int64_t mag_tensor_get_rank(const mag_tensor_t* t) { return t->rank; }
@@ -3479,6 +3479,42 @@ uint32_t mag_crc32c(const void* buffer, size_t size) {
     return ~crc;
 }
 
+static const uint8_t* mag_validate_utf8(const uint8_t* s) {
+    while (*s) {
+        if (*s < 0x80) ++s;                                 /* 0xxxxxxx */
+        else if ((*s&0xe0) == 0xc0) {                       /* 110XXXXx - 10xxxxxx */
+            if ((s[1]&0xc0) != 0x80 || (*s&0xfe) == 0xc0)   /* Is an overlong sequence? */
+                return s;
+            s += 2;
+        } else if ((*s&0xf0) == 0xe0) {                     /* 1110XXXX - 10Xxxxxx - 10xxxxxx */
+            if ((s[1]&0xc0) != 0x80 ||
+                (s[2]&0xc0) != 0x80 ||
+                (*s == 0xe0 && (s[1]&0xe0) == 0x80) ||      /* Is an overlong sequence? */
+                (*s == 0xed && (s[1]&0xe0) == 0xa0) ||      /* Is a surrogate? */
+                (*s == 0xef && s[1] == 0xbf &&
+                 (s[2]&0xfe) == 0xbe))                      /* U+FFFE or U+FFFF? */
+                 return s;
+            s += 3;
+        } else if ((*s & 0xf8) == 0xf0) {                   /* 11110XXX - 10XXxxxx - 10xxxxxx - 10xxxxxx */
+            if ((s[1]&0xc0) != 0x80 ||
+                (s[2]&0xc0) != 0x80 ||
+                (s[3]&0xc0) != 0x80 ||
+                (*s == 0xf0 && (s[1]&0xf0) == 0x80) ||      /* Is an overlong sequence? */
+                (*s == 0xf4 && s[1] > 0x8f) || *s > 0xf4)   /* > U+10FFFF? */
+                return s;
+            s += 4;
+        } else
+            return s;
+    }
+    return NULL;
+}
+
+static size_t mag_strlen_utf8(const uint8_t* str) {
+    const uint8_t* s;
+    for (s = str; *s; ++s);
+    return s-str;
+}
+
 #define mag_make_magic(a, b, c, d) ((((d)&0xff)<<24) + (((c)&0xff)<<16) + (((b)&0xff)<<8) + ((a)&0xff))
 #define MAG_STO_FILE_MAGIC mag_make_magic('M', 'A', 'G', '&')
 #define MAG_STO_TENSOR_HDR_SECTION mag_make_magic('T', 'H', 'D', 'R')
@@ -3564,14 +3600,15 @@ static bool mag_sto_read_file_hdr(FILE* f, uint32_t* num_tensors, uint32_t* num_
 
 static bool mag_sto_write_tensor_hdr(
     FILE* f,
-    const char* key,
+    const uint8_t* key,
     const int64_t(*shape)[MAG_MAX_DIMS],
-    const char (*name)[MAG_MAX_TENSOR_NAME_LEN],
+    const uint8_t (*name)[MAG_MAX_TENSOR_NAME_LEN],
     int64_t rank,
     mag_dtype_t dtype
 ) {
     long start = ftell(f);
-    size_t key_len = strlen(key);
+    mag_sto_sanitize(!mag_validate_utf8(key), "invalid utf8-8 in tensor key", false);
+    size_t key_len = mag_strlen_utf8(key);
     mag_sto_sanitize(key_len > 0 && key_len <= MAG_STO_MAX_KEY_LEN, "invalid key length", false);
     mag_sto_sanitize(mag_sto_write_u32_le(f, key_len), "failed to write key length", false); /* Write key length */
     for (int i=0; i < MAG_MAX_DIMS; ++i) /* Write shape */
@@ -3579,6 +3616,7 @@ static bool mag_sto_write_tensor_hdr(
     uint32_t aux;
     mag_sto_sanitize(mag_pack_aux32(&aux, 0, 0, rank, dtype), "failed to pack aux", false);
     mag_sto_sanitize(mag_sto_write_u32_le(f, aux), "failed to write aux", false); /* Write aux */
+    mag_sto_sanitize(!mag_validate_utf8(*name), "invalid utf8-8 in tensor name", false);
     mag_sto_sanitize(fwrite(name, MAG_MAX_TENSOR_NAME_LEN, 1, f) == 1, "failed to write name", false); /* Write name */
     mag_sto_sanitize(fwrite(key, key_len, 1, f) == 1, "failed to write key", false); /* Write key */
     long end = ftell(f);
@@ -3588,9 +3626,9 @@ static bool mag_sto_write_tensor_hdr(
 
 static bool mag_sto_read_tensor_hdr(
     FILE* f,
-    char** key,
+    uint8_t** key,
     int64_t(*shape)[MAG_MAX_DIMS],
-    char (*name)[MAG_MAX_TENSOR_NAME_LEN],
+    uint8_t (*name)[MAG_MAX_TENSOR_NAME_LEN],
     int64_t* rank,
     mag_dtype_t* dtype
 ) {
@@ -3617,10 +3655,12 @@ static bool mag_sto_read_tensor_hdr(
         memcpy(*name+(i<<3), &packed, sizeof(packed));
     }
     (*name)[MAG_MAX_TENSOR_NAME_LEN-1] = 0; /* Ensure null termination */
+    mag_sto_sanitize(!mag_validate_utf8(*name), "invalid utf8-8 in tensor name", false);
     *key = (*mag_alloc)(NULL, key_len+1); /* Allocate key */
     mag_sto_sanitize(fread(*key, key_len, 1, f) == 1, "failed to read key", false); /* Read key */
     (*key)[key_len] = '\0'; /* Ensure null termination */
     mag_sto_sanitize(*key, "empty key", false);
+    mag_sto_sanitize(!mag_validate_utf8(*key), "invalid utf8-8 in tensor key", false);
     long end = ftell(f);
     mag_sto_sanitize(end - start == MAG_STO_TENSOR_HDR_SIZE+key_len, "invalid tensor header size", false);
     return true;
@@ -3654,9 +3694,12 @@ static bool mag_sto_read_tensor_data(FILE* f, mag_tensor_t* t) {
     return true;
 }
 
+mag_static_assert(sizeof(char) == sizeof(uint8_t));
+
 typedef struct mag_tensor_bucket_t {
     mag_tensor_t* tensor;
-    char* key;
+    uint8_t* key;
+    size_t key_len;
 } mag_tensor_bucket_t;
 
 struct mag_storage_stream_t {
@@ -3721,16 +3764,16 @@ mag_storage_stream_t* mag_storage_stream_deserialize(mag_ctx_t* ctx, const char*
     mag_sto_sanitize(tmp_marker == MAG_STO_TENSOR_HDR_SECTION, "invalid tensor header section marker", NULL);
     for (uint32_t i=0; i < num_tensors; ++i) {
         int64_t shape[MAG_MAX_DIMS] = {};
-        char name[MAG_MAX_TENSOR_NAME_LEN] = {};
+        uint8_t name[MAG_MAX_TENSOR_NAME_LEN] = {};
         int64_t rank = 0;
         mag_dtype_t dtype = MAG_DTYPE__NUM;
-        char* key;
+        uint8_t* key;
         mag_sto_sanitize(mag_sto_read_tensor_hdr(f, &key, &shape, &name, &rank, &dtype), "failed to read tensor header", NULL);
         mag_sto_sanitize(rank >= 1 && rank <= MAG_MAX_DIMS, "invalid tensor rank", NULL);
         mag_tensor_t* tensor = mag_tensor_create(ctx, dtype, shape, rank, NULL, 0);
         mag_sto_sanitize(tensor, "failed to create tensor", NULL);
-        mag_tensor_set_name(tensor, name);
-        mag_sto_sanitize(mag_storage_stream_put_tensor(stream, key, tensor), "failed to put tensor", NULL);
+        mag_tensor_set_name(tensor, (const char*)name);
+        mag_sto_sanitize(mag_storage_stream_put_tensor(stream, (const char*)key, tensor), "failed to put tensor", NULL);
         mag_tensor_decref(tensor); /* The function above increments the refcount and we also retain wich get_tensor, so we decref by one. */
         (*mag_alloc)(key, 0); /* Free key */
     }
@@ -3758,15 +3801,17 @@ bool mag_storage_stream_put_tensor(mag_storage_stream_t* st, const char* key, ma
     bucket->tensor = t;
     size_t key_len = strlen(key);
     bucket->key = (*mag_alloc)(NULL, key_len+1);
-    strncpy(bucket->key, key, key_len);
+    memcpy(bucket->key, key, key_len);
     bucket->key[key_len] = '\0';
+    bucket->key_len = key_len;
     return true;
 }
 
 mag_tensor_t* mag_storage_stream_get_tensor(mag_storage_stream_t* st, const char* key) {
     if (mag_unlikely(!key || !*key)) return NULL;
+    size_t len = strlen(key);
     for (size_t i=0; i < st->tensors_num; ++i) { /* TODO: map */
-        if (strncmp(st->tensors[i].key, key, strlen(key)) == 0) {
+        if (st->tensors[i].key_len == len && memcmp(st->tensors[i].key, key, len) == 0) {
             mag_tensor_incref(st->tensors[i].tensor);
             return st->tensors[i].tensor;
         }

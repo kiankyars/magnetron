@@ -878,7 +878,7 @@ struct mag_tensor_t {
     mag_tensor_t* view_uplink;                          /* View base tensor. */
     size_t view_offs;                                   /* Offset in view tensor. */
     mag_tensor_t* grad;                                 /* ∇f - Gradient tensor. */
-    char name[MAG_MAX_TENSOR_NAME_LEN];                 /* Tensor debug name. */
+    uint8_t name[MAG_MAX_TENSOR_NAME_LEN];              /* Tensor debug name. */
     void* ud;                                           /* User data. */
 };
 
