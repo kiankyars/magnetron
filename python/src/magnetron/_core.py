@@ -63,6 +63,10 @@ e5m10: DataType = DataType(_C.MAG_DTYPE_E5M10, 2, 'e5m10', True)
 f32: DataType = e8m23
 f16: DataType = e5m10
 
+_dtype_enum_map: dict[int, DataType] = {
+    e8m23.enum_value: e8m23,
+    e5m10.enum_value: e5m10,
+}
 
 @dataclass
 class Config:
@@ -383,9 +387,6 @@ class Tensor:
         instance = _C.mag_tensor_load(Context.primary()._ptr, bytes(file_path, 'utf-8'))
         return cls(ptr=instance)
 
-    def print(self, print_header: bool = False, print_data: bool = True) -> None:
-        _C.mag_tensor_print(self._ptr, print_header, print_data)
-
     @property
     def name(self) -> str:
         return _ffi.string(_C.mag_tensor_get_name(self._ptr)).decode('utf-8')
@@ -409,12 +410,10 @@ class Tensor:
     @property
     def dtype(self) -> DataType:
         dtype_value: int = _C.mag_tensor_get_dtype(self._ptr)
-        if dtype_value == e8m23.enum_value:
-            return e8m23
-        elif dtype_value == e5m10.enum_value:
-            return e5m10
-        else:
-            raise ValueError(f'Unsupported dtype value: {dtype_value}')
+        assert dtype_value in _dtype_enum_map, (
+            f'Unsupported tensor dtype: {dtype_value}'
+        )
+        return _dtype_enum_map[dtype_value]
 
     @property
     def data_ptr(self) -> int:
@@ -778,8 +777,7 @@ class Tensor:
         return _C.mag_tensor_eq(self._ptr, other._ptr)
 
     def __str__(self) -> str:
-        self.print(False, True)
-        return ''
+        return self.__repr__()
 
     def __repr__(self) -> str:
         if self.name is not None and self.name != '':

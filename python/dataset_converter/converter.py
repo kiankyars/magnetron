@@ -29,3 +29,6 @@ convert_pickle(INPUT, OUTPUT)
 
 inp = StorageStream.open(OUTPUT)
 print(inp.get('fc1_w'))
+print(inp.get('fc1_b'))
+print(inp.get('fc2_w'))
+print(inp.get('fc2_b'))

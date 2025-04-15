@@ -3598,7 +3598,6 @@ static bool mag_sto_read_tensor_hdr(
     uint32_t key_len;
     mag_sto_sanitize(mag_sto_read_u32_le(f, &key_len), "failed to read key length", false); /* Read key length */
     mag_sto_sanitize(key_len > 0 && key_len <= MAG_STO_MAX_KEY_LEN, "invalid key length", false);
-    mag_sto_sanitize(*key, "empty key", false);
     for (int i=0; i < MAG_MAX_DIMS; ++i) { /* Read shape */
         uint64_t udim;
         mag_sto_sanitize(mag_sto_read_u64_le(f, &udim), "failed to read shape", false);
@@ -3621,6 +3620,7 @@ static bool mag_sto_read_tensor_hdr(
     *key = (*mag_alloc)(NULL, key_len+1); /* Allocate key */
     mag_sto_sanitize(fread(*key, key_len, 1, f) == 1, "failed to read key", false); /* Read key */
     (*key)[key_len] = '\0'; /* Ensure null termination */
+    mag_sto_sanitize(*key, "empty key", false);
     long end = ftell(f);
     mag_sto_sanitize(end - start == MAG_STO_TENSOR_HDR_SIZE+key_len, "invalid tensor header size", false);
     return true;
@@ -3731,6 +3731,8 @@ mag_storage_stream_t* mag_storage_stream_deserialize(mag_ctx_t* ctx, const char*
         mag_sto_sanitize(tensor, "failed to create tensor", NULL);
         mag_tensor_set_name(tensor, name);
         mag_sto_sanitize(mag_storage_stream_put_tensor(stream, key, tensor), "failed to put tensor", NULL);
+        mag_tensor_decref(tensor); /* The function above increments the refcount and we also retain wich get_tensor, so we decref by one. */
+        (*mag_alloc)(key, 0); /* Free key */
     }
     mag_sto_sanitize(mag_sto_read_u32_le(f, &tmp_marker), "failed to read tensor data section marker", NULL);
     mag_sto_sanitize(tmp_marker == MAG_STO_TENSOR_DAT_SECTION, "invalid tensor data section marker", NULL);
