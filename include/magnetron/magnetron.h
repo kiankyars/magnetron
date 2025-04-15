@@ -16,12 +16,12 @@
 extern "C" {
 #endif
 
-#define MAG_DEFAULT_CHUNK_SIZE (1ull<<30)  /* Default size of memory chunk in bytes. 1 GiB */
-#define MAG_DEFAULT_CHUNK_CAP 128          /* Default capacity of memory chunk */
-#define MAG_MAX_DIMS 6                     /* Maximum number of dimensions for a tensor */
-#define MAG_MAX_TENSOR_NAME_LEN 32         /* Maximum length for tensor name */
-#define MAG_MAX_OP_INPUTS 2            /* Maximum number of input tensors for an operation */
-#define MAG_MAX_OP_PARAMS 6                /* Maximum number of parameters for an operation */
+#define MAG_DEFAULT_CHUNK_SIZE (1ull<<30)   /* Default size of memory chunk in bytes. 1 GiB */
+#define MAG_DEFAULT_CHUNK_CAP 128           /* Default capacity of memory chunk */
+#define MAG_MAX_DIMS 6                      /* Maximum number of dimensions for a tensor */
+#define MAG_MAX_TENSOR_NAME_LEN 64          /* Maximum length for tensor name */
+#define MAG_MAX_OP_INPUTS 2                 /* Maximum number of input tensors for an operation */
+#define MAG_MAX_OP_PARAMS 6                 /* Maximum number of parameters for an operation */
 
 #ifndef MAG_EXPORT
 #ifdef MAG_SHARED
@@ -387,6 +387,8 @@ extern MAG_EXPORT float mag_tensor_subscript_get_flattened(mag_tensor_t* _Nonnul
  */
 extern MAG_EXPORT void mag_tensor_subscript_set_flattened(mag_tensor_t* _Nonnull t, int64_t idx, float val);
 
+extern MAG_EXPORT void* _Nonnull mag_tensor_to_byte_array(mag_tensor_t* _Nonnull t);
+extern MAG_EXPORT void mag_tensor_to_byte_array_free_data(void* _Nonnull ret_val);
 extern MAG_EXPORT float* _Nonnull mag_tensor_to_float_array(mag_tensor_t* _Nonnull t);
 extern MAG_EXPORT void mag_tensor_to_float_array_free_data(float* _Nonnull ret_val);
 
@@ -410,7 +412,7 @@ typedef struct mag_storage_stream_t mag_storage_stream_t;
 
 extern MAG_EXPORT mag_storage_stream_t* _Nonnull mag_storage_stream_new(void);
 extern MAG_EXPORT mag_storage_stream_t* _Nonnull mag_storage_stream_open(const char* _Nonnull file);
-extern MAG_EXPORT bool mag_storage_stream_serialize(mag_storage_stream_t* _Nonnull st, const char* _Nonnull file);
+extern MAG_EXPORT bool mag_storage_stream_serialize(mag_storage_stream_t* _Nonnull st, const char* _Nonnull path);
 extern MAG_EXPORT void mag_storage_stream_close(mag_storage_stream_t* _Nonnull st);
 
 extern MAG_EXPORT bool mag_storage_stream_put_tensor(mag_storage_stream_t* _Nonnull st, const char* _Nonnull key, mag_tensor_t* _Nonnull t);

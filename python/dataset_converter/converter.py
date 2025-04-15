@@ -16,13 +16,12 @@ def convert_pickle(input_file_path: Path | str, output_file_path: Path  | str | 
     if output_file_path is None:
         output_file_path = input_file_path.with_suffix('.mag')
     output = StorageStream()
-    output.serialize(output_file_path)
     for key in data:
         if key.endswith('w'):
             output.put(key, mag.Tensor.from_data(data[key], name=key).T) # Transpose weights
         else:
             output.put(key, mag.Tensor.from_data(data[key], name=key))
-
+    output.serialize(output_file_path)
 
 INPUT = Path('../examples/interactive/mnist_interactive/mnist_mlp_weights.pkl')
 OUTPUT = Path('out.mag')
