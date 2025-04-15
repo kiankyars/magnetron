@@ -263,17 +263,7 @@ TEST(core_tensor_logic, init_1d) {
     ASSERT_EQ(t.dtype(), dtype::e8m23);
     ASSERT_EQ(t.rank(), 1);
     ASSERT_EQ(t.shape()[0], 10);
-    ASSERT_EQ(t.shape()[1], 1);
-    ASSERT_EQ(t.shape()[2], 1);
-    ASSERT_EQ(t.shape()[3], 1);
-    ASSERT_EQ(t.shape()[4], 1);
-    ASSERT_EQ(t.shape()[5], 1);
     ASSERT_EQ(t.strides()[0], 1);
-    ASSERT_EQ(t.strides()[1], 10);
-    ASSERT_EQ(t.strides()[2], 10);
-    ASSERT_EQ(t.strides()[3], 10);
-    ASSERT_EQ(t.strides()[4], 10);
-    ASSERT_EQ(t.strides()[5], 10);
     ASSERT_NE(t.data_ptr(), nullptr);
     ASSERT_EQ(t.data_size(), 10 * sizeof(e8m23_t));
     ASSERT_EQ(t.numel(), 10);
@@ -314,10 +304,6 @@ TEST(core_tensor_logic, init_2d) {
     ASSERT_EQ(t.rank(), 2);
     ASSERT_EQ(t.shape()[0], 10);
     ASSERT_EQ(t.shape()[1], 10);
-    ASSERT_EQ(t.shape()[2], 1);
-    ASSERT_EQ(t.shape()[3], 1);
-    ASSERT_EQ(t.shape()[4], 1);
-    ASSERT_EQ(t.shape()[5], 1);
     ASSERT_EQ(t.strides()[0], 1);
     ASSERT_EQ(t.strides()[1], 10);
     ASSERT_EQ(t.strides()[2], 100);
@@ -365,9 +351,6 @@ TEST(core_tensor_logic, init_3d) {
     ASSERT_EQ(t.shape()[0], 10);
     ASSERT_EQ(t.shape()[1], 10);
     ASSERT_EQ(t.shape()[2], 10);
-    ASSERT_EQ(t.shape()[3], 1);
-    ASSERT_EQ(t.shape()[4], 1);
-    ASSERT_EQ(t.shape()[5], 1);
     ASSERT_EQ(t.strides()[0], 1);
     ASSERT_EQ(t.strides()[1], 10);
     ASSERT_EQ(t.strides()[2], 100);
@@ -416,8 +399,6 @@ TEST(core_tensor_logic, init_4d) {
     ASSERT_EQ(t.shape()[1], 10);
     ASSERT_EQ(t.shape()[2], 10);
     ASSERT_EQ(t.shape()[3], 10);
-    ASSERT_EQ(t.shape()[4], 1);
-    ASSERT_EQ(t.shape()[5], 1);
     ASSERT_EQ(t.strides()[0], 1);
     ASSERT_EQ(t.strides()[1], 10);
     ASSERT_EQ(t.strides()[2], 100);
@@ -467,7 +448,6 @@ TEST(core_tensor_logic, init_5d) {
     ASSERT_EQ(t.shape()[2], 10);
     ASSERT_EQ(t.shape()[3], 10);
     ASSERT_EQ(t.shape()[4], 10);
-    ASSERT_EQ(t.shape()[5], 1);
     ASSERT_EQ(t.strides()[0], 1);
     ASSERT_EQ(t.strides()[1], 10);
     ASSERT_EQ(t.strides()[2], 100);

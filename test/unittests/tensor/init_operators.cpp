@@ -15,7 +15,7 @@ TEST(cpu_tensor_init_ops, copy_e8m23) {
         fill_data.resize(t.numel());
         std::uniform_real_distribution<e8m23_t> dist {dtype_traits<e8m23_t>::min, dtype_traits<e8m23_t>::max};
         std::ranges::generate(fill_data, [&] { return dist(gen); });
-        t.copy_buffer_from<e8m23_t>(fill_data);
+        t.fill_from(fill_data);
         std::vector<e8m23_t> data {t.to_vector()};
         ASSERT_EQ(data.size(), t.numel());
         for (std::size_t i {}; i < data.size(); ++i) {
@@ -32,7 +32,7 @@ TEST(cpu_tensor_init_ops, copy_e5m10) {
         fill_data.resize(t.numel());
         std::uniform_real_distribution<e8m23_t> dist {-1.0f, 1.0f};
         std::ranges::generate(fill_data, [&] { return dist(gen); });
-        t.copy_buffer_from<e8m23_t>(fill_data);
+        t.fill_from(fill_data);
         std::vector<e8m23_t> data {t.to_vector()};
         ASSERT_EQ(data.size(), t.numel());
         for (std::size_t i {}; i < data.size(); ++i) {

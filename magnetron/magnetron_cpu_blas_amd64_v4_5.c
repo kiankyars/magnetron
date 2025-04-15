@@ -22,6 +22,8 @@
     || !defined(__AVX512FP16__)
 #error "BLAS specialization requires matching compile flags"
 #endif
+#else
+#pragma message("MSVC does not allow to fine tune CPU architecture level, usine clang-cl or mingw-w64 for best performance!")
 #endif
 #ifdef __APX__
 #error "BLAS specialization feature too high"

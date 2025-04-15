@@ -279,6 +279,17 @@ defined(__WIN32__) || defined(__TOS_WIN__) || defined(__WINDOWS__)
 #define MAG_PAGE_SIZE_4K 0x1000
 #define MAG_PAGE_SIZE_2M 0x200000
 
+static uint16_t MAG_AINLINE mag_bswap16(uint16_t x) { /* Swap bytes for endianess switch. Should be optimized to a (bswap/rev) instruction on modern compilers. */
+    #ifdef MAG_BE
+    #if (defined(__GNUC__) && ((__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3))) || defined(__clang__)
+        x = (uint32_t)__builtin_bswap16((int32_t)x);
+    #else
+        x = (x & 0xff00) >> 8 | x & 0xff << 8;
+    #endif
+    #endif
+    return x;
+}
+
 static uint32_t MAG_AINLINE mag_bswap32(uint32_t x) { /* Swap bytes for endianess switch. Should be optimized to a (bswap/rev) instruction on modern compilers. */
     #ifdef MAG_BE
         #if (defined(__GNUC__) && ((__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3))) || defined(__clang__)
@@ -593,7 +604,11 @@ typedef struct mag_rc_control_block_t {
 
 static MAG_AINLINE mag_rc_control_block_t mag_rc_control_init(void* self, void (*dtor)(void*)) {
     mag_assert2(self && dtor); /* Self and destructor must be set. */
-    return (mag_rc_control_block_t){.rc=1, .self=self, .dtor=dtor};
+    mag_rc_control_block_t control;
+    control.rc = 1;
+    control.self = self;
+    control.dtor = dtor;
+    return control;
 }
 static MAG_AINLINE void mag_rc_control_incref(mag_rc_control_block_t* rcb) {
     mag_assert(++rcb->rc < 0xffffffffu, "Reference count overflow");
@@ -781,9 +796,9 @@ typedef enum mag_amd64_cap_t {
 
 extern const char* const mag_amd64_cap_names[MAG_AMD64_CAP__NUM];
 
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(_M_ARM64)
 
-#define mag_arm64_feature_def(_, __) /* Enumerator | Shift */\
+#define mag_arm64_feature_def(_, __) /* Enumerator */\
     _(NONE)__\
     _(NEON)__\
     _(DOTPROD)__\
@@ -826,7 +841,7 @@ struct mag_ctx_t {
 #if defined(__x86_64__) || defined(_M_X64)
         uint64_t amd64_cpu_caps;                        /* x86-64 CPU features. Bitset of 1ull<<MAG_AMD64_CAP_* */
         bool is_amd;                                    /* Is AMD CPU? */
-#elif defined (__aarch64__)
+#elif defined (__aarch64__) || defined(_M_ARM64)
         uint64_t arm64_cpu_caps;                        /* ARM64 CPU features. */
         int64_t arm64_cpu_sve_width;                    /* ARM64 SVE vector register width. */
 #endif
@@ -878,7 +893,7 @@ struct mag_tensor_t {
     mag_tensor_t* view_uplink;                          /* View base tensor. */
     size_t view_offs;                                   /* Offset in view tensor. */
     mag_tensor_t* grad;                                 /* ∇f - Gradient tensor. */
-    char name[MAG_MAX_TENSOR_NAME_LEN];                 /* Tensor debug name. */
+    uint8_t name[MAG_MAX_TENSOR_NAME_LEN];              /* Tensor debug name. */
     void* ud;                                           /* User data. */
 };
 
@@ -922,26 +937,21 @@ typedef struct mag_compute_payload_t { /* Compute payload for kernel execution. 
     mag_prng_state_t* local_prng;
 } mag_compute_payload_t;
 
-typedef struct mag_kernel_context_t { /* General op kernel context. */
-    mag_tensor_t* node;
-    int64_t alloced_threads;
-    union {
-       int dummy;
-    } per_op; /* Per-op data is added here */
-} mag_kernel_context_t;
-
 typedef struct mag_kernel_registry_t { /* Kernel registry for operators. */
-    void (*init[MAG_IOP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
-    uint32_t (*fwd_pre[MAG_OP__NUM])(mag_kernel_context_t*);
-    void (*fwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
-    void (*fwd_post[MAG_OP__NUM])(mag_kernel_context_t*);
-    uint32_t (*bwd_pre[MAG_OP__NUM])(mag_kernel_context_t*);
-    void (*bwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*, mag_kernel_context_t*);
-    void (*bwd_post[MAG_OP__NUM])(mag_kernel_context_t*);
+    void (*init[MAG_IOP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*);
+    void (*fwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*);
+    void (*bwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t*);
     void (*vector_cast)(size_t nb, const void* src, mag_dtype_t src_t, void* dst, mag_dtype_t dst_t);
 } mag_kernel_registry_t;
 
 #define mag_load_local_storage_group(xk, prefix, var) mag_load_local_storage_group_arr((xk)->var, prefix)
+
+static inline void mag_hash_combine(uint32_t* seed, uint32_t value) {
+    *seed ^= value + 0x9e3779b9 + (*seed<<6) + (*seed>>2);
+}
+
+extern MAG_EXPORT uint32_t mag_hash(const void* key, size_t len, uint32_t seed); /* compute murmur3_32 hash */
+extern MAG_EXPORT uint32_t mag_crc32c(const void* buffer, size_t size); /* Compute CRC32 checksum with CRC32c polynomial. */
 
 #ifdef __cplusplus
 }
