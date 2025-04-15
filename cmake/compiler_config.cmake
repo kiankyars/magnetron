@@ -23,6 +23,7 @@ set(MAG_MSVC_RELEASE_COMPILE_FLAGS
     /Oy
     /Ot
     /Ob3
+    /RTC-
 )
 set(MAG_MSVC_LINK_OPTIONS "")
 set(MAG_MSVC_RELEASE_LINK_OPTIONS "")
@@ -79,6 +80,7 @@ if (WIN32) # Windows (MSVC) specific config
     target_compile_options(magnetron PRIVATE ${MAG_MSVC_COMPILE_FLAGS})
     target_link_options(magnetron PRIVATE ${MAG_MSVC_LINK_OPTIONS})
     if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")     # Enable optimizations for release builds
+        message(STATUS "! Generating optimized MAGNETRON release build")
         target_compile_options(magnetron PRIVATE ${MAG_MSVC_RELEASE_COMPILE_FLAGS})
         target_link_options(magnetron PRIVATE ${MAG_MSVC_RELEASE_LINK_OPTIONS})
     endif()
@@ -93,6 +95,7 @@ else() # GCC/Clang specific config
     endif()
 
     if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")     # Enable optimizations only for release builds
+        message(STATUS "! Generating optimized MAGNETRON release build")
         if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
             target_compile_options(magnetron PRIVATE ${MAG_GCC_RELEASE_COMPILE_FLAGS})
             target_link_options(magnetron PRIVATE ${MAG_GCC_RELEASE_LINK_OPTIONS})

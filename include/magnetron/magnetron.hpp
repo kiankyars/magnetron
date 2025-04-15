@@ -6,6 +6,7 @@
 #include "magnetron.h"
 
 #include <algorithm>
+#include <stdexcept>
 #include <array>
 #include <string>
 #include <string_view>
