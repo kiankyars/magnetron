@@ -6,8 +6,10 @@ from magnetron._bootstrap import load_native_module
 
 _ffi, _C = load_native_module()
 
+
 class StorageStream:
     """Reads and writes Magnetron (.mag) storage files."""
+
     def __init__(self, handle: _ffi.CData | None = None) -> None:
         self._ctx = Context.primary()
         if handle is not None:
@@ -29,7 +31,9 @@ class StorageStream:
         """Opens a Magnetron storage file for reading."""
         if isinstance(file_path, str):
             file_path = Path(file_path)
-        handle = _C.mag_storage_stream_deserialize(Context.primary().native_ptr, str(file_path).encode('utf-8'))
+        handle = _C.mag_storage_stream_deserialize(
+            Context.primary().native_ptr, str(file_path).encode('utf-8')
+        )
         if handle == _ffi.NULL:
             raise RuntimeError(f'Failed to open storage stream from file: {file_path}')
         return cls(handle)
@@ -39,7 +43,9 @@ class StorageStream:
         assert tensor.native_ptr is not None and tensor.native_ptr != _ffi.NULL
         key_utf8: bytes = key.encode('utf-8')
         if _C.mag_storage_stream_get_tensor(self._ptr, key_utf8) != _ffi.NULL:
-            raise RuntimeError(f'Tensor with key {key} already exists in storage stream')
+            raise RuntimeError(
+                f'Tensor with key {key} already exists in storage stream'
+            )
         if not _C.mag_storage_stream_put_tensor(self._ptr, key_utf8, tensor.native_ptr):
             raise RuntimeError('Failed to put tensor into storage stream')
 
@@ -50,6 +56,21 @@ class StorageStream:
             return None
         return Tensor(handle)
 
+    def __getitem__(self, key: str) -> Tensor:
+        """Retrieves a tensor from the storage stream."""
+        tensor: Tensor | None = self.get(key)
+        if tensor is None:
+            raise KeyError(f'Tensor with key {key} not found in storage stream')
+        return tensor
+
+    def __setitem__(self, key: str, tensor: Tensor) -> None:
+        """Adds a tensor with unique key to the storage stream."""
+        self.put(key, tensor)
+
     def serialize(self, file_path: Path) -> None:
-        if not _C.mag_storage_stream_serialize(self._ptr, str(file_path).encode('utf-8')):
-            raise RuntimeError(f'Failed to serialize storage stream to file: {file_path}')
+        if not _C.mag_storage_stream_serialize(
+            self._ptr, str(file_path).encode('utf-8')
+        ):
+            raise RuntimeError(
+                f'Failed to serialize storage stream to file: {file_path}'
+            )

@@ -47,9 +47,11 @@ class MNIST(nn.Module):
 MODEL_PATH: str = 'mnist_mlp_weights.pkl'
 model = MNIST(MODEL_PATH)
 
+
 @ensure_csrf_cookie
 def index(request: HttpRequest) -> HttpResponse:
     return render(request, 'index.html')
+
 
 @mag.no_grad()
 def predict_digit(request: HttpRequest) -> JsonResponse:
@@ -64,8 +66,10 @@ def predict_digit(request: HttpRequest) -> JsonResponse:
     img_data: bytes = base64.b64decode(encoded)
     image: Image = Image.open(io.BytesIO(img_data)).convert('L')
     image = post_process_image(image, target_size=28, padding=4)
-    arr = (np.array(image, dtype=np.float32) / 255.0)
-    test_tensor: mag.Tensor = mag.Tensor.from_data([arr.flatten().tolist()], name='input').T
+    arr = np.array(image, dtype=np.float32) / 255.0
+    test_tensor: mag.Tensor = mag.Tensor.from_data(
+        [arr.flatten().tolist()], name='input'
+    ).T
     pred = model.predict(test_tensor)
     digit: int = pred[0]
     return JsonResponse({'prediction': digit})

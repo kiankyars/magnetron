@@ -68,6 +68,7 @@ _dtype_enum_map: dict[int, DataType] = {
     e5m10.enum_value: e5m10,
 }
 
+
 @dataclass
 class Config:
     verbose: bool = getenv('MAGNETRON_VERBOSE', '0') == '1'
@@ -222,6 +223,7 @@ def _flatten_nested_lists(nested: object) -> tuple[tuple[int, ...], list[float]]
             assert s == first_shape, 'All sub-lists must have the same shape'
         return (len(nested),) + first_shape, flattened
 
+
 class Tensor:
     """A 1-6 dimensional tensor with support for automatic differentiation."""
 
@@ -319,7 +321,9 @@ class Tensor:
             name=name,
         )
         _C.mag_tensor_fill_from_floats(
-            tensor._ptr, _ffi.new(f'float[{len(flattened_data)}]', flattened_data), len(flattened_data)
+            tensor._ptr,
+            _ffi.new(f'float[{len(flattened_data)}]', flattened_data),
+            len(flattened_data),
         )
         return tensor
 

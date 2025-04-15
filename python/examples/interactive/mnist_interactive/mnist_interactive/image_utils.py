@@ -9,7 +9,10 @@ def center_image(image_np: np.ndarray) -> np.ndarray:
     shift_x = int(round(image_np.shape[1] / 2 - cx))
     return np.roll(np.roll(image_np, shift_y, axis=0), shift_x, axis=1)
 
-def post_process_image(image: Image.Image, target_size: int = 28, padding: int = 4) -> Image.Image:
+
+def post_process_image(
+    image: Image.Image, target_size: int = 28, padding: int = 4
+) -> Image.Image:
     arr = np.array(image)
     threshold = np.percentile(arr, 90)
     coords = np.column_stack(np.nonzero(arr > threshold))

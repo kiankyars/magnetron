@@ -17,7 +17,7 @@ dependencies = ["cffi"]
 dev = ["pytest", "matplotlib", "sphinx", "sphinx-autoapi", "sphinx-rtd-theme", "torch", "numpy", "pre-commit", "ruff"]
 
 # Optional dependencies for complex examples (install if you want to run the examples)
-examples = ["numpy", "matplotlib", "django", "pillow"]
+examples = ["numpy", "matplotlib", "django", "pillow", "tqdm"]
 
 [tool.ruff]
 line-length = 120

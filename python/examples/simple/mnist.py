@@ -1,9 +1,39 @@
-import pickle
-
 import magnetron as mag
 import magnetron.nn as nn
+from magnetron.io import StorageStream
 import numpy as np
 from matplotlib import pyplot as plt
+from pathlib import Path
+import urllib.request
+from tqdm import tqdm
+
+# Download helper
+
+
+def download_with_progress(url: str, filename: str) -> None:
+    class TqdmBarUpdater(tqdm):
+        def update_to(
+            self, b: int = 1, bsize: int = 1, tsize: int | None = None
+        ) -> None:
+            if tsize is not None:
+                self.total = tsize
+            self.update(b * bsize - self.n)
+
+    with TqdmBarUpdater(
+        unit='B', unit_scale=True, miniters=1, desc=url.split('/')[-1]
+    ) as t:
+        urllib.request.urlretrieve(url, filename, reporthook=t.update_to)
+
+
+# Download the MNIST dataset
+
+URL: str = 'https://huggingface.co/datasets/mario-sieg/magnetron-mnist/resolve/main/mnist_full_e8m23.mag'
+FILE_NAME: str = 'mnist_full_e8m23.mag'
+
+if not Path(FILE_NAME).exists():
+    print(f'Downloading dataset file f{FILE_NAME}...')
+    download_with_progress(URL, FILE_NAME)
+    print('Download complete!')
 
 
 class MNIST(nn.Module):
@@ -12,13 +42,14 @@ class MNIST(nn.Module):
         self.fc1 = nn.Linear(784, 128)
         self.fc2 = nn.Linear(128, 10)
 
-        with open(data_file, 'rb') as f:
-            dat = pickle.load(f)
+        stream = StorageStream.open(data_file)
+        self.test_images = stream['test_images']
+        self.test_labels = stream['test_labels']
 
-        self.fc1.weight.x = mag.Tensor.from_data(dat['fc1_w'], name='fc1_w')
-        self.fc1.bias.x = mag.Tensor.from_data(dat['fc1_b'], name='fc1_b')
-        self.fc2.weight.x = mag.Tensor.from_data(dat['fc2_w'], name='fc2_w')
-        self.fc2.bias.x = mag.Tensor.from_data(dat['fc2_b'], name='fc2_b')
+        self.fc1.weight.x = stream['fc1_w']
+        self.fc1.bias.x = stream['fc1_b']
+        self.fc2.weight.x = stream['fc2_w']
+        self.fc2.bias.x = stream['fc2_b']
         self.eval()
 
     def forward(self, x: mag.Tensor) -> mag.Tensor:
@@ -37,12 +68,6 @@ class MNIST(nn.Module):
         return preds
 
 
-def load_test_data() -> mag.Tensor:
-    with open('mnist_test_images.pkl', 'rb') as f:
-        test_images = pickle.load(f)
-    return mag.Tensor.from_data(test_images, name='test_images')
-
-
 def plot_predictions(y_hat: list[int], test_data: mag.Tensor) -> None:
     images = np.array(test_data.tolist()).reshape(-1, 28, 28)
     n_show = 20
@@ -58,9 +83,8 @@ def plot_predictions(y_hat: list[int], test_data: mag.Tensor) -> None:
 
 
 if __name__ == '__main__':
-    model = MNIST('mnist_mlp_weights.pkl')
-    test_data: mag.Tensor = load_test_data()
+    model = MNIST('mnist_full_e8m23.mag')
 
     with mag.no_grad():
-        y_hat: list[int] = model.predict(test_data)
-        plot_predictions(y_hat, test_data)
+        y_hat: list[int] = model.predict(model.test_images)
+        plot_predictions(y_hat, model.test_images)

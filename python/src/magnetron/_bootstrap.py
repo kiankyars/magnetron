@@ -11,6 +11,7 @@ MAG_LIBS: list[tuple[str, str]] = [
     ('darwin', 'libmagnetron.dylib'),
 ]
 
+
 @lru_cache(maxsize=1)
 def load_native_module() -> tuple[FFI, object]:
     platform = sys.platform

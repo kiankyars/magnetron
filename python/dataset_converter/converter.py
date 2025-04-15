@@ -5,7 +5,10 @@ from magnetron.io import StorageStream
 from pathlib import Path
 import pickle
 
-def convert_pickle(input_file_path: Path | str, output_file_path: Path  | str | None) -> None:
+
+def convert_pickle(
+    input_file_path: Path | str, output_file_path: Path | str | None
+) -> None:
     if isinstance(input_file_path, str):
         input_file_path = Path(input_file_path)
     if isinstance(output_file_path, str):
@@ -18,10 +21,13 @@ def convert_pickle(input_file_path: Path | str, output_file_path: Path  | str | 
     output = StorageStream()
     for key in data:
         if key.endswith('w'):
-            output.put(key, mag.Tensor.from_data(data[key], name=key).T) # Transpose weights
+            output.put(
+                key, mag.Tensor.from_data(data[key], name=key).T
+            )  # Transpose weights
         else:
             output.put(key, mag.Tensor.from_data(data[key], name=key))
     output.serialize(output_file_path)
+
 
 INPUT = Path('../examples/interactive/mnist_interactive/mnist_mlp_weights.pkl')
 OUTPUT = Path('out.mag')
