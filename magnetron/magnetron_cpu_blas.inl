@@ -89,8 +89,11 @@ static MAG_AINLINE mag_e5m10_t mag_e8m23_cvt_e5m10(mag_e8m23_t x) {
             r = _cvtss_sh(x, 0);
         #endif
     #elif defined(__ARM_NEON) && !defined(_MSC_VER)
-        __fp16 h = (__fp16)x;
-        r = *(uint16_t*)&h;
+        union {
+            __fp16 f;
+            uint16_t u;
+        } castor = {.f=(__fp16)x};
+        r = castor.u;
     #else
         union {
             uint32_t u;
@@ -118,7 +121,11 @@ static MAG_AINLINE mag_e8m23_t mag_e5m10_cvt_e8m23(mag_e5m10_t x) {
             return _cvtsh_ss(x.bits);
         #endif
     #elif defined(__ARM_NEON) && !defined(_MSC_VER)
-        return *(__fp16*)&x.bits;
+        union {
+            __fp16 f;
+            uint16_t u;
+        } castor = {.u=x.bits};
+        return castor.f;
     #else
         union {
             uint32_t u;
