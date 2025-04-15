@@ -487,12 +487,12 @@ TEST(core_tensor_logic, init_6d) {
     ASSERT_EQ(t.shape()[3], 10);
     ASSERT_EQ(t.shape()[4], 10);
     ASSERT_EQ(t.shape()[5], 10);
-    ASSERT_EQ(t.strides()[0], 1);
-    ASSERT_EQ(t.strides()[1], 10);
-    ASSERT_EQ(t.strides()[2], 100);
-    ASSERT_EQ(t.strides()[3], 1000);
-    ASSERT_EQ(t.strides()[4], 10000);
-    ASSERT_EQ(t.strides()[5], 100000);
+    ASSERT_EQ(t.strides()[0], 100000);
+    ASSERT_EQ(t.strides()[1], 10000);
+    ASSERT_EQ(t.strides()[2], 1000);
+    ASSERT_EQ(t.strides()[3], 100);
+    ASSERT_EQ(t.strides()[4], 10);
+    ASSERT_EQ(t.strides()[5], 1);
     ASSERT_NE(t.data_ptr(), nullptr);
     ASSERT_EQ(t.numel(), 10*10*10*10*10*10);
     ASSERT_EQ(t.data_size(), t.numel() * sizeof(e8m23_t));
