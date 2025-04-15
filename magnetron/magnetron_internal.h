@@ -279,6 +279,17 @@ defined(__WIN32__) || defined(__TOS_WIN__) || defined(__WINDOWS__)
 #define MAG_PAGE_SIZE_4K 0x1000
 #define MAG_PAGE_SIZE_2M 0x200000
 
+static uint16_t MAG_AINLINE mag_bswap16(uint16_t x) { /* Swap bytes for endianess switch. Should be optimized to a (bswap/rev) instruction on modern compilers. */
+    #ifdef MAG_BE
+    #if (defined(__GNUC__) && ((__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3))) || defined(__clang__)
+        x = (uint32_t)__builtin_bswap16((int32_t)x);
+    #else
+        x = (x & 0xff00) >> 8 | x & 0xff << 8;
+    #endif
+    #endif
+    return x;
+}
+
 static uint32_t MAG_AINLINE mag_bswap32(uint32_t x) { /* Swap bytes for endianess switch. Should be optimized to a (bswap/rev) instruction on modern compilers. */
     #ifdef MAG_BE
         #if (defined(__GNUC__) && ((__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3))) || defined(__clang__)

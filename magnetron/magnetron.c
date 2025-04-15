@@ -3566,6 +3566,28 @@ static bool mag_unpack_aux(uint32_t aux, uint8_t* unused0, uint8_t* unused1, int
     return true;
 }
 
+static void mag_bswap_block_le(void* dst, size_t numel, size_t granularity) {
+    switch (granularity) {
+        case 1: return; /* No need to swap bytes. */
+        case 2: {
+            uint16_t* d = (uint16_t*)dst;
+            for (size_t i=0; i < numel; ++i)
+                d[i] = mag_bswap16(d[i]);
+        } return;
+        case 4: {
+            uint32_t* d = (uint32_t*)dst;
+            for (size_t i=0; i < numel; ++i)
+                d[i] = mag_bswap32(d[i]);
+        } return;
+        case 8: {
+            uint64_t* d = (uint64_t*)dst;
+            for (size_t i=0; i < numel; ++i)
+                d[i] = mag_bswap64(d[i]);
+        } return;
+        default: mag_panic("invalid granularity"); return;
+    }
+}
+
 static bool mag_sto_write_file_hdr(FILE* f, uint32_t num_tensors, uint32_t num_kv) {
     long start = ftell(f);
     mag_sto_sanitize(num_tensors < UINT32_MAX, "invalid num tensors", false);
@@ -3643,6 +3665,11 @@ static bool mag_sto_read_tensor_hdr(
         mag_sto_sanitize(dim > 0 && dim < INT64_MAX, "invalid shape dim", false);
         (*shape)[i] = dim;
     }
+    int64_t numel_total = (*shape)[0];
+    for (int i=1; i < MAG_MAX_DIMS; ++i) {
+        mag_sto_sanitize(!mag_imull64_ov(numel_total, (*shape)[i], &numel_total), "overflowing shape", false);
+    }
+    mag_sto_sanitize(numel_total > 0 && numel_total < INT64_MAX, "invalid shape total", false);
     uint32_t aux;
     mag_sto_sanitize(mag_sto_read_u32_le(f, &aux), "failed to read aux", false);
     uint8_t unused0, unused1;
@@ -3671,6 +3698,9 @@ static bool mag_sto_write_tensor_data(FILE* f, mag_tensor_t* t) {
     size_t size = mag_tensor_get_data_size(t);
     if (mag_likely(size)) {
         void* data = mag_tensor_get_raw_data_as_bytes(t);
+        #if MAG_BE /* Byteswap data if system is big-endian */
+            mag_bswap_block_le(data, t->numel, mag_dtype_meta_of(t->dtype)->size);
+        #endif
         mag_sto_sanitize(fwrite(data, size, 1, f) == 1, "failed to write tensor data", false);
         mag_tensor_get_raw_data_as_bytes_free(data);
     }
@@ -3685,6 +3715,9 @@ static bool mag_sto_read_tensor_data(FILE* f, mag_tensor_t* t) {
     if (mag_likely(size)) {
         void* data = (*mag_alloc)(NULL, size);
         mag_sto_sanitize(fread(data, size, 1, f) == 1, "failed to read tensor data", false);
+        #if MAG_BE /* Byteswap data if system is big-endian */
+            mag_bswap_block_le(data, t->numel, mag_dtype_meta_of(t->dtype)->size);
+        #endif
         mag_storage_buffer_t* sto = t->storage;
         (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CPY, 0, data, size);
         (*mag_alloc)(data, 0);
