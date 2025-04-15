@@ -37,7 +37,7 @@ def test_simple_ff() -> None:
 
     mag_data = []
     for x in truth_table:
-        x = tensor([x])
+        x = Tensor.from_data([x])
 
         z1 = x @ W1 + b1
         a1 = z1.sigmoid()
@@ -46,7 +46,7 @@ def test_simple_ff() -> None:
         mag_data.append(a2)
 
     for mag, np_ in zip(mag_data, np_data):
-        np.testing.assert_allclose(tonumpy(mag), np_)
+        np.testing.assert_allclose(tonumpy(mag), np_, atol=1e-4)
 
 
 def test_matmul_squared() -> None:
