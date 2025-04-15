@@ -153,7 +153,7 @@ static void MAG_HOTPROC mag_vector_cast_mag_e8m23_cvt_e5m10(int64_t n, const mag
     #ifdef __ARM_NEON
         for (; i+3 < n; i += 4) {
             float32x4_t v = vld1q_f32(src+i);
-            vst1_u16((uint16_t*)dst+i, vcvt_f16_f32(v));
+            vst1_f16((__fp16*)dst+i, vcvt_f16_f32(v));
         }
     #endif
     for (; i < n; ++i) {
@@ -165,7 +165,7 @@ static void MAG_HOTPROC mag_vector_cast_mag_e5m10_cvt_e8m23(int64_t n, const mag
     int64_t i=0;
     #ifdef __ARM_NEON
         for (; i+3 < n; i += 4) {
-            uint16x4_t v = vld1_u16((const uint16_t*)src+i);
+            float16x4_t v = vld1_f16((const __fp16*)src+i);
             vst1q_f32(dst+i, vcvt_f32_f16(v));
         }
     #endif
