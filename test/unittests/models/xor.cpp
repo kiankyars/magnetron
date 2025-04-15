@@ -37,10 +37,10 @@ TEST(models, xor) {
     };
 
     tensor x {ctx, dtype::e8m23, x_data.size(), x_data[0].size()};
-    x.copy_buffer_from(&x_data, sizeof(x_data));
+    x.fill_from(&x_data, sizeof(x_data));
 
     tensor y {ctx, dtype::e8m23, y_data.size(), y_data[0].size()};
-    y.copy_buffer_from(&y_data, sizeof(y_data));
+    y.fill_from(&y_data, sizeof(y_data));
 
     constexpr std::int64_t epochs {2000};
     for (std::int64_t epoch = 0; epoch < epochs; ++epoch) {

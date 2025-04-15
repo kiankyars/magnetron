@@ -26,3 +26,6 @@ def convert_pickle(input_file_path: Path | str, output_file_path: Path  | str | 
 INPUT = Path('../examples/interactive/mnist_interactive/mnist_mlp_weights.pkl')
 OUTPUT = Path('out.mag')
 convert_pickle(INPUT, OUTPUT)
+
+inp = StorageStream.open(OUTPUT)
+print(inp.get('fc1_w'))

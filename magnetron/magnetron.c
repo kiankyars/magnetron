@@ -2029,7 +2029,7 @@ mag_tensor_t* mag_abs(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_abs_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_ABS, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2038,7 +2038,7 @@ mag_tensor_t* mag_neg(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_neg_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_NEG, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2047,7 +2047,7 @@ mag_tensor_t* mag_log(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_log_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_LOG, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2056,7 +2056,7 @@ mag_tensor_t* mag_sqr(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sqr_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SQR, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2065,7 +2065,7 @@ mag_tensor_t* mag_sqrt(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sqrt_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SQRT, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2074,7 +2074,7 @@ mag_tensor_t* mag_sin(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sin_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SIN, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2083,7 +2083,7 @@ mag_tensor_t* mag_cos(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_cos_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_COS, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2092,7 +2092,7 @@ mag_tensor_t* mag_step(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_step_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_STEP, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2101,7 +2101,7 @@ mag_tensor_t* mag_exp(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_exp_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_EXP, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2110,7 +2110,7 @@ mag_tensor_t* mag_softmax(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_softmax_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2119,7 +2119,7 @@ mag_tensor_t* mag_softmax_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_softmax_dv_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2128,7 +2128,7 @@ mag_tensor_t* mag_sigmoid(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sigmoid_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SIGMOID, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2137,7 +2137,7 @@ mag_tensor_t* mag_sigmoid_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sigmoid_dv_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SIGMOID_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2146,7 +2146,7 @@ mag_tensor_t* mag_hard_sigmoid(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_hard_sigmoid_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_HARD_SIGMOID, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2155,7 +2155,7 @@ mag_tensor_t* mag_silu(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_silu_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SILU, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2164,7 +2164,7 @@ mag_tensor_t* mag_silu_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_silu_dv_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SILU_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2173,7 +2173,7 @@ mag_tensor_t* mag_tanh(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_tanh_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_TANH, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2182,7 +2182,7 @@ mag_tensor_t* mag_tanh_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_tanh_dv_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_TANH_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2191,7 +2191,7 @@ mag_tensor_t* mag_relu(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_relu_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_RELU, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2200,7 +2200,7 @@ mag_tensor_t* mag_relu_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_relu_dv_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_RELU_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2209,7 +2209,7 @@ mag_tensor_t* mag_gelu(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_gelu_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_GELU, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2218,7 +2218,7 @@ mag_tensor_t* mag_gelu_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_gelu_dv_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_GELU_DV, true, &x, 1, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2227,7 +2227,7 @@ mag_tensor_t* mag_add(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_add_(mag_tensor_t* x, mag_tensor_t* y) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_ADD, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2236,7 +2236,7 @@ mag_tensor_t* mag_sub(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_sub_(mag_tensor_t* x, mag_tensor_t* y) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SUB, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2245,7 +2245,7 @@ mag_tensor_t* mag_mul(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_mul_(mag_tensor_t* x, mag_tensor_t* y) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_MUL, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2254,7 +2254,7 @@ mag_tensor_t* mag_div(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_div_(mag_tensor_t* x, mag_tensor_t* y) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_DIV, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_GRA_FWD);
 }
 
@@ -2264,7 +2264,7 @@ mag_tensor_t* mag_adds(mag_tensor_t* x, mag_e8m23_t xi) {
 }
 
 mag_tensor_t* mag_adds_(mag_tensor_t* x, mag_e8m23_t xi) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_ADDS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
@@ -2275,7 +2275,7 @@ mag_tensor_t* mag_subs(mag_tensor_t* x, mag_e8m23_t xi) {
 }
 
 mag_tensor_t* mag_subs_(mag_tensor_t* x, mag_e8m23_t xi) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_SUBS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
@@ -2286,7 +2286,7 @@ mag_tensor_t* mag_muls(mag_tensor_t* x, mag_e8m23_t xi) {
 }
 
 mag_tensor_t* mag_muls_(mag_tensor_t* x, mag_e8m23_t xi) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_MULS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
@@ -2297,7 +2297,7 @@ mag_tensor_t* mag_divs(mag_tensor_t* x, mag_e8m23_t xi) {
 }
 
 mag_tensor_t* mag_divs_(mag_tensor_t* x, mag_e8m23_t xi) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_DIVS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
@@ -2308,7 +2308,7 @@ mag_tensor_t* mag_pows(mag_tensor_t* x, mag_e8m23_t xi) {
 }
 
 mag_tensor_t* mag_pows_(mag_tensor_t* x, mag_e8m23_t xi) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "In-place operations are not supported for gradient-tracking tensors");
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "in-place operations are not supported for gradient-tracking tensors");
     mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_POWS, true, &x, 1, &param, 1, MAG_GRA_FWD);
 }
@@ -2322,19 +2322,26 @@ mag_tensor_t* mag_repeat_back(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_tensor_get_arg(const mag_tensor_t* t, size_t slot) {
-    mag_assert(slot < MAG_MAX_OP_INPUTS, "Slot must be within [0, %d)", MAG_MAX_OP_INPUTS);
+    mag_assert(slot < MAG_MAX_OP_INPUTS, "slot must be within [0, %d)", MAG_MAX_OP_INPUTS);
     return t->op_inputs[slot];
 }
 
 void mag_tensor_set_arg(mag_tensor_t* t, size_t slot, mag_tensor_t* arg) {
-    mag_assert(slot < MAG_MAX_OP_INPUTS, "Slot must be within [0, %d)", MAG_MAX_OP_INPUTS);
-    mag_assert(t->op_inputs[slot] == NULL, "Argument at slot #%zu already set", slot);
+    mag_assert(slot < MAG_MAX_OP_INPUTS, "slot must be within [0, %d)", MAG_MAX_OP_INPUTS);
+    mag_assert(t->op_inputs[slot] == NULL, "argument at slot #%zu already set", slot);
     t->op_inputs[slot] = arg;
 }
 
-void mag_tensor_copy_buffer_from(mag_tensor_t* t, const void* data, size_t size) {
+void mag_tensor_fill_from_floats(mag_tensor_t* t, const mag_e8m23_t* data, size_t len) {
+    mag_assert(data && len, "invalid data pointer or length");
     mag_storage_buffer_t* sto = t->storage;
-    (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CVT_E8M23, 0, (void*)data, size);
+    (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CVT_E8M23, 0, (void*)data, len*sizeof(*data));
+}
+
+void mag_tensor_fill_from_raw_bytes(mag_tensor_t* t, const void* data, size_t len) {
+    mag_assert(data && len, "invalid data pointer or length");
+    mag_storage_buffer_t* sto = t->storage;
+    (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CPY, 0, (void*)data, len);
 }
 
 void mag_tensor_fill(mag_tensor_t* t, mag_e8m23_t x) {
@@ -2388,7 +2395,7 @@ const int64_t* mag_tensor_get_strides(const mag_tensor_t* t) { return t->strides
 mag_dtype_t mag_tensor_get_dtype(const mag_tensor_t* t) { return t->dtype; }
 void* mag_tensor_get_data_ptr(const mag_tensor_t* t) { return (void*)t->storage->base; }
 
-void* _Nonnull mag_tensor_to_byte_array(mag_tensor_t* _Nonnull t) {
+void* _Nonnull mag_tensor_get_raw_data_as_bytes(mag_tensor_t* _Nonnull t) {
     size_t size = t->storage->size;
     mag_assert2(size);
     void* dst = (*mag_alloc)(NULL, size); /* TODO: Use dynamic scratch buffer */
@@ -2397,12 +2404,12 @@ void* _Nonnull mag_tensor_to_byte_array(mag_tensor_t* _Nonnull t) {
     return dst;
 }
 
-void mag_tensor_to_byte_array_free_data(void* _Nonnull ret_val) {
+void mag_tensor_get_raw_data_as_bytes_free(void* _Nonnull ret_val) {
     (*mag_alloc)(ret_val, 0);
 }
 
 
-mag_e8m23_t* mag_tensor_to_float_array(mag_tensor_t* t) {
+mag_e8m23_t* mag_tensor_get_data_as_floats(mag_tensor_t* t) {
     size_t size = t->numel*sizeof(mag_e8m23_t);
     mag_assert2(size);
     mag_e8m23_t* dst = (*mag_alloc)(NULL, size); /* TODO: Use dynamic scratch buffer */
@@ -2411,7 +2418,7 @@ mag_e8m23_t* mag_tensor_to_float_array(mag_tensor_t* t) {
     return dst;
 }
 
-void mag_tensor_to_float_array_free_data(mag_e8m23_t* ret_val) {
+void mag_tensor_get_data_as_floats_free(mag_e8m23_t* ret_val) {
     (*mag_alloc)(ret_val, 0);
 }
 
@@ -3481,38 +3488,12 @@ mag_static_assert(sizeof(MAG_STO_FILE_MAGIC) == 4);
 mag_static_assert(sizeof(MAG_STO_TENSOR_HDR_SECTION) == 4);
 mag_static_assert(sizeof(MAG_STO_TENSOR_DAT_SECTION) == 4);
 mag_static_assert(sizeof(MAG_STO_TENSOR_KV_SECTION) == 4);
+#define MAG_STO_MAX_KEY_LEN 1024
 #define MAG_STO_FILE_HDR_SIZE (4*6)
-#define MAG_STO_TENSOR_HDR_SIZE (8*MAG_MAX_DIMS + 4 + MAG_MAX_TENSOR_NAME_LEN)
+#define MAG_STO_TENSOR_HDR_SIZE (4 + 8*MAG_MAX_DIMS + 4 + MAG_MAX_TENSOR_NAME_LEN)
 mag_static_assert(MAG_MAX_TENSOR_NAME_LEN % 8 == 0); /* Because we write it as multiple u64s. */
-
-#define mag_sto_sanitize(exp, ret) do { if (mag_unlikely(!(exp))) { mag_log_error("magnetron storage sanitize error: " #exp); return (ret); } } while (0)
-
-struct mag_storage_stream_t {
-    mag_tensor_t** tensors; /* TODO: currently O(n), replace with O(1) hashmap */
-    size_t tensors_num;
-    size_t tensors_cap;
-};
-
-mag_storage_stream_t* mag_storage_stream_new(void) {
-    mag_storage_stream_t* stream = (*mag_alloc)(NULL, sizeof(*stream));
-    stream->tensors_num = 0;
-    stream->tensors_cap = 16;
-    stream->tensors = (*mag_alloc)(NULL, sizeof(*stream->tensors)*stream->tensors_cap);
-    return stream;
-}
-
-mag_storage_stream_t* mag_storage_stream_open(const char* file) {
-    mag_storage_stream_t* stream = mag_storage_stream_new();
-    return stream;
-}
-
-void mag_storage_stream_close(mag_storage_stream_t* st) {
-    for (size_t i=0; i < st->tensors_num; ++i) {
-        mag_tensor_decref(st->tensors[i]);
-    }
-    (*mag_alloc)(st->tensors, 0);
-    (*mag_alloc)(st, 0);
-}
+#define MAG_STO_TENSOR_KEY_HASH_SEED 0xa38876a9
+#define mag_sto_sanitize(exp, msg, ret) do { if (mag_unlikely(!(exp))) { mag_log_error("magnetron storage sanitize error: " #exp " <- " msg); return (ret); } } while (0)
 
 static bool mag_sto_write_u32_le(FILE* f, uint32_t v) {
     v = mag_bswap32(v);
@@ -3522,80 +3503,243 @@ static bool mag_sto_write_u64_le(FILE* f, uint64_t v) {
     v = mag_bswap64(v);
     return fwrite(&v, sizeof(v), 1, f) == 1;
 }
-
-static bool mag_sto_write_file_hdr(FILE* f, uint32_t num_tensors, uint32_t num_kv) {
-    long start = ftell(f);
-    bool ok = true;
-    ok = ok && mag_sto_write_u32_le(f, MAG_STO_FILE_MAGIC);          /* magic id */
-    ok = ok && mag_sto_write_u32_le(f, MAG_STORAGE_VERSION);    /* storage version */
-    ok = ok && mag_sto_write_u32_le(f, 0);                      /* checksum (unused for now) */
-    ok = ok && mag_sto_write_u32_le(f, num_tensors);              /* number of tensors */
-    ok = ok && mag_sto_write_u32_le(f, num_kv);                   /* number of key-value pairs */
-    ok = ok && mag_sto_write_u32_le(f, 0);                      /* aux (unused for now) */
-    long end = ftell(f);
-    return ok && (end - start == MAG_STO_FILE_HDR_SIZE);
+static bool mag_sto_read_u32_le(FILE* f, uint32_t* v) {
+    if (mag_unlikely(fread(v, sizeof(*v), 1, f) != 1)) return false;
+    *v = mag_bswap32(*v);
+    return true;
+}
+static bool mag_sto_read_u64_le(FILE* f, uint64_t* v) {
+    if (mag_unlikely(fread(v, sizeof(*v), 1, f) != 1)) return false;
+    *v = mag_bswap64(*v);
+    return true;
 }
 
-static inline uint32_t mag_pack_aux32(uint8_t unused0, uint8_t unused1, int64_t rank, mag_dtype_t dtype) {
-    return ((uint32_t)(unused0&0xff)<<24) + ((uint32_t)(unused1&0xff)<<16) + ((uint32_t)(rank&0xff)<<8) + (uint32_t)(dtype&0xff);
+static bool mag_pack_aux32(uint32_t* out, uint8_t unused0, uint8_t unused1, int64_t rank, mag_dtype_t dtype) {
+    mag_sto_sanitize(rank >= 1 && rank <= MAG_MAX_DIMS, "invalid rank", false);
+    mag_sto_sanitize(dtype >= 0 && dtype < MAG_DTYPE__NUM, "invalid dtype", false);
+    *out = ((uint32_t)(unused0&0xff)<<24) + ((uint32_t)(unused1&0xff)<<16) + ((uint32_t)(rank&0xff)<<8) + (uint32_t)(dtype&0xff);
+    return true;
 }
-static inline void mag_unpack_aux(uint8_t* unused0, uint8_t* unused1, int64_t* rank, mag_dtype_t* dtype, uint32_t aux) {
+static bool mag_unpack_aux(uint32_t aux, uint8_t* unused0, uint8_t* unused1, int64_t* rank, mag_dtype_t* dtype) {
     *unused0 = (aux>>24)&0xff;
     *unused1 = (aux>>16)&0xff;
     *rank = (aux>>8)&0xff;
     *dtype = aux&0xff;
+    mag_sto_sanitize(*rank >= 1 && *rank <= MAG_MAX_DIMS, "invalid rank", false);
+    mag_sto_sanitize(*dtype >= 0 && *dtype < MAG_DTYPE__NUM, "invalid dtype", false);
+    return true;
 }
 
-static bool mag_sto_write_tensor_hdr(FILE* f, const mag_tensor_t* t) {
+static bool mag_sto_write_file_hdr(FILE* f, uint32_t num_tensors, uint32_t num_kv) {
     long start = ftell(f);
-    bool ok = true;
-    for (int i=0; i < MAG_MAX_DIMS; ++i) /* Write shape */
-        ok = ok && mag_sto_write_u64_le(f, t->shape[i]);
-    ok = ok && mag_sto_write_u32_le(f, mag_pack_aux32(0, 0, t->rank, t->dtype)); /* Write aux */
-    for (int i=0; i < MAG_MAX_TENSOR_NAME_LEN>>3; ++i) { /* Write name */
-        uint64_t packed;
-        memcpy(&packed, t->name+(i<<3), sizeof(packed));
-        ok = ok && mag_sto_write_u64_le(f, packed);
-    }
+    mag_sto_sanitize(num_tensors < UINT32_MAX, "invalid num tensors", false);
+    mag_sto_sanitize(num_kv < UINT32_MAX, "invalid num kv", false);
+    mag_sto_sanitize(mag_sto_write_u32_le(f, MAG_STO_FILE_MAGIC), "failed to write file magic", false);
+    mag_sto_sanitize(mag_sto_write_u32_le(f, MAG_STORAGE_VERSION), "failed to write version", false);
+    mag_sto_sanitize(mag_sto_write_u32_le(f, 0), "failed to write checksum", false);
+    mag_sto_sanitize(mag_sto_write_u32_le(f, num_tensors), "failed to write num tensors", false);
+    mag_sto_sanitize(mag_sto_write_u32_le(f, num_kv), "failed to write num kv", false);
+    mag_sto_sanitize(mag_sto_write_u32_le(f, 0), "failed to write aux", false);
     long end = ftell(f);
-    return ok && (end - start == MAG_STO_TENSOR_HDR_SIZE);
+    mag_sto_sanitize(end - start == MAG_STO_FILE_HDR_SIZE, "invalid file header size", false);
+    return true;
+}
+static bool mag_sto_read_file_hdr(FILE* f, uint32_t* num_tensors, uint32_t* num_kv) {
+    long start = ftell(f);
+    uint32_t magic, version, checksum, aux;
+    mag_sto_sanitize(mag_sto_read_u32_le(f, &magic), "failed to read file magic", false);
+    mag_sto_sanitize(magic == MAG_STO_FILE_MAGIC, "invalid file magic", false);
+    mag_sto_sanitize(mag_sto_read_u32_le(f, &version), "failed to read version", false);
+    mag_sto_sanitize(version != 0, "invalid version", false);
+    mag_sto_sanitize(mag_sto_read_u32_le(f, &checksum), "failed to read checksum", false);
+    mag_sto_sanitize(checksum == 0, "invalid checksum", false);
+    mag_sto_sanitize(mag_sto_read_u32_le(f, num_tensors), "failed to read num tensors", false);
+    mag_sto_sanitize(mag_sto_read_u32_le(f, num_kv), "failed to read num kv", false);
+    mag_sto_sanitize(mag_sto_read_u32_le(f, &aux), "failed to read aux", false);
+    mag_sto_sanitize(aux == 0, "invalid aux", false);
+    long end = ftell(f);
+    mag_sto_sanitize(end - start == MAG_STO_FILE_HDR_SIZE, "invalid file header size", false);
+    return true;
+}
+
+static bool mag_sto_write_tensor_hdr(
+    FILE* f,
+    const char* key,
+    const int64_t(*shape)[MAG_MAX_DIMS],
+    const char (*name)[MAG_MAX_TENSOR_NAME_LEN],
+    int64_t rank,
+    mag_dtype_t dtype
+) {
+    long start = ftell(f);
+    size_t key_len = strlen(key);
+    mag_sto_sanitize(key_len > 0 && key_len <= MAG_STO_MAX_KEY_LEN, "invalid key length", false);
+    mag_sto_sanitize(mag_sto_write_u32_le(f, key_len), "failed to write key length", false); /* Write key length */
+    for (int i=0; i < MAG_MAX_DIMS; ++i) /* Write shape */
+        mag_sto_sanitize(mag_sto_write_u64_le(f, (*shape)[i]), "failed to write shape", false);
+    uint32_t aux;
+    mag_sto_sanitize(mag_pack_aux32(&aux, 0, 0, rank, dtype), "failed to pack aux", false);
+    mag_sto_sanitize(mag_sto_write_u32_le(f, aux), "failed to write aux", false); /* Write aux */
+    mag_sto_sanitize(fwrite(name, MAG_MAX_TENSOR_NAME_LEN, 1, f) == 1, "failed to write name", false); /* Write name */
+    mag_sto_sanitize(fwrite(key, key_len, 1, f) == 1, "failed to write key", false); /* Write key */
+    long end = ftell(f);
+    mag_sto_sanitize(end - start == MAG_STO_TENSOR_HDR_SIZE+key_len, "invalid tensor header size", false);
+    return true;
+}
+
+static bool mag_sto_read_tensor_hdr(
+    FILE* f,
+    char** key,
+    int64_t(*shape)[MAG_MAX_DIMS],
+    char (*name)[MAG_MAX_TENSOR_NAME_LEN],
+    int64_t* rank,
+    mag_dtype_t* dtype
+) {
+    long start = ftell(f);
+    uint32_t key_len;
+    mag_sto_sanitize(mag_sto_read_u32_le(f, &key_len), "failed to read key length", false); /* Read key length */
+    mag_sto_sanitize(key_len > 0 && key_len <= MAG_STO_MAX_KEY_LEN, "invalid key length", false);
+    mag_sto_sanitize(*key, "empty key", false);
+    for (int i=0; i < MAG_MAX_DIMS; ++i) { /* Read shape */
+        uint64_t udim;
+        mag_sto_sanitize(mag_sto_read_u64_le(f, &udim), "failed to read shape", false);
+        int64_t dim = (int64_t)udim;
+        mag_sto_sanitize(dim > 0 && dim < INT64_MAX, "invalid shape dim", false);
+        (*shape)[i] = dim;
+    }
+    uint32_t aux;
+    mag_sto_sanitize(mag_sto_read_u32_le(f, &aux), "failed to read aux", false);
+    uint8_t unused0, unused1;
+    mag_sto_sanitize(mag_unpack_aux(aux, &unused0, &unused1, rank, dtype), "failed to unpack aux", false);
+    mag_sto_sanitize(*rank >= 1 && *rank <= MAG_MAX_DIMS, "invalid rank", false);
+    mag_sto_sanitize(*dtype >= 0 && *dtype < MAG_DTYPE__NUM, "invalid dtype", false);
+    for (int i=0; i < MAG_MAX_TENSOR_NAME_LEN>>3; ++i) {
+        uint64_t packed;
+        mag_sto_sanitize(mag_sto_read_u64_le(f, &packed), "failed to read name", false);
+        memcpy(*name+(i<<3), &packed, sizeof(packed));
+    }
+    (*name)[MAG_MAX_TENSOR_NAME_LEN-1] = 0; /* Ensure null termination */
+    *key = (*mag_alloc)(NULL, key_len+1); /* Allocate key */
+    mag_sto_sanitize(fread(*key, key_len, 1, f) == 1, "failed to read key", false); /* Read key */
+    (*key)[key_len] = '\0'; /* Ensure null termination */
+    long end = ftell(f);
+    mag_sto_sanitize(end - start == MAG_STO_TENSOR_HDR_SIZE+key_len, "invalid tensor header size", false);
+    return true;
 }
 
 static bool mag_sto_write_tensor_data(FILE* f, mag_tensor_t* t) {
     long start = ftell(f);
-    bool ok = true;
     size_t size = mag_tensor_get_data_size(t);
     if (mag_likely(size)) {
-        void* data = mag_tensor_to_byte_array(t);
-        ok = ok && fwrite(data, size, 1, f) == 1;
-        mag_tensor_to_byte_array_free_data(data);
+        void* data = mag_tensor_get_raw_data_as_bytes(t);
+        mag_sto_sanitize(fwrite(data, size, 1, f) == 1, "failed to write tensor data", false);
+        mag_tensor_get_raw_data_as_bytes_free(data);
     }
     long end = ftell(f);
-    return ok && (end - start == size);
+    mag_sto_sanitize(end - start == size, "invalid tensor data size", false);
+    return true;
+}
+
+static bool mag_sto_read_tensor_data(FILE* f, mag_tensor_t* t) {
+    long start = ftell(f);
+    size_t size = mag_tensor_get_data_size(t);
+    if (mag_likely(size)) {
+        void* data = (*mag_alloc)(NULL, size);
+        mag_sto_sanitize(fread(data, size, 1, f) == 1, "failed to read tensor data", false);
+        mag_storage_buffer_t* sto = t->storage;
+        (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CPY, 0, data, size);
+        (*mag_alloc)(data, 0);
+    }
+    long end = ftell(f);
+    mag_sto_sanitize(end - start == size, "invalid tensor data size", false);
+    return true;
+}
+
+typedef struct mag_tensor_bucket_t {
+    mag_tensor_t* tensor;
+    char* key;
+} mag_tensor_bucket_t;
+
+struct mag_storage_stream_t {
+    mag_ctx_t* ctx;
+    mag_tensor_bucket_t* tensors; /* TODO: currently O(n), replace with O(1) hashmap */
+    size_t tensors_num;
+    size_t tensors_cap;
+};
+
+mag_storage_stream_t* mag_storage_stream_new(mag_ctx_t* ctx) {
+    mag_assert2(ctx);
+    mag_storage_stream_t* stream = (*mag_alloc)(NULL, sizeof(*stream));
+    stream->tensors_num = 0;
+    stream->tensors_cap = 16;
+    stream->tensors = (*mag_alloc)(NULL, sizeof(*stream->tensors)*stream->tensors_cap);
+    stream->ctx = ctx;
+    return stream;
+}
+
+void mag_storage_stream_close(mag_storage_stream_t* st) {
+    for (size_t i=0; i < st->tensors_num; ++i) {
+        mag_tensor_decref(st->tensors[i].tensor);
+        (*mag_alloc)(st->tensors[i].key, 0);
+    }
+    (*mag_alloc)(st->tensors, 0);
+    (*mag_alloc)(st, 0);
 }
 
 bool mag_storage_stream_serialize(mag_storage_stream_t* st, const char* path) {
-    FILE* f = mag_fopen(path, "wb");
-    if (mag_unlikely(!f)) {
-        mag_log_error("Failed to open path for writing: %s", path);
-        return false;
-    }
-    bool ok = true;
-    ok = ok && mag_sto_write_file_hdr(f, st->tensors_num, 0); /* File header */
-    ok = ok && mag_sto_write_u32_le(f, MAG_STO_TENSOR_KV_SECTION); /* Key-value section marker */
+    FILE* f = mag_fopen(path, "wb"); /* TODO: is not closed by santinize */
+    mag_sto_sanitize(f, "failed to open file for writing", false);
+    mag_sto_sanitize(st->tensors_num <= UINT32_MAX, "invalud num tensors", false); /* We should never have more than 4B tensors (haha) */
+    mag_sto_sanitize(mag_sto_write_file_hdr(f, (uint32_t)st->tensors_num, 0), "failed to write file header", false);
+    mag_sto_sanitize(mag_sto_write_u32_le(f, MAG_STO_TENSOR_KV_SECTION), "failed to write kv section marker", false);
     /* TODO: kv */
-    ok = ok && mag_sto_write_u32_le(f, MAG_STO_TENSOR_HDR_SECTION); /* Tensor header section marker */
-    for (size_t i=0; i < st->tensors_num; ++i)
-        ok = ok && mag_sto_write_tensor_hdr(f, st->tensors[i]);
-    ok = ok && mag_sto_write_u32_le(f, MAG_STO_TENSOR_DAT_SECTION); /* Tensor data section marker */
-    for (size_t i=0; i < st->tensors_num; ++i)
-        ok = ok && mag_sto_write_tensor_data(f, st->tensors[i]);
-    fclose(f);
-    if (mag_unlikely(!ok)) {
-        mag_log_error("Failed to write storage stream to file: %s", path);
-        return false;
+    mag_sto_sanitize(mag_sto_write_u32_le(f, MAG_STO_TENSOR_HDR_SECTION), "failed to write tensor header section marker", false);
+    for (size_t i=0; i < st->tensors_num; ++i) {
+        const mag_tensor_bucket_t* bucket = st->tensors+i;
+        const mag_tensor_t* t = bucket->tensor;
+        mag_sto_sanitize(mag_sto_write_tensor_hdr(f, bucket->key, &t->shape, &t->name, t->rank, t->dtype), "failed to write tensor header", false);
     }
+    mag_sto_sanitize(mag_sto_write_u32_le(f, MAG_STO_TENSOR_DAT_SECTION), "failed to write tensor data section marker", false);
+    for (size_t i=0; i < st->tensors_num; ++i)
+        mag_sto_sanitize(mag_sto_write_tensor_data(f, st->tensors[i].tensor), "failed to write tensor data", false);
+    fclose(f);
     return true;
+}
+
+mag_storage_stream_t* mag_storage_stream_deserialize(mag_ctx_t* ctx, const char* file) {
+    FILE* f = mag_fopen(file, "rb");
+    mag_sto_sanitize(f, "failed to open file for reading", NULL);
+    mag_storage_stream_t* stream = mag_storage_stream_new(ctx);
+    uint32_t num_tensors, num_kv;
+    mag_sto_sanitize(mag_sto_read_file_hdr(f, &num_tensors, &num_kv), "failed to read file header", NULL);
+    mag_sto_sanitize(num_tensors < UINT32_MAX, "invalid number of tensors", NULL);
+    mag_sto_sanitize(num_kv < UINT32_MAX, "invalid number of kv", NULL);
+    uint32_t tmp_marker; /* Section marker */
+    mag_sto_sanitize(mag_sto_read_u32_le(f, &tmp_marker), "failed to read kv section marker", NULL);
+    mag_sto_sanitize(tmp_marker == MAG_STO_TENSOR_KV_SECTION, "invalid kv section marker", NULL);
+    /* TODO: kv */
+    mag_sto_sanitize(mag_sto_read_u32_le(f, &tmp_marker), "failed to read tensor header section marker", NULL);
+    mag_sto_sanitize(tmp_marker == MAG_STO_TENSOR_HDR_SECTION, "invalid tensor header section marker", NULL);
+    for (uint32_t i=0; i < num_tensors; ++i) {
+        int64_t shape[MAG_MAX_DIMS] = {};
+        char name[MAG_MAX_TENSOR_NAME_LEN] = {};
+        int64_t rank = 0;
+        mag_dtype_t dtype = MAG_DTYPE__NUM;
+        char* key;
+        mag_sto_sanitize(mag_sto_read_tensor_hdr(f, &key, &shape, &name, &rank, &dtype), "failed to read tensor header", NULL);
+        mag_sto_sanitize(rank >= 1 && rank <= MAG_MAX_DIMS, "invalid tensor rank", NULL);
+        mag_tensor_t* tensor = mag_tensor_create(ctx, dtype, shape, rank, NULL, 0);
+        mag_sto_sanitize(tensor, "failed to create tensor", NULL);
+        mag_tensor_set_name(tensor, name);
+        mag_sto_sanitize(mag_storage_stream_put_tensor(stream, key, tensor), "failed to put tensor", NULL);
+    }
+    mag_sto_sanitize(mag_sto_read_u32_le(f, &tmp_marker), "failed to read tensor data section marker", NULL);
+    mag_sto_sanitize(tmp_marker == MAG_STO_TENSOR_DAT_SECTION, "invalid tensor data section marker", NULL);
+    for (uint32_t i=0; i < num_tensors; ++i) {
+        mag_tensor_bucket_t* bucket = stream->tensors+i;
+        mag_sto_sanitize(mag_sto_read_tensor_data(f, bucket->tensor), "failed to read tensor data", NULL);
+    }
+    fclose(f);
+    return stream;
 }
 
 bool mag_storage_stream_put_tensor(mag_storage_stream_t* st, const char* key, mag_tensor_t* t) {
@@ -3608,15 +3752,21 @@ bool mag_storage_stream_put_tensor(mag_storage_stream_t* st, const char* key, ma
         st->tensors = (*mag_alloc)(st->tensors, sizeof(*st->tensors)*(st->tensors_cap<<=1));
     }
     mag_tensor_incref(t);
-    st->tensors[st->tensors_num++] = t;
+    mag_tensor_bucket_t* bucket = st->tensors+st->tensors_num++;
+    bucket->tensor = t;
+    size_t key_len = strlen(key);
+    bucket->key = (*mag_alloc)(NULL, key_len+1);
+    strncpy(bucket->key, key, key_len);
+    bucket->key[key_len] = '\0';
     return true;
 }
 
 mag_tensor_t* mag_storage_stream_get_tensor(mag_storage_stream_t* st, const char* key) {
     if (mag_unlikely(!key || !*key)) return NULL;
     for (size_t i=0; i < st->tensors_num; ++i) { /* TODO: map */
-        if (st->tensors[i] && !strcmp(st->tensors[i]->name, key)) {
-            return st->tensors[i];
+        if (strncmp(st->tensors[i].key, key, strlen(key)) == 0) {
+            mag_tensor_incref(st->tensors[i].tensor);
+            return st->tensors[i].tensor;
         }
     }
     return NULL;

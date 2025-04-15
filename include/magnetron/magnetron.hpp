@@ -377,11 +377,15 @@ namespace magnetron {
 
         template <typename T> requires std::is_arithmetic_v<T>
         auto copy_buffer_from(std::span<const T> buf) -> void {
-            mag_tensor_copy_buffer_from(m_tensor, buf.data(), buf.size_bytes());
+            mag_tensor_fill_from_floats(m_tensor, buf.data(), buf.size_bytes());
         }
 
-        auto copy_buffer_from(const void* buf, std::size_t nb) -> void {
-            mag_tensor_copy_buffer_from(m_tensor, buf, nb);
+        auto fill_from(const void* buf, std::size_t nb) -> void {
+            mag_tensor_fill_from_raw_bytes(m_tensor, buf, nb);
+        }
+
+        auto fill_from(std::span<const float> data) -> void {
+            mag_tensor_fill_from_floats(m_tensor, data.data(), data.size());
         }
 
         auto fill(float val) -> void {
@@ -416,11 +420,11 @@ namespace magnetron {
         [[nodiscard]] auto dtype() const noexcept -> dtype { return static_cast<enum dtype>(mag_tensor_get_dtype(m_tensor)); }
         [[nodiscard]] auto data_ptr() const noexcept -> void* { return mag_tensor_get_data_ptr(m_tensor); }
         [[nodiscard]] auto to_vector() const -> std::vector<float> {
-            auto* data {mag_tensor_to_float_array(m_tensor)};
+            auto* data {mag_tensor_get_data_as_floats(m_tensor)};
             std::vector<float> result {};
             result.resize(numel());
             std::copy_n(data, numel(), result.begin());
-            mag_tensor_to_float_array_free_data(data);
+            mag_tensor_get_data_as_floats_free(data);
             return result;
         }
         [[nodiscard]] auto data_size() const noexcept -> std::int64_t { return mag_tensor_get_data_size(m_tensor); }
@@ -461,7 +465,63 @@ namespace magnetron {
         }
 
     private:
+        friend class storage_stream;
+
         explicit tensor(mag_tensor_t* ptr) noexcept : m_tensor{ptr} {}
         mag_tensor_t* m_tensor {};
+    };
+
+    class storage_stream final {
+    public:
+        explicit storage_stream(context& ctx) {
+            m_stream = mag_storage_stream_new(&*ctx);
+        }
+        storage_stream(context& ctx, const std::string& file_path) {
+            m_stream = mag_storage_stream_deserialize(&*ctx, file_path.c_str());
+            if (!m_stream) [[unlikely]]
+                throw std::runtime_error{"Failed to deserialize storage stream from file: " + file_path};
+        }
+        storage_stream(const storage_stream&) = delete;
+        storage_stream(storage_stream&& other) {
+            if (this != &other) {
+                m_stream = other.m_stream;
+                other.m_stream = nullptr;
+            }
+        }
+        auto operator = (const storage_stream&) -> storage_stream& = delete;
+        auto operator = (storage_stream&& other) -> storage_stream& {
+            if (this != &other) {
+                mag_storage_stream_close(m_stream);
+                m_stream = other.m_stream;
+                other.m_stream = nullptr;
+            }
+            return *this;
+        }
+        ~storage_stream() {
+            if (m_stream) {
+                mag_storage_stream_close(m_stream);
+            }
+        }
+
+        auto operator * () noexcept -> mag_storage_stream_t& { return *m_stream; }
+        auto operator * () const noexcept -> const mag_storage_stream_t& { return *m_stream; }
+
+        auto put (const std::string& key, tensor value) -> void {
+            mag_storage_stream_put_tensor(m_stream, key.c_str(), &*value);
+        }
+
+        auto get (const std::string& key) -> std::optional<tensor> {
+            if (auto* t = mag_storage_stream_get_tensor(m_stream, key.c_str())) {
+                return tensor{t};
+            }
+            return std::nullopt;
+        }
+
+        auto serialize(const std::string& file_path) -> void {
+            mag_storage_stream_serialize(m_stream, file_path.c_str());
+        }
+
+    private:
+        mag_storage_stream_t* m_stream {};
     };
 }

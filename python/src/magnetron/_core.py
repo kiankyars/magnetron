@@ -102,6 +102,10 @@ class Context:
         self.default_dtype = Config.default_dtype
 
     @property
+    def native_ptr(self) -> _ffi.CData:
+        return self._ptr
+
+    @property
     def compute_device_name(self) -> str:
         return _ffi.string(_C.mag_ctx_get_compute_device_name(self._ptr)).decode(
             'utf-8'
@@ -231,6 +235,10 @@ class Tensor:
             _C.mag_tensor_decref(self._ptr)
         self._ptr = _ffi.NULL
 
+    @property
+    def native_ptr(self) -> _ffi.CData:
+        return self._ptr
+
     def _new(
         self,
         ctx: Context,
@@ -306,9 +314,8 @@ class Tensor:
             requires_grad=requires_grad,
             name=name,
         )
-        size: int = len(flattened_data) * _ffi.sizeof('float')
-        _C.mag_tensor_copy_buffer_from(
-            tensor._ptr, _ffi.new(f'float[{len(flattened_data)}]', flattened_data), size
+        _C.mag_tensor_fill_from_floats(
+            tensor._ptr, _ffi.new(f'float[{len(flattened_data)}]', flattened_data), len(flattened_data)
         )
         return tensor
 
@@ -417,11 +424,11 @@ class Tensor:
         return self.tolist()[0]
 
     def tolist(self) -> list[float]:
-        ptr: _ffi.CData = _C.mag_tensor_to_float_array(
+        ptr: _ffi.CData = _C.mag_tensor_get_data_as_floats(
             self._ptr
         )  # Convert tensor dtype to float array
         unpacked: list[float] = _ffi.unpack(ptr, self.numel)
-        _C.mag_tensor_to_float_array_free_data(ptr)  # Free allocated native float array
+        _C.mag_tensor_get_data_as_floats_free(ptr)  # Free allocated native float array
         return unpacked
 
     @property

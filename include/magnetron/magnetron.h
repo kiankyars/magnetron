@@ -291,28 +291,29 @@ extern MAG_EXPORT mag_tensor_t* _Nonnull mag_repeat_back(mag_tensor_t* _Nonnull 
 
 /* ============ Tensor Init Operators ============ */
 
-extern MAG_EXPORT void mag_tensor_copy_buffer_from(mag_tensor_t* _Nonnull t, const void* _Nonnull data, size_t size);   /* Copy data into tensor buffer */
-extern MAG_EXPORT void mag_tensor_fill(mag_tensor_t* _Nonnull t, float x);                                              /* Set all tensor elements to a specific value */
-extern MAG_EXPORT void mag_tensor_fill_random_uniform(mag_tensor_t* _Nonnull t, float min, float max);                  /* Fill tensor with random values from uniform distribution within [min, max] */
-extern MAG_EXPORT void mag_tensor_fill_random_normal(mag_tensor_t* _Nonnull t, float mean, float stddev);               /* Fill tensor with random values from the normal distribution. */
+extern MAG_EXPORT void mag_tensor_fill_from_floats(mag_tensor_t* _Nonnull t, const float* _Nonnull data, size_t len);       /* Copy floats into tensor buffer. If the tensors datatype is not float, the values are converted to the tensors dtype. */
+extern MAG_EXPORT void mag_tensor_fill_from_raw_bytes(mag_tensor_t* _Nonnull t, const void* _Nonnull data, size_t len);     /* Copy raw bytes into tensor buffer */
+extern MAG_EXPORT void mag_tensor_fill(mag_tensor_t* _Nonnull t, float x);                                                  /* Set all tensor elements to a specific value */
+extern MAG_EXPORT void mag_tensor_fill_random_uniform(mag_tensor_t* _Nonnull t, float min, float max);                      /* Fill tensor with random values from uniform distribution within [min, max] */
+extern MAG_EXPORT void mag_tensor_fill_random_normal(mag_tensor_t* _Nonnull t, float mean, float stddev);                   /* Fill tensor with random values from the normal distribution. */
 
 /* ============ Tensor Property Accessors ============ */
 
-extern MAG_EXPORT uint64_t mag_tensor_get_refcount(const mag_tensor_t* _Nonnull t);                                     /* Return reference count of tensor itself. */
-extern MAG_EXPORT uint64_t mag_tensor_get_storage_refcount(const mag_tensor_t* _Nonnull t);                             /* Return reference count of tensor itself. */
-extern MAG_EXPORT size_t mag_tensor_get_memory_usage(const mag_tensor_t* _Nonnull t);                                   /* Return memory used by this tensor in bytes. */
-extern MAG_EXPORT void mag_tensor_set_name(mag_tensor_t* _Nonnull t, const char* _Nonnull name);                        /* Set the name of the tensor */
-extern MAG_EXPORT void mag_tensor_fmt_name(mag_tensor_t* _Nonnull t, const char* _Nonnull fmt, ...);                    /* Format the name of the tensor */
-extern MAG_EXPORT const char* _Nonnull mag_tensor_get_name(const mag_tensor_t* _Nonnull t);                             /* Get the name of the tensor */
-extern MAG_EXPORT int64_t mag_tensor_get_rank(const mag_tensor_t* _Nonnull t);                                          /* Get the rank (number of dimensions) of the tensor */
-extern MAG_EXPORT const int64_t* _Nonnull mag_tensor_get_shape(const mag_tensor_t* _Nonnull t);                         /* Get the dimensions of the tensor */
-extern MAG_EXPORT const int64_t* _Nonnull mag_tensor_get_strides(const mag_tensor_t* _Nonnull t);                       /* Get the strides of the tensor */
-extern MAG_EXPORT mag_dtype_t mag_tensor_get_dtype(const mag_tensor_t* _Nonnull t);                                     /* Get the data type of the tensor */
-extern MAG_EXPORT void* _Nonnull mag_tensor_get_data_ptr(const mag_tensor_t* _Nonnull t);                               /* Get the tensor raw buffer pointer. Might pointer to GPU or any other device memory. */
-extern MAG_EXPORT int64_t mag_tensor_get_data_size(const mag_tensor_t* _Nonnull );                                      /* Get the size of the tensor buffer in bytes. */
-extern MAG_EXPORT int64_t mag_tensor_get_numel(const mag_tensor_t* _Nonnull t);                                         /* Get the total amount of elements in the tensor. */
-extern MAG_EXPORT mag_ctx_t* _Nonnull mag_tensor_get_ctx(const mag_tensor_t* _Nonnull t);                                                                                                   /* Get the context of the tensor */
-extern MAG_EXPORT void* _Nullable mag_tensor_get_user_data(const mag_tensor_t* _Nonnull t);                                                                                                 /* Get the user data of the tensor */
+extern MAG_EXPORT uint64_t mag_tensor_get_refcount(const mag_tensor_t* _Nonnull t);                                         /* Return reference count of tensor itself. */
+extern MAG_EXPORT uint64_t mag_tensor_get_storage_refcount(const mag_tensor_t* _Nonnull t);                                 /* Return reference count of tensor itself. */
+extern MAG_EXPORT size_t mag_tensor_get_memory_usage(const mag_tensor_t* _Nonnull t);                                       /* Return memory used by this tensor in bytes. */
+extern MAG_EXPORT void mag_tensor_set_name(mag_tensor_t* _Nonnull t, const char* _Nonnull name);                            /* Set the name of the tensor */
+extern MAG_EXPORT void mag_tensor_fmt_name(mag_tensor_t* _Nonnull t, const char* _Nonnull fmt, ...);                        /* Format the name of the tensor */
+extern MAG_EXPORT const char* _Nonnull mag_tensor_get_name(const mag_tensor_t* _Nonnull t);                                 /* Get the name of the tensor */
+extern MAG_EXPORT int64_t mag_tensor_get_rank(const mag_tensor_t* _Nonnull t);                                              /* Get the rank (number of dimensions) of the tensor */
+extern MAG_EXPORT const int64_t* _Nonnull mag_tensor_get_shape(const mag_tensor_t* _Nonnull t);                             /* Get the dimensions of the tensor */
+extern MAG_EXPORT const int64_t* _Nonnull mag_tensor_get_strides(const mag_tensor_t* _Nonnull t);                           /* Get the strides of the tensor */
+extern MAG_EXPORT mag_dtype_t mag_tensor_get_dtype(const mag_tensor_t* _Nonnull t);                                         /* Get the data type of the tensor */
+extern MAG_EXPORT void* _Nonnull mag_tensor_get_data_ptr(const mag_tensor_t* _Nonnull t);                                   /* Get the tensor raw buffer pointer. Might pointer to GPU or any other device memory. */
+extern MAG_EXPORT int64_t mag_tensor_get_data_size(const mag_tensor_t* _Nonnull );                                          /* Get the size of the tensor buffer in bytes. */
+extern MAG_EXPORT int64_t mag_tensor_get_numel(const mag_tensor_t* _Nonnull t);                                             /* Get the total amount of elements in the tensor. */
+extern MAG_EXPORT mag_ctx_t* _Nonnull mag_tensor_get_ctx(const mag_tensor_t* _Nonnull t);                                   /* Get the context of the tensor */
+extern MAG_EXPORT void* _Nullable mag_tensor_get_user_data(const mag_tensor_t* _Nonnull t);                                 /* Get the user data of the tensor */
 extern MAG_EXPORT void mag_tensor_set_user_data(mag_tensor_t* _Nonnull t, void* _Nullable ud);
 extern MAG_EXPORT int64_t mag_tensor_get_width(const mag_tensor_t* _Nonnull t);
 extern MAG_EXPORT int64_t mag_tensor_get_height(const mag_tensor_t* _Nonnull t);
@@ -322,7 +323,7 @@ extern MAG_EXPORT int64_t mag_tensor_get_channels(const mag_tensor_t* _Nonnull t
 
 extern MAG_EXPORT bool mag_tensor_is_shape_eq(const mag_tensor_t* _Nonnull x, const mag_tensor_t* _Nonnull y);          /* Checks if a and b have the same shape. */
 extern MAG_EXPORT bool mag_tensor_are_strides_eq(const mag_tensor_t* _Nonnull x, const mag_tensor_t* _Nonnull y);       /* Checks if a and b have the same strides. */
-extern MAG_EXPORT bool mag_tensor_can_broadcast(const mag_tensor_t* _Nonnull small, const mag_tensor_t* _Nonnull big);        /* Checks if b can be broadcasted into a. */
+extern MAG_EXPORT bool mag_tensor_can_broadcast(const mag_tensor_t* _Nonnull small, const mag_tensor_t* _Nonnull big);  /* Checks if b can be broadcasted into a. */
 extern MAG_EXPORT bool mag_tensor_is_transposed(const mag_tensor_t* _Nonnull t);                                        /* Check if the tensor is transposed */
 extern MAG_EXPORT bool mag_tensor_is_permuted(const mag_tensor_t* _Nonnull t);                                          /* Check if the tensor is permuted */
 extern MAG_EXPORT bool mag_tensor_is_contiguous(const mag_tensor_t* _Nonnull t);                                        /* Check if the tensor memory is contiguous */
@@ -387,10 +388,11 @@ extern MAG_EXPORT float mag_tensor_subscript_get_flattened(mag_tensor_t* _Nonnul
  */
 extern MAG_EXPORT void mag_tensor_subscript_set_flattened(mag_tensor_t* _Nonnull t, int64_t idx, float val);
 
-extern MAG_EXPORT void* _Nonnull mag_tensor_to_byte_array(mag_tensor_t* _Nonnull t);
-extern MAG_EXPORT void mag_tensor_to_byte_array_free_data(void* _Nonnull ret_val);
-extern MAG_EXPORT float* _Nonnull mag_tensor_to_float_array(mag_tensor_t* _Nonnull t);
-extern MAG_EXPORT void mag_tensor_to_float_array_free_data(float* _Nonnull ret_val);
+extern MAG_EXPORT void* _Nonnull mag_tensor_get_raw_data_as_bytes(mag_tensor_t* _Nonnull t);
+extern MAG_EXPORT void mag_tensor_get_raw_data_as_bytes_free(void* _Nonnull ret_val);
+
+extern MAG_EXPORT float* _Nonnull mag_tensor_get_data_as_floats(mag_tensor_t* _Nonnull t);
+extern MAG_EXPORT void mag_tensor_get_data_as_floats_free(float* _Nonnull ret_val);
 
 /* ============ Tensor Misc API ============ */
 
@@ -410,9 +412,9 @@ extern MAG_EXPORT void mag_tensor_export_backward_graph_graphviz(mag_tensor_t* _
 
 typedef struct mag_storage_stream_t mag_storage_stream_t;
 
-extern MAG_EXPORT mag_storage_stream_t* _Nonnull mag_storage_stream_new(void);
-extern MAG_EXPORT mag_storage_stream_t* _Nonnull mag_storage_stream_open(const char* _Nonnull file);
+extern MAG_EXPORT mag_storage_stream_t* _Nonnull mag_storage_stream_new(mag_ctx_t* _Nonnull ctx);
 extern MAG_EXPORT bool mag_storage_stream_serialize(mag_storage_stream_t* _Nonnull st, const char* _Nonnull path);
+extern MAG_EXPORT mag_storage_stream_t* _Nullable mag_storage_stream_deserialize(mag_ctx_t* _Nonnull ctx, const char* _Nonnull file);
 extern MAG_EXPORT void mag_storage_stream_close(mag_storage_stream_t* _Nonnull st);
 
 extern MAG_EXPORT bool mag_storage_stream_put_tensor(mag_storage_stream_t* _Nonnull st, const char* _Nonnull key, mag_tensor_t* _Nonnull t);

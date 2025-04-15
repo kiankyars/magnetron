@@ -112,8 +112,8 @@ TEST(cpu_tensor_bin_ops, matmul_square) {
     context ctx {compute_device::cpu};
     tensor a {ctx, dtype::e8m23, A.size(), A[0].size()};
     tensor b {ctx, dtype::e8m23, B.size(), B[0].size()};
-    a.copy_buffer_from(&A, sizeof(A));
-    b.copy_buffer_from(&B, sizeof(B));
+    a.fill_from(&A, sizeof(A));
+    b.fill_from(&B, sizeof(B));
     tensor c {a&b};
     ASSERT_EQ(c.shape()[0], 2);
     ASSERT_EQ(c.shape()[1], 2);
@@ -146,8 +146,8 @@ TEST(cpu_tensor_bin_ops, matmul_non_square) {
     context ctx {compute_device::cpu};
     tensor a {ctx, dtype::e8m23, A.size(), A[0].size()};
     tensor b {ctx, dtype::e8m23, B.size(), B[0].size()};
-    a.copy_buffer_from(&A, sizeof(A));
-    b.copy_buffer_from(&B, sizeof(B));
+    a.fill_from(&A, sizeof(A));
+    b.fill_from(&B, sizeof(B));
     tensor c {a&b};
     ASSERT_EQ(c.shape()[0], 3);
     ASSERT_EQ(c.shape()[1], 4);
@@ -172,8 +172,8 @@ TEST(cpu_tensor_bin_ops, matmul_square_zero) {
     context ctx {compute_device::cpu};
     tensor a {ctx, dtype::e8m23, A.size(), A[0].size()};
     tensor b {ctx, dtype::e8m23, B.size(), B[0].size()};
-    a.copy_buffer_from(&A, sizeof(A));
-    b.copy_buffer_from(&B, sizeof(B));
+    a.fill_from(&A, sizeof(A));
+    b.fill_from(&B, sizeof(B));
     tensor c {a&b};
     ASSERT_EQ(c.shape()[0], 2);
     ASSERT_EQ(c.shape()[1], 2);
@@ -201,8 +201,8 @@ TEST(cpu_tensor_bin_ops, matmul_square_identity) {
     context ctx {compute_device::cpu};
     tensor a {ctx, dtype::e8m23, A.size(), A[0].size()};
     tensor b {ctx, dtype::e8m23, B.size(), B[0].size()};
-    a.copy_buffer_from(&A, sizeof(A));
-    b.copy_buffer_from(&B, sizeof(B));
+    a.fill_from(&A, sizeof(A));
+    b.fill_from(&B, sizeof(B));
     tensor c {a&b};
     ASSERT_EQ(c.shape()[0], 2);
     ASSERT_EQ(c.shape()[1], 2);
@@ -232,8 +232,8 @@ TEST(cpu_tensor_bin_ops, matmul_matrix_vector) {
     context ctx {compute_device::cpu};
     tensor a {ctx, dtype::e8m23, A.size(), A[0].size()};
     tensor b {ctx, dtype::e8m23, B.size()};
-    a.copy_buffer_from(&A, sizeof(A));
-    b.copy_buffer_from(&B, sizeof(B));
+    a.fill_from(&A, sizeof(A));
+    b.fill_from(&B, sizeof(B));
     tensor c {a&b};
     ASSERT_EQ(c.shape()[0], 3);
     ASSERT_EQ(c.shape()[1], 1);
