@@ -604,7 +604,11 @@ typedef struct mag_rc_control_block_t {
 
 static MAG_AINLINE mag_rc_control_block_t mag_rc_control_init(void* self, void (*dtor)(void*)) {
     mag_assert2(self && dtor); /* Self and destructor must be set. */
-    return (mag_rc_control_block_t){.rc=1, .self=self, .dtor=dtor};
+    mag_rc_control_block_t control;
+    control.rc = 1;
+    control.self = self;
+    control.dtor = dtor;
+    return control;
 }
 static MAG_AINLINE void mag_rc_control_incref(mag_rc_control_block_t* rcb) {
     mag_assert(++rcb->rc < 0xffffffffu, "Reference count overflow");
@@ -792,9 +796,9 @@ typedef enum mag_amd64_cap_t {
 
 extern const char* const mag_amd64_cap_names[MAG_AMD64_CAP__NUM];
 
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(_M_ARM64)
 
-#define mag_arm64_feature_def(_, __) /* Enumerator | Shift */\
+#define mag_arm64_feature_def(_, __) /* Enumerator */\
     _(NONE)__\
     _(NEON)__\
     _(DOTPROD)__\
@@ -837,7 +841,7 @@ struct mag_ctx_t {
 #if defined(__x86_64__) || defined(_M_X64)
         uint64_t amd64_cpu_caps;                        /* x86-64 CPU features. Bitset of 1ull<<MAG_AMD64_CAP_* */
         bool is_amd;                                    /* Is AMD CPU? */
-#elif defined (__aarch64__)
+#elif defined (__aarch64__) || defined(_M_ARM64)
         uint64_t arm64_cpu_caps;                        /* ARM64 CPU features. */
         int64_t arm64_cpu_sve_width;                    /* ARM64 SVE vector register width. */
 #endif

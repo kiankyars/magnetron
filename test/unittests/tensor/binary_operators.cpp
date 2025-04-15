@@ -117,7 +117,6 @@ TEST(cpu_tensor_bin_ops, matmul_square) {
     tensor c {a&b};
     ASSERT_EQ(c.shape()[0], 2);
     ASSERT_EQ(c.shape()[1], 2);
-    ASSERT_EQ(c.shape()[2], 1);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 4);
     ASSERT_EQ(c.numel(), a.numel());
@@ -151,7 +150,6 @@ TEST(cpu_tensor_bin_ops, matmul_non_square) {
     tensor c {a&b};
     ASSERT_EQ(c.shape()[0], 3);
     ASSERT_EQ(c.shape()[1], 4);
-    ASSERT_EQ(c.shape()[2], 1);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 12);
     std::vector<e8m23_t> cr {c.to_vector()};
@@ -177,7 +175,6 @@ TEST(cpu_tensor_bin_ops, matmul_square_zero) {
     tensor c {a&b};
     ASSERT_EQ(c.shape()[0], 2);
     ASSERT_EQ(c.shape()[1], 2);
-    ASSERT_EQ(c.shape()[2], 1);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 4);
     ASSERT_EQ(c.numel(), a.numel());
@@ -206,7 +203,6 @@ TEST(cpu_tensor_bin_ops, matmul_square_identity) {
     tensor c {a&b};
     ASSERT_EQ(c.shape()[0], 2);
     ASSERT_EQ(c.shape()[1], 2);
-    ASSERT_EQ(c.shape()[2], 1);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 4);
     ASSERT_EQ(c.numel(), a.numel());
@@ -236,8 +232,6 @@ TEST(cpu_tensor_bin_ops, matmul_matrix_vector) {
     b.fill_from(&B, sizeof(B));
     tensor c {a&b};
     ASSERT_EQ(c.shape()[0], 3);
-    ASSERT_EQ(c.shape()[1], 1);
-    ASSERT_EQ(c.shape()[2], 1);
     ASSERT_EQ(c.rank(), 1);
     ASSERT_EQ(c.numel(), 3);
     ASSERT_NE(c.numel(), a.numel());

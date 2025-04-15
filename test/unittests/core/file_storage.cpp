@@ -1,8 +1,7 @@
 // (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
 #include <prelude.hpp>
-#include <__filesystem/filesystem_error.h>
-#include <__filesystem/operations.h>
+#include <filesystem>
 
 using namespace magnetron;
 

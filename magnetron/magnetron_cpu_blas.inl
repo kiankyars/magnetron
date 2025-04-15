@@ -933,7 +933,7 @@ uint64_t MAG_BLAS_SPECIALIZATION_FEAT_REQUEST() {
     return caps;
 }
 
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(_M_ARM64)
 
 uint64_t MAG_BLAS_SPECIALIZATION_FEAT_REQUEST(void) {
     uint64_t caps = 1u<<MAG_ARM64_CAP_NEON; /* Always required on arm64. */

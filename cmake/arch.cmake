@@ -6,7 +6,7 @@ else()
     set(IS_AMD64 FALSE)
 endif()
 
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64)|(arm64)")
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64)|(arm64)|(ARM64)")
     set(IS_ARM64 TRUE)
 else()
     set(IS_ARM64 FALSE)

@@ -18,6 +18,8 @@
     || !defined(__AVX512VL__)
 #error "BLAS specialization requires matching compile flags"
 #endif
+#else
+#pragma message("MSVC does not allow to fine tune CPU architecture level, usine clang-cl or mingw-w64 for best performance!")
 #endif
 #ifdef __AVX512VNNI__
 #error "BLAS specialization feature too high"

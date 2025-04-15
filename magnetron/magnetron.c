@@ -8,6 +8,7 @@
 **  - Automatic differentiation and gradient computation.
 **  - Metadata of datatypes and operators and misc functions.
 **  - Hardware detection and system information.
+**  - File storage format loading and saving for (*.mag) files.
 */
 
 #include <magnetron/magnetron.h>
@@ -2444,7 +2445,6 @@ bool mag_tensor_can_broadcast(const mag_tensor_t* small, const mag_tensor_t* big
 bool mag_tensor_is_transposed(const mag_tensor_t* t) { return t->strides[0] > t->strides[1]; }
 
 bool mag_tensor_is_permuted(const mag_tensor_t* t) {
-    #pragma GCC unroll 5
     for (int i=0; i < MAG_MAX_DIMS-1; ++i)
         if (t->strides[i] > t->strides[i+1])
             return true;
@@ -3251,7 +3251,7 @@ static void MAG_COLDPROC mag_machine_probe_memory(uint64_t* out_phys_mem_total, 
         #undef mag_cpy_regs
     }
 
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(_M_ARM64)
 static void MAG_COLDPROC mag_system_info_query_arm64_cpu_caps(uint64_t* caps, int64_t* sve_width) {
     *caps = MAG_ARM64_CAP_NONE;
     #ifdef __linux__
@@ -3265,6 +3265,13 @@ static void MAG_COLDPROC mag_system_info_query_arm64_cpu_caps(uint64_t* caps, in
         if (hwcap2 & HWCAP2_BF16) *caps |= 1ull<<MAG_ARM64_CAP_BF16;
         if (hwcap & HWCAP_SVE) *caps |= 1ull<<MAG_ARM64_CAP_SVE;
         if (hwcap2 & HWCAP2_SVE2) *caps |= 1ull<<MAG_ARM64_CAP_SVE2;
+        *sve_width = 0; /* NYI */
+    #elif defined(_WIN32)
+        if (IsProcessorFeaturePresent(PF_ARM_NEON_INSTRUCTIONS_AVAILABLE))
+            *caps |= 1ull << MAG_ARM64_CAP_NEON;
+        if (IsProcessorFeaturePresent(PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE))
+            *caps |= 1ull << MAG_ARM64_CAP_DOTPROD;
+        /* Other features not supported by IsProcessorFeaturePresent*/
         *sve_width = 0; /* NYI */
     #elif defined(__APPLE__)
         int sx = 0;
