@@ -42,9 +42,9 @@ for epoch in range(EPOCHS):
     print(f'epoch {epoch + 1}/{EPOCHS}, acc {acc:.4f}')
 
 data = {
-    'fc1_w': net[0].weight.detach().numpy().T.tolist(),
+    'fc1_w': net[0].weight.detach().numpy().tolist(),
     'fc1_b': net[0].bias.detach().numpy().tolist(),
-    'fc2_w': net[2].weight.detach().numpy().T.tolist(),
+    'fc2_w': net[2].weight.detach().numpy().tolist(),
     'fc2_b': net[2].bias.detach().numpy().tolist(),
 }
 

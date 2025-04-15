@@ -15,9 +15,9 @@ class MNIST(nn.Module):
         with open(data_file, 'rb') as f:
             dat = pickle.load(f)
 
-        self.fc1.weight.x = mag.Tensor.from_data(dat['fc1_w'], name='fc1_w').T
+        self.fc1.weight.x = mag.Tensor.from_data(dat['fc1_w'], name='fc1_w')
         self.fc1.bias.x = mag.Tensor.from_data(dat['fc1_b'], name='fc1_b')
-        self.fc2.weight.x = mag.Tensor.from_data(dat['fc2_w'], name='fc2_w').T
+        self.fc2.weight.x = mag.Tensor.from_data(dat['fc2_w'], name='fc2_w')
         self.fc2.bias.x = mag.Tensor.from_data(dat['fc2_b'], name='fc2_b')
         self.eval()
 
