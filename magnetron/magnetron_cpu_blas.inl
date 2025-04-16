@@ -438,6 +438,9 @@ static void mag_blas_init_rand_normal_e5m10(const mag_compute_payload_t* payload
                 xoff += xcoord * x->strides[d]; \
                 yoff += ycoord * y->strides[d]; \
             } \
+            mag_bnd_chk(bx+xoff, bx, mag_tensor_get_data_size(x)); \
+            mag_bnd_chk(by+yoff, by, mag_tensor_get_data_size(y)); \
+            mag_bnd_chk(br+roff, br, mag_tensor_get_data_size(r)); \
             br[roff] = mag_##T##_s##OP(bx[xoff], by[yoff]); \
         } \
     }
@@ -465,6 +468,8 @@ static void mag_blas_init_rand_normal_e5m10(const mag_compute_payload_t* payload
                 int64_t xcoord = (x->shape[d] == 1) ? 0 : coord; \
                 xoff += xcoord * x->strides[d]; \
             } \
+            mag_bnd_chk(bx+xoff, bx, mag_tensor_get_data_size(x)); \
+            mag_bnd_chk(br+roff, br, mag_tensor_get_data_size(r)); \
             br[roff] = mag_##T##_s##FUNC(bx[xoff]); \
         } \
     }
@@ -493,6 +498,8 @@ static void mag_blas_init_rand_normal_e5m10(const mag_compute_payload_t* payload
                 int64_t xcoord = (x->shape[d] == 1) ? 0 : coord; \
                 xoff += xcoord * x->strides[d]; \
             } \
+            mag_bnd_chk(bx+xoff, bx, mag_tensor_get_data_size(x)); \
+            mag_bnd_chk(br+roff, br, mag_tensor_get_data_size(r)); \
             br[roff] = mag_##T##_s##FUNC(bx[xoff], xi); \
         } \
     }
@@ -507,6 +514,7 @@ static void mag_blas_init_rand_normal_e5m10(const mag_compute_payload_t* payload
         ACC_T acc = (INIT_EXPR); \
         for (int64_t i=0; i < x->numel; ++i) { \
             int64_t off = mag_offset_from_flat(x, i); \
+            mag_bnd_chk(bx+off, bx, mag_tensor_get_data_size(x)); \
             UPDATE_STMT; \
         } \
         FINAL_STMT; \
