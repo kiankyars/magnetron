@@ -1,7 +1,23 @@
+import urllib
 import numpy as np
 from PIL import Image, ImageFilter
 from scipy.ndimage import center_of_mass
+from tqdm import tqdm
 
+
+def download_with_progress(url: str, filename: str) -> None:
+    class TqdmBarUpdater(tqdm):
+        def update_to(
+            self, b: int = 1, bsize: int = 1, tsize: int | None = None
+        ) -> None:
+            if tsize is not None:
+                self.total = tsize
+            self.update(b * bsize - self.n)
+
+    with TqdmBarUpdater(
+        unit='B', unit_scale=True, miniters=1, desc=url.split('/')[-1]
+    ) as t:
+        urllib.request.urlretrieve(url, filename, reporthook=t.update_to)
 
 def center_image(image_np: np.ndarray) -> np.ndarray:
     cy, cx = center_of_mass(image_np)

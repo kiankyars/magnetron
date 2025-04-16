@@ -1,16 +1,28 @@
+from pathlib import Path
+
 import magnetron as mag
 import magnetron.nn as nn
 import base64
 import io
-import pickle
 
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from PIL import Image
-from .image_utils import post_process_image
+from magnetron.io import StorageStream
+
+from .utils import post_process_image, download_with_progress
 import numpy as np
 
+# Download the MNIST dataset
+
+DATASET_URL: str = 'https://huggingface.co/datasets/mario-sieg/magnetron-mnist/resolve/main/mnist_full_e8m23.mag'
+DATASET_FILE_NAME: str = 'mnist_full_e8m23.mag'
+
+if not Path(DATASET_FILE_NAME).exists():
+    print(f'Downloading dataset file f{DATASET_FILE_NAME}...')
+    download_with_progress(DATASET_URL, DATASET_FILE_NAME)
+    print('Download complete!')
 
 class MNIST(nn.Module):
     def __init__(self, data_file: str) -> None:
@@ -18,13 +30,14 @@ class MNIST(nn.Module):
         self.fc1 = nn.Linear(784, 128)
         self.fc2 = nn.Linear(128, 10)
 
-        with open(data_file, 'rb') as f:
-            dat = pickle.load(f)
+        stream = StorageStream.open(data_file)
+        self.test_images = stream['test_images']
+        self.test_labels = stream['test_labels']
 
-        self.fc1.weight.x = mag.Tensor.from_data(dat['fc1_w'], name='fc1_w').T
-        self.fc1.bias.x = mag.Tensor.from_data(dat['fc1_b'], name='fc1_b')
-        self.fc2.weight.x = mag.Tensor.from_data(dat['fc2_w'], name='fc2_w').T
-        self.fc2.bias.x = mag.Tensor.from_data(dat['fc2_b'], name='fc2_b')
+        self.fc1.weight.x = stream['fc1_w']
+        self.fc1.bias.x = stream['fc1_b']
+        self.fc2.weight.x = stream['fc2_w']
+        self.fc2.bias.x = stream['fc2_b']
         self.eval()
 
     def forward(self, x: mag.Tensor) -> mag.Tensor:
@@ -44,8 +57,7 @@ class MNIST(nn.Module):
         return preds
 
 
-MODEL_PATH: str = 'mnist_mlp_weights.pkl'
-model = MNIST(MODEL_PATH)
+model = MNIST(DATASET_FILE_NAME)
 
 
 @ensure_csrf_cookie
@@ -69,7 +81,7 @@ def predict_digit(request: HttpRequest) -> JsonResponse:
     arr = np.array(image, dtype=np.float32) / 255.0
     test_tensor: mag.Tensor = mag.Tensor.from_data(
         [arr.flatten().tolist()], name='input'
-    ).T
+    )
     pred = model.predict(test_tensor)
     digit: int = pred[0]
     return JsonResponse({'prediction': digit})

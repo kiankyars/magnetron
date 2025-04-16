@@ -27,12 +27,12 @@ def download_with_progress(url: str, filename: str) -> None:
 
 # Download the MNIST dataset
 
-URL: str = 'https://huggingface.co/datasets/mario-sieg/magnetron-mnist/resolve/main/mnist_full_e8m23.mag'
-FILE_NAME: str = 'mnist_full_e8m23.mag'
+DATASET_URL: str = 'https://huggingface.co/datasets/mario-sieg/magnetron-mnist/resolve/main/mnist_full_e8m23.mag'
+DATASET_FILE_NAME: str = 'mnist_full_e8m23.mag'
 
-if not Path(FILE_NAME).exists():
-    print(f'Downloading dataset file f{FILE_NAME}...')
-    download_with_progress(URL, FILE_NAME)
+if not Path(DATASET_FILE_NAME).exists():
+    print(f'Downloading dataset file f{DATASET_FILE_NAME}...')
+    download_with_progress(DATASET_URL, DATASET_FILE_NAME)
     print('Download complete!')
 
 

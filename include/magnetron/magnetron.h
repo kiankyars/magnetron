@@ -230,9 +230,9 @@ extern MAG_EXPORT mag_tensor_t* _Nonnull mag_transpose(mag_tensor_t* _Nonnull x)
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_permute(mag_tensor_t* _Nonnull x, uint32_t d0, uint32_t d1, uint32_t d2, uint32_t d3, uint32_t d4, uint32_t d5);
 
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_mean(mag_tensor_t* _Nonnull x);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_min (mag_tensor_t* _Nonnull x);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_max (mag_tensor_t* _Nonnull x);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_sum (mag_tensor_t* _Nonnull x);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_min(mag_tensor_t* _Nonnull x);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_max(mag_tensor_t* _Nonnull x);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_sum(mag_tensor_t* _Nonnull x);
 
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_abs(mag_tensor_t* _Nonnull x);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_abs_(mag_tensor_t* _Nonnull x);
