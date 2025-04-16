@@ -72,7 +72,9 @@ def scalar_op(dtype: mag.DataType, f: callable, rhs: bool = True, lim: int = 4) 
         xi: float = random.uniform(-1.0, 1.0)
         x = mag.Tensor.uniform(shape, dtype=dtype)
         r = f(x, xi)
-        np.testing.assert_allclose(tonumpy(r, numpy_dt), f(tonumpy(x, numpy_dt), xi), atol=atol)
+        np.testing.assert_allclose(
+            tonumpy(r, numpy_dt), f(tonumpy(x, numpy_dt), xi), atol=atol
+        )
 
     square_shape_permutations(compute, lim)
 
@@ -83,7 +85,9 @@ def scalar_op(dtype: mag.DataType, f: callable, rhs: bool = True, lim: int = 4) 
         xi: float = random.uniform(-1.0, 1.0)
         x = mag.Tensor.uniform(shape)
         r = f(xi, x)
-        np.testing.assert_allclose(tonumpy(r, numpy_dt), f(xi, tonumpy(x, numpy_dt)), atol=atol)
+        np.testing.assert_allclose(
+            tonumpy(r, numpy_dt), f(xi, tonumpy(x, numpy_dt)), atol=atol
+        )
 
     square_shape_permutations(compute, lim)
 

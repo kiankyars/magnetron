@@ -19,6 +19,7 @@ def download_with_progress(url: str, filename: str) -> None:
     ) as t:
         urllib.request.urlretrieve(url, filename, reporthook=t.update_to)
 
+
 def center_image(image_np: np.ndarray) -> np.ndarray:
     cy, cx = center_of_mass(image_np)
     shift_y = int(round(image_np.shape[0] / 2 - cy))

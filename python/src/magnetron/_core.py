@@ -385,12 +385,6 @@ class Tensor:
         _C.mag_tensor_fill_random_normal(tensor._ptr, mean, stddev)
         return tensor
 
-    @classmethod
-    def load(cls, file_path: str) -> 'Tensor':
-        assert file_path.endswith('.magnetron'), 'File must be a magnetron file'
-        instance = _C.mag_tensor_load(Context.primary()._ptr, bytes(file_path, 'utf-8'))
-        return cls(ptr=instance)
-
     @property
     def name(self) -> str:
         return _ffi.string(_C.mag_tensor_get_name(self._ptr)).decode('utf-8')
@@ -501,11 +495,6 @@ class Tensor:
         assert self.requires_grad, 'Tensor must require gradient tracking'
         _C.mag_tensor_zero_grad(self._ptr)
 
-    def save(self, file_path: str) -> None:
-        if not file_path.endswith('.magnetron'):
-            file_path += '.magnetron'
-        _C.mag_tensor_save(self._ptr, bytes(file_path, 'utf-8'))
-
     def export_graphviz(self, file_path: str) -> None:
         _C.mag_tensor_export_graphviz(self._ptr, bytes(file_path, 'utf-8'))
 
@@ -521,6 +510,11 @@ class Tensor:
     @property
     def T(self) -> 'Tensor':
         return Tensor(_C.mag_transpose(self._ptr))
+
+    def contiguous(self) -> 'Tensor':
+        if self.is_contiguous:
+            return self
+        return self.clone()
 
     def permute(self, axes: tuple[int, ...]) -> 'Tensor':
         assert len(axes) == self.rank, (

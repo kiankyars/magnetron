@@ -42,14 +42,15 @@ class MNIST(nn.Module):
         self.fc1 = nn.Linear(784, 128)
         self.fc2 = nn.Linear(128, 10)
 
-        stream = StorageStream.open(data_file)
-        self.test_images = stream['test_images']
-        self.test_labels = stream['test_labels']
+        with StorageStream.open(data_file) as stream:
+            self.test_images = stream['test_images']
+            self.test_labels = stream['test_labels']
 
-        self.fc1.weight.x = stream['fc1_w']
-        self.fc1.bias.x = stream['fc1_b']
-        self.fc2.weight.x = stream['fc2_w']
-        self.fc2.bias.x = stream['fc2_b']
+            self.fc1.weight.x = stream['fc1_w']
+            self.fc1.bias.x = stream['fc1_b']
+            self.fc2.weight.x = stream['fc2_w']
+            self.fc2.bias.x = stream['fc2_b']
+
         self.eval()
 
     def forward(self, x: mag.Tensor) -> mag.Tensor:

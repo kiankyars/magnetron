@@ -6,24 +6,54 @@ from magnetron._bootstrap import load_native_module
 
 _ffi, _C = load_native_module()
 
+from pathlib import Path
+from magnetron import Tensor, Context
+from magnetron._bootstrap import load_native_module
+
+_ffi, _C = load_native_module()
+
 
 class StorageStream:
-    """Reads and writes Magnetron (.mag) storage files."""
+    """Reads and writes Magnetron (.mag) storage files.
+
+    Supports context management to ensure proper cleanup of native resources.
+    """
 
     def __init__(self, handle: _ffi.CData | None = None) -> None:
         self._ctx = Context.primary()
         if handle is not None:
-            assert handle != _ffi.NULL
+            if handle == _ffi.NULL:
+                raise ValueError('Received an invalid native handle (NULL).')
             self._ptr = handle
         else:
             self._ptr = _C.mag_storage_stream_new(self._ctx.native_ptr)
+        self._closed = False
+
+    def close(self) -> None:
+        """Closes the storage stream and frees native resources."""
+        if not self._closed:
+            _C.mag_storage_stream_close(self._ptr)
+            self._ptr = None
+            self._closed = True
 
     def __del__(self) -> None:
-        _C.mag_storage_stream_close(self._ptr)
-        self._ptr = None
+        self.close()  # Ensure resources are freed if not explicitly closed
+
+    def __enter__(self) -> 'StorageStream':
+        """Enters the runtime context related to this object."""
+        if self._closed:
+            raise RuntimeError('Cannot enter context with a closed StorageStream.')
+        return self
+
+    def __exit__(self, exc_type: any, exc_value: any, traceback: any) -> None:
+        """Exits the runtime context and closes the storage stream."""
+        self.close()
 
     @property
     def native_ptr(self) -> _ffi.CData:
+        """Returns the native pointer associated with this storage stream."""
+        if self._closed:
+            raise RuntimeError('Attempting to access a closed StorageStream.')
         return self._ptr
 
     @classmethod
@@ -39,18 +69,23 @@ class StorageStream:
         return cls(handle)
 
     def put(self, key: str, tensor: Tensor) -> None:
-        """Adds a tensor with unique key to the storage stream."""
-        assert tensor.native_ptr is not None and tensor.native_ptr != _ffi.NULL
+        """Adds a tensor with a unique key to the storage stream."""
+        if self._closed:
+            raise RuntimeError('Cannot operate on a closed StorageStream.')
+        if tensor.native_ptr is None or tensor.native_ptr == _ffi.NULL:
+            raise ValueError('Invalid tensor provided.')
         key_utf8: bytes = key.encode('utf-8')
         if _C.mag_storage_stream_get_tensor(self._ptr, key_utf8) != _ffi.NULL:
             raise RuntimeError(
-                f'Tensor with key {key} already exists in storage stream'
+                f"Tensor with key '{key}' already exists in the storage stream"
             )
         if not _C.mag_storage_stream_put_tensor(self._ptr, key_utf8, tensor.native_ptr):
             raise RuntimeError('Failed to put tensor into storage stream')
 
     def get(self, key: str) -> Tensor | None:
         """Retrieves a tensor from the storage stream."""
+        if self._closed:
+            raise RuntimeError('Cannot operate on a closed StorageStream.')
         handle = _C.mag_storage_stream_get_tensor(self._ptr, key.encode('utf-8'))
         if handle == _ffi.NULL:
             return None
@@ -60,14 +95,17 @@ class StorageStream:
         """Retrieves a tensor from the storage stream."""
         tensor: Tensor | None = self.get(key)
         if tensor is None:
-            raise KeyError(f'Tensor with key {key} not found in storage stream')
+            raise KeyError(f"Tensor with key '{key}' not found in the storage stream")
         return tensor
 
     def __setitem__(self, key: str, tensor: Tensor) -> None:
-        """Adds a tensor with unique key to the storage stream."""
+        """Adds a tensor with a unique key to the storage stream."""
         self.put(key, tensor)
 
     def serialize(self, file_path: Path) -> None:
+        """Serializes the storage stream to a file."""
+        if self._closed:
+            raise RuntimeError('Cannot serialize a closed StorageStream.')
         if not _C.mag_storage_stream_serialize(
             self._ptr, str(file_path).encode('utf-8')
         ):
