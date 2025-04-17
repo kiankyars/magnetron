@@ -35,23 +35,23 @@ protected:
 TEST_F(hash_map_test, empty_map) {
     EXPECT_EQ(mag_hashmap_count(map), 0u);
     int key = 123;
-    EXPECT_EQ(mag_hashmap_get(map, &key), nullptr);
+    EXPECT_EQ(mag_hashmap_lookup(map, &key), nullptr);
     EXPECT_EQ(mag_hashmap_delete(map, &key), nullptr);
 }
 
 TEST_F(hash_map_test, insert_and_get) {
     int key = 7;
     // first insert → returns NULL
-    const auto* prev = static_cast<const int*>(mag_hashmap_set(map, &key));
+    const auto* prev = static_cast<const int*>(mag_hashmap_insert(map, &key));
     ASSERT_EQ(prev, nullptr);
 
     // now get should find it
-    const auto* found = static_cast<const int*>(mag_hashmap_get(map, &key));
+    const auto* found = static_cast<const int*>(mag_hashmap_lookup(map, &key));
     ASSERT_NE(found, nullptr);
     EXPECT_EQ(*found, key);
 
     // inserting the same key again → returns non‑NULL (the replaced item)
-    const auto* replaced = static_cast<const int*>(mag_hashmap_set(map, &key));
+    const auto* replaced = static_cast<const int*>(mag_hashmap_insert(map, &key));
     ASSERT_NE(replaced, nullptr);
     EXPECT_EQ(*replaced, key);
 
@@ -66,7 +66,7 @@ TEST_F(hash_map_test, delete_and_get) {
     EXPECT_EQ(mag_hashmap_delete(map, &b), nullptr);
 
     // insert and then delete
-    mag_hashmap_set(map, &a);
+    mag_hashmap_insert(map, &a);
     EXPECT_EQ(mag_hashmap_count(map), 1u);
 
     const auto* del = static_cast<const int*>(mag_hashmap_delete(map, &a));
@@ -74,14 +74,14 @@ TEST_F(hash_map_test, delete_and_get) {
     EXPECT_EQ(*del, a);
 
     // now it's gone
-    EXPECT_EQ(mag_hashmap_get(map, &a), nullptr);
+    EXPECT_EQ(mag_hashmap_lookup(map, &a), nullptr);
     EXPECT_EQ(mag_hashmap_count(map), 0u);
 }
 
 TEST_F(hash_map_test, clear_map) {
     int vals[] = {1,2,3,4,5};
     for (int v : vals) {
-        mag_hashmap_set(map, &v);
+        mag_hashmap_insert(map, &v);
     }
     EXPECT_EQ(mag_hashmap_count(map), 5u);
 
@@ -91,14 +91,14 @@ TEST_F(hash_map_test, clear_map) {
 
     // can re‑insert after clear
     int x = 7;
-    EXPECT_EQ(mag_hashmap_set(map, &x), nullptr);
+    EXPECT_EQ(mag_hashmap_insert(map, &x), nullptr);
     // note: first insert returns NULL
     EXPECT_EQ(mag_hashmap_count(map), 1u);
 }
 
 TEST_F(hash_map_test, scan_callback) {
     int keys[] = {10,20,30};
-    for (int k : keys) mag_hashmap_set(map, &k);
+    for (int k : keys) mag_hashmap_insert(map, &k);
 
     std::vector<int> seen;
     auto cb = [](const void* item, void* ud) {
@@ -115,7 +115,7 @@ TEST_F(hash_map_test, scan_callback) {
 
 TEST_F(hash_map_test, IterationYieldsAllItems) {
     int keys[] = {11,22,33,44};
-    for (int k : keys) mag_hashmap_set(map, &k);
+    for (int k : keys) mag_hashmap_insert(map, &k);
     EXPECT_EQ(mag_hashmap_count(map), 4u);
     size_t iter = 0;
     void* item = nullptr;
@@ -132,11 +132,11 @@ TEST_F(hash_map_test, auto_grow_under_pressure) {
     std::vector<int> data;
     for (int i = 0; i < 20; ++i) {
         data.push_back(i);
-        mag_hashmap_set(map, &data.back());
+        mag_hashmap_insert(map, &data.back());
     }
     // after growing, still findable
     for (int v : data) {
-        auto* p = static_cast<const int*>(mag_hashmap_get(map, &v));
+        auto* p = static_cast<const int*>(mag_hashmap_lookup(map, &v));
         ASSERT_NE(p, nullptr);
         EXPECT_EQ(*p, v);
     }
