@@ -3406,30 +3406,81 @@ static inline uint32_t mag_murmur_32_scramble(uint32_t k) {
     return k;
 }
 
-uint32_t mag_hash(const void* key, size_t len, uint32_t seed) {
-    const uint8_t* ky = (const uint8_t*)key;
-    uint32_t h = seed;
-    uint32_t k;
-    for (size_t i=len>>2; i; --i) {
-        memcpy(&k, ky, sizeof(uint32_t));
-        ky += sizeof(uint32_t);
-        h ^= mag_murmur_32_scramble(k);
-        h = (h<<13) | (h>>19);
-        h = h*5 + 0xe6546b64;
+uint64_t mag_hash(const void* key, size_t len, uint32_t seed) {
+    #define	mag_rol32(x, r) (((x)<<(r))|((x)>>(32-(r))))
+    #define mag_mix32(h) h^=h>>16; h*=0x85ebca6b; h^=h>>13; h*=0xc2b2ae35; h^=h>>16;
+    const uint8_t* p = key;
+    int64_t nblocks = (int64_t)len>>4;
+    uint32_t h1 = seed;
+    uint32_t h2 = seed;
+    uint32_t h3 = seed;
+    uint32_t h4 = seed;
+    uint32_t c1 = 0x239b961b;
+    uint32_t c2 = 0xab0e9789;
+    uint32_t c3 = 0x38b34ae5;
+    uint32_t c4 = 0xa1e38b93;
+    const uint32_t * blocks = (const uint32_t *)(p + nblocks*16);
+    for (int64_t i = -nblocks; i; i++) {
+        uint32_t k1 = blocks[i*4+0];
+        uint32_t k2 = blocks[i*4+1];
+        uint32_t k3 = blocks[i*4+2];
+        uint32_t k4 = blocks[i*4+3];
+        k1 *= c1; k1  = mag_rol32(k1,15); k1 *= c2; h1 ^= k1;
+        h1 = mag_rol32(h1,19); h1 += h2; h1 = h1*5+0x561ccd1b;
+        k2 *= c2; k2  = mag_rol32(k2,16); k2 *= c3; h2 ^= k2;
+        h2 = mag_rol32(h2,17); h2 += h3; h2 = h2*5+0x0bcaa747;
+        k3 *= c3; k3  = mag_rol32(k3,17); k3 *= c4; h3 ^= k3;
+        h3 = mag_rol32(h3,15); h3 += h4; h3 = h3*5+0x96cd1c35;
+        k4 *= c4; k4  = mag_rol32(k4,18); k4 *= c1; h4 ^= k4;
+        h4 = mag_rol32(h4,13); h4 += h1; h4 = h4*5+0x32ac3b17;
     }
-    k = 0;
-    for (size_t i=len&3; i; --i) {
-        k <<= 8;
-        k |= ky[i-1];
-    }
-    h ^= mag_murmur_32_scramble(k);
-    h ^= len;
-    h ^= h>>16;
-    h *= 0x85ebca6b;
-    h ^= h>>13;
-    h *= 0xc2b2ae35;
-    h ^= h>>16;
-    return h;
+    const uint8_t * tail = (const uint8_t*)(p + nblocks*16);
+    uint32_t k1 = 0;
+    uint32_t k2 = 0;
+    uint32_t k3 = 0;
+    uint32_t k4 = 0;
+    switch(len&15) {
+        case 15: k4 ^= tail[14] << 16;
+        case 14: k4 ^= tail[13] << 8;
+        case 13: k4 ^= tail[12] << 0;
+            k4 *= c4;
+            k4 = mag_rol32(k4,18);
+            k4 *= c1;
+            h4 ^= k4;
+        case 12: k3 ^= tail[11] << 24;
+        case 11: k3 ^= tail[10] << 16;
+        case 10: k3 ^= tail[9] << 8;
+        case 9: k3 ^= tail[8] << 0;
+            k3 *= c3;
+            k3 = mag_rol32(k3,17);
+            k3 *= c4;
+            h3 ^= k3;
+        case 8: k2 ^= tail[7] << 24;
+        case 7: k2 ^= tail[6] << 16;
+        case 6: k2 ^= tail[5] << 8;
+        case 5: k2 ^= tail[4] << 0;
+            k2 *= c2;
+            k2 = mag_rol32(k2,16);
+            k2 *= c3;
+            h2 ^= k2;
+        case 4: k1 ^= tail[3] << 24;
+        case 3: k1 ^= tail[2] << 16;
+        case 2: k1 ^= tail[1] << 8;
+        case 1: k1 ^= tail[0] << 0;
+            k1 *= c1;
+            k1 = mag_rol32(k1,15);
+            k1 *= c2;
+            h1 ^= k1;
+    };
+    h1 ^= len; h2 ^= len; h3 ^= len; h4 ^= len;
+    h1 += h2; h1 += h3; h1 += h4;
+    h2 += h1; h3 += h1; h4 += h1;
+    mag_mix32(h1); mag_mix32(h2); mag_mix32(h3); mag_mix32(h4);
+    h1 += h2; h1 += h3; h1 += h4;
+    h2 += h1; h3 += h1; h4 += h1;
+    return (((uint64_t)h2)<<32)|h1;
+    #undef mag_rol32
+    #undef mag_mix32
 }
 
 uint32_t mag_crc32c(const void* buffer, size_t size) {
@@ -3484,6 +3535,321 @@ uint32_t mag_crc32c(const void* buffer, size_t size) {
     for (size_t i=0; i < size; ++i)
         crc = (crc>>8) ^ crc_lut[buf[i] ^ (crc&0xff)];
     return ~crc;
+}
+
+typedef struct mag_bucket_t {
+    uint64_t hash : 48;
+    uint64_t dib : 16;
+} mag_bucket_t;
+mag_static_assert(sizeof(mag_bucket_t) == 8);
+
+struct mag_hashmap_t {
+    size_t elsize;
+    size_t cap;
+    uint32_t seed;
+    uint64_t (*hash)(const void* item, uint32_t seed);
+    bool (*cmp)(const void* a, const void* b, void* ud);
+    void (*elfree)(void* el);
+    void* ud;
+    size_t bucketsz;
+    size_t nbuckets;
+    size_t count;
+    size_t mask;
+    size_t growat;
+    size_t shrinkat;
+    uint8_t loadfactor;
+    uint8_t growpower;
+    bool oom;
+    void* buckets;
+    void* spare;
+    void* edata;
+    double grow_fac;
+    double shrink_fac;
+    double load_fac;
+};
+
+void mag_hashmap_set_grow_by_power(mag_hashmap_t* map, size_t pow) {
+    map->growpower = pow < 1 ? 1 : pow > 16 ? 16 : pow;
+}
+static double mag_hashmap_clamp_load_factor(double fac, double def) {
+    return isnan(fac) ? def : fac < 0.50 ? 0.50 : fac > 0.95 ? 0.95 : fac;
+}
+void mag_hashmap_set_load_factor(mag_hashmap_t* map, double factor) {
+    factor = mag_hashmap_clamp_load_factor(factor, map->loadfactor/100.0);
+    map->loadfactor = (uint8_t)(factor*100.0);
+    map->growat = (size_t)((double)map->nbuckets*(map->loadfactor/100.0));
+}
+static mag_bucket_t* mag_hashmap_bucket_at0(void* buckets, size_t bucketsz, size_t i) { return (mag_bucket_t*)((char*)buckets + bucketsz*i); }
+static mag_bucket_t* mag_hashmap_bucket_at(mag_hashmap_t* map, size_t index) { return mag_hashmap_bucket_at0(map->buckets, map->bucketsz, index); }
+static void* mag_hashmap_bucket_item(mag_bucket_t* entry) { return (char*)entry+sizeof(mag_bucket_t); }
+static uint64_t mag_hashmap_clip_hash(uint64_t hash) {return hash & 0xffffffffffff; }
+static uint64_t mag_hashmap_get_hash(mag_hashmap_t* map, const void* key) { return mag_hashmap_clip_hash((*map->hash)(key, map->seed)); }
+
+mag_hashmap_t* mag_hashmap_create(
+    size_t elsize,
+    size_t cap,
+    uint32_t seed,
+    uint64_t (*hash)(const void* item, uint32_t seed),
+    bool (*cmp)(const void* a, const void* b, void *ud),
+    void (*elfree)(void* el),
+    void* ud,
+    double grow_fac,
+    double shrink_fac,
+    double load_fac
+) {
+    grow_fac = grow_fac ? grow_fac : MAG_DEF_MAP_GROW_FACTOR;
+    shrink_fac = shrink_fac ? shrink_fac : MAG_DEF_MAP_SHRINK_FACTOR;
+    load_fac = load_fac ? load_fac : grow_fac;
+    size_t ncap = 16;
+    if (cap < ncap) cap = ncap;
+    else {
+        while (ncap < cap) ncap <<= 1;
+        cap = ncap;
+    }
+    size_t bsz = sizeof(mag_bucket_t)+elsize;
+    for (; bsz&7; ++bsz);
+    size_t sz = sizeof(mag_hashmap_t)+(bsz<<1);
+    mag_hashmap_t* map = (*mag_alloc)(NULL, sz);
+    memset(map, 0, sizeof(mag_hashmap_t));
+    map->elsize = elsize;
+    map->bucketsz = bsz;
+    map->seed = seed;
+    map->hash = hash;
+    map->cmp = cmp;
+    map->elfree = elfree;
+    map->ud = ud;
+    map->spare = (char*)map+sizeof(mag_hashmap_t);
+    map->edata = (char*)map->spare+bsz;
+    map->cap = cap;
+    map->nbuckets = cap;
+    map->mask = map->nbuckets-1;
+    map->grow_fac = grow_fac;
+    map->shrink_fac = shrink_fac;
+    map->load_fac = load_fac;
+    map->buckets = (*mag_alloc)(NULL, map->bucketsz*map->nbuckets);
+    memset(map->buckets, 0, map->bucketsz*map->nbuckets);
+    map->growpower = 1;
+    map->loadfactor = (uint8_t)(mag_hashmap_clamp_load_factor(map->load_fac, map->grow_fac) * 100.0);
+    map->growat = (size_t)((double)map->nbuckets*(map->loadfactor / 100.0));
+    map->shrinkat = (size_t)((double)map->nbuckets*map->shrink_fac);
+    return map;
+}
+
+static void mag_hashmap_free_elems(mag_hashmap_t* map) {
+    if (map->elfree) {
+        for (size_t i=0; i < map->nbuckets; i++) {
+            mag_bucket_t* bucket = mag_hashmap_bucket_at(map, i);
+            if (bucket->dib) map->elfree(mag_hashmap_bucket_item(bucket));
+        }
+    }
+}
+
+void mag_hashmap_clear(mag_hashmap_t* map, bool update_cap) {
+    map->count = 0;
+    mag_hashmap_free_elems(map);
+    if (update_cap) {
+        map->cap = map->nbuckets;
+    } else if (map->nbuckets != map->cap) {
+        void* nb = (*mag_alloc)(NULL, map->bucketsz*map->cap);
+        if (nb) {
+            (*mag_alloc)(map->buckets, 0);
+            map->buckets = nb;
+        }
+        map->nbuckets = map->cap;
+    }
+    memset(map->buckets, 0, map->bucketsz*map->nbuckets);
+    map->mask = map->nbuckets-1;
+    map->growat = (size_t)((double)map->nbuckets*(map->loadfactor / 100.0));
+    map->shrinkat = (size_t)((double)map->nbuckets*map->shrink_fac);
+}
+
+static bool mag_hashmap_resize0(mag_hashmap_t* map, size_t new_cap) {
+    mag_hashmap_t* map2 = mag_hashmap_create(
+        map->elsize,
+        new_cap,
+        map->seed,
+        map->hash,
+        map->cmp,
+        map->elfree,
+        map->ud,
+        map->grow_fac,
+        map->shrink_fac,
+        map->load_fac
+    );
+    for (size_t i=0; i < map->nbuckets; i++) {
+        mag_bucket_t* entry = mag_hashmap_bucket_at(map, i);
+        if (!entry->dib) {
+            continue;
+        }
+        entry->dib = 1;
+        size_t j = entry->hash & map2->mask;
+        while(1) {
+            mag_bucket_t* bucket = mag_hashmap_bucket_at(map2, j);
+            if (bucket->dib == 0) {
+                memcpy(bucket, entry, map->bucketsz);
+                break;
+            }
+            if (bucket->dib < entry->dib) {
+                memcpy(map2->spare, bucket, map->bucketsz);
+                memcpy(bucket, entry, map->bucketsz);
+                memcpy(entry, map2->spare, map->bucketsz);
+            }
+            j = (j+1) & map2->mask;
+            ++entry->dib;
+        }
+    }
+    (*mag_alloc)(map->buckets, 0);
+    map->buckets = map2->buckets;
+    map->nbuckets = map2->nbuckets;
+    map->mask = map2->mask;
+    map->growat = map2->growat;
+    map->shrinkat = map2->shrinkat;
+    (*mag_alloc)(map2, 0);
+    return true;
+}
+
+static bool mag_hashmap_resize(mag_hashmap_t* map, size_t new_cap) {
+    return mag_hashmap_resize0(map, new_cap);
+}
+
+const void* mag_hashmap_set_with_hash(mag_hashmap_t* map, const void* item, uint64_t hash) {
+    hash = mag_hashmap_clip_hash(hash);
+    map->oom = false;
+    if (map->count >= map->growat) {
+        if (!mag_hashmap_resize(map, map->nbuckets*(1<<map->growpower))) {
+            map->oom = true;
+            return NULL;
+        }
+    }
+    mag_bucket_t* entry = map->edata;
+    entry->hash = hash;
+    entry->dib = 1;
+    void* eitem = mag_hashmap_bucket_item(entry);
+    memcpy(eitem, item, map->elsize);
+    void* bitem;
+    size_t i = entry->hash&map->mask;
+    while(1) {
+        mag_bucket_t* bucket = mag_hashmap_bucket_at(map, i);
+        if (bucket->dib == 0) {
+            memcpy(bucket, entry, map->bucketsz);
+            ++map->count;
+            return NULL;
+        }
+        bitem = mag_hashmap_bucket_item(bucket);
+        if (entry->hash == bucket->hash && (!map->cmp || map->cmp(eitem, bitem, map->ud))) {
+            memcpy(map->spare, bitem, map->elsize);
+            memcpy(bitem, eitem, map->elsize);
+            return map->spare;
+        }
+        if (bucket->dib < entry->dib) {
+            memcpy(map->spare, bucket, map->bucketsz);
+            memcpy(bucket, entry, map->bucketsz);
+            memcpy(entry, map->spare, map->bucketsz);
+            eitem = mag_hashmap_bucket_item(entry);
+        }
+        i = (i+1) & map->mask;
+        ++entry->dib;
+    }
+}
+
+const void* mag_hashmap_set(mag_hashmap_t* map, const void* item) {
+    return mag_hashmap_set_with_hash(map, item, mag_hashmap_get_hash(map, item));
+}
+
+const void *mag_hashmap_get_with_hash(mag_hashmap_t* map, const void* key, uint64_t hash) {
+    hash = mag_hashmap_clip_hash(hash);
+    size_t i = hash&map->mask;
+    while(1) {
+        mag_bucket_t* bucket = mag_hashmap_bucket_at(map, i);
+        if (!bucket->dib) return NULL;
+        if (bucket->hash == hash) {
+            void* bitem = mag_hashmap_bucket_item(bucket);
+            if (!map->cmp || map->cmp(key, bitem, map->ud)) {
+                return bitem;
+            }
+        }
+        i = (i+1) & map->mask;
+    }
+}
+
+const void* mag_hashmap_get(mag_hashmap_t* map, const void* key) { return mag_hashmap_get_with_hash(map, key, mag_hashmap_get_hash(map, key)); }
+const void* mag_hashmap_probe(mag_hashmap_t* map, uint64_t position) {
+    size_t i = position & map->mask;
+    mag_bucket_t* bucket = mag_hashmap_bucket_at(map, i);
+    if (!bucket->dib) {
+        return NULL;
+    }
+    return mag_hashmap_bucket_item(bucket);
+}
+
+const void* mag_hashmap_delete_with_hash(mag_hashmap_t* map, const void* key, uint64_t hash) {
+    hash = mag_hashmap_clip_hash(hash);
+    map->oom = false;
+    size_t i = hash&map->mask;
+    while(1) {
+        mag_bucket_t* bucket = mag_hashmap_bucket_at(map, i);
+        if (!bucket->dib) {
+            return NULL;
+        }
+        void* bitem = mag_hashmap_bucket_item(bucket);
+        if (bucket->hash == hash && (!map->cmp || map->cmp(key, bitem, map->ud))) {
+            memcpy(map->spare, bitem, map->elsize);
+            bucket->dib = 0;
+            while(1) {
+                mag_bucket_t* prev = bucket;
+                i = (i+1) & map->mask;
+                bucket = mag_hashmap_bucket_at(map, i);
+                if (bucket->dib <= 1) {
+                    prev->dib = 0;
+                    break;
+                }
+                memcpy(prev, bucket, map->bucketsz);
+                prev->dib--;
+            }
+            map->count--;
+            if (map->nbuckets > map->cap && map->count <= map->shrinkat) {
+                mag_hashmap_resize(map, map->nbuckets>>1);
+            }
+            return map->spare;
+        }
+        i = (i+1) & map->mask;
+    }
+}
+
+const void *mag_hashmap_delete(mag_hashmap_t* map, const void* key) {
+    return mag_hashmap_delete_with_hash(map, key, mag_hashmap_get_hash(map, key));
+}
+
+size_t mag_hashmap_count(mag_hashmap_t* map) { return map->count; }
+
+void mag_hashmap_destroy(mag_hashmap_t* map) {
+    if (!map) return;
+    mag_hashmap_free_elems(map);
+    (*mag_alloc)(map->buckets, 0);
+    (*mag_alloc)(map, 0);
+}
+
+bool mag_hashmap_is_oom(mag_hashmap_t* map) { return map->oom; }
+
+bool mag_hashmap_scan(mag_hashmap_t* map, bool (*iter)(const void* item, void* ud), void* ud) {
+    for (size_t i=0; i < map->nbuckets; i++) {
+        mag_bucket_t* bucket = mag_hashmap_bucket_at(map, i);
+        if (bucket->dib && !iter(mag_hashmap_bucket_item(bucket), ud)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool mag_hashmap_iter(mag_hashmap_t* map, size_t* i, void** item) {
+    mag_bucket_t* bucket;
+    do {
+        if (*i >= map->nbuckets) return false;
+        bucket = mag_hashmap_bucket_at(map, *i);
+        (*i)++;
+    } while (!bucket->dib);
+    *item = mag_hashmap_bucket_item(bucket);
+    return true;
 }
 
 static const uint8_t* mag_validate_utf8(const uint8_t* s) {
@@ -3744,7 +4110,7 @@ typedef struct mag_tensor_bucket_t {
 
 struct mag_storage_stream_t {
     mag_ctx_t* ctx;
-    mag_tensor_bucket_t* tensors; /* TODO: currently O(n), replace with O(1) hashmap */
+    mag_tensor_bucket_t* tensors; /* TODO: currently O(n), replace with O(1) mag_hashmap_t */
     size_t tensors_num;
     size_t tensors_cap;
 };

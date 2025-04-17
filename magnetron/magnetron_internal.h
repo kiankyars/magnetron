@@ -950,8 +950,43 @@ static inline void mag_hash_combine(uint32_t* seed, uint32_t value) {
     *seed ^= value + 0x9e3779b9 + (*seed<<6) + (*seed>>2);
 }
 
-extern MAG_EXPORT uint32_t mag_hash(const void* key, size_t len, uint32_t seed); /* compute murmur3_32 hash */
+extern MAG_EXPORT uint64_t mag_hash(const void* key, size_t len, uint32_t seed); /* compute murmur3_32 hash */
 extern MAG_EXPORT uint32_t mag_crc32c(const void* buffer, size_t size); /* Compute CRC32 checksum with CRC32c polynomial. */
+
+#define MAG_DEF_MAP_GROW_FACTOR 0.6
+#define MAG_DEF_MAP_SHRINK_FACTOR 0.1
+#define MAG_DEF_MAP_LOAD_FACTOR MAG_DEF_MAP_GROW_FACTOR
+
+typedef struct mag_hashmap_t mag_hashmap_t;
+
+extern MAG_EXPORT mag_hashmap_t *mag_hashmap_create(
+    size_t elsize,
+    size_t cap,
+    uint32_t seed,
+    uint64_t (*hash)(const void* item, uint32_t seed),
+    bool (*cmp)(const void *a, const void* b, void* ud),
+    void (*elfree)(void* item),
+    void* ud,
+    double grow_fac,
+    double shrink_fac,
+    double load_fac
+);
+
+extern MAG_EXPORT void mag_hashmap_destroy(mag_hashmap_t* map);
+extern MAG_EXPORT void mag_hashmap_clear(mag_hashmap_t* map, bool update_cap);
+extern MAG_EXPORT size_t mag_hashmap_count(mag_hashmap_t* map);
+extern MAG_EXPORT bool mag_hashmap_is_oom(mag_hashmap_t* map);
+extern MAG_EXPORT const void* mag_hashmap_get(mag_hashmap_t* map, const void* item);
+extern MAG_EXPORT const void* mag_hashmap_set(mag_hashmap_t* map, const void* item);
+extern MAG_EXPORT const void* mag_hashmap_delete(mag_hashmap_t* map, const void* item);
+extern MAG_EXPORT const void* mag_hashmap_probe(mag_hashmap_t* map, uint64_t position);
+extern MAG_EXPORT bool mag_hashmap_scan(mag_hashmap_t* map, bool (*iter)(const void* item, void* ud), void* ud);
+extern MAG_EXPORT bool mag_hashmap_iter(mag_hashmap_t* map, size_t* i, void** item);
+extern MAG_EXPORT const void* mag_hashmap_get_with_hash(mag_hashmap_t* map, const void* key, uint64_t hash);
+extern MAG_EXPORT const void* mag_hashmap_delete_with_hash(mag_hashmap_t* map, const void* key, uint64_t hash);
+extern MAG_EXPORT const void* mag_hashmap_set_with_hash(mag_hashmap_t* map, const void* item, uint64_t hash);
+extern MAG_EXPORT void mag_hashmap_set_grow_by_power(mag_hashmap_t* map, size_t pow);
+extern MAG_EXPORT void mag_hashmap_set_load_factor(mag_hashmap_t* map, double load_factor);
 
 #ifdef __cplusplus
 }
