@@ -57,11 +57,8 @@ TEST(models, xor) {
     tensor y_hat {model(x)};
 
     std::vector<e8m23_t> output {y_hat.to_vector()};
-    for (auto r : output) {
-        std::cout << r << " ";
-    }
-    std::cout << std::endl;
-    for (auto r : y_data) {
-        std::cout << r[0] << " ";
+    ASSERT_EQ(y_data.size(), output.size());
+    for (std::int64_t i = 0; i < output.size(); ++i) {
+        ASSERT_EQ(y_data[i][0], std::round(output[i]));
     }
 }
