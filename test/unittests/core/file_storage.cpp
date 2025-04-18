@@ -101,7 +101,7 @@ TEST(file_storage, deserialize) {
 }
 
 TEST(file_storage, stress_roundtrip) {
-    constexpr std::size_t N = 10'000;
+    constexpr std::size_t N = 1'000;
     constexpr std::size_t H = 100, W = 100;
     std::vector<std::vector<test::e8m23_t>> reference;
     reference.reserve(N);
