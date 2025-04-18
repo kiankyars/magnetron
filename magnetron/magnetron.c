@@ -4305,3 +4305,25 @@ mag_tensor_t* mag_storage_stream_get_tensor(mag_storage_stream_t* st, const char
     }
     return NULL;
 }
+
+const char** mag_storage_stream_get_all_tensor_keys(mag_storage_stream_t* st, size_t* count) {
+    void* el;
+    *count = mag_hashmap_count(st->tensors);
+    char** keys = (*mag_alloc)(NULL, (*count+1)*sizeof(*keys));
+    size_t j=0;
+    for (size_t i=0; mag_hashmap_iter(st->tensors, &i, &el); ++j) {
+        mag_sto_tensor_kv_t* kv = (mag_sto_tensor_kv_t*)el;
+        char* clone = (*mag_alloc)(NULL, kv->key_len+1);
+        memcpy(clone, kv->key, kv->key_len);
+        clone[kv->key_len] = '\0';
+        keys[j] = clone;
+    }
+    keys[*count] = NULL; /* Null-terminate the array */
+    return (const char**)keys;
+}
+
+void mag_storage_stream_get_all_tensor_keys_free_data(const char** ret_val) {
+    for (const char** key = ret_val; *key; ++key)
+        (*mag_alloc)((void*)*key, 0);
+    (*mag_alloc)(ret_val, 0);
+}

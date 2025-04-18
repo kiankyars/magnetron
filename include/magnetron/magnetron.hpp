@@ -503,19 +503,30 @@ namespace magnetron {
         auto operator * () noexcept -> mag_storage_stream_t& { return *m_stream; }
         auto operator * () const noexcept -> const mag_storage_stream_t& { return *m_stream; }
 
-        auto put (const std::string& key, tensor value) -> void {
+        auto serialize(const std::string& file_path) -> void {
+            mag_storage_stream_serialize(m_stream, file_path.c_str());
+        }
+
+        auto put(const std::string& key, tensor value) -> void {
             mag_storage_stream_put_tensor(m_stream, key.c_str(), &*value);
         }
 
-        auto get (const std::string& key) -> std::optional<tensor> {
+        auto get(const std::string& key) -> std::optional<tensor> {
             if (auto* t = mag_storage_stream_get_tensor(m_stream, key.c_str())) {
                 return tensor{t};
             }
             return std::nullopt;
         }
 
-        auto serialize(const std::string& file_path) -> void {
-            mag_storage_stream_serialize(m_stream, file_path.c_str());
+        [[nodiscard]] auto all_tensor_keys() -> std::vector<std::string> {
+            std::size_t count {};
+            const char** keys {mag_storage_stream_get_all_tensor_keys(m_stream, &count)};
+            std::vector<std::string> result {};
+            result.reserve(count);
+            for (std::size_t i {}; i < count; ++i)
+                result.emplace_back(keys[i]);
+            mag_storage_stream_get_all_tensor_keys_free_data(keys);
+            return result;
         }
 
     private:

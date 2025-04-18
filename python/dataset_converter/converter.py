@@ -1,5 +1,7 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
+# This script converts datasets from industry adapted formats like pickle, safetensors, onnx etc. to the Magnetron data format.
+
 import magnetron as mag
 from magnetron.io import StorageStream
 from pathlib import Path

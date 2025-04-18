@@ -91,6 +91,17 @@ class StorageStream:
             return None
         return Tensor(handle)
 
+    def tensor_keys(self) -> list[str]:
+        """Returns a list of all tensor keys in the storage stream."""
+        count: _ffi.CData = _ffi.new('size_t[1]')
+        keys: _ffi.CData = _C.mag_storage_stream_get_all_tensor_keys(self._ptr, count)
+        result: list[str] = []
+        print(count[0])
+        for i in range(count[0]):
+            result.append(_ffi.string(keys[i]).decode('utf-8'))
+        _C.mag_storage_stream_get_all_tensor_keys_free_data(keys) # Free the keys data
+        return result
+
     def __getitem__(self, key: str) -> Tensor:
         """Retrieves a tensor from the storage stream."""
         tensor: Tensor | None = self.get(key)

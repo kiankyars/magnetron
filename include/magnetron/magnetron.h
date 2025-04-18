@@ -419,6 +419,8 @@ extern MAG_EXPORT void mag_storage_stream_close(mag_storage_stream_t* _Nonnull s
 
 extern MAG_EXPORT bool mag_storage_stream_put_tensor(mag_storage_stream_t* _Nonnull st, const char* _Nonnull key, mag_tensor_t* _Nonnull t);
 extern MAG_EXPORT mag_tensor_t* _Nullable mag_storage_stream_get_tensor(mag_storage_stream_t* _Nonnull st, const char* _Nonnull key);
+extern MAG_EXPORT const char* _Nonnull* _Nonnull mag_storage_stream_get_all_tensor_keys(mag_storage_stream_t* _Nonnull st, size_t* _Nonnull count);
+extern MAG_EXPORT void mag_storage_stream_get_all_tensor_keys_free_data(const char* _Nonnull* _Nonnull ret_val);
 
 #ifdef __cplusplus
 }

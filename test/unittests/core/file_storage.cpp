@@ -30,6 +30,9 @@ TEST(file_storage, put_get_tensor) {
     ASSERT_EQ(stream.get("tensor_b").value().dtype(), dtype::f32);
     ASSERT_EQ(stream.get("tensor_b").value().shape()[0], 4);
     ASSERT_EQ(stream.get("tensor_b").value().shape()[1], 4);
+    ASSERT_EQ(stream.all_tensor_keys().size(), 2);
+    ASSERT_EQ(stream.all_tensor_keys()[0], "tensor_a");
+    ASSERT_EQ(stream.all_tensor_keys()[1], "tensor_b");
 }
 
 TEST(file_storage, serialize) {
@@ -39,6 +42,7 @@ TEST(file_storage, serialize) {
     tensor b {ctx, dtype::f32, 4, 4};
     stream.put("tensor_a", a);
     stream.put("tensor_b", b);
+    ASSERT_EQ(stream.all_tensor_keys().size(), 2);
 
     stream.serialize("test_storage.mag");
     ASSERT_TRUE(std::filesystem::exists("test_storage.mag"));

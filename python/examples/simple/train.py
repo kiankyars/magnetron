@@ -1,6 +1,7 @@
 import gzip, pickle, urllib.request, random, time
 from pathlib import Path
 
+import numpy
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -43,7 +44,7 @@ for epoch in range(EPOCHS):
         acc = (pred == test_labels).float().mean().item()
     print(f'epoch {epoch + 1}/{EPOCHS}, acc {acc:.4f}')
 
-data = {
+data: dict[str, list[float]] = {
     'fc1_w': net[0].weight.detach().numpy().tolist(),
     'fc1_b': net[0].bias.detach().numpy().tolist(),
     'fc2_w': net[2].weight.detach().numpy().tolist(),
@@ -54,7 +55,6 @@ data = {
 
 stream = StorageStream()
 for key in data:
-    tensor = mag.Tensor.from_data(data[key])
-    print(f'key: {key}, shape: {tensor.shape}, dtype: {tensor.dtype}')
-    stream[key] = tensor
+    stream[key] = mag.Tensor.from_data(data[key])
 stream.serialize('mnist_full_e8m23.mag')
+print(stream.tensor_keys())
