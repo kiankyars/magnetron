@@ -99,3 +99,76 @@ TEST(file_storage, deserialize) {
         ASSERT_TRUE(std::filesystem::remove("test_storage2.mag"));
    }
 }
+
+TEST(file_storage, stress_roundtrip) {
+    constexpr std::size_t N = 10'000;
+    constexpr std::size_t H = 100, W = 100;
+    std::vector<std::vector<test::e8m23_t>> reference;
+    reference.reserve(N);
+
+    // --- write & serialize ---
+    double serialize_time = 0.0;
+    {
+        context ctx{compute_device::cpu};
+        storage_stream writer{ctx};
+
+        std::random_device rd{};
+        std::mt19937 gen{rd()};
+        std::uniform_real_distribution<float> dist{-1.0f, 1000.0f};
+
+        for (std::size_t i = 0; i < N; ++i) {
+            tensor t{ctx, dtype::f32, H, W};
+            // fill and capture
+            std::vector<test::e8m23_t> data(H * W);
+            for (auto &x : data) x = dist(gen);
+            t.fill_from(data);
+
+            reference.push_back(std::move(data));
+            writer.put(std::to_string(i), t);
+        }
+
+        auto t0 = std::chrono::high_resolution_clock::now();
+        writer.serialize("large_storage.mag");
+        auto t1 = std::chrono::high_resolution_clock::now();
+        serialize_time = std::chrono::duration<double>(t1 - t0).count();
+
+        ASSERT_TRUE(std::filesystem::exists("large_storage.mag"));
+    }
+    std::cout << "[perf] serialize(" << N << "×" << H << "×" << W << "): "
+              << serialize_time << " s\n";
+
+    // --- deserialize & verify ---
+    double deserialize_time = 0.0;
+    {
+        auto t0 = std::chrono::high_resolution_clock::now();
+        context ctx{compute_device::cpu};
+        storage_stream reader{ctx, "large_storage.mag"};
+        for (std::size_t i = 0; i < N; ++i) {
+            auto opt = reader.get(std::to_string(i)); /* Pre lazy load tensor */
+        }
+        auto t1 = std::chrono::high_resolution_clock::now();
+
+
+        {
+            for (std::size_t i = 0; i < N; ++i) {
+                auto opt = reader.get(std::to_string(i));
+                ASSERT_TRUE(opt.has_value()) << "Missing tensor " << i;
+                tensor t = *opt;
+                auto loaded = t.to_vector();
+                auto &orig = reference[i];
+                ASSERT_EQ(loaded.size(), orig.size())
+                    << "Size mismatch at tensor " << i;
+                for (size_t j = 0; j < loaded.size(); ++j) {
+                    ASSERT_FLOAT_EQ(loaded[j], orig[j])
+                        << "Mismatch at tensor " << i << ", element " << j;
+                }
+            }
+        }
+
+        std::cout << "[perf] deserialize: "
+                  << std::chrono::duration<double>(t1 - t0).count()
+                  << " s\n";
+
+        ASSERT_TRUE(std::filesystem::remove("large_storage.mag"));
+    }
+}

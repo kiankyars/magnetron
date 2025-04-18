@@ -13,9 +13,10 @@
 #include <gmock/gmock.h>
 
 #include "prelude.hpp"
-using namespace testing;
 
 #include <half.hpp>
+
+using namespace testing;
 
 namespace magnetron::test {
     using e8m23_t = float;
