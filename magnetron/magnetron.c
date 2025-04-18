@@ -3852,32 +3852,33 @@ bool mag_hashmap_iter(mag_hashmap_t* map, size_t* i, void** item) {
     return true;
 }
 
-static const uint8_t* mag_utf8_validate(const uint8_t* s) {
-    while (*s) {
-        if (*s < 0x80) ++s;                                 /* 0xxxxxxx */
-        else if ((*s&0xe0) == 0xc0) {                       /* 110XXXXx - 10xxxxxx */
-            if ((s[1]&0xc0) != 0x80 || (*s&0xfe) == 0xc0)   /* Is an overlong sequence? */
-                return s;
-            s += 2;
-        } else if ((*s&0xf0) == 0xe0) {                     /* 1110XXXX - 10Xxxxxx - 10xxxxxx */
-            if ((s[1]&0xc0) != 0x80 ||
-                (s[2]&0xc0) != 0x80 ||
-                (*s == 0xe0 && (s[1]&0xe0) == 0x80) ||      /* Is an overlong sequence? */
-                (*s == 0xed && (s[1]&0xe0) == 0xa0) ||      /* Is a surrogate? */
-                (*s == 0xef && s[1] == 0xbf &&
-                 (s[2]&0xfe) == 0xbe))                      /* U+FFFE or U+FFFF? */
-                 return s;
-            s += 3;
-        } else if ((*s & 0xf8) == 0xf0) {                   /* 11110XXX - 10XXxxxx - 10xxxxxx - 10xxxxxx */
-            if ((s[1]&0xc0) != 0x80 ||
-                (s[2]&0xc0) != 0x80 ||
-                (s[3]&0xc0) != 0x80 ||
-                (*s == 0xf0 && (s[1]&0xf0) == 0x80) ||      /* Is an overlong sequence? */
-                (*s == 0xf4 && s[1] > 0x8f) || *s > 0xf4)   /* > U+10FFFF? */
-                return s;
-            s += 4;
-        } else
-            return s;
+static const uint8_t* mag_utf8_validate(const uint8_t* restrict s, const uint8_t* restrict end) {
+    const uint8_t* p = s;
+    while (p < end) {
+        uint8_t c = *p;
+        if (c < 0x80) { ++p; continue; }
+        if ((c & 0xe0) == 0xc0) {
+            if (p+1 >= end) return p;
+            uint8_t b1 = p[1];
+            if ((b1 & 0xc0) != 0x80 || (c & 0xfe) == 0xc0) return p;
+            p += 2;
+        } else if ((c & 0xf0) == 0xe0) {
+            if (p+2 >= end) return p;
+            uint8_t b1 = p[1], b2 = p[2];
+            if ((b1 & 0xc0) != 0x80 || (b2 & 0xc0) != 0x80) return p;
+            if (c == 0xe0 && (b1 & 0xe0) == 0x80) return p;
+            if (c == 0xeD && (b1 & 0xe0) == 0xa0) return p;
+            p += 3;
+        } else if ((c & 0xf8) == 0xf0) {
+            if (p+3 >= end) return p;
+            uint8_t b1 = p[1], b2 = p[2], b3 = p[3];
+            if ((b1 & 0xc0) != 0x80 || (b2 & 0xc0) != 0x80 || (b3 & 0xc0) != 0x80) return p;
+            if (c == 0xf0 && (b1 & 0xf0) == 0x80) return p;
+            if ((c == 0xf4 && b1 > 0x8f) || c > 0xf4) return p;
+            p += 4;
+            continue;
+        }
+        return p;
     }
     return NULL;
 }
@@ -4005,14 +4006,14 @@ static bool mag_sto_read_file_hdr(FILE* f, uint32_t* num_tensors, uint32_t* num_
 static bool mag_sto_write_tensor_hdr(
     FILE* f,
     const uint8_t* key,
+    size_t key_len,
     const int64_t(*shape)[MAG_MAX_DIMS],
     const uint8_t (*name)[MAG_MAX_TENSOR_NAME_LEN],
     int64_t rank,
     mag_dtype_t dtype
 ) {
     long start = ftell(f);
-    mag_sto_sanitize(!mag_utf8_validate(key), "invalid utf8-8 in tensor key", return false);
-    size_t key_len = mag_utf8_strlen(key);
+    mag_sto_sanitize(!mag_utf8_validate(key, key+key_len), "invalid utf8-8 in tensor key", return false);
     mag_sto_sanitize(key_len > 0 && key_len <= MAG_STO_MAX_KEY_LEN, "invalid key length", return false);
     mag_sto_sanitize(mag_sto_write_u32_le(f, key_len), "failed to write key length", return false); /* Write key length */
     for (int i=0; i < MAG_MAX_DIMS; ++i) /* Write shape */
@@ -4020,7 +4021,7 @@ static bool mag_sto_write_tensor_hdr(
     uint32_t aux;
     mag_sto_sanitize(mag_pack_aux32(&aux, 0, 0, rank, dtype), "failed to pack aux", return false);
     mag_sto_sanitize(mag_sto_write_u32_le(f, aux), "failed to write aux", return false); /* Write aux */
-    mag_sto_sanitize(!mag_utf8_validate(*name), "invalid utf8-8 in tensor name", return false);
+    mag_sto_sanitize(!mag_utf8_validate(*name, *name+sizeof(name)), "invalid utf8-8 in tensor name", return false);
     mag_sto_sanitize(fwrite(name, MAG_MAX_TENSOR_NAME_LEN, 1, f) == 1, "failed to write name", return false); /* Write name */
     mag_sto_sanitize(fwrite(key, key_len, 1, f) == 1, "failed to write key", return false); /* Write key */
     long end = ftell(f);
@@ -4058,18 +4059,18 @@ static bool mag_sto_read_tensor_hdr(
     mag_sto_sanitize(mag_unpack_aux(aux, &unused0, &unused1, rank, dtype), "failed to unpack aux", return false);
     mag_sto_sanitize(*rank >= 1 && *rank <= MAG_MAX_DIMS, "invalid rank", return false);
     mag_sto_sanitize(*dtype >= 0 && *dtype < MAG_DTYPE__NUM, "invalid dtype", return false);
-    for (int i=0; i < MAG_MAX_TENSOR_NAME_LEN>>3; ++i) {
+    for (int i=0; i < MAG_MAX_TENSOR_NAME_LEN>>3; ++i) { /* todo read individual chars */
         uint64_t packed;
         mag_sto_sanitize(mag_sto_read_u64_le(f, &packed), "failed to read name", return false);
         memcpy(*name+(i<<3), &packed, sizeof(packed));
     }
     (*name)[MAG_MAX_TENSOR_NAME_LEN-1] = 0; /* Ensure null termination */
-    mag_sto_sanitize(!mag_utf8_validate(*name), "invalid utf8-8 in tensor name", return false);
+    mag_sto_sanitize(!mag_utf8_validate(*name, *name+sizeof(name)), "invalid utf8-8 in tensor name", return false);
     *key = (*mag_alloc)(NULL, key_len+1); /* Allocate key */
     mag_sto_sanitize(fread(*key, key_len, 1, f) == 1, "failed to read key", return false); /* Read key */
     (*key)[key_len] = '\0'; /* Ensure null termination */
     mag_sto_sanitize(*key, "empty key", false);
-    mag_sto_sanitize(!mag_utf8_validate(*key), "invalid utf8-8 in tensor key", return false);
+    mag_sto_sanitize(!mag_utf8_validate(*key, *key+key_len), "invalid utf8-8 in tensor key", return false);
     long end = ftell(f);
     mag_sto_sanitize(end - start == MAG_STO_TENSOR_HDR_SIZE+key_len, "invalid tensor header size", return false);
     return true;
@@ -4181,7 +4182,7 @@ bool mag_storage_stream_serialize(mag_storage_stream_t* st, const char* path) {
         const mag_sto_tensor_kv_t* bucket = (const mag_sto_tensor_kv_t*)el;
         mag_tensor_t* tensor = bucket->tensor;
         mag_sto_sanitize(
-            mag_sto_write_tensor_hdr(f, bucket->key, &tensor->shape, &tensor->name, tensor->rank, tensor->dtype),
+            mag_sto_write_tensor_hdr(f, bucket->key, bucket->key_len, &tensor->shape, &tensor->name, tensor->rank, tensor->dtype),
             "failed to write tensor header",
             goto cleanup
         );
