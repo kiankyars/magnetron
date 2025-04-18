@@ -233,6 +233,7 @@ static void mag_worker_exec_thread_local(const mag_kernel_registry_t* kernels, m
         = payload->gra_eval == MAG_GRA_INIT
         ? kernels->init[iop][dtype] : payload->gra_eval == MAG_GRA_FWD
         ? kernels->fwd[op][dtype] : kernels->bwd[op][dtype];
+    mag_assert(kernel, "no kernel found for op '%s' (iop #%d) with dtype %s", mag_op_meta_of(op)->mnemonic, iop, mag_dtype_meta_of(dtype)->name);
     (*kernel)(payload);
     payload->node = NULL;
 }

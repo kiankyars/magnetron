@@ -505,7 +505,7 @@ static void mag_blas_init_rand_normal_e5m10(const mag_compute_payload_t* payload
             } \
             mag_bnd_chk(bx+xoff, bx, mag_tensor_get_data_size(x)); \
             mag_bnd_chk(br+roff, br, mag_tensor_get_data_size(r)); \
-            br[roff] = mag_##T##_s##FUNC(bx[xoff], xi); \
+            br[roff] = mag_##T##_ss##FUNC(bx[xoff], xi); \
         } \
     }
 
@@ -530,6 +530,11 @@ static void mag_blas_init_rand_normal_e5m10(const mag_compute_payload_t* payload
 #define mag_e8m23_smul(x, y) ((x)*(y))
 #define mag_e8m23_sdiv(x, y) ((x)/(y))
 #define mag_e8m23_spow(x, y) (powf((x), (y)))
+#define mag_e8m23_ssadd(x, y) ((x)+(y))
+#define mag_e8m23_sssub(x, y) ((x)-(y))
+#define mag_e8m23_ssmul(x, y) ((x)*(y))
+#define mag_e8m23_ssdiv(x, y) ((x)/(y))
+#define mag_e8m23_sspow(x, y) (powf((x), (y)))
 #define mag_e8m23_sabs(x) (fabs(x))
 #define mag_e8m23_sneg(x) (-(x))
 #define mag_e8m23_slog(x) (logf(x))
@@ -644,6 +649,11 @@ static void MAG_HOTPROC mag_blas_softmax_e8m23(const mag_compute_payload_t* payl
 #define mag_e5m10_smul(x, y) mag_e8m23_cvt_e5m10(mag_e8m23_smul(mag_e5m10_cvt_e8m23(x), mag_e5m10_cvt_e8m23(y)))
 #define mag_e5m10_sdiv(x, y) mag_e8m23_cvt_e5m10(mag_e8m23_sdiv(mag_e5m10_cvt_e8m23(x), mag_e5m10_cvt_e8m23(y)))
 #define mag_e5m10_spow(x, y) mag_e8m23_cvt_e5m10(mag_e8m23_spow(mag_e5m10_cvt_e8m23(x), mag_e5m10_cvt_e8m23(y)))
+#define mag_e5m10_ssadd(x, y) mag_e8m23_cvt_e5m10(mag_e8m23_sadd(mag_e5m10_cvt_e8m23(x), y))
+#define mag_e5m10_sssub(x, y) mag_e8m23_cvt_e5m10(mag_e8m23_ssub(mag_e5m10_cvt_e8m23(x), y))
+#define mag_e5m10_ssmul(x, y) mag_e8m23_cvt_e5m10(mag_e8m23_smul(mag_e5m10_cvt_e8m23(x), y))
+#define mag_e5m10_ssdiv(x, y) mag_e8m23_cvt_e5m10(mag_e8m23_sdiv(mag_e5m10_cvt_e8m23(x), y))
+#define mag_e5m10_sspow(x, y) mag_e8m23_cvt_e5m10(mag_e8m23_spow(mag_e5m10_cvt_e8m23(x), y))
 #define mag_e5m10_sabs(x) mag_e8m23_cvt_e5m10(mag_e8m23_sabs(mag_e5m10_cvt_e8m23(x)))
 #define mag_e5m10_sneg(x) mag_e8m23_cvt_e5m10(mag_e8m23_sneg(mag_e5m10_cvt_e8m23(x)))
 #define mag_e5m10_slog(x) mag_e8m23_cvt_e5m10(mag_e8m23_slog(mag_e5m10_cvt_e8m23(x)))
@@ -689,15 +699,35 @@ mag_cpu_blas_impl_unary(e5m10, relu)
 mag_cpu_blas_impl_unary(e5m10, relu_dv)
 mag_cpu_blas_impl_unary(e5m10, gelu)
 mag_cpu_blas_impl_unary(e5m10, gelu_dv)
-//mag_cpu_blas_impl_unary_scalar(e5m10, add)
-//mag_cpu_blas_impl_unary_scalar(e5m10, sub)
-//mag_cpu_blas_impl_unary_scalar(e5m10, mul)
-//mag_cpu_blas_impl_unary_scalar(e5m10, div)
-//mag_cpu_blas_impl_unary_scalar(e5m10, pow)
+mag_cpu_blas_impl_unary_scalar(e5m10, add)
+mag_cpu_blas_impl_unary_scalar(e5m10, sub)
+mag_cpu_blas_impl_unary_scalar(e5m10, mul)
+mag_cpu_blas_impl_unary_scalar(e5m10, div)
+mag_cpu_blas_impl_unary_scalar(e5m10, pow)
 mag_cpu_blas_impl_binary(e5m10, add)
 mag_cpu_blas_impl_binary(e5m10, sub)
 mag_cpu_blas_impl_binary(e5m10, mul)
 mag_cpu_blas_impl_binary(e5m10, div)
+
+mag_cpu_blas_impl_reduce( \
+    e5m10, sum, mag_e8m23_t, 0.0f, \
+    acc += mag_e5m10_cvt_e8m23(bx[off]);, \
+    *br = mag_e8m23_cvt_e5m10(acc); )
+
+mag_cpu_blas_impl_reduce( \
+    e5m10, mean, mag_e8m23_t, 0.0f, \
+    acc += mag_e5m10_cvt_e8m23(bx[off]);, \
+    acc /= (mag_e8m23_t)x->numel; *br = mag_e8m23_cvt_e5m10(acc); )
+
+mag_cpu_blas_impl_reduce( \
+    e5m10, min, mag_e8m23_t, INFINITY, \
+    acc = fminf(acc, mag_e5m10_cvt_e8m23(bx[off]));, \
+    *br = mag_e8m23_cvt_e5m10(acc); )
+
+mag_cpu_blas_impl_reduce( \
+    e5m10, max, mag_e8m23_t, -INFINITY, \
+    acc = fmaxf(acc, mag_e5m10_cvt_e8m23(bx[off]));, \
+    *br = mag_e8m23_cvt_e5m10(acc); )
 
 #undef mag_cpu_blas_impl_unary_scalar
 #undef mag_cpu_blas_impl_unary
@@ -796,6 +826,80 @@ static void MAG_HOTPROC mag_blas_matmul_e8m23(const mag_compute_payload_t* paylo
     (*mag_alloc)(rbuf, 0);
 }
 
+static void MAG_HOTPROC mag_blas_matmul_e5m10(const mag_compute_payload_t* payload) {
+    if (payload->thread_idx != 0) return;
+    mag_tensor_t* r = payload->node;
+    const mag_tensor_t* x = r->op_inputs[0];
+    const mag_tensor_t* y = r->op_inputs[1];
+    mag_e5m10_t* br = mag_e5m10p_mut(r);
+    const mag_e5m10_t* bx = mag_e5m10p(x);
+    const mag_e5m10_t* by = mag_e5m10p(y);
+    int64_t M, N, K;
+    if (r->rank == 1) {
+        M = r->shape[0];
+        N = 1;
+    } else {
+        M = r->shape[r->rank - 2];
+        N = r->shape[r->rank - 1];
+    }
+    K = x->shape[x->rank - 1];
+    int64_t batch = (r->rank == 3) ? r->shape[0] : 1;
+    int64_t bx_batch = (x->rank == 3) ? x->shape[0] : 1;
+    int64_t by_batch = (y->rank == 3) ? y->shape[0] : 1;
+    bool x_row = mag_tensor_is_contiguous(x) && x->strides[x->rank-1] == 1;
+    bool y_row = mag_tensor_is_contiguous(y) && (y->rank == 1 || y->strides[y->rank-1] == 1);
+    bool r_row = mag_tensor_is_contiguous(r) && (r->rank == 1 || r->strides[r->rank-1] == 1);
+    VLA(mag_e5m10_t, xbuf, M * K);
+    VLA(mag_e5m10_t, ybuf, K * N);
+    VLA(mag_e5m10_t, rbuf, M * N);
+    for (int64_t b=0; b < batch; ++b) {
+        int64_t xb = bx_batch == 1 ? 0 : b;
+        int64_t yb = by_batch == 1 ? 0 : b;
+        const mag_e5m10_t* px = bx + mag_offset_rmn(x, xb, 0, 0);
+        const mag_e5m10_t* py = by + mag_offset_rmn(y, yb, 0, 0);
+        mag_e5m10_t* pr = br + mag_offset_rmn(r,  b,  0, 0);
+        const mag_e5m10_t* A = px;
+        if (!x_row) { /* pack / broadcast X if needed */
+            for (int64_t i=0; i < M; ++i) {
+                for (int64_t k=0; k < K; ++k) {
+                    size_t j = mag_offset_rmn(x, xb, i, k);
+                    mag_bnd_chk(px+j, bx, mag_tensor_get_data_size(x));
+                    mag_bnd_chk(xbuf + i*K + k, xbuf, M*K*sizeof(*xbuf));
+                    xbuf[i*K + k] = px[j];
+                }
+            }
+            A = xbuf;
+        }
+        const mag_e5m10_t* B = py;
+        if (!y_row) { /* pack / broadcast Y if needed */
+            for (int64_t k=0; k < K; ++k) {
+                for (int64_t n=0; n < N; ++n) {
+                    ybuf[k*N + n] = y->rank == 1 ? py[k] : py[mag_offset_rmn(y, yb, k, n)];
+                }
+            }
+            B = ybuf;
+        }
+        mag_e5m10_t* C = r_row ? pr : rbuf;
+        for (int64_t i=0; i < M; ++i) { /* Standard SGEMM */
+            for (int64_t n=0; n < N; ++n) {
+                mag_e8m23_t acc = 0.0f;
+                for (int64_t k=0; k < K; ++k) {
+                    acc += mag_e5m10_cvt_e8m23(A[i*K + k])*mag_e5m10_cvt_e8m23(B[k*N + n]);
+                }
+                C[i*N + n] = mag_e8m23_cvt_e5m10(acc);
+            }
+        }
+        if (!r_row) { /* Scatter back R if needed */
+            for (int64_t i=0; i < M; ++i)
+                for (int64_t n=0; n < N; ++n)
+                    pr[mag_offset_rmn(r, b, i, n)] = rbuf[i*N + n];
+        }
+    }
+    (*mag_alloc)(xbuf, 0);
+    (*mag_alloc)(ybuf, 0);
+    (*mag_alloc)(rbuf, 0);
+}
+
 static void MAG_HOTPROC  mag_blas_repeat_back_e8m23(const mag_compute_payload_t* payload) {
     if (payload->thread_idx != 0) return;
     mag_tensor_t* r = payload->node;
@@ -825,9 +929,33 @@ static void MAG_HOTPROC  mag_blas_repeat_back_e8m23(const mag_compute_payload_t*
     }
 }
 
-
 static void MAG_HOTPROC mag_blas_repeat_back_e5m10(const mag_compute_payload_t* payload) {
-    mag_panic("NYI");
+    if (payload->thread_idx != 0) return;
+    mag_tensor_t* r = payload->node;
+    const mag_tensor_t* x = r->op_inputs[0];
+    mag_e5m10_t* br = mag_e5m10p_mut(r);
+    const mag_e5m10_t* bx = mag_e5m10p(x);
+    for (int64_t i=0; i < r->numel; ++i)
+        br[mag_offset_from_flat(r, i)].bits = 0;
+    int64_t rx = r->rank;
+    int64_t xx = x->rank;
+    int64_t shift = xx - rx;
+    for (int64_t flat=0; flat < x->numel; ++flat) {
+        int64_t tmp = flat;
+        int64_t xoff = 0;
+        int64_t roff = 0;
+        for (int64_t d = xx-1; d >= 0; --d) {
+            int64_t coord = tmp % x->shape[d];
+            tmp /= x->shape[d];
+            xoff += coord * x->strides[d];
+            int64_t rd = d - shift;
+            if (rd >= 0) {
+                int64_t rcoord = coord % r->shape[rd];
+                roff += rcoord * r->strides[rd];
+            }
+        }
+        br[roff] = mag_e8m23_cvt_e5m10(mag_e5m10_cvt_e8m23(br[roff]) + mag_e5m10_cvt_e8m23(bx[xoff]));
+    }
 }
 
 #ifndef MAG_BLAS_SPECIALIZATION
@@ -1035,19 +1163,19 @@ static void (*const mag_blas_lut_forward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(c
     },
     [MAG_OP_MEAN] = {
         [MAG_DTYPE_E8M23] = &mag_blas_mean_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_mean_e5m10,
     },
     [MAG_OP_MIN] = {
         [MAG_DTYPE_E8M23] = &mag_blas_min_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_min_e5m10,
     },
     [MAG_OP_MAX] = {
         [MAG_DTYPE_E8M23] = &mag_blas_max_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_max_e5m10,
     },
     [MAG_OP_SUM] = {
         [MAG_DTYPE_E8M23] = &mag_blas_sum_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_sum_e5m10,
     },
     [MAG_OP_ABS] = {
         [MAG_DTYPE_E8M23] = &mag_blas_abs_e8m23,
@@ -1155,27 +1283,27 @@ static void (*const mag_blas_lut_forward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(c
     },
     [MAG_OP_ADDS] = {
         [MAG_DTYPE_E8M23] = &mag_blas_adds_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_adds_e5m10,
     },
     [MAG_OP_SUBS] = {
         [MAG_DTYPE_E8M23] = &mag_blas_subs_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_subs_e5m10,
     },
     [MAG_OP_MULS] = {
         [MAG_DTYPE_E8M23] = &mag_blas_muls_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_muls_e5m10,
     },
     [MAG_OP_DIVS] = {
         [MAG_DTYPE_E8M23] = &mag_blas_divs_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_divs_e5m10,
     },
     [MAG_OP_POWS] = {
         [MAG_DTYPE_E8M23] = &mag_blas_pows_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_pows_e5m10,
     },
     [MAG_OP_MATMUL] = {
         [MAG_DTYPE_E8M23] = &mag_blas_matmul_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_matmul_e5m10,
     },
     [MAG_OP_REPEAT_BACK] = {
         [MAG_DTYPE_E8M23] = &mag_blas_repeat_back_e8m23,
@@ -1206,19 +1334,19 @@ static void (*const mag_blas_lut_backward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(
     },
     [MAG_OP_MEAN] = {
         [MAG_DTYPE_E8M23] = &mag_blas_mean_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_mean_e5m10,
     },
     [MAG_OP_MIN] = {
         [MAG_DTYPE_E8M23] = &mag_blas_min_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_min_e5m10,
     },
     [MAG_OP_MAX] = {
         [MAG_DTYPE_E8M23] = &mag_blas_max_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_max_e5m10,
     },
     [MAG_OP_SUM] = {
         [MAG_DTYPE_E8M23] = &mag_blas_sum_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_sum_e5m10,
     },
     [MAG_OP_ABS] = {
         [MAG_DTYPE_E8M23] = &mag_blas_abs_e8m23,
@@ -1326,27 +1454,27 @@ static void (*const mag_blas_lut_backward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(
     },
     [MAG_OP_ADDS] = {
         [MAG_DTYPE_E8M23] = &mag_blas_adds_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_adds_e5m10,
     },
     [MAG_OP_SUBS] = {
         [MAG_DTYPE_E8M23] = &mag_blas_subs_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_subs_e5m10,
     },
     [MAG_OP_MULS] = {
         [MAG_DTYPE_E8M23] = &mag_blas_muls_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_muls_e5m10,
     },
     [MAG_OP_DIVS] = {
         [MAG_DTYPE_E8M23] = &mag_blas_divs_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_divs_e5m10,
     },
     [MAG_OP_POWS] = {
         [MAG_DTYPE_E8M23] = &mag_blas_pows_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_pows_e5m10,
     },
     [MAG_OP_MATMUL] = {
         [MAG_DTYPE_E8M23] = &mag_blas_matmul_e8m23,
-        [MAG_DTYPE_E5M10] = NULL,
+        [MAG_DTYPE_E5M10] = &mag_blas_matmul_e5m10,
     },
     [MAG_OP_REPEAT_BACK] = {
         [MAG_DTYPE_E8M23] = &mag_blas_repeat_back_e8m23,

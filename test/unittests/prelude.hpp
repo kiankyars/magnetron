@@ -249,15 +249,15 @@ namespace magnetron::test {
         // Linear/Dense layer
         class linear_layer final : public module {
         public:
-            linear_layer(context& ctx, std::int64_t in_features, std::int64_t out_features, bool has_bias = true) {
-                tensor weight {ctx, dtype::e8m23, out_features, in_features};
+            linear_layer(context& ctx, std::int64_t in_features, std::int64_t out_features, dtype type = dtype::e8m23, bool has_bias = true) {
+                tensor weight {ctx, type, out_features, in_features};
                 weight.set_name("weight");
                 weight.fill_rand_normal(0.0f, 1.0f);
                 tensor weight2 = weight/static_cast<e8m23_t>(std::sqrt(in_features + out_features));
                 register_param(weight2);
                 this->weight = weight2;
                 if (has_bias) {
-                    tensor bias {ctx, dtype::e8m23, out_features};
+                    tensor bias {ctx, type, out_features};
                     bias.fill(0);
                     bias.set_name("bias");
                     register_param(bias);

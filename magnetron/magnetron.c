@@ -927,6 +927,26 @@ static bool mag_check_are_op_params_valid(mag_op_t op, const mag_opp_t* params, 
     return true;
 }
 
+static bool mag_check_are_dtypes_compatible(mag_op_t op, const mag_tensor_t* a, const mag_tensor_t* b) {
+    const mag_op_meta_t* meta = mag_op_meta_of(op);
+    if (mag_likely(a->dtype == b->dtype)) return true;
+    mag_print_separator(stderr);
+    fprintf(stderr,
+        "Failed to execute operation: %s.\n"
+        "ERROR: Input tensor dtypes are not compatible.\n"
+        "    - Tensor 1 '%s' Datatype: %s\n"
+        "    - Tensor 2 '%s' Datatype: %s\n"
+        "    Hint: Ensure the input tensors have the same dtype.\n",
+        meta->mnemonic,
+        a->name, mag_dtype_meta_of(a->dtype)->name,
+        b->name, mag_dtype_meta_of(b->dtype)->name
+    );
+    mag_print_separator(stderr);
+    fputc('\n', stderr);
+    fflush(stderr);
+    return false;
+}
+
 /* Checks if the shape of a and b are equal. If not a detailed error message is printed.  Return true if valid, else false. */
 static bool mag_check_is_shape_eq(mag_op_t op, const mag_tensor_t* a, const mag_tensor_t* b) {
     const mag_op_meta_t* meta = mag_op_meta_of(op);
@@ -1958,6 +1978,9 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
     mag_assert2(op != MAG_OP_NOP);
     mag_assert(inputs && mag_check_are_inputs_valid(op, inputs, numin), "Invalid input tensors for operation %s.", mag_op_meta_of(op)->mnemonic);
     mag_assert(mag_check_are_op_params_valid(op, opps, numopps), "Invalid parameters for operation %s.", mag_op_meta_of(op)->mnemonic);
+       if (numin == 2) {
+           mag_assert(mag_check_are_dtypes_compatible(op, inputs[0], inputs[1]), "Invalid dtypes for operation %s.", mag_op_meta_of(op)->mnemonic);
+       }
     const mag_op_meta_t* meta = mag_op_meta_of(op);
     mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_opp_t*) = meta->r_alloc;
     bool (*validate_op)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_opp_t*) = meta->validator;
