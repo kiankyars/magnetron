@@ -66,7 +66,7 @@ void mag_set_log_mode(bool enabled) {
 #if defined(__linux__) && defined(__GLIBC__)
 #include <sys/wait.h>
 #include <execinfo.h>
-static void mag_dump_backtrace(void) {
+static void mag_dump_backtrace(void) { /* Try to print backtrace using gdb or lldb. */
     char proc[64];
     snprintf(proc, sizeof(proc), "attach %d", getpid());
     int pid = fork();
@@ -114,7 +114,7 @@ MAG_NORET MAG_COLDPROC MAG_EXPORT void mag_panic(const char* msg, ...) { /* Pani
 
 #ifdef MAGNETRON_USE_MIMALLOC
 
-static void* mag_alloc_stub(void* blk, size_t size) { /* Allocator stub. */
+static void* mag_alloc_stub(void* blk, size_t size) { /* Allocator stub for mimalloc. */
     if (!size) {
         mi_free(blk);
         return NULL;
@@ -141,7 +141,7 @@ void mag_free_aligned(void* blk) {
 
 #else
 
-static void* mag_alloc_stub(void* blk, size_t size) {
+static void* mag_alloc_stub(void* blk, size_t size) { /* Allocator stub for malloc/free. */
     if (!size) {
         free(blk);
         return NULL;
@@ -158,6 +158,7 @@ static void* mag_alloc_stub(void* blk, size_t size) {
     return block;
 }
 
+/* Allocate aligned memory by overallocating. Alignment must be a power of two. */
 void* mag_alloc_aligned(size_t size, size_t align) {
     mag_assert(align && !(align&(align-1)), "Alignment must be power of 2: %zu", align); /* Alignment must be a power of 2 */
     void* p = (*mag_alloc)(NULL, size+sizeof(void*)+align-1);
