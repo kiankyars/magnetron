@@ -65,9 +65,9 @@ namespace mag::cuda {
         mag_assert2(x->numel == r->numel);
         std::int64_t block_size {256};
         std::int64_t num_blocks {(r->numel + block_size - 1)/block_size};
-        auto* pr {reinterpret_cast<mag_e8m23_t*>(r->storage.base)};
-        auto* px {reinterpret_cast<mag_e8m23_t*>(x->storage.base)};
-        auto* py {reinterpret_cast<mag_e8m23_t*>(y->storage.base)};
+        auto* pr {reinterpret_cast<mag_e8m23_t*>(r->storage->base)};
+        auto* px {reinterpret_cast<mag_e8m23_t*>(x->storage->base)};
+        auto* py {reinterpret_cast<mag_e8m23_t*>(y->storage->base)};
         kernels::add<<<num_blocks, block_size>>>(r->numel, pr, px, py);
     }
 
@@ -203,9 +203,7 @@ namespace mag::cuda {
             .is_async = true,
             .type = MAG_COMPUTE_DEVICE_TYPE_GPU_CUDA,
             .eager_exec_fwd = &exec_fwd,
-            .eager_exec_bwd = nullptr,
             .alloc_storage = nullptr, // todo
-            .free_storage = nullptr // todo
         };
         double vram;
         const char* unit;
