@@ -56,10 +56,10 @@ TEST(models, xor_e8m23) {
 
     tensor y_hat {model(x)};
 
-    std::vector<e8m23_t> output {y_hat.to_vector()};
+    std::vector<e8m23_t> output {y_hat.round().to_vector()};
     ASSERT_EQ(y_data.size(), output.size());
     for (std::int64_t i = 0; i < output.size(); ++i) {
-        ASSERT_EQ(y_data[i], std::round(output[i]));
+        ASSERT_EQ(y_data[i], output[i]);
     }
 }
 
@@ -95,9 +95,9 @@ TEST(models, xor_e5m10) {
 
     tensor y_hat {model(x)};
 
-    std::vector<e8m23_t> output {y_hat.to_vector()};
+    std::vector<e8m23_t> output {y_hat.round().to_vector()};
     ASSERT_EQ(y_data.size(), output.size());
     for (std::int64_t i = 0; i < output.size(); ++i) {
-        ASSERT_EQ(y_data[i], std::round(output[i]));
+        ASSERT_EQ(y_data[i], output[i]);
     }
 }

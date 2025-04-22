@@ -625,6 +625,33 @@ class Tensor:
         )
         return Tensor(_C.mag_exp_(self._ptr))
 
+    def floor(self) -> 'Tensor':
+        return Tensor(_C.mag_floor(self._ptr))
+
+    def floor_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
+        return Tensor(_C.mag_floor_(self._ptr))
+
+    def ceil(self) -> 'Tensor':
+        return Tensor(_C.mag_ceil(self._ptr))
+
+    def ceil_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
+        return Tensor(_C.mag_ceil_(self._ptr))
+
+    def round(self) -> 'Tensor':
+        return Tensor(_C.mag_round(self._ptr))
+
+    def round_(self) -> 'Tensor':
+        assert not self.requires_grad, (
+            'In-place operations are not supported for gradient-tracking tensors'
+        )
+        return Tensor(_C.mag_round_(self._ptr))
+
     def softmax(self) -> 'Tensor':
         return Tensor(_C.mag_softmax(self._ptr))
 

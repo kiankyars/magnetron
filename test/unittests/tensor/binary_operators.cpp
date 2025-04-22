@@ -9,7 +9,7 @@ static constexpr std::int64_t lim {4};
 static constexpr std::int64_t broadcast_lim {lim-1};
 
 #if 0
-TEST(cpu_tensor_bin_ops, print_test_info) {
+TEST(cpu_tensor_binary_ops, print_test_info) {
     std::cout << "=== Binary Operators ===" << std::endl;
     std::set<std::vector<std::int64_t>> perms {};
     test::for_all_shape_perms(lim, 1, [&](std::span<const std::int64_t> shape) {
@@ -26,25 +26,25 @@ TEST(cpu_tensor_bin_ops, print_test_info) {
 #endif
 
 #define impl_binary_operator_test_group(name, op, data_type) \
-    TEST(cpu_tensor_bin_ops, name##_same_shape_##data_type) { \
+    TEST(cpu_tensor_binary_ops, name##_same_shape_##data_type) { \
         test::test_binary_operator<false, false>(lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op b; }, \
             [](float a, float b) -> float { return a op b; } \
         ); \
     } \
-    TEST(cpu_tensor_bin_ops, name##_broadcast_##data_type) { \
+    TEST(cpu_tensor_binary_ops, name##_broadcast_##data_type) { \
         test::test_binary_operator<true, false>(broadcast_lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op b; }, \
             [](float a, float b) -> float { return a op b; } \
         ); \
     } \
-    TEST(cpu_tensor_bin_ops, name##_inplace_same_shape_##data_type) { \
+    TEST(cpu_tensor_binary_ops, name##_inplace_same_shape_##data_type) { \
         test::test_binary_operator<false, true>(lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op##= b; }, \
             [](float a, float b) -> float { return a op b; } \
         ); \
     } \
-    TEST(cpu_tensor_bin_ops, name##_inplace_broadcast_##data_type) { \
+    TEST(cpu_tensor_binary_ops, name##_inplace_broadcast_##data_type) { \
         test::test_binary_operator<true, true>(broadcast_lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op##= b; }, \
             [](float a, float b) -> float { return a op b; } \
@@ -82,7 +82,7 @@ static auto naive_matmul(
     }
 }
 
-TEST(cpu_tensor_bin_ops, matmul_naive) {
+TEST(cpu_tensor_binary_ops, matmul_naive) {
     static constexpr std::array<e8m23_t, 6> A {
         1.0f, 2.0f,
         3.0f, 4.0f,
@@ -104,7 +104,7 @@ template <const std::size_t M, const std::size_t N, typename T>
     };
 }
 
-TEST(cpu_tensor_bin_ops, matmul_square_e8m23) {
+TEST(cpu_tensor_binary_ops, matmul_square_e8m23) {
     static constexpr std::array<std::array<e8m23_t, 2>, 2> A {
         std::array<e8m23_t, 2>{1.6354027f, -1.3607267f},
         std::array<e8m23_t, 2>{1.8556793f, 1.1689897f}
@@ -135,7 +135,7 @@ TEST(cpu_tensor_bin_ops, matmul_square_e8m23) {
     }
 }
 
-TEST(cpu_tensor_bin_ops, matmul_square_e5m10) {
+TEST(cpu_tensor_binary_ops, matmul_square_e5m10) {
     static constexpr std::array<std::array<e8m23_t, 2>, 2> A {
         std::array<e8m23_t, 2>{1.6354027f, -1.3607267f},
         std::array<e8m23_t, 2>{1.8556793f, 1.1689897f}
@@ -166,7 +166,7 @@ TEST(cpu_tensor_bin_ops, matmul_square_e5m10) {
     }
 }
 
-TEST(cpu_tensor_bin_ops, matmul_non_square_e8m23) {
+TEST(cpu_tensor_binary_ops, matmul_non_square_e8m23) {
     static constexpr std::array<std::array<e8m23_t, 2>, 3> A {
         std::array<e8m23_t, 2>{1.0f, 2.0f},
         std::array<e8m23_t, 2>{3.0f, 4.0f},
@@ -197,7 +197,7 @@ TEST(cpu_tensor_bin_ops, matmul_non_square_e8m23) {
     }
 }
 
-TEST(cpu_tensor_bin_ops, matmul_non_square_e5m10) {
+TEST(cpu_tensor_binary_ops, matmul_non_square_e5m10) {
     static constexpr std::array<std::array<e8m23_t, 2>, 3> A {
         std::array<e8m23_t, 2>{1.0f, 2.0f},
         std::array<e8m23_t, 2>{3.0f, 4.0f},
@@ -228,7 +228,7 @@ TEST(cpu_tensor_bin_ops, matmul_non_square_e5m10) {
     }
 }
 
-TEST(cpu_tensor_bin_ops, matmul_square_zero_e8m23) {
+TEST(cpu_tensor_binary_ops, matmul_square_zero_e8m23) {
     static constexpr std::array<std::array<e8m23_t, 2>, 2> A {
         std::array<e8m23_t, 2>{1.6354027f, -1.3607267f},
         std::array<e8m23_t, 2>{1.8556793f, 1.1689897f}
@@ -255,7 +255,7 @@ TEST(cpu_tensor_bin_ops, matmul_square_zero_e8m23) {
     }
 }
 
-TEST(cpu_tensor_bin_ops, matmul_square_zero_e5m10) {
+TEST(cpu_tensor_binary_ops, matmul_square_zero_e5m10) {
     static constexpr std::array<std::array<e8m23_t, 2>, 2> A {
         std::array<e8m23_t, 2>{1.6354027f, -1.3607267f},
         std::array<e8m23_t, 2>{1.8556793f, 1.1689897f}
@@ -282,7 +282,7 @@ TEST(cpu_tensor_bin_ops, matmul_square_zero_e5m10) {
     }
 }
 
-TEST(cpu_tensor_bin_ops, matmul_square_identity_e8m23) {
+TEST(cpu_tensor_binary_ops, matmul_square_identity_e8m23) {
     static constexpr std::array<std::array<e8m23_t, 2>, 2> A {
         std::array<e8m23_t, 2>{1.6354027f, -1.3607267f},
         std::array<e8m23_t, 2>{1.8556793f, 1.1689897f}
@@ -310,7 +310,7 @@ TEST(cpu_tensor_bin_ops, matmul_square_identity_e8m23) {
     }
 }
 
-TEST(cpu_tensor_bin_ops, matmul_square_identity_e5m10) {
+TEST(cpu_tensor_binary_ops, matmul_square_identity_e5m10) {
     static constexpr std::array<std::array<e8m23_t, 2>, 2> A {
         std::array<e8m23_t, 2>{1.6354027f, -1.3607267f},
         std::array<e8m23_t, 2>{1.8556793f, 1.1689897f}
@@ -338,7 +338,7 @@ TEST(cpu_tensor_bin_ops, matmul_square_identity_e5m10) {
     }
 }
 
-TEST(cpu_tensor_bin_ops, matmul_matrix_vector_e8m23) {
+TEST(cpu_tensor_binary_ops, matmul_matrix_vector_e8m23) {
     static constexpr std::array<std::array<e8m23_t, 2>, 3> A {
         std::array<e8m23_t, 2>{1.0f, 2.0f},
         std::array<e8m23_t, 2>{3.0f, 4.0f},
@@ -366,7 +366,7 @@ TEST(cpu_tensor_bin_ops, matmul_matrix_vector_e8m23) {
     }
 }
 
-TEST(cpu_tensor_bin_ops, matmul_matrix_vector_e5m10) {
+TEST(cpu_tensor_binary_ops, matmul_matrix_vector_e5m10) {
     static constexpr std::array<std::array<e8m23_t, 2>, 3> A {
         std::array<e8m23_t, 2>{1.0f, 2.0f},
         std::array<e8m23_t, 2>{3.0f, 4.0f},

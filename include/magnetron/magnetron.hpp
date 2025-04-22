@@ -304,6 +304,12 @@ namespace magnetron {
         [[nodiscard]] auto step_() const noexcept -> tensor { return tensor{mag_step_(m_tensor)}; }
         [[nodiscard]] auto exp() const noexcept -> tensor { return tensor{mag_exp(m_tensor)}; }
         [[nodiscard]] auto exp_() const noexcept -> tensor { return tensor{mag_exp_(m_tensor)}; }
+        [[nodiscard]] auto floor() const noexcept -> tensor { return tensor{mag_floor(m_tensor)}; }
+        [[nodiscard]] auto floor_() const noexcept -> tensor { return tensor{mag_floor_(m_tensor)}; }
+        [[nodiscard]] auto ceil() const noexcept -> tensor { return tensor{mag_ceil(m_tensor)}; }
+        [[nodiscard]] auto ceil_() const noexcept -> tensor { return tensor{mag_ceil_(m_tensor)}; }
+        [[nodiscard]] auto round() const noexcept -> tensor { return tensor{mag_round(m_tensor)}; }
+        [[nodiscard]] auto round_() const noexcept -> tensor { return tensor{mag_round_(m_tensor)}; }
         [[nodiscard]] auto softmax() const noexcept -> tensor { return tensor{mag_softmax(m_tensor)}; }
         [[nodiscard]] auto softmax_() const noexcept -> tensor { return tensor{mag_softmax_(m_tensor)}; }
         [[nodiscard]] auto sigmoid() const noexcept -> tensor { return tensor{mag_sigmoid(m_tensor)}; }

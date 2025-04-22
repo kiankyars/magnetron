@@ -596,15 +596,20 @@ static MAG_AINLINE uint64_t mag_opp_unpack_u62_or(mag_opp_t pa, uint64_t fallbac
 
 /* Standard opcodes, not including initialization operators. */
 typedef enum mag_op_t {
+    /* Pseudo */
     MAG_OP_NOP,
     MAG_OP_CLONE,
     MAG_OP_VIEW,
     MAG_OP_TRANSPOSE,
     MAG_OP_PERMUTE,
+
+    /* Reductions */
     MAG_OP_MEAN,
     MAG_OP_MIN,
     MAG_OP_MAX,
     MAG_OP_SUM,
+
+    /* Unary */
     MAG_OP_ABS,
     MAG_OP_NEG,
     MAG_OP_LOG,
@@ -614,6 +619,9 @@ typedef enum mag_op_t {
     MAG_OP_COS,
     MAG_OP_STEP,
     MAG_OP_EXP,
+    MAG_OP_FLOOR,
+    MAG_OP_CEIL,
+    MAG_OP_ROUND,
     MAG_OP_SOFTMAX,
     MAG_OP_SOFTMAX_DV,
     MAG_OP_SIGMOID,
@@ -627,6 +635,8 @@ typedef enum mag_op_t {
     MAG_OP_RELU_DV,
     MAG_OP_GELU,
     MAG_OP_GELU_DV,
+
+    /* Binary */
     MAG_OP_ADD,
     MAG_OP_SUB,
     MAG_OP_MUL,

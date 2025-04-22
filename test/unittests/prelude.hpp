@@ -136,6 +136,30 @@ namespace magnetron::test {
         });
     }
 
+    template <bool BROADCAST, bool INPLACE, typename A, typename B>
+        requires std::is_invocable_r_v<tensor, A, tensor> && std::is_invocable_v<B, e8m23_t>
+    auto test_unary_operator(std::int64_t lim, e8m23_t eps, dtype ty, A&& a, B&& b, e8m23_t min = 0.0, e8m23_t max = 10.0) -> decltype(auto) {
+        auto ctx = context{compute_device::cpu};
+        ctx.stop_grad_recorder();
+        for_all_shape_perms(lim, BROADCAST ? 2 : 1, [&](std::span<const std::int64_t> shape) {
+            tensor t_a {ctx, ty, shape};
+            t_a.fill_rand_uniform(min, max);
+            std::vector<e8m23_t> d_a {t_a.to_vector()};
+            tensor t_r {std::invoke(a, t_a)};
+            if constexpr (INPLACE) {
+                ASSERT_EQ(t_a.data_ptr(), t_r.data_ptr());
+            } else {
+                ASSERT_NE(t_a.data_ptr(), t_r.data_ptr());
+            }
+            std::vector<e8m23_t> d_r {t_r.to_vector()};
+            ASSERT_EQ(d_a.size(), d_r.size());
+            ASSERT_EQ(t_a.dtype(), t_r.dtype());
+            for (std::int64_t i = 0; i < d_r.size(); ++i) {
+                ASSERT_NEAR(std::invoke(b, d_a[i]), d_r[i], eps);
+            }
+        });
+    }
+
     template <typename T>
     [[nodiscard]] auto compute_mean(std::span<const T> data) -> mag_e8m23_t {
         mag_e8m23_t sum {};

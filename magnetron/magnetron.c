@@ -1641,6 +1641,48 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
                 .thread_treshold = 250000
             }
         },
+        [MAG_OP_FLOOR] = {
+            .mnemonic = "floor",
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
+            .backward = NULL,
+            .r_alloc = &mag_result_constructor_routine_isomorph,
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
+        },
+        [MAG_OP_CEIL] = {
+            .mnemonic = "ceil",
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
+            .backward = NULL,
+            .r_alloc = &mag_result_constructor_routine_isomorph,
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
+        },
+        [MAG_OP_ROUND] = {
+            .mnemonic = "round",
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
+            .backward = NULL,
+            .r_alloc = &mag_result_constructor_routine_isomorph,
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
+        },
         [MAG_OP_SOFTMAX] = {
             .mnemonic = "softmax",
             .num_inputs = 1,
@@ -2245,6 +2287,33 @@ mag_tensor_t* mag_exp(mag_tensor_t* x) {
 mag_tensor_t* mag_exp_(mag_tensor_t* x) {
     mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_EXP, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_tensor_t* mag_floor(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_FLOOR, false, &x, 1, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_tensor_t* mag_floor_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
+    return mag_tensor_operator(x->ctx, MAG_OP_FLOOR, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_tensor_t* mag_ceil(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_CEIL, false, &x, 1, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_tensor_t* mag_ceil_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
+    return mag_tensor_operator(x->ctx, MAG_OP_CEIL, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_tensor_t* mag_round(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_ROUND, false, &x, 1, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_tensor_t* mag_round_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
+    return mag_tensor_operator(x->ctx, MAG_OP_ROUND, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
 mag_tensor_t* mag_softmax(mag_tensor_t* x) {

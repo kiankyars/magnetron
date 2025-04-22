@@ -544,6 +544,9 @@ static void mag_blas_init_rand_normal_e5m10(const mag_compute_payload_t* _Nonnul
 #define mag_e8m23_scos(x) (cosf(x))
 #define mag_e8m23_sstep(x) ((x) > 0.0f ? 1.0f : 0.0f)
 #define mag_e8m23_sexp(x) (expf(x))
+#define mag_e8m23_sfloor(x) (floorf(x))
+#define mag_e8m23_sceil(x) (ceilf(x))
+#define mag_e8m23_sround(x) (roundf(x))
 #define mag_e8m23_ssoftmax(x) (expf(x))
 #define mag_e8m23_ssoftmax_dv(x) (expf(x))
 #define mag_e8m23_ssigmoid(x) (1.0f / (1.0f + expf(-(x))))
@@ -567,6 +570,9 @@ mag_cpu_blas_impl_unary(e8m23, sin)
 mag_cpu_blas_impl_unary(e8m23, cos)
 mag_cpu_blas_impl_unary(e8m23, step)
 mag_cpu_blas_impl_unary(e8m23, exp)
+mag_cpu_blas_impl_unary(e8m23, floor)
+mag_cpu_blas_impl_unary(e8m23, ceil)
+mag_cpu_blas_impl_unary(e8m23, round)
 mag_cpu_blas_impl_unary(e8m23, softmax_dv)
 mag_cpu_blas_impl_unary(e8m23, sigmoid)
 mag_cpu_blas_impl_unary(e8m23, sigmoid_dv)
@@ -663,6 +669,9 @@ static void MAG_HOTPROC mag_blas_softmax_e8m23(const mag_compute_payload_t* _Non
 #define mag_e5m10_scos(x) mag_e8m23_cvt_e5m10(mag_e8m23_scos(mag_e5m10_cvt_e8m23(x)))
 #define mag_e5m10_sstep(x) mag_e8m23_cvt_e5m10(mag_e8m23_sstep(mag_e5m10_cvt_e8m23(x)))
 #define mag_e5m10_sexp(x) mag_e8m23_cvt_e5m10(mag_e8m23_sexp(mag_e5m10_cvt_e8m23(x)))
+#define mag_e5m10_sfloor(x) mag_e8m23_cvt_e5m10(mag_e8m23_sfloor(mag_e5m10_cvt_e8m23(x)))
+#define mag_e5m10_sceil(x) mag_e8m23_cvt_e5m10(mag_e8m23_sceil(mag_e5m10_cvt_e8m23(x)))
+#define mag_e5m10_sround(x) mag_e8m23_cvt_e5m10(mag_e8m23_sround(mag_e5m10_cvt_e8m23(x)))
 #define mag_e5m10_ssoftmax(x) mag_e8m23_cvt_e5m10(mag_e8m23_ssoftmax(mag_e5m10_cvt_e8m23(x)))
 #define mag_e5m10_ssoftmax_dv(x) mag_e8m23_cvt_e5m10(mag_e8m23_ssoftmax_dv(mag_e5m10_cvt_e8m23(x)))
 #define mag_e5m10_ssigmoid(x) mag_e8m23_cvt_e5m10(mag_e8m23_ssigmoid(mag_e5m10_cvt_e8m23(x)))
@@ -686,6 +695,9 @@ mag_cpu_blas_impl_unary(e5m10, sin)
 mag_cpu_blas_impl_unary(e5m10, cos)
 mag_cpu_blas_impl_unary(e5m10, step)
 mag_cpu_blas_impl_unary(e5m10, exp)
+mag_cpu_blas_impl_unary(e5m10, floor)
+mag_cpu_blas_impl_unary(e5m10, ceil)
+mag_cpu_blas_impl_unary(e5m10, round)
 mag_cpu_blas_impl_unary(e5m10, softmax)
 mag_cpu_blas_impl_unary(e5m10, softmax_dv)
 mag_cpu_blas_impl_unary(e5m10, sigmoid)
@@ -1212,6 +1224,18 @@ static void (*_Nonnull const mag_blas_lut_eval_kernels[MAG_OP__NUM][MAG_DTYPE__N
     [MAG_OP_EXP] = {
         [MAG_DTYPE_E8M23] = &mag_blas_exp_e8m23,
         [MAG_DTYPE_E5M10] = &mag_blas_exp_e5m10,
+    },
+    [MAG_OP_FLOOR] = {
+        [MAG_DTYPE_E8M23] = &mag_blas_floor_e8m23,
+        [MAG_DTYPE_E5M10] = &mag_blas_floor_e5m10,
+    },
+    [MAG_OP_CEIL] = {
+        [MAG_DTYPE_E8M23] = &mag_blas_ceil_e8m23,
+        [MAG_DTYPE_E5M10] = &mag_blas_ceil_e5m10,
+    },
+    [MAG_OP_ROUND] = {
+        [MAG_DTYPE_E8M23] = &mag_blas_round_e8m23,
+        [MAG_DTYPE_E5M10] = &mag_blas_round_e5m10,
     },
     [MAG_OP_SOFTMAX] = {
         [MAG_DTYPE_E8M23] = &mag_blas_softmax_e8m23,
