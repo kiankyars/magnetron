@@ -1283,10 +1283,6 @@ static mag_tensor_t* mag_result_constructor_routine_repeat_back(mag_tensor_t** i
     return mag_tensor_init_internal(inputs[0]->ctx, inputs[0]->dtype, inputs[1]->rank, inputs[1]->shape, NULL, 0);
 }
 
-static void mag_op_backward_nop(mag_tensor_t* node, mag_tensor_t** grads) {
-    *grads = mag_clone(node->grad);
-}
-
 static void mag_op_backward_clone(mag_tensor_t* node, mag_tensor_t** grads) {
     *grads = mag_clone(node->grad);
 }
@@ -1331,9 +1327,9 @@ static void mag_op_backward_abs(mag_tensor_t* node, mag_tensor_t** grads) {
 }
 
 static void mag_op_backward_neg(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_tensor_t* mone = mag_tensor_scalar(node->grad->ctx, node->grad->dtype, -1.f);
-    grads[0] = mag_mul(node->grad, mone);
-    mag_tensor_decref(mone);
+    mag_tensor_t* m1 = mag_tensor_scalar(node->grad->ctx, node->grad->dtype, -1.f);
+    grads[0] = mag_mul(node->grad, m1);
+    mag_tensor_decref(m1);
 }
 
 static void mag_op_backward_log(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1370,13 +1366,11 @@ static void mag_op_backward_sin(mag_tensor_t* node, mag_tensor_t** grads) {
 
 static void mag_op_backward_cos(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
-    mag_tensor_t* sin_x = mag_sin(x);
-    mag_tensor_t* m1 = mag_tensor_scalar(x->ctx, x->dtype, -1.f);
-    mag_tensor_t* neg_sin_x = mag_mul(sin_x, m1);
-    grads[0] = mag_mul(node->grad, neg_sin_x);
-    mag_tensor_decref(m1);
-    mag_tensor_decref(sin_x);
-    mag_tensor_decref(neg_sin_x);
+    mag_tensor_t* sinx = mag_sin(x);
+    mag_tensor_t* nsinx = mag_neg(sinx);
+    grads[0] = mag_mul(node->grad, nsinx);
+    mag_tensor_decref(sinx);
+    mag_tensor_decref(nsinx);
 }
 
 static void mag_op_backward_exp(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1527,7 +1521,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
             .num_params = 0,
             .param_types = {MAG_OPP_NONE},
             .flags = MAG_OP_FLAG_NONE,
-            .backward = &mag_op_backward_nop,
+            .backward = NULL,
             .r_alloc = NULL,
             .validator = NULL
         },
