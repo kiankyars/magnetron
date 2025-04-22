@@ -124,55 +124,6 @@ static bool mag_blas_detect_optimal_specialization(const mag_ctx_t* ctx, mag_ker
     return false; /* No spec used, fallback is active */
 }
 
-typedef struct mag_cpu_op_info_t {
-    bool mt_support;
-    mag_e11m52_t growth;
-    int64_t threshold;
-} mag_cpu_op_info_t;
-
-static const mag_cpu_op_info_t mag_cpu_op_infos[MAG_OP__NUM] = {
-    [MAG_OP_NOP]            = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_CLONE]          = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_VIEW]           = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_TRANSPOSE]      = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_PERMUTE]        = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_MEAN]           = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_MIN]            = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_MAX]            = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_SUM]            = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_ABS]            = {.mt_support = true,  .growth = 0.1, .threshold = 0},
-    [MAG_OP_NEG]            = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_LOG]            = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SQR]            = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SQRT]           = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SIN]            = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_COS]            = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_STEP]           = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SOFTMAX]        = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SOFTMAX_DV]     = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SIGMOID]        = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SIGMOID_DV]     = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_HARD_SIGMOID]   = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SILU]           = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SILU_DV]        = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_TANH]           = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_TANH_DV]        = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_RELU]           = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_RELU_DV]        = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_GELU]           = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_GELU_DV]        = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_ADD]            = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_SUB]            = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_MUL]            = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_DIV]            = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_ADDS]           = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_SUBS]           = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_MULS]           = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_DIVS]           = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_MATMUL]         = {.mt_support = true,  .growth = 3.0, .threshold =  10000},
-    [MAG_OP_REPEAT_BACK]    = {.mt_support = false, .growth = 3.0, .threshold =  10000},
-};
-
 typedef struct mag_worker_t mag_worker_t;
 typedef struct mag_threadpool_t {
     mag_alignas(MAG_DESTRUCTIVE_INTERFERENCE_SIZE) volatile bool interrupt;   /* Interrupt flag, 1=stop */
@@ -522,10 +473,11 @@ static mag_cpu_device_t* mag_cpu_init_device(mag_ctx_t* ctx, uint32_t num_thread
 ** TODO: This can be improved by using a more sophisticated heuristic and a benchmarked, numerical approach.
 */
 static uint32_t mag_cpu_dynamic_work_scaling(mag_cpu_device_t* dvc, mag_op_t op, int64_t numel) {
-    const mag_cpu_op_info_t* info = mag_cpu_op_infos+op;
-    if (!dvc->pool || !info->mt_support || numel < info->threshold) return 1;           /* Use a single worker (main thread). */
-    numel -= info->threshold;                                                           /* Saturate threshold */
-    uint32_t workers = (uint32_t)ceil(info->growth * log2((mag_e11m52_t)numel));        /* Logarithmic scaling */
+    const mag_op_meta_t* meta = mag_op_meta_of(op);
+    if (!dvc->pool || !(meta->flags & MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING) || numel < meta->cpu.thread_treshold)  /* Use a single worker (main thread). */
+        return 1;
+    numel -= meta->cpu.thread_treshold;                                                             /* Saturate threshold */
+    uint32_t workers = (uint32_t)ceil(meta->cpu.thread_growth * log2((mag_e11m52_t)numel));         /* Logarithmic scaling */
     workers = mag_xmin(dvc->num_allocated_workers, mag_xmax(1, workers));
     return workers;
 }

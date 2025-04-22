@@ -514,64 +514,7 @@ extern MAG_EXPORT void mag_thread_set_prio(mag_thread_sched_prio_t prio); /* Set
 extern MAG_EXPORT void mag_thread_set_name(const char* _Nonnull name); /* Set thread name. */
 extern MAG_EXPORT void mag_thread_yield(void); /* Yield current thread. */
 
-/* Standard opcodes, not including initialization operators. */
-typedef enum mag_op_t {
-    MAG_OP_NOP,
-    MAG_OP_CLONE,
-    MAG_OP_VIEW,
-    MAG_OP_TRANSPOSE,
-    MAG_OP_PERMUTE,
-    MAG_OP_MEAN,
-    MAG_OP_MIN,
-    MAG_OP_MAX,
-    MAG_OP_SUM,
-    MAG_OP_ABS,
-    MAG_OP_NEG,
-    MAG_OP_LOG,
-    MAG_OP_SQR,
-    MAG_OP_SQRT,
-    MAG_OP_SIN,
-    MAG_OP_COS,
-    MAG_OP_STEP,
-    MAG_OP_EXP,
-    MAG_OP_SOFTMAX,
-    MAG_OP_SOFTMAX_DV,
-    MAG_OP_SIGMOID,
-    MAG_OP_SIGMOID_DV,
-    MAG_OP_HARD_SIGMOID,
-    MAG_OP_SILU,
-    MAG_OP_SILU_DV,
-    MAG_OP_TANH,
-    MAG_OP_TANH_DV,
-    MAG_OP_RELU,
-    MAG_OP_RELU_DV,
-    MAG_OP_GELU,
-    MAG_OP_GELU_DV,
-    MAG_OP_ADD,
-    MAG_OP_SUB,
-    MAG_OP_MUL,
-    MAG_OP_DIV,
-    MAG_OP_ADDS,
-    MAG_OP_SUBS,
-    MAG_OP_MULS,
-    MAG_OP_DIVS,
-    MAG_OP_POWS,
-    MAG_OP_MATMUL,
-    MAG_OP_REPEAT_BACK,
-    MAG_OP__NUM
-} mag_op_t;
-mag_static_assert(MAG_OP_NOP == 0);
-mag_static_assert(MAG_OP_REPEAT_BACK+1 == MAG_OP__NUM);
-mag_static_assert(MAG_OP__NUM <= 0xff);
-
-/* Initialization opcodes. */
-typedef enum mag_init_op_t {
-    MAG_IOP_NOP,
-    MAG_IOP_BROADCAST,
-    MAG_IOP_RAND_UNIFORM,
-    MAG_IOP_RAND_NORMAL,
-    MAG_IOP__NUM
-} mag_init_op_t;
+/* Operation parameter */
 
 /* Operation parameter type tag. */
 typedef enum mag_opp_type_t {
@@ -652,6 +595,104 @@ static MAG_AINLINE uint64_t mag_opp_unpack_u62_or(mag_opp_t pa, uint64_t fallbac
     return mag_opp_is_type(pa, MAG_OPP_U62) ? mag_opp_unpack_u62_or_panic(pa) : fallback;
 }
 
+/* Standard opcodes, not including initialization operators. */
+typedef enum mag_op_t {
+    MAG_OP_NOP,
+    MAG_OP_CLONE,
+    MAG_OP_VIEW,
+    MAG_OP_TRANSPOSE,
+    MAG_OP_PERMUTE,
+    MAG_OP_MEAN,
+    MAG_OP_MIN,
+    MAG_OP_MAX,
+    MAG_OP_SUM,
+    MAG_OP_ABS,
+    MAG_OP_NEG,
+    MAG_OP_LOG,
+    MAG_OP_SQR,
+    MAG_OP_SQRT,
+    MAG_OP_SIN,
+    MAG_OP_COS,
+    MAG_OP_STEP,
+    MAG_OP_EXP,
+    MAG_OP_SOFTMAX,
+    MAG_OP_SOFTMAX_DV,
+    MAG_OP_SIGMOID,
+    MAG_OP_SIGMOID_DV,
+    MAG_OP_HARD_SIGMOID,
+    MAG_OP_SILU,
+    MAG_OP_SILU_DV,
+    MAG_OP_TANH,
+    MAG_OP_TANH_DV,
+    MAG_OP_RELU,
+    MAG_OP_RELU_DV,
+    MAG_OP_GELU,
+    MAG_OP_GELU_DV,
+    MAG_OP_ADD,
+    MAG_OP_SUB,
+    MAG_OP_MUL,
+    MAG_OP_DIV,
+    MAG_OP_ADDS,
+    MAG_OP_SUBS,
+    MAG_OP_MULS,
+    MAG_OP_DIVS,
+    MAG_OP_POWS,
+    MAG_OP_MATMUL,
+    MAG_OP_REPEAT_BACK,
+    MAG_OP__NUM
+} mag_op_t;
+mag_static_assert(MAG_OP_NOP == 0);
+mag_static_assert(MAG_OP_REPEAT_BACK+1 == MAG_OP__NUM);
+mag_static_assert(MAG_OP__NUM <= 0xff);
+
+/* Initialization opcodes. */
+typedef enum mag_init_op_t {
+    MAG_IOP_NOP,
+    MAG_IOP_BROADCAST,
+    MAG_IOP_RAND_UNIFORM,
+    MAG_IOP_RAND_NORMAL,
+    MAG_IOP__NUM
+} mag_init_op_t;
+
+typedef enum mag_op_flags_t {
+    MAG_OP_FLAG_NONE = 0,
+    MAG_OP_FLAG_SUPPORTS_INPLACE = 1<<0,                /* Allows to be executed inplace on the input tensor. */
+    MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING = 1<<1,      /* Supports multithreading on CPU. */
+} mag_op_flags_t;
+
+/* Stores operator metadata such as operation type, number of inputs and parameters, and the types of the parameters. */
+typedef struct mag_op_meta_t {
+    const char* const _Nonnull mnemonic;                    /* Operation mnemonic */
+    const uint8_t num_inputs;                               /* Number of inputs */
+    const uint8_t num_params;                               /* Number of parameters */
+    const mag_opp_type_t param_types[MAG_MAX_OP_PARAMS];    /* Parameter types */
+    const mag_op_flags_t flags;                             /* Operation flags */
+
+    void (*_Nullable const backward)(                       /* Backward pass function or NULL. */
+        mag_tensor_t* _Nonnull,
+        mag_tensor_t* _Nonnull* _Nonnull
+    );
+
+    mag_tensor_t* _Nonnull (*_Nullable const r_alloc)(      /* Result allocator function or NULL. */
+        mag_tensor_t* _Nonnull* _Nonnull,
+        const mag_opp_t* _Nullable
+    );
+
+    bool (*_Nullable const validator)(                      /* Validator function or NULL. */
+        mag_op_t,
+        mag_tensor_t* _Nonnull,
+        mag_tensor_t* _Nonnull* _Nonnull,
+        const mag_opp_t* _Nullable
+    );
+
+    struct {
+        double thread_growth;
+        int64_t thread_treshold;
+    } cpu; /* CPU specific metadata. */
+} mag_op_meta_t;
+
+extern MAG_EXPORT const mag_op_meta_t* _Nonnull mag_op_meta_of(mag_op_t opc); /* Get operation metadata for a specific opcode. */
+
 /* Header for all objects that are reference counted. */
 typedef struct mag_rc_control_block_t {
     uint64_t rc;                            /* Strong reference count. Object is deallocated if this reaches zero. */
@@ -680,19 +721,6 @@ static MAG_AINLINE bool mag_rc_control_decref(mag_rc_control_block_t* _Nonnull r
     }
     return false;
 }
-
-/* Stores operator metadata such as operation type, number of inputs and parameters, and the types of the parameters. */
-typedef struct mag_op_meta_t {
-    const char* _Nonnull mnemonic;                          /* Operation mnemonic */
-    uint8_t numin;                                          /* Number of inputs */
-    uint8_t paramcount;                                     /* Number of parameters */
-    mag_opp_type_t opp_types[MAG_MAX_OP_PARAMS];            /* Parameter types */
-    bool inplace;                                           /* Supports inplace execution */
-    void (*_Nonnull backward)(mag_tensor_t* _Nonnull, mag_tensor_t* _Nonnull* _Nonnull);        /* Backward pass */
-    mag_tensor_t* _Nonnull (*_Nonnull r_alloc)(mag_tensor_t* _Nonnull* _Nonnull, const mag_opp_t* _Nullable);
-    bool (*_Nonnull validator)(mag_op_t, mag_tensor_t* _Nonnull, mag_tensor_t* _Nonnull* _Nonnull, const mag_opp_t* _Nullable);
-} mag_op_meta_t;
-extern MAG_EXPORT const mag_op_meta_t* _Nonnull mag_op_meta_of(mag_op_t opc); /* Get operation metadata for a specific opcode. */
 
 /* Memory chunk for intrusive memory pool. */
 typedef struct mag_intrusive_chunk mag_intrusive_chunk;

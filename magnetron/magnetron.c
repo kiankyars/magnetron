@@ -860,20 +860,20 @@ const mag_dtype_meta_t* mag_dtype_meta_of(mag_dtype_t type) {
 /* Check if the input tensors are not null and valid. Return true if valid, else false. */
 static bool mag_check_are_inputs_valid(mag_op_t op, mag_tensor_t** inputs, uint32_t numin) {
     const mag_op_meta_t* meta = mag_op_meta_of(op);
-    if (mag_unlikely(meta->numin != numin || numin > MAG_MAX_OP_INPUTS)) {
+    if (mag_unlikely(meta->num_inputs != numin || numin > MAG_MAX_OP_INPUTS)) {
         mag_print_separator(stderr);
         fprintf(stderr,
             "Failed to execute operation: %s.\n"
             "ERROR: Operation requires %u input tensors, but %u were provided.\n"
             "    Hint: Ensure the correct number of input tensors are provided.\n",
-            meta->mnemonic, meta->numin, numin
+            meta->mnemonic, meta->num_inputs, numin
         );
         mag_print_separator(stderr);
         fputc('\n', stderr);
         fflush(stderr);
         return false;
     }
-    for (uint32_t i=0; i < meta->numin; ++i) {
+    for (uint32_t i=0; i < meta->num_inputs; ++i) {
         if (mag_unlikely(!inputs[i])) {
             mag_print_separator(stderr);
             fprintf(stderr,
@@ -894,14 +894,14 @@ static bool mag_check_are_inputs_valid(mag_op_t op, mag_tensor_t** inputs, uint3
 /* Check if the op parameters exist and have valid types. Return true if valid, else false. */
 static bool mag_check_are_op_params_valid(mag_op_t op, const mag_opp_t* params, uint32_t numparams) {
     const mag_op_meta_t* meta = mag_op_meta_of(op);
-    if (!meta->paramcount) return true; /* No parameters to validate. */
-    if (mag_unlikely(meta->paramcount != numparams || numparams > MAG_MAX_OP_PARAMS)) {
+    if (!meta->num_params) return true; /* No parameters to validate. */
+    if (mag_unlikely(meta->num_params != numparams || numparams > MAG_MAX_OP_PARAMS)) {
         mag_print_separator(stderr);
         fprintf(stderr,
             "Failed to execute operation: %s.\n"
             "ERROR: Operation requires at most %u parameters, but %u were provided.\n"
             "    Hint: Ensure the correct number of operation parameters are provided.\n",
-            meta->mnemonic, MAG_MAX_OP_PARAMS, meta->paramcount
+            meta->mnemonic, MAG_MAX_OP_PARAMS, meta->num_params
         );
         mag_print_separator(stderr);
         fputc('\n', stderr);
@@ -921,8 +921,8 @@ static bool mag_check_are_op_params_valid(mag_op_t op, const mag_opp_t* params, 
         fflush(stderr);
         return false;
     }
-    for (uint32_t i=0; i < meta->paramcount; ++i) {
-        if (mag_unlikely(!mag_opp_is_type(params[i], meta->opp_types[i]))) {
+    for (uint32_t i=0; i < meta->num_params; ++i) {
+        if (mag_unlikely(!mag_opp_is_type(params[i], meta->param_types[i]))) {
             mag_print_separator(stderr);
             fprintf(stderr,
                 "Failed to execute operation: %s.\n"
@@ -930,7 +930,7 @@ static bool mag_check_are_op_params_valid(mag_op_t op, const mag_opp_t* params, 
                 "    - Expected type id: %d\n"
                 "    - Provided type id: %d\n"
                 "    Hint: Ensure the correct parameter types are provided.\n",
-                meta->mnemonic, i, meta->opp_types[i], mag_opp_unpack_type(params[i])
+                meta->mnemonic, i, meta->param_types[i], mag_opp_unpack_type(params[i])
             );
         }
     }
@@ -1451,49 +1451,49 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
     static const mag_op_meta_t infos[MAG_OP__NUM] = {
         [MAG_OP_NOP] = {
             .mnemonic = "nop",
-            .numin = 0,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = false,
+            .num_inputs = 0,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_NONE,
             .backward = &mag_op_backward_nop,
             .r_alloc = NULL,
             .validator = NULL
         },
         [MAG_OP_CLONE] = {
             .mnemonic = "clone",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = false,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_NONE,
             .backward = &mag_op_backward_clone,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary
         },
         [MAG_OP_VIEW] = {
             .mnemonic = "view",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = false,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_NONE,
             .backward = &mag_op_backward_view,
             .r_alloc = &mag_result_constructor_routine_view,
             .validator = &mag_validate_op_unary
         },
         [MAG_OP_TRANSPOSE] = {
             .mnemonic = "transpose",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = false,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_NONE,
             .backward = &mag_op_backward_transpose,
             .r_alloc = &mag_result_constructor_routine_transposed,
             .validator = &mag_validate_op_transpose
         },
         [MAG_OP_PERMUTE] = {
             .mnemonic = "permute",
-            .numin = 1,
-            .paramcount = MAG_MAX_DIMS,
-            .opp_types = {
+            .num_inputs = 1,
+            .num_params = MAG_MAX_DIMS,
+            .param_types = {
                 MAG_OPP_U62,
                 MAG_OPP_U62,
                 MAG_OPP_U62,
@@ -1501,327 +1501,435 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
                 MAG_OPP_U62,
                 MAG_OPP_U62,
             },
-            .inplace = false,
+            .flags = MAG_OP_FLAG_NONE,
             .backward = &mag_op_backward_permute,
             .r_alloc = &mag_result_constructor_routine_permuted,
             .validator = &mag_validate_op_transpose
         },
         [MAG_OP_MEAN] = {
             .mnemonic = "mean",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = false,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_NONE,
             .backward = &mag_op_backward_mean,
             .r_alloc = &mag_result_constructor_routine_scalar,
             .validator = &mag_validate_op_scalar
         },
         [MAG_OP_MIN] = {
             .mnemonic = "min",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = false,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_NONE,
             .backward = &mag_op_backward_min,
             .r_alloc = &mag_result_constructor_routine_scalar,
             .validator = &mag_validate_op_scalar
         },
         [MAG_OP_MAX] = {
             .mnemonic = "max",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = false,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_NONE,
             .backward = &mag_op_backward_max,
             .r_alloc = &mag_result_constructor_routine_scalar,
             .validator = &mag_validate_op_scalar
         },
         [MAG_OP_SUM] = {
             .mnemonic = "sum",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = false,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_NONE,
             .backward = &mag_op_backward_sum,
             .r_alloc = &mag_result_constructor_routine_scalar,
             .validator = &mag_validate_op_scalar
         },
         [MAG_OP_ABS] = {
             .mnemonic = "abs",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_abs,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_NEG] = {
             .mnemonic = "neg",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_neg,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_LOG] = {
             .mnemonic = "log",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_log,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_SQR] = {
             .mnemonic = "sqr",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_sqr,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_SQRT] = {
             .mnemonic = "sqrt",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags =  MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_sqrt,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_SIN] = {
             .mnemonic = "sin",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_sin,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_COS] = {
             .mnemonic = "cos",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_cos,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_STEP] = {
             .mnemonic = "step",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_step,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_EXP] = {
             .mnemonic = "exp",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_exp,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_SOFTMAX] = {
             .mnemonic = "softmax",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_softmax,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_SOFTMAX_DV] = {
             .mnemonic = "softmax_dv",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_SIGMOID] = {
             .mnemonic = "sigmoid",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = mag_op_backward_sigmoid,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_SIGMOID_DV] = {
             .mnemonic = "sigmoid_dv",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_HARD_SIGMOID] = {
             .mnemonic = "hard_sigmoid",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_SILU] = {
             .mnemonic = "silu",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_silu,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_SILU_DV] = {
             .mnemonic = "silu_dv",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_TANH] = {
             .mnemonic = "tanh",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_tanh,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_TANH_DV] = {
             .mnemonic = "tanh_dv",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_RELU] = {
             .mnemonic = "relu",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_relu,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_RELU_DV] = {
             .mnemonic = "relu_dv",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_GELU] = {
             .mnemonic = "gelu",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_gelu,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_GELU_DV] = {
             .mnemonic = "gelu_dv",
-            .numin = 1,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_unary
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_ADD] = {
             .mnemonic = "add",
-            .numin = 2,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 2,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_add,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_binary
+            .validator = &mag_validate_op_binary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_SUB] = {
             .mnemonic = "sub",
-            .numin = 2,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 2,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_sub,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_binary
+            .validator = &mag_validate_op_binary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_MUL] = {
             .mnemonic = "mul",
-            .numin = 2,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 2,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_mul,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_binary
+            .validator = &mag_validate_op_binary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_DIV] = {
             .mnemonic = "div",
-            .numin = 2,
-            .paramcount = 0,
-            .opp_types = {MAG_OPP_NONE},
-            .inplace = true,
+            .num_inputs = 2,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_div,
             .r_alloc = &mag_result_constructor_routine_isomorph,
-            .validator = &mag_validate_op_binary
+            .validator = &mag_validate_op_binary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
         },
         [MAG_OP_MATMUL] = {
             .mnemonic = "matmul",
-            .numin = 2,
-            .paramcount = 0,
-            .opp_types = {},
-            .inplace = true,
+            .num_inputs = 2,
+            .num_params = 0,
+            .param_types = {},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_matmul,
             .r_alloc = &mag_result_constructor_routine_matmul,
-            .validator = &mag_validate_op_matmul
+            .validator = &mag_validate_op_matmul,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 10000
+            }
         },
         [MAG_OP_REPEAT_BACK] = {
             .mnemonic = "repeat_rev",
-            .numin = 2,
-            .paramcount = 0,
-            .opp_types = {},
-            .inplace = true,
+            .num_inputs = 2,
+            .num_params = 0,
+            .param_types = {},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_repeat_back,
             .validator = mag_validate_op_repeat_rev
@@ -1979,7 +2087,7 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
     mag_ctx_t* ctx,             /* Context to use. All involved tensors must be allocated from this context. */
     mag_op_t op,                /* Operator code */
     bool inplace,               /* Attempt to perform inplace operation? e.g.    r <- x += y    instead of      r <- x + y */
-    mag_tensor_t** inputs,      /* Input tensors. Must point to an array of 'numin' (N) non-null tensors. */
+    mag_tensor_t** inputs,      /* Input tensors. Must point to an array of 'num_inputs' (N) non-null tensors. */
     uint32_t numin,             /* Number of valid non-null input tensors in the inputs array. Must be same as specified in the op metadata. */
     const mag_opp_t* opps,      /* Operation parameters or NULL. Must be same as specified in the op metadata. */
     uint32_t numopps,           /* Number of operation parameters. Must be same as specified in the op metadata. */
@@ -1989,34 +2097,35 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
     mag_assert2(op != MAG_OP_NOP);
     mag_assert(inputs && mag_check_are_inputs_valid(op, inputs, numin), "Invalid input tensors for operation %s.", mag_op_meta_of(op)->mnemonic);
     mag_assert(mag_check_are_op_params_valid(op, opps, numopps), "Invalid parameters for operation %s.", mag_op_meta_of(op)->mnemonic);
-   if (numin == 2) {
+    if (numin == 2) {
        mag_assert(mag_check_are_dtypes_compatible(op, inputs[0], inputs[1]), "Invalid dtypes for operation %s.", mag_op_meta_of(op)->mnemonic);
-   }
+    }
     const mag_op_meta_t* meta = mag_op_meta_of(op);
     mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_opp_t*) = meta->r_alloc;                             /* Get result allocator function. */
     bool (*validate_op)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_opp_t*) = meta->validator;       /* Get validator function. */
-    mag_tensor_t* R = (inplace && numin && meta->inplace)                                                   /* Inplace requested and possible? */
-        ? mag_tensor_create(ctx, (*inputs)->dtype, (*inputs)->shape, (*inputs)->rank, *inputs, 0)   /* ->   then view R as X for inplace aliasing op. */
+    inplace &= !!(meta->flags & MAG_OP_FLAG_SUPPORTS_INPLACE);                                              /* Inplace operation requested and supported? */
+    mag_tensor_t* result =
+        inplace ? mag_tensor_create(ctx, (*inputs)->dtype, (*inputs)->shape, (*inputs)->rank, *inputs, 0)   /* ->   then view R as X for inplace aliasing op. */
         : (*r_alloc)(inputs, opps);                                                                         /* ->   else construct new result tensor. */
-    mag_assert((*validate_op)(op, R, inputs, opps), "Invalid operation %s.", meta->mnemonic);               /* Validate operation or panic. */
-    R->op = op;                                                                                             /* Set opcode. */
+    mag_assert((*validate_op)(op, result, inputs, opps), "Invalid operation %s.", meta->mnemonic);          /* Validate operation or panic. */
+    result->op = op;                                                                                        /* Set opcode. */
     mag_assert2(numin <= MAG_MAX_OP_INPUTS);                                                                /* Assert correct input tensor count. */
     for (uint32_t i=0; i < numin; ++i) {                                                                    /* Set input tensors and flags. */
         mag_tensor_t* input = inputs[i];
-        R->op_inputs[i] = input;
-        if (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER) {              /* Gradient recording is enabled */
-            R->flags |= input->flags & MAG_TFLAG_REQUIRES_GRAD;     /* Set gradient tracking flag */
-            mag_tensor_incref(input);                               /* Input must stay alive for backward pass. */
+        result->op_inputs[i] = input;
+        if (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER) {                  /* Gradient recording is enabled */
+            result->flags |= input->flags & MAG_TFLAG_REQUIRES_GRAD;    /* Set gradient tracking flag */
+            mag_tensor_incref(input);                                   /* Input must stay alive for backward pass. */
         }
     }
-    if (opps) memcpy(R->op_params, opps, numopps*sizeof(*opps));    /* Copy operation parameters */
-    if (mag_likely(ctx->exec_mode == MAG_EXEC_MODE_EAGER)) {        /* In eager execution mode, we execute immediately. */
-        mag_op_exec(R, ctx->device, gra);                           /* Execute the operation immediately. */
-        if (!(ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)) {           /* If not recording gradients, free parent tensors. */
-            memset(R->op_inputs, 0, sizeof(R->op_inputs));
+    if (opps) memcpy(result->op_params, opps, numopps*sizeof(*opps));   /* Copy operation parameters */
+    if (mag_likely(ctx->exec_mode == MAG_EXEC_MODE_EAGER)) {            /* In eager execution mode, we execute immediately. */
+        mag_op_exec(result, ctx->device, gra);                          /* Execute the operation immediately. */
+        if (!(ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)) {               /* If not recording gradients, free parent tensors. */
+            memset(result->op_inputs, 0, sizeof(result->op_inputs));
         }
     }
-    return R;
+    return result;
 }
 
 mag_tensor_t* mag_clone(mag_tensor_t* x) {
@@ -2567,7 +2676,7 @@ static void mag_collect_topo_iterative(mag_tensor_t* root, mag_tensor_array_t* o
     while (sta_len) { /* Iterative DFS */
         mag_topo_stack_record_t* top = &stack[sta_len - 1];
         mag_tensor_t* cur_tensor = top->tensor;
-        if (top->next_child_idx < mag_op_meta_of(cur_tensor->op)->numin) {
+        if (top->next_child_idx < mag_op_meta_of(cur_tensor->op)->num_inputs) {
             mag_tensor_t* child = cur_tensor->op_inputs[top->next_child_idx++];
             if (child && (child->flags & MAG_TFLAG_REQUIRES_GRAD)) {
                 if (!mag_hashset_contains_key(&visited, child)) {
@@ -2619,7 +2728,7 @@ void mag_tensor_backward(mag_tensor_t* root) {
         void (*op_bwd)(mag_tensor_t*, mag_tensor_t**) = meta->backward;
         mag_assert2(op_bwd);
         (*op_bwd)(child, grads);
-        uint32_t numin = meta->numin;
+        uint32_t numin = meta->num_inputs;
         mag_assert2(numin <= MAG_MAX_OP_INPUTS);
         for (uint32_t i=0; i < numin; ++i) {
             mag_tensor_t* input = child->op_inputs[i];
@@ -3421,7 +3530,7 @@ MAG_COLDPROC void mag_tensor_export_backward_graph_graphviz(mag_tensor_t* t, con
     for (size_t i=0; i < post_order.size; ++i) {
         mag_tensor_t* node = post_order.data[i];
         const mag_op_meta_t* meta = mag_op_meta_of(node->op);
-        for (uint32_t j = 0; j < meta->numin; ++j) {
+        for (uint32_t j = 0; j < meta->num_inputs; ++j) {
             mag_tensor_t* input = node->op_inputs[j];
             if (input) {
                 fprintf(fp, "    \"%p\" -> \"%p\" [label=\"input %u\"];\n", node, input, j);
