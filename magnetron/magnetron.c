@@ -1197,17 +1197,6 @@ static void mag_op_backward_transpose(mag_tensor_t* node, mag_tensor_t** grads) 
     mag_tensor_decref(t);
 }
 
-static void mag_op_backward_permute(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
-    /*
-    uint32_t inv_perm[6];
-    for (int i = 0; i < 6; i++) {
-        inv_perm[node->dim[i]] = i;
-    }
-    *grads = mag_permute(node->grad, inv_perm[0], inv_perm[1], inv_perm[2],
-                          inv_perm[3], inv_perm[4], inv_perm[5]);*/
-}
-
 static void mag_op_backward_mean(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
     mag_e11m52_t scale = 1.0/(mag_e11m52_t)x->numel;
@@ -1215,14 +1204,6 @@ static void mag_op_backward_mean(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_fill(scale_tensor, scale);
     *grads = mag_mul(scale_tensor, node->grad);
     mag_tensor_decref(scale_tensor);
-}
-
-static void mag_op_backward_min(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
-}
-
-static void mag_op_backward_max(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
 }
 
 static void mag_op_backward_sum(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1301,10 +1282,6 @@ static void mag_op_backward_cos(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_decref(m1);
     mag_tensor_decref(sin_x);
     mag_tensor_decref(neg_sin_x);
-}
-
-static void mag_op_backward_step(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_panic("NYI");
 }
 
 static void mag_op_backward_exp(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -1502,7 +1479,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
                 MAG_OPP_U62,
             },
             .flags = MAG_OP_FLAG_NONE,
-            .backward = &mag_op_backward_permute,
+            .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_permuted,
             .validator = &mag_validate_op_transpose
         },
@@ -1522,7 +1499,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
             .num_params = 0,
             .param_types = {MAG_OPP_NONE},
             .flags = MAG_OP_FLAG_NONE,
-            .backward = &mag_op_backward_min,
+            .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_scalar,
             .validator = &mag_validate_op_scalar
         },
@@ -1532,7 +1509,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
             .num_params = 0,
             .param_types = {MAG_OPP_NONE},
             .flags = MAG_OP_FLAG_NONE,
-            .backward = &mag_op_backward_max,
+            .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_scalar,
             .validator = &mag_validate_op_scalar
         },
@@ -1650,7 +1627,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
             .num_params = 0,
             .param_types = {MAG_OPP_NONE},
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
-            .backward = &mag_op_backward_step,
+            .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary,
             .cpu = {
