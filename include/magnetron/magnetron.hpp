@@ -220,15 +220,7 @@ namespace magnetron {
     class tensor final {
     public:
         tensor(context& ctx, dtype type, std::span<const std::int64_t> shape) {
-            switch (shape.size()) {
-                case 1: m_tensor = mag_tensor_create_1d(&*ctx, static_cast<mag_dtype_t>(type), shape[0]); break;
-                case 2: m_tensor = mag_tensor_create_2d(&*ctx, static_cast<mag_dtype_t>(type), shape[0], shape[1]); break;
-                case 3: m_tensor = mag_tensor_create_3d(&*ctx, static_cast<mag_dtype_t>(type), shape[0], shape[1], shape[2]); break;
-                case 4: m_tensor = mag_tensor_create_4d(&*ctx, static_cast<mag_dtype_t>(type), shape[0], shape[1], shape[2], shape[3]); break;
-                case 5: m_tensor = mag_tensor_create_5d(&*ctx, static_cast<mag_dtype_t>(type), shape[0], shape[1], shape[2], shape[3], shape[4]); break;
-                case 6: m_tensor = mag_tensor_create_6d(&*ctx, static_cast<mag_dtype_t>(type), shape[0], shape[1], shape[2], shape[3], shape[4], shape[5]); break;
-                default: throw std::invalid_argument("Invalid tensor shape: " + std::to_string(shape.size()));
-            }
+            m_tensor = mag_tensor_empty(&*ctx, static_cast<mag_dtype_t>(type), shape.size(), shape.data());
         }
 
         template <typename... S> requires std::is_integral_v<std::common_type_t<S...>>
@@ -336,23 +328,19 @@ namespace magnetron {
         [[nodiscard]] auto div_(tensor other) const noexcept -> tensor { return tensor{mag_div_(m_tensor, &*other)}; }
         [[nodiscard]] auto matmul(tensor other) const noexcept -> tensor { return tensor{mag_matmul(m_tensor, &*other)}; }
         [[nodiscard]] auto add(float other) const noexcept -> tensor {
-            tensor sca {mag_tensor_create_1d(mag_tensor_get_ctx(m_tensor), mag_tensor_get_dtype(m_tensor), 1)};
-            sca.fill(other);
+            tensor sca {mag_tensor_scalar(mag_tensor_get_ctx(m_tensor), mag_tensor_get_dtype(m_tensor), other)};
             return add(sca);
         }
         [[nodiscard]] auto sub(float other) const noexcept -> tensor {
-            tensor sca {mag_tensor_create_1d(mag_tensor_get_ctx(m_tensor), mag_tensor_get_dtype(m_tensor), 1)};
-            sca.fill(other);
+            tensor sca {mag_tensor_scalar(mag_tensor_get_ctx(m_tensor), mag_tensor_get_dtype(m_tensor), other)};
             return sub(sca);
         }
         [[nodiscard]] auto mul(float other) const noexcept -> tensor {
-            tensor sca {mag_tensor_create_1d(mag_tensor_get_ctx(m_tensor), mag_tensor_get_dtype(m_tensor), 1)};
-            sca.fill(other);
+            tensor sca {mag_tensor_scalar(mag_tensor_get_ctx(m_tensor), mag_tensor_get_dtype(m_tensor), other)};
             return mul(sca);
         }
         [[nodiscard]] auto div(float other) const noexcept -> tensor {
-            tensor sca {mag_tensor_create_1d(mag_tensor_get_ctx(m_tensor), mag_tensor_get_dtype(m_tensor), 1)};
-            sca.fill(other);
+            tensor sca {mag_tensor_scalar(mag_tensor_get_ctx(m_tensor), mag_tensor_get_dtype(m_tensor), other)};
             return div(sca);
         }
 

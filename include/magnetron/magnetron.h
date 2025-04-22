@@ -139,79 +139,19 @@ typedef struct mag_dtype_meta_t {
 extern MAG_EXPORT const mag_dtype_meta_t* _Nonnull mag_dtype_meta_of(mag_dtype_t type);
 
 /**
- * @brief Create a new 1-dimensional tensor.
+ * @brief Create a new N-dimensional tensor.
  *      Data is uninitialized, should be filled with values before using it.
  * @param ctx Context to create the tensor in. Must not be NULL.
  * @param type Data type of the tensor. Must be a valid mag_dtype_t.
  * @param d1 Size of the first dimension. Must be > 0 and < INT64_MAX.
  * @returns New tensor. Is never NULL.
  */
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_create_1d(mag_ctx_t* _Nonnull ctx, mag_dtype_t type, int64_t d1);
-
-/**
- * @brief Create a new 2-dimensional tensor.
- *      Data is uninitialized, should be filled with values before using it.
- * @param ctx Context to create the tensor in. Must not be NULL.
- * @param type Data type of the tensor. Must be a valid mag_dtype_t.
- * @param d1 Size of the first dimension. Must be > 0 and < INT64_MAX.
- * @param d2 Size of the second dimension. Must be > 0 and < INT64_MAX.
- * @returns New tensor. Is never NULL.
- */
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_create_2d(mag_ctx_t* _Nonnull ctx, mag_dtype_t type, int64_t d1, int64_t d2);
-
-/**
- * @brief Create a new 3-dimensional tensor.
- *      Data is uninitialized, should be filled with values before using it.
- * @param ctx Context to create the tensor in. Must not be NULL.
- * @param type Data type of the tensor. Must be a valid mag_dtype_t.
- * @param d1 Size of the first dimension. Must be > 0 and < INT64_MAX.
- * @param d2 Size of the second dimension. Must be > 0 and < INT64_MAX.
- * @param d3 Size of the third dimension. Must be > 0 and < INT64_MAX.
- * @returns New tensor. Is never NULL.
- */
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_create_3d(mag_ctx_t* _Nonnull ctx, mag_dtype_t type, int64_t d1, int64_t d2, int64_t d3);
-
-/**
- * @brief Create a new 4-dimensional tensor.
- *      Data is uninitialized, should be filled with values before using it.
- * @param ctx Context to create the tensor in. Must not be NULL.
- * @param type Data type of the tensor. Must be a valid mag_dtype_t.
- * @param d1 Size of the first dimension. Must be > 0 and < INT64_MAX.
- * @param d2 Size of the second dimension. Must be > 0 and < INT64_MAX.
- * @param d3 Size of the third dimension. Must be > 0 and < INT64_MAX.
- * @param d4 Size of the fourth dimension. Must be > 0 and < INT64_MAX.
- * @returns New tensor. Is never NULL.
- */
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_create_4d(mag_ctx_t* _Nonnull ctx, mag_dtype_t type, int64_t d1, int64_t d2, int64_t d3, int64_t d4);
-
-/**
- * @brief Create a new 5-dimensional tensor.
- *      Data is uninitialized, should be filled with values before using it.
- * @param ctx Context to create the tensor in. Must not be NULL.
- * @param type Data type of the tensor. Must be a valid mag_dtype_t.
- * @param d1 Size of the first dimension. Must be > 0 and < INT64_MAX.
- * @param d2 Size of the second dimension. Must be > 0 and < INT64_MAX.
- * @param d3 Size of the third dimension. Must be > 0 and < INT64_MAX.
- * @param d4 Size of the fourth dimension. Must be > 0 and < INT64_MAX.
- * @param d5 Size of the fifth dimension. Must be > 0 and < INT64_MAX.
- * @returns New tensor. Is never NULL.
- */
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_create_5d(mag_ctx_t* _Nonnull ctx, mag_dtype_t type, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5);
-
-/**
- * @brief Create a new 6-dimensional tensor.
- *      Data is uninitialized, should be filled with values before using it.
- * @param ctx Context to create the tensor in. Must not be NULL.
- * @param type Data type of the tensor. Must be a valid mag_dtype_t.
- * @param d1 Size of the first dimension. Must be > 0 and < INT64_MAX.
- * @param d2 Size of the second dimension. Must be > 0 and < INT64_MAX.
- * @param d3 Size of the third dimension. Must be > 0 and < INT64_MAX.
- * @param d4 Size of the fourth dimension. Must be > 0 and < INT64_MAX.
- * @param d5 Size of the fifth dimension. Must be > 0 and < INT64_MAX.
- * @param d6 Size of the sixth dimension. Must be > 0 and < INT64_MAX.
- * @returns New tensor. Is never NULL.
- */
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_create_6d(mag_ctx_t* _Nonnull ctx, mag_dtype_t type, int64_t d1, int64_t d2, int64_t d3, int64_t d4, int64_t d5, int64_t d6);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_empty(mag_ctx_t* _Nonnull ctx, mag_dtype_t type, int64_t rank, const int64_t* _Nonnull shape);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_empty_like(mag_tensor_t* _Nonnull isomorph);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_empty_scalar(mag_ctx_t* _Nonnull ctx, mag_dtype_t type);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_scalar(mag_ctx_t* _Nonnull ctx, mag_dtype_t type, float value);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_full(mag_ctx_t* _Nonnull ctx, mag_dtype_t type, int64_t rank, const int64_t* _Nonnull shape, float value);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_full_like(mag_tensor_t* _Nonnull isomorph, float value);
 
 /* ============ Tensor Operators ============ */
 
