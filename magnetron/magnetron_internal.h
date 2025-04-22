@@ -63,12 +63,11 @@ extern "C" {
 
 #define MAG_GELU_COEFF 0.044715f /* Coefficient for GELU approximation. */
 
-/* Compute graph evaluation type. */
-typedef enum mag_gra_eval_t {
-    MAG_GRA_FWD,    /* Eval forward pass */
-    MAG_GRA_BWD,    /* Eval backward pass */
-    MAG_GRA_INIT    /* Eval initialization pass */
-} mag_gra_eval_t;
+/* Compute execution stage. */
+typedef enum mag_exec_stage_t {
+    MAG_STAGE_EVAL,     /* Eval op. */
+    MAG_STAGE_INIT      /* Execute init op. */
+} mag_exec_stage_t;
 
 #define MAG_MAX_CPUS 8192               /* Maximum number of virtual CPUs supported. */
 #define MAG_MAX_NUMA_NODES 64           /* Maximum number of NUMA nodes supported. */
@@ -803,7 +802,6 @@ struct mag_compute_device_t {
     mag_compute_device_type_t type;                                                                                 /* Device type enum. */
     void (*_Nonnull eager_exec_init)(mag_compute_device_t* _Nonnull dvc, mag_tensor_t* _Nonnull root);                                         /* Execute a single init op. */
     void (*_Nonnull eager_exec_fwd)(mag_compute_device_t* _Nonnull dvc, mag_tensor_t* _Nonnull root);                                          /* Execute a single op forward. */
-    void (*_Nonnull eager_exec_bwd)(mag_compute_device_t* _Nonnull dvc, mag_tensor_t* _Nonnull root);                                          /* Execute a single op backwards. */
     void (*_Nonnull alloc_storage)(mag_compute_device_t* _Nonnull dvc, mag_storage_buffer_t* _Nonnull* _Nonnull out, size_t size, mag_dtype_t dtype);   /* Allocate storage buffer in device memory */
 };
 
@@ -1039,7 +1037,7 @@ typedef struct mag_compute_payload_t {
     int64_t thread_num;                     /* Total number of threads involved. */
     int64_t thread_idx;                     /* Current thread index used to compute thread-local partition. */
     mag_tensor_t* _Nonnull node;            /* Result tensor. Stores input tensors and all other op-specific data. */
-    mag_gra_eval_t gra_eval;                /* Graph evaluation type. */
+    mag_exec_stage_t stage;                /* Graph evaluation type. */
     mag_prng_state_t* _Nonnull local_prng;  /* Thread-local CPU PRNG state. */
 } mag_compute_payload_t;
 
@@ -1052,7 +1050,6 @@ typedef struct mag_compute_payload_t {
 typedef struct mag_kernel_registry_t {
     void (*_Nonnull init[MAG_IOP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t* _Nonnull);   /* Initialization operator kernels. */
     void (*_Nonnull fwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t* _Nonnull);     /* Forward operator kernels. */
-    void (*_Nonnull bwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t* _Nonnull);     /* Backward operator kernels. */
     void (*_Nonnull vector_cast)(size_t nb, const void* _Nonnull src, mag_dtype_t src_t, void* _Nonnull dst, mag_dtype_t dst_t); /* Vector cast (dtype conversion) kernel. */
 } mag_kernel_registry_t;
 

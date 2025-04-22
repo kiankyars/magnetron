@@ -180,10 +180,7 @@ static void mag_worker_exec_thread_local(const mag_kernel_registry_t* kernels, m
     mag_assert2(op >= 0 && op < MAG_OP__NUM);
     mag_assert2(iop >= 0 && iop < MAG_IOP__NUM);
     mag_assert2(dtype >= 0 && dtype < MAG_DTYPE__NUM);
-    void (*kernel)(const mag_compute_payload_t*)
-        = payload->gra_eval == MAG_GRA_INIT
-        ? kernels->init[iop][dtype] : payload->gra_eval == MAG_GRA_FWD
-        ? kernels->fwd[op][dtype] : kernels->bwd[op][dtype];
+    void (*kernel)(const mag_compute_payload_t*) = payload->stage == MAG_STAGE_INIT ? kernels->init[iop][dtype] : kernels->fwd[op][dtype];
     mag_assert(kernel, "no kernel found for op '%s' (iop #%d) with dtype %s", mag_op_meta_of(op)->mnemonic, iop, mag_dtype_meta_of(dtype)->name);
     (*kernel)(payload);
     payload->node = NULL;
@@ -245,7 +242,7 @@ static mag_threadpool_t* mag_threadpool_create(mag_ctx_t* host_ctx, uint32_t num
                 .thread_num = num_workers,
                 .thread_idx = ti,
                 .node = NULL,
-                .gra_eval = MAG_GRA_FWD,
+                .stage = MAG_STAGE_EVAL,
                 .local_prng = NULL
             },
             .pool = pool,
@@ -279,14 +276,14 @@ static void mag_threadpool_destroy(mag_threadpool_t* pool) {
 }
 
 /* Submits work payload and awakens all threads */
-static void mag_threadpool_kickoff(mag_threadpool_t* pool, mag_tensor_t* node, mag_gra_eval_t gra_eval, uint32_t num_active_workers) {
+static void mag_threadpool_kickoff(mag_threadpool_t* pool, mag_tensor_t* node, mag_exec_stage_t stage, uint32_t num_active_workers) {
     mag_mutex_lock(&pool->mtx);
     pool->num_active_workers = num_active_workers;
     for (uint32_t i=0; i < pool->num_allocated_workers; ++i) { /* Set up payload */
         mag_compute_payload_t* payload = &pool->workers[i].payload;
         payload->thread_num = num_active_workers;
         payload->node = node;
-        payload->gra_eval = gra_eval;
+        payload->stage = stage;
     }
     ++pool->phase;
     pool->num_completed = 0; /* Reset completion counter */
@@ -306,9 +303,9 @@ static void mag_threadpool_barrier(mag_threadpool_t* pool) {
 }
 
 /* Execute an operator tensor on the CPU */
-static MAG_HOTPROC void mag_threadpool_parallel_compute(mag_threadpool_t* pool, mag_tensor_t* node, mag_gra_eval_t gra_eval, uint32_t num_active_workers) {
+static MAG_HOTPROC void mag_threadpool_parallel_compute(mag_threadpool_t* pool, mag_tensor_t* node, mag_exec_stage_t stage, uint32_t num_active_workers) {
     mag_assert2(pool != NULL);
-    mag_threadpool_kickoff(pool, node, gra_eval, num_active_workers);               /* Kick off workers */
+    mag_threadpool_kickoff(pool, node, stage, num_active_workers);               /* Kick off workers */
     mag_cv_broadcast(&pool->cv);                                                    /* Wake up all workers */
     mag_worker_exec_and_broadcast(pool, pool->kernels, &pool->workers->payload);    /* Main thread does work too */
     mag_threadpool_barrier(pool);                                                   /* Wait for all workers to finish */
@@ -316,33 +313,29 @@ static MAG_HOTPROC void mag_threadpool_parallel_compute(mag_threadpool_t* pool, 
 
 static uint32_t mag_cpu_dynamic_work_scaling(mag_cpu_device_t* dvc, mag_op_t op, int64_t numel);
 
-static MAG_HOTPROC void mag_cpu_exec(mag_compute_device_t* dvc, mag_gra_eval_t gra_eval, mag_tensor_t* node) {
+static MAG_HOTPROC void mag_cpu_exec(mag_compute_device_t* dvc, mag_exec_stage_t stage, mag_tensor_t* node) {
     mag_cpu_device_t* cpu_dvc = dvc->impl;
-    uint32_t intraop_workers = gra_eval == MAG_GRA_INIT ? 0 : mag_cpu_dynamic_work_scaling(cpu_dvc, node->op, node->numel);   /* Use thread count recommended by pre-kernel or compute general thread count heuristic. */
+    uint32_t intraop_workers = stage == MAG_STAGE_INIT ? 0 : mag_cpu_dynamic_work_scaling(cpu_dvc, node->op, node->numel);   /* Use thread count recommended by pre-kernel or compute general thread count heuristic. */
     if (intraop_workers <= 1) { /* Main thread does the work (single threaded mode). */
         mag_compute_payload_t payload = {
             .node = node,
             .thread_idx = 0,
             .thread_num = 1,
-            .gra_eval = gra_eval,
+            .stage = stage,
             .local_prng = &cpu_dvc->primary_prng
         };
         mag_worker_exec_thread_local(&cpu_dvc->kernels, &payload);
         return; /* We're done */
     }
-    mag_threadpool_parallel_compute(cpu_dvc->pool, node, gra_eval, intraop_workers); /* Multithreaded exec + barrier */
+    mag_threadpool_parallel_compute(cpu_dvc->pool, node, stage, intraop_workers); /* Multithreaded exec + barrier */
 }
 
 static void mag_cpu_exec_init(mag_compute_device_t* dvc, mag_tensor_t* node) {
-    mag_cpu_exec(dvc, MAG_GRA_INIT, node);
+    mag_cpu_exec(dvc, MAG_STAGE_INIT, node);
 }
 
 static void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t* node) {
-    mag_cpu_exec(dvc, MAG_GRA_FWD, node);
-}
-
-static void mag_cpu_exec_bwd(mag_compute_device_t* dvc, mag_tensor_t* node) {
-    mag_cpu_exec(dvc, MAG_GRA_BWD, node);
+    mag_cpu_exec(dvc, MAG_STAGE_EVAL, node);
 }
 
 static void mag_cpu_buf_broadcast(mag_storage_buffer_t* sto, size_t offs, const void* src, size_t stride) {
@@ -499,7 +492,6 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num
         .type = MAG_COMPUTE_DEVICE_TYPE_CPU,
         .eager_exec_init = &mag_cpu_exec_init,
         .eager_exec_fwd = &mag_cpu_exec_fwd,
-        .eager_exec_bwd = &mag_cpu_exec_bwd,
         .alloc_storage = &mag_cpu_alloc_storage,
     };
     snprintf(dvc->name, sizeof(dvc->name), "%s", ctx->machine.cpu_name);

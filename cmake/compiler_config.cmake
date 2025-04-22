@@ -37,6 +37,8 @@ set(MAG_CLANG_COMPILE_FLAGS
     -Werror
     -Wno-error=overflow
     -Wno-error=unused-function
+    -Wno-unused-parameter
+    -Wno-unused-function
 )
 set(MAG_CLANG_RELEASE_COMPILE_FLAGS
     -O3
@@ -56,6 +58,8 @@ set(MAG_GCC_COMPILE_FLAGS
     -Wno-error=overflow
     -Wno-error=unused-function
     -Wno-error=format-truncation
+    -Wno-unused-parameter
+    -Wno-unused-function
 )
 set(MAG_GCC_RELEASE_COMPILE_FLAGS
     -O3
