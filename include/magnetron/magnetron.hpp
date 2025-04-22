@@ -44,19 +44,6 @@ namespace magnetron {
         return mag_device_type_get_name(static_cast<mag_compute_device_type_t>(device));
     }
 
-    // Operator evaluation mode
-    enum class exec_mode : std::underlying_type_t<mag_exec_mode_t> {
-        /**
-         * Execute operations eagerly (immediately and synchronously)
-         */
-        eager = MAG_EXEC_MODE_EAGER,
-
-        /**
-         * Execute operations deferred (lazily and asynchronously)
-         */
-        deferred = MAG_EXEC_MODE_DEFERRED
-    };
-
     /**
      * Pseudo-random number generator (PRNG) algorithm
      */
@@ -191,8 +178,6 @@ namespace magnetron {
 
         [[nodiscard]] auto operator *() noexcept -> mag_ctx_t& { return *m_ctx; }
         [[nodiscard]] auto operator *() const noexcept -> const mag_ctx_t& { return *m_ctx; }
-        [[nodiscard]] auto exec_mode() const noexcept -> exec_mode { return static_cast<enum exec_mode>(mag_ctx_get_exec_mode(m_ctx)); }
-        auto exec_mode(enum exec_mode mode) noexcept -> void { mag_ctx_set_exec_mode(m_ctx, static_cast<mag_exec_mode_t>(mode)); }
         [[nodiscard]] auto prng_algorithm() const noexcept -> prng_algorithm { return static_cast<enum prng_algorithm>(mag_ctx_get_prng_algorithm(m_ctx)); }
         auto prng_algorithm(enum prng_algorithm algorithm, std::uint64_t seed) noexcept -> void { mag_ctx_set_prng_algorithm(m_ctx, static_cast<mag_prng_algorithm_t>(algorithm), seed); }
         [[nodiscard]] auto device_type() const noexcept -> compute_device { return static_cast<compute_device>(mag_ctx_get_compute_device_type(m_ctx)); }

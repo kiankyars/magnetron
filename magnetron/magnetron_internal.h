@@ -940,7 +940,6 @@ struct mag_ctx_t {
     size_t num_storages;                                /* Total storage buffers allocated. */
     mag_fixed_intrusive_pool tensor_pool;               /* Tensor struct memory pool. */
     mag_fixed_intrusive_pool storage_pool;              /* Storage struct memory pool. */
-    mag_exec_mode_t exec_mode;                          /* Execution mode. */
     mag_ctx_flags_t flags;                              /* Context flags. */
     mag_prng_algorithm_t prng_algo;                     /* Active PRNG algorithm. */
     uintptr_t tr_id;                                    /* Host thread ID. */

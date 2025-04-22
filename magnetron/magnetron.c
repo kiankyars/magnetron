@@ -625,7 +625,6 @@ mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
     mag_system_host_info_dump(ctx);
 
     /* Create selected compute device. */
-    ctx->exec_mode = MAG_EXEC_MODE_EAGER;
     ctx->device_type = device_info->type;
     ctx->device = mag_init_dynamic_device(ctx, device_info);
     mag_log_info("Compute device: %s", ctx->device->name);
@@ -645,13 +644,6 @@ void mag_ctx_destroy(mag_ctx_t* ctx) { /* Destroy magnetron context. */
     (*mag_alloc)(ctx, 0); /* Free ctx. */
     ctx = NULL;
     mag_log_info("magnetron context destroyed.");
-}
-
-mag_exec_mode_t mag_ctx_get_exec_mode(const mag_ctx_t* ctx) { return ctx->exec_mode; }
-
-void mag_ctx_set_exec_mode(mag_ctx_t* ctx, mag_exec_mode_t mode) {
-    ctx->exec_mode = mode;
-    mag_log_info("Execution mode set to: %s", mode == MAG_EXEC_MODE_EAGER ? "Eager" : "Deferred");
 }
 
 mag_prng_algorithm_t mag_ctx_get_prng_algorithm(const mag_ctx_t* ctx) {
@@ -2095,11 +2087,9 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
         }
     }
     if (opps) memcpy(result->op_params, opps, numopps*sizeof(*opps));   /* Copy operation parameters */
-    if (mag_likely(ctx->exec_mode == MAG_EXEC_MODE_EAGER)) {            /* In eager execution mode, we execute immediately. */
-        mag_op_exec(result, ctx->device, stage);                          /* Execute the operation immediately. */
-        if (!(ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)) {               /* If not recording gradients, free parent tensors. */
-            memset(result->op_inputs, 0, sizeof(result->op_inputs));
-        }
+    mag_op_exec(result, ctx->device, stage);                          /* Execute the operation immediately. */
+    if (!(ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)) {               /* If not recording gradients, free parent tensors. */
+        memset(result->op_inputs, 0, sizeof(result->op_inputs));
     }
     return result;
 }
@@ -2248,7 +2238,6 @@ mag_tensor_t* mag_sigmoid(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sigmoid_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SIGMOID, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -2257,7 +2246,6 @@ mag_tensor_t* mag_sigmoid_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sigmoid_dv_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SIGMOID_DV, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -2266,7 +2254,6 @@ mag_tensor_t* mag_hard_sigmoid(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_hard_sigmoid_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_HARD_SIGMOID, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -2275,7 +2262,6 @@ mag_tensor_t* mag_silu(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_silu_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SILU, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -2284,7 +2270,6 @@ mag_tensor_t* mag_silu_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_silu_dv_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SILU_DV, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -2293,7 +2278,6 @@ mag_tensor_t* mag_tanh(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_tanh_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_TANH, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -2302,7 +2286,6 @@ mag_tensor_t* mag_tanh_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_tanh_dv_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_TANH_DV, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -2311,7 +2294,6 @@ mag_tensor_t* mag_relu(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_relu_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_RELU, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -2320,7 +2302,6 @@ mag_tensor_t* mag_relu_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_relu_dv_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_RELU_DV, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -2329,7 +2310,6 @@ mag_tensor_t* mag_gelu(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_gelu_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_GELU, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -2338,7 +2318,6 @@ mag_tensor_t* mag_gelu_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_gelu_dv_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_GELU_DV, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -2347,7 +2326,6 @@ mag_tensor_t* mag_add(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_add_(mag_tensor_t* x, mag_tensor_t* y) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_ADD, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -2356,7 +2334,6 @@ mag_tensor_t* mag_sub(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_sub_(mag_tensor_t* x, mag_tensor_t* y) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SUB, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -2365,7 +2342,6 @@ mag_tensor_t* mag_mul(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_mul_(mag_tensor_t* x, mag_tensor_t* y) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_MUL, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -2374,7 +2350,6 @@ mag_tensor_t* mag_div(mag_tensor_t* x, mag_tensor_t* y) {
 }
 
 mag_tensor_t* mag_div_(mag_tensor_t* x, mag_tensor_t* y) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_DIV, true, (mag_tensor_t*[]){x, y}, 2, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -2384,7 +2359,6 @@ mag_tensor_t* mag_adds(mag_tensor_t* x, mag_e8m23_t xi) {
 }
 
 mag_tensor_t* mag_adds_(mag_tensor_t* x, mag_e8m23_t xi) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_ADDS, true, &x, 1, &param, 1, MAG_STAGE_EVAL);
 }
@@ -2395,7 +2369,6 @@ mag_tensor_t* mag_subs(mag_tensor_t* x, mag_e8m23_t xi) {
 }
 
 mag_tensor_t* mag_subs_(mag_tensor_t* x, mag_e8m23_t xi) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_SUBS, true, &x, 1, &param, 1, MAG_STAGE_EVAL);
 }
@@ -2406,7 +2379,6 @@ mag_tensor_t* mag_muls(mag_tensor_t* x, mag_e8m23_t xi) {
 }
 
 mag_tensor_t* mag_muls_(mag_tensor_t* x, mag_e8m23_t xi) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_MULS, true, &x, 1, &param, 1, MAG_STAGE_EVAL);
 }
@@ -2417,7 +2389,6 @@ mag_tensor_t* mag_divs(mag_tensor_t* x, mag_e8m23_t xi) {
 }
 
 mag_tensor_t* mag_divs_(mag_tensor_t* x, mag_e8m23_t xi) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_DIVS, true, &x, 1, &param, 1, MAG_STAGE_EVAL);
 }
@@ -2428,7 +2399,6 @@ mag_tensor_t* mag_pows(mag_tensor_t* x, mag_e8m23_t xi) {
 }
 
 mag_tensor_t* mag_pows_(mag_tensor_t* x, mag_e8m23_t xi) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "in-place operations are not supported for gradient-tracking tensors");
     mag_opp_t param = mag_opp_pack_e8m23(xi);
     return mag_tensor_operator(x->ctx, MAG_OP_POWS, true, &x, 1, &param, 1, MAG_STAGE_EVAL);
 }

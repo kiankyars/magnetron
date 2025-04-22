@@ -57,13 +57,6 @@ typedef enum mag_compute_device_type_t {
 } mag_compute_device_type_t;
 extern MAG_EXPORT const char* _Nonnull mag_device_type_get_name(mag_compute_device_type_t op);
 
-typedef enum mag_exec_mode_t {
-    MAG_EXEC_MODE_EAGER = 0,        /* Execute operations immediately. (Dynamic computation graph, like PyTorch). */
-    MAG_EXEC_MODE_DEFERRED = 1,     /* Build computation graph and execute later. (Static computation graph, like TensorFlow 1.0). */
-
-    MAG_EXEC_MODE__NUM
-} mag_exec_mode_t;
-
 typedef enum mag_prng_algorithm_t {
     MAG_PRNG_MERSENNE_TWISTER = 0,  /* Mersenne Twister PRNG */
     MAG_PRNG_PCG = 1,               /* Permuted Congruential Generator PRNG */
@@ -104,8 +97,6 @@ typedef struct mag_device_descriptor_t {
 
 extern MAG_EXPORT mag_ctx_t* _Nonnull mag_ctx_create(mag_compute_device_type_t device);                                     /* Create context with default config, and only specify device type. */
 extern MAG_EXPORT mag_ctx_t* _Nonnull mag_ctx_create2(const mag_device_descriptor_t* _Nonnull device_info);                 /* Create context with customized device config, and only specify device type. */
-extern MAG_EXPORT mag_exec_mode_t mag_ctx_get_exec_mode(const mag_ctx_t* _Nonnull ctx);                                     /* Get execution mode */
-extern MAG_EXPORT void mag_ctx_set_exec_mode(mag_ctx_t* _Nonnull ctx, mag_exec_mode_t mode);                                /* Set execution mode */
 extern MAG_EXPORT mag_prng_algorithm_t mag_ctx_get_prng_algorithm(const mag_ctx_t* _Nonnull ctx);                           /* Get PRNG algorithm */
 extern MAG_EXPORT void mag_ctx_set_prng_algorithm(mag_ctx_t* _Nonnull ctx, mag_prng_algorithm_t algorithm, uint64_t seed);  /* Set PRNG algorithm */
 extern MAG_EXPORT mag_compute_device_type_t mag_ctx_get_compute_device_type(const mag_ctx_t* _Nonnull ctx);                 /* Get compute device type */
