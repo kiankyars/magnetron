@@ -1437,7 +1437,7 @@ static void mag_op_backward_matmul(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_decref(xt);
 }
 
-const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
+const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
     static const mag_op_meta_t infos[MAG_OP__NUM] = {
         [MAG_OP_NOP] = {
             .mnemonic = "nop",
@@ -1817,7 +1817,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t type) {
             .validator = mag_validate_op_repeat_rev
         }
     };
-    return infos+type;
+    return infos+opc;
 }
 
 #undef mag_validate_inputs
