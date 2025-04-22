@@ -516,82 +516,77 @@ extern MAG_EXPORT void mag_thread_yield(void); /* Yield current thread. */
 /* Operation parameter */
 
 /* Operation parameter type tag. */
-typedef enum mag_opp_type_t {
+typedef enum mag_op_param_type_t {
     MAG_OPP_NONE  = 0,
     MAG_OPP_E8M23 = 1,    /* fp32 */
-    MAG_OPP_I62   = 2,    /* 62-bit signed integer. Top 2-bits (MSB) will be truncated and must be 0. */
-    MAG_OPP_U62   = 3,    /* 62-bit unsigned integer. Top 2-bits (MSB) will be truncated and must be 0. */
+    MAG_OPP_I64   = 2,    /* 64-bit signed integer. */
+    MAG_OPP_U64   = 3,    /* 64-bit unsigned integer. */
 
     MAG_OPP__NUM
-} mag_opp_type_t;
-mag_static_assert(MAG_OPP__NUM-1 <= 3); /* Must fit in 2 bits */
+} mag_op_param_type_t;
 
 /*
 ** The opp (Operation Parameter) is used to pass additional data to the operation. For example:
 **      The FILL init op uses the opp to pass the value to fill the tensor buffer with.
 **      The permute op receives all permutation axes in the operation parameters.
-** The opp is essentially a tagged union (variant), but the type tag and the value (which is a float, integer or pointer) are packed into a single 64-bit integer.
-** TODO @mario: simplify this to a normal struct with subunion - packing is probably unnecessary?
+** The opp is a tagged union (variant).
 */
-typedef uint64_t mag_opp_t;
+typedef struct mag_op_param_t {
+    mag_op_param_type_t type;
+    union { /* Overlapping values, one is active. */
+        mag_e8m23_t e8m23;
+        int64_t i64;
+        uint64_t u64;
+    };
+} mag_op_param_t;
 
-/*
-** Pack a value and type into a single 64-bit integer.
-** Additionally check that the data fits within 62 bits, because the top 2 bits are used for the type tag.
-** Panics if the top 2 bits of the data are not zero.
-*/
-static MAG_AINLINE mag_opp_t mag_opp_pack(uint64_t dat, mag_opp_type_t t) {
-    mag_assert(dat>>(64-2)==0 || (t==MAG_OPP_I62 && (dat>>(64-2) == 3)), "contained value must be a 62-bit integer: %" PRIx64, dat);
-    return (dat<<2)|(3&t);
+static MAG_AINLINE mag_op_param_t mag_op_param_none() {
+    return (mag_op_param_t){.type=MAG_OPP_NONE, .u64=0};
 }
-static MAG_AINLINE mag_opp_t mag_opp_pack_none(void) { return 0; } /* Pack none type. */
-static MAG_AINLINE mag_opp_t mag_opp_pack_e8m23(mag_e8m23_t x) { /* Create opp of type e8m23 and wrapping a value. */
-    union { uint32_t u32; mag_e8m23_t e8m23; } castor = {.e8m23=x};
-    return mag_opp_pack(castor.u32, MAG_OPP_E8M23);
-}
-static MAG_AINLINE mag_opp_t mag_opp_pack_i62(int64_t x) { /* Create opp of type int62 and wrapping a value. */
-    mag_assert(x >= -(1ll<<61) && x <= ((1ll<<61)-1), "int62 out of range: %" PRIi64, x);
-    return mag_opp_pack(x&((1ull<<62)-1), MAG_OPP_I62);
-}
-static MAG_AINLINE mag_opp_t mag_opp_pack_u62(uint64_t x) { return mag_opp_pack(x, MAG_OPP_U62); } /* Create opp of type uint62 and wrapping a value. */
-static MAG_AINLINE mag_opp_type_t mag_opp_unpack_type(mag_opp_t pa) { return (mag_opp_type_t)(3&pa); } /* Unpack type tag from packed opp. */
-static MAG_AINLINE uint64_t mag_opp_unpack_raw_value(mag_opp_t pa) { return pa>>2; } /* Unpack raw value from packed opp. */
-static MAG_AINLINE bool mag_opp_is_type(mag_opp_t pa, mag_opp_type_t type) { return (3&pa) == type; } /* Check if packed opp is of type 'type'. */
 
-/* Unpack value from packed opp. Panics if the type is not the expected type. */
-static MAG_AINLINE mag_e8m23_t mag_opp_unpack_e8m23_or_panic(mag_opp_t pa) {
-    mag_assert(mag_opp_is_type(pa, MAG_OPP_E8M23), "invalid op param type: %d", mag_opp_unpack_type(pa))
-    union { uint32_t u32; mag_e8m23_t e8m23; } castor = {.u32=(uint32_t)mag_opp_unpack_raw_value(pa)};
-    return castor.e8m23;
+static MAG_AINLINE mag_op_param_t mag_op_param_wrap_e8m23(mag_e8m23_t x) {
+    uint32_t u32;
+    memcpy(&u32, &x, sizeof(u32));
+    return (mag_op_param_t){.type=MAG_OPP_E8M23, .u64=u32};
+}
+
+static MAG_AINLINE mag_op_param_t mag_op_param_wrap_i64(int64_t x) {
+    return (mag_op_param_t){.type=MAG_OPP_I64, .i64=x};
+}
+
+static MAG_AINLINE mag_op_param_t mag_op_param_wrap_u64(uint64_t x) {
+    return (mag_op_param_t){.type=MAG_OPP_U64, .u64=x};
 }
 
 /* Unpack value from packed opp. Panics if the type is not the expected type. */
-static MAG_AINLINE int64_t mag_opp_unpack_i62_or_panic(mag_opp_t pa) {
-    mag_assert(mag_opp_is_type(pa, MAG_OPP_I62), "invalid op param type: %d", mag_opp_unpack_type(pa))
-    uint64_t v = mag_opp_unpack_raw_value(pa);
-    if (v & (1ull<<61)) v|=(3ull<<62);
-    return (int64_t)v;
+static MAG_AINLINE mag_e8m23_t mag_op_param_unpack_e8m23_or_panic(mag_op_param_t pa) {
+    mag_assert(pa.type == MAG_OPP_E8M23, "invalid op param type: %d", pa.type);
+    mag_e8m23_t e8m23 = 0.f;
+    uint32_t u32 = (uint32_t)pa.u64;
+    memcpy(&e8m23, &u32, sizeof(e8m23));
+    return e8m23;
 }
 
-/* Unpack value from packed opp. Panics if the type is not the expected type. */
-static MAG_AINLINE uint64_t mag_opp_unpack_u62_or_panic(mag_opp_t pa) {
-    mag_assert(mag_opp_is_type(pa, MAG_OPP_U62), "invalid op param type: %d", mag_opp_unpack_type(pa))
-    return mag_opp_unpack_raw_value(pa);
+static MAG_AINLINE int64_t mag_op_param_unpack_i64_or_panic(mag_op_param_t pa) {
+    mag_assert(pa.type == MAG_OPP_I64, "invalid op param type: %d", pa.type);
+    return pa.i64;
 }
 
-/* Unpack value from packed opp. If the type is not the expected type, return fallback. */
-static MAG_AINLINE mag_e8m23_t mag_opp_unpack_e8m23_or(mag_opp_t pa, mag_e8m23_t fallback) {
-    return mag_opp_is_type(pa, MAG_OPP_E8M23) ? mag_opp_unpack_e8m23_or_panic(pa) : fallback;
+static MAG_AINLINE uint64_t mag_op_param_unpack_u64_or_panic(mag_op_param_t pa) {
+    mag_assert(pa.type == MAG_OPP_U64, "invalid op param type: %d", pa.type);
+    return pa.u64;
 }
 
-/* Unpack value from packed opp. If the type is not the expected type, return fallback. */
-static MAG_AINLINE int64_t mag_opp_unpack_i62_or(mag_opp_t pa, int64_t fallback) {
-    return mag_opp_is_type(pa, MAG_OPP_I62) ? mag_opp_unpack_i62_or_panic(pa) : fallback;
+static MAG_AINLINE mag_e8m23_t mag_op_param_unpack_e8m23_or(mag_op_param_t pa, mag_e8m23_t fallback) {
+    return pa.type == MAG_OPP_E8M23 ? mag_op_param_unpack_e8m23_or_panic(pa) : fallback;
 }
 
-/* Unpack value from packed opp. If the type is not the expected type, return fallback. */
-static MAG_AINLINE uint64_t mag_opp_unpack_u62_or(mag_opp_t pa, uint64_t fallback) {
-    return mag_opp_is_type(pa, MAG_OPP_U62) ? mag_opp_unpack_u62_or_panic(pa) : fallback;
+static MAG_AINLINE int64_t mag_op_param_unpack_i64_or(mag_op_param_t pa, int64_t fallback) {
+    return pa.type == MAG_OPP_I64 ? mag_op_param_unpack_i64_or_panic(pa) : fallback;
+}
+
+static MAG_AINLINE uint64_t mag_op_param_unpack_u64_or(mag_op_param_t pa, uint64_t fallback) {
+    return pa.type == MAG_OPP_U64 ? mag_op_param_unpack_u64_or_panic(pa) : fallback;
 }
 
 /* Standard opcodes, not including initialization operators. */
@@ -675,7 +670,7 @@ typedef struct mag_op_meta_t {
     const char* const _Nonnull mnemonic;                    /* Operation mnemonic */
     const uint8_t num_inputs;                               /* Number of inputs */
     const uint8_t num_params;                               /* Number of parameters */
-    const mag_opp_type_t param_types[MAG_MAX_OP_PARAMS];    /* Parameter types */
+    const mag_op_param_type_t param_types[MAG_MAX_OP_PARAMS];    /* Parameter types */
     const mag_op_flags_t flags;                             /* Operation flags */
 
     void (*_Nullable const backward)(                       /* Backward pass function or NULL. */
@@ -685,14 +680,14 @@ typedef struct mag_op_meta_t {
 
     mag_tensor_t* _Nonnull (*_Nullable const r_alloc)(      /* Result allocator function or NULL. */
         mag_tensor_t* _Nonnull* _Nonnull,
-        const mag_opp_t* _Nullable
+        const mag_op_param_t* _Nullable
     );
 
     bool (*_Nullable const validator)(                      /* Validator function or NULL. */
         mag_op_t,
         mag_tensor_t* _Nonnull,
         mag_tensor_t* _Nonnull* _Nonnull,
-        const mag_opp_t* _Nullable
+        const mag_op_param_t* _Nullable
     );
 
     struct {
@@ -990,9 +985,9 @@ struct mag_tensor_t {
     mag_tensor_flags_t flags;                               /* Tensor flags. */
     mag_op_t op;                                            /* Opcode for operators. */
     mag_tensor_t* _Nullable op_inputs[MAG_MAX_OP_INPUTS];   /* Input tensors for operators. */
-    mag_opp_t op_params[MAG_MAX_OP_PARAMS];                 /* Operator parameters. */
+    mag_op_param_t op_params[MAG_MAX_OP_PARAMS];                 /* Operator parameters. */
     mag_init_op_t init_op;                                  /* Initialization op */
-    mag_opp_t init_op_params[MAG_MAX_OP_PARAMS];            /* Init operator parameters */
+    mag_op_param_t init_op_params[MAG_MAX_OP_PARAMS];            /* Init operator parameters */
     mag_tensor_t* _Nullable view_uplink;                    /* View base tensor. */
     size_t view_offs;                                       /* Offset in view tensor. */
     mag_tensor_t* _Nullable grad;                           /* ∇f - Gradient tensor. */
