@@ -1140,7 +1140,7 @@ static void (*_Nonnull const mag_blas_lut_init_kernels[MAG_IOP__NUM][MAG_DTYPE__
     },
 };
 
-static void (*_Nonnull const mag_blas_lut_forward_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t* _Nonnull) = {
+static void (*_Nonnull const mag_blas_lut_eval_kernels[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t* _Nonnull) = {
     [MAG_OP_NOP] = {
         [MAG_DTYPE_E8M23] = &mag_blas_nop,
         [MAG_DTYPE_E5M10] = &mag_blas_nop,
@@ -1335,7 +1335,7 @@ void MAG_BLAS_SPECIALIZATION(mag_kernel_registry_t* _Nonnull kernels) {
             kernels->init[i][j] = mag_blas_lut_init_kernels[i][j];
     for (int i=0; i < MAG_OP__NUM; ++i) {
         for (int j=0; j < MAG_DTYPE__NUM; ++j) {
-            kernels->fwd[i][j] = mag_blas_lut_forward_kernels[i][j];
+            kernels->fwd[i][j] = mag_blas_lut_eval_kernels[i][j];
         }
     }
     kernels->vector_cast = &mag_blas_vector_cast_stub;

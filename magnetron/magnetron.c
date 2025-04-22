@@ -1996,12 +1996,25 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
     return hdr;
 }
 
+static mag_tensor_t* mag_tensor_inplace_view(mag_tensor_t* base) {
+    return mag_tensor_create(base->ctx, base->dtype, base->shape, base->rank, base, 0);
+}
+
 void mag_tensor_incref(mag_tensor_t* t) { /* Increase reference count of the tensor. */
     mag_rc_control_incref(&t->rc_control);
 }
 
 bool mag_tensor_decref(mag_tensor_t* t) { /* Decrease reference count of the tensor. */
     return mag_rc_control_decref(&t->rc_control);
+}
+
+mag_tensor_t* mag_tensor_detach(mag_tensor_t* t) {
+    t->op = MAG_OP_NOP;
+    t->init_op = MAG_IOP_NOP;
+    memset(t->op_inputs, 0, sizeof(t->op_inputs));
+    memset(t->op_params, 0, sizeof(t->op_params));
+    memset(t->init_op_params, 0, sizeof(t->init_op_params));
+    return t;
 }
 
 /*
@@ -2044,6 +2057,21 @@ mag_tensor_t* mag_tensor_create_6d(mag_ctx_t* ctx, mag_dtype_t type, int64_t d1,
     return mag_tensor_create(ctx, type, (int64_t[]) {d1, d2, d3, d4, d5, d6}, 6, NULL, 0);
 }
 
+static void mag_pre_validate_op(
+    mag_op_t op,                /* Operator code */
+    mag_tensor_t** inputs,      /* Input tensors. Must point to an array of 'num_inputs' (N) non-null tensors. */
+    uint32_t numin,             /* Number of valid non-null input tensors in the inputs array. Must be same as specified in the op metadata. */
+    const mag_opp_t* opps,      /* Operation parameters or NULL. Must be same as specified in the op metadata. */
+    uint32_t numopps            /* Number of operation parameters. Must be same as specified in the op metadata. */
+) {
+    mag_assert2(op != MAG_OP_NOP);
+    mag_assert(inputs && mag_check_are_inputs_valid(op, inputs, numin), "invalid input tensors for operation '%s'", mag_op_meta_of(op)->mnemonic);
+    mag_assert(mag_check_are_op_params_valid(op, opps, numopps), "invalid parameters for operation '%s'", mag_op_meta_of(op)->mnemonic);
+    if (numin > 1) { /* Check that dtype are compatible. */
+        mag_assert(mag_check_are_dtypes_compatible(op, inputs[0], inputs[1]), "invalid dtypes for operation '%s'", mag_op_meta_of(op)->mnemonic);
+    }
+}
+
 /* Execute init/normal operator on R. */
 static void MAG_HOTPROC mag_op_exec(mag_tensor_t* R, mag_compute_device_t* dvc, mag_exec_stage_t stage) {
     void (*exec)(mag_compute_device_t*, mag_tensor_t*) = stage == MAG_STAGE_INIT ? dvc->eager_exec_init : dvc->eager_exec_fwd;
@@ -2056,40 +2084,44 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
     mag_op_t op,                /* Operator code */
     bool inplace,               /* Attempt to perform inplace operation? e.g.    r <- x += y    instead of      r <- x + y */
     mag_tensor_t** inputs,      /* Input tensors. Must point to an array of 'num_inputs' (N) non-null tensors. */
-    uint32_t numin,             /* Number of valid non-null input tensors in the inputs array. Must be same as specified in the op metadata. */
-    const mag_opp_t* opps,      /* Operation parameters or NULL. Must be same as specified in the op metadata. */
-    uint32_t numopps,           /* Number of operation parameters. Must be same as specified in the op metadata. */
+    uint32_t num_inputs,        /* Number of valid non-null input tensors in the inputs array. Must be same as specified in the op metadata. */
+    const mag_opp_t* params,    /* Operation parameters or NULL. Must be same as specified in the op metadata. */
+    uint32_t num_params,        /* Number of operation parameters. Must be same as specified in the op metadata. */
     mag_exec_stage_t stage      /* Graph evaluation direction. */
 ) {
-    /* Validate inputs and params first */
-    mag_assert2(op != MAG_OP_NOP);
-    mag_assert(inputs && mag_check_are_inputs_valid(op, inputs, numin), "Invalid input tensors for operation %s.", mag_op_meta_of(op)->mnemonic);
-    mag_assert(mag_check_are_op_params_valid(op, opps, numopps), "Invalid parameters for operation %s.", mag_op_meta_of(op)->mnemonic);
-    if (numin == 2) {
-       mag_assert(mag_check_are_dtypes_compatible(op, inputs[0], inputs[1]), "Invalid dtypes for operation %s.", mag_op_meta_of(op)->mnemonic);
-    }
+    mag_pre_validate_op(op, inputs, num_inputs, params, num_params); /* Validate that function inputs are correct. */
+
+    /* Query validate and result constructor functions for the scheduled opcode. */
     const mag_op_meta_t* meta = mag_op_meta_of(op);
-    mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_opp_t*) = meta->r_alloc;                             /* Get result allocator function. */
-    bool (*validate_op)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_opp_t*) = meta->validator;       /* Get validator function. */
-    inplace &= !!(meta->flags & MAG_OP_FLAG_SUPPORTS_INPLACE);                                              /* Inplace operation requested and supported? */
-    mag_tensor_t* result =
-        inplace ? mag_tensor_create(ctx, (*inputs)->dtype, (*inputs)->shape, (*inputs)->rank, *inputs, 0)   /* ->   then view R as X for inplace aliasing op. */
-        : (*r_alloc)(inputs, opps);                                                                         /* ->   else construct new result tensor. */
-    mag_assert((*validate_op)(op, result, inputs, opps), "Invalid operation %s.", meta->mnemonic);          /* Validate operation or panic. */
-    result->op = op;                                                                                        /* Set opcode. */
-    mag_assert2(numin <= MAG_MAX_OP_INPUTS);                                                                /* Assert correct input tensor count. */
-    for (uint32_t i=0; i < numin; ++i) {                                                                    /* Set input tensors and flags. */
+    mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_opp_t*) = meta->r_alloc;                         /* Get result allocator function. */
+    bool (*validate_op)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_opp_t*) = meta->validator;   /* Get validator function. */
+
+    inplace &= !!(meta->flags & MAG_OP_FLAG_SUPPORTS_INPLACE);                                          /* Inplace operation requested and supported? */
+    mag_tensor_t* result = inplace ? mag_tensor_inplace_view(*inputs) : (*r_alloc)(inputs, params);     /* If inplace, result views x (input 0), else a new result tensor is allocated. */
+    result->op = op;                                                                                    /* Set opcode of result. */
+
+    mag_assert((*validate_op)(op, result, inputs, params), "Invalid operation %s.", meta->mnemonic);    /* Now validate the full operation and panic if something doesn't work out. */
+    mag_assert2(num_inputs <= MAG_MAX_OP_INPUTS);                                                       /* Assert correct input tensor count. */
+
+    /* Apply input tensor's gradient rules and increase their lifetime. */
+    for (uint32_t i=0; i < num_inputs; ++i) {
         mag_tensor_t* input = inputs[i];
         result->op_inputs[i] = input;
-        if (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER) {                  /* Gradient recording is enabled */
-            result->flags |= input->flags & MAG_TFLAG_REQUIRES_GRAD;    /* Set gradient tracking flag */
-            mag_tensor_incref(input);                                   /* Input must stay alive for backward pass. */
+
+        /* If gradient tracking is enabled, the result tensor inherits the input's gradient rules. */
+        if (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER) {
+            result->flags |= input->flags & MAG_TFLAG_REQUIRES_GRAD; /* Set gradient tracking flag if set in input. */
+            mag_tensor_incref(input);                                /* Keep input alive for the backward pass. */
         }
     }
-    if (opps) memcpy(result->op_params, opps, numopps*sizeof(*opps));   /* Copy operation parameters */
-    mag_op_exec(result, ctx->device, stage);                          /* Execute the operation immediately. */
-    if (!(ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)) {               /* If not recording gradients, free parent tensors. */
-        memset(result->op_inputs, 0, sizeof(result->op_inputs));
+
+    if (params) /* If available, copy operation parameters to result */
+        memcpy(result->op_params, params, num_params*sizeof(*params));
+
+    mag_op_exec(result, ctx->device, stage);  /* Now execute the operator. */
+
+    if (!(ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)) {
+        result = mag_tensor_detach(result); /* If gradient are not recorded, detach the tensor (clear parent and opcode). TODO: why are we doing this? */
     }
     return result;
 }
