@@ -288,6 +288,8 @@ namespace magnetron {
         [[nodiscard]] auto sum() const noexcept -> tensor { return tensor{mag_sum(m_tensor)}; }
         [[nodiscard]] auto abs() const noexcept -> tensor { return tensor{mag_abs(m_tensor)}; }
         [[nodiscard]] auto abs_() const noexcept -> tensor { return tensor{mag_abs_(m_tensor)}; }
+        [[nodiscard]] auto sgn() const noexcept -> tensor { return tensor{mag_sgn(m_tensor)}; }
+        [[nodiscard]] auto sgn_() const noexcept -> tensor { return tensor{mag_sgn_(m_tensor)}; }
         [[nodiscard]] auto neg() const noexcept -> tensor { return tensor{mag_neg(m_tensor)}; }
         [[nodiscard]] auto neg_() const noexcept -> tensor { return tensor{mag_neg_(m_tensor)}; }
         [[nodiscard]] auto log() const noexcept -> tensor { return tensor{mag_log(m_tensor)}; }

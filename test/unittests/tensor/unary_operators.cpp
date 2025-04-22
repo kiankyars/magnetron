@@ -36,6 +36,8 @@ static constexpr std::int64_t broadcast_lim {lim-1};
 
 impl_unary_operator_test_group(abs, e8m23, [](auto x) { return std::abs(x); })
 impl_unary_operator_test_group(abs, e5m10, [](auto x) { return std::abs(x); })
+impl_unary_operator_test_group(sgn, e8m23, [](auto x) { return (x > 0.f) ? 1.f : ((x < 0.f) ? -1.f : 0.f); })
+impl_unary_operator_test_group(sgn, e5m10, [](auto x) { return (x > 0.f) ? 1.f : ((x < 0.f) ? -1.f : 0.f); })
 impl_unary_operator_test_group(neg, e8m23, [](auto x) { return -x; })
 impl_unary_operator_test_group(neg, e5m10, [](auto x) { return -x; })
 impl_unary_operator_test_group(log, e8m23, [](auto x) { return std::log(x); })

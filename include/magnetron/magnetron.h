@@ -227,6 +227,8 @@ extern MAG_EXPORT mag_tensor_t* _Nonnull mag_sum(mag_tensor_t* _Nonnull x);
 
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_abs(mag_tensor_t* _Nonnull x);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_abs_(mag_tensor_t* _Nonnull x);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_sgn(mag_tensor_t* _Nonnull x);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_sgn_(mag_tensor_t* _Nonnull x);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_neg(mag_tensor_t* _Nonnull x);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_neg_(mag_tensor_t* _Nonnull x);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_log(mag_tensor_t* _Nonnull x);

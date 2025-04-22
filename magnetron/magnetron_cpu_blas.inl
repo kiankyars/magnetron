@@ -536,6 +536,7 @@ static void mag_blas_init_rand_normal_e5m10(const mag_compute_payload_t* _Nonnul
 #define mag_e8m23_ssdiv(x, y) ((x)/(y))
 #define mag_e8m23_sspow(x, y) (powf((x), (y)))
 #define mag_e8m23_sabs(x) (fabs(x))
+#define mag_e8m23_ssgn(x) ((x) > 0.f ? 1.f : ((x) < 0.f ? -1.f : 0.f))
 #define mag_e8m23_sneg(x) (-(x))
 #define mag_e8m23_slog(x) (logf(x))
 #define mag_e8m23_ssqr(x) ((x)*(x))
@@ -562,6 +563,7 @@ static void mag_blas_init_rand_normal_e5m10(const mag_compute_payload_t* _Nonnul
 #define mag_e8m23_sgelu_dv(x) (0.5f * (1.0f + mag_e8m23_stanh(x)) + 0.5f * (x) * (1.0f - mag_e8m23_stanh(x) * mag_e8m23_stanh(x)))
 
 mag_cpu_blas_impl_unary(e8m23, abs)
+mag_cpu_blas_impl_unary(e8m23, sgn)
 mag_cpu_blas_impl_unary(e8m23, neg)
 mag_cpu_blas_impl_unary(e8m23, log)
 mag_cpu_blas_impl_unary(e8m23, sqr)
@@ -661,6 +663,7 @@ static void MAG_HOTPROC mag_blas_softmax_e8m23(const mag_compute_payload_t* _Non
 #define mag_e5m10_ssdiv(x, y) mag_e8m23_cvt_e5m10(mag_e8m23_sdiv(mag_e5m10_cvt_e8m23(x), y))
 #define mag_e5m10_sspow(x, y) mag_e8m23_cvt_e5m10(mag_e8m23_spow(mag_e5m10_cvt_e8m23(x), y))
 #define mag_e5m10_sabs(x) mag_e8m23_cvt_e5m10(mag_e8m23_sabs(mag_e5m10_cvt_e8m23(x)))
+#define mag_e5m10_ssgn(x) mag_e8m23_cvt_e5m10(mag_e8m23_ssgn(mag_e5m10_cvt_e8m23(x)))
 #define mag_e5m10_sneg(x) mag_e8m23_cvt_e5m10(mag_e8m23_sneg(mag_e5m10_cvt_e8m23(x)))
 #define mag_e5m10_slog(x) mag_e8m23_cvt_e5m10(mag_e8m23_slog(mag_e5m10_cvt_e8m23(x)))
 #define mag_e5m10_ssqr(x) mag_e8m23_cvt_e5m10(mag_e8m23_ssqr(mag_e5m10_cvt_e8m23(x)))
@@ -687,6 +690,7 @@ static void MAG_HOTPROC mag_blas_softmax_e8m23(const mag_compute_payload_t* _Non
 #define mag_e5m10_sgelu_dv(x) mag_e8m23_cvt_e5m10(mag_e8m23_sgelu_dv(mag_e5m10_cvt_e8m23(x)))
 
 mag_cpu_blas_impl_unary(e5m10, abs)
+mag_cpu_blas_impl_unary(e5m10, sgn)
 mag_cpu_blas_impl_unary(e5m10, neg)
 mag_cpu_blas_impl_unary(e5m10, log)
 mag_cpu_blas_impl_unary(e5m10, sqr)
@@ -1192,6 +1196,10 @@ static void (*_Nonnull const mag_blas_lut_eval_kernels[MAG_OP__NUM][MAG_DTYPE__N
     [MAG_OP_ABS] = {
         [MAG_DTYPE_E8M23] = &mag_blas_abs_e8m23,
         [MAG_DTYPE_E5M10] = &mag_blas_abs_e5m10,
+    },
+    [MAG_OP_SGN] = {
+        [MAG_DTYPE_E8M23] = &mag_blas_sgn_e8m23,
+        [MAG_DTYPE_E5M10] = &mag_blas_sgn_e5m10,
     },
     [MAG_OP_NEG] = {
         [MAG_DTYPE_E8M23] = &mag_blas_neg_e8m23,

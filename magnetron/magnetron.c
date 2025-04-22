@@ -1529,6 +1529,20 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
                 .thread_treshold = 250000
             }
         },
+        [MAG_OP_SGN] = {
+            .mnemonic = "sgn",
+            .num_inputs = 1,
+            .num_params = 0,
+            .param_types = {MAG_OPP_NONE},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
+            .backward = NULL,
+            .r_alloc = &mag_result_constructor_routine_isomorph,
+            .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
+        },
         [MAG_OP_NEG] = {
             .mnemonic = "neg",
             .num_inputs = 1,
@@ -2215,6 +2229,15 @@ mag_tensor_t* mag_abs(mag_tensor_t* x) {
 mag_tensor_t* mag_abs_(mag_tensor_t* x) {
     mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_ABS, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_tensor_t* mag_sgn(mag_tensor_t* x) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SGN, false, &x, 1, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_tensor_t* mag_sgn_(mag_tensor_t* x) {
+    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
+    return mag_tensor_operator(x->ctx, MAG_OP_SGN, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
 mag_tensor_t* mag_neg(mag_tensor_t* x) {

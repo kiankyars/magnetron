@@ -611,6 +611,7 @@ typedef enum mag_op_t {
 
     /* Unary */
     MAG_OP_ABS,
+    MAG_OP_SGN,
     MAG_OP_NEG,
     MAG_OP_LOG,
     MAG_OP_SQR,
