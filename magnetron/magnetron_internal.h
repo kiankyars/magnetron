@@ -340,7 +340,8 @@ extern MAG_EXPORT void* _Nonnull (*_Nonnull mag_alloc)(void* _Nullable blk, size
 extern MAG_EXPORT void* _Nonnull mag_alloc_aligned(size_t size, size_t align); /* Aligned allocator function. */
 extern MAG_EXPORT void mag_free_aligned(void* _Nonnull blk); /* Free aligned memory. */
 
-extern MAG_EXPORT void mag_humanize_memory_size(size_t n, mag_e11m52_t* _Nonnull out, const char* _Nonnull* _Nonnull unit); /* Humanize memory size. Returns unit string like KiB and the scaled value. */
+/* Humanize memory size. Format and convert a memory size to the appropriate unit. For example. 1024 => 1 KiB */
+extern MAG_EXPORT void mag_humanize_memory_size(size_t n, mag_e11m52_t* _Nonnull out, const char* _Nonnull* _Nonnull unit);
 extern MAG_EXPORT uintptr_t mag_thread_id(void); /* Get current native thread ID. */
 
 #define mag_swap(T, a, b) do { T tmp = (a); (a) = (b); (b) = tmp; } while (0)

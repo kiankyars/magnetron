@@ -178,7 +178,8 @@ void* (*mag_alloc)(void* blk, size_t size) = &mag_alloc_stub;
 void* (*mag_get_alloc_fn(void))(void* blk, size_t size) { return mag_alloc; } /* Get global allocator. */
 void mag_set_alloc_fn(void* (*alloc)(void* blk, size_t size)) { mag_assert2(alloc); mag_alloc = alloc; } /* Set global allocator. */
 
-void mag_humanize_memory_size(size_t n, mag_e11m52_t* out, const char** unit) { /* Format and convert a memory size to the appropriate unit. For example. 1024 => 1 KiB */
+/* Humanize memory size. Format and convert a memory size to the appropriate unit. For example. 1024 => 1 KiB */
+void mag_humanize_memory_size(size_t n, mag_e11m52_t* out, const char** unit) {
     if (n < (1<<10)) {
         *out = (mag_e11m52_t)n;
         *unit = "B";
@@ -243,7 +244,7 @@ extern __declspec(dllimport) int __stdcall WideCharToMultiByte(
 );
 #endif
 
-/* Open file. Basically fopen but with UTF-8 support. */
+/* Open file. Basically fopen but with UTF-8 support on Windows. */
 static FILE* mag_fopen(const char* file, const char* mode) {
     mag_assert(file && *file && mode && *mode, "Invalid file name or mode");
     FILE* f = NULL;
@@ -266,7 +267,7 @@ static FILE* mag_fopen(const char* file, const char* mode) {
     return f;
 }
 
-uintptr_t mag_thread_id(void) { /* Get the current thread ID as. */
+uintptr_t mag_thread_id(void) { /* Get the current thread ID. */
     uintptr_t tid;
     #if defined(_MSC_VER) && defined(_M_X64)
         tid = __readgsqword(48);
@@ -352,7 +353,7 @@ static uint64_t mag_hpc_clock_ns(void) { /* High precision clock in nanoseconds.
     #endif
 }
 static uint64_t mag_hpc_clock_elapsed_ns(uint64_t start) { /* High precision clock elapsed time in microseconds. */
-    return (uint64_t)llabs((int64_t)mag_hpc_clock_ns() - (int64_t)start);
+    return (uint64_t)llabs((long long)mag_hpc_clock_ns() - (long long)start);
 }
 static mag_e11m52_t mag_hpc_clock_elapsed_ms(uint64_t start) { /* High precision clock elapsed time in milliseconds. */
     return (mag_e11m52_t)mag_hpc_clock_elapsed_ns(start) / 1e6;
@@ -360,7 +361,8 @@ static mag_e11m52_t mag_hpc_clock_elapsed_ms(uint64_t start) { /* High precision
 #define mag_clock_cycles() ((uint64_t)clock())
 #define mag_cycles_per_ms() ((uint64_t)CLOCKS_PER_SEC/1000)
 
-typedef uint32_t mag_bitset_t; /* Fixed bitset for hashset. */
+/* Bitset for 32-bit integers. */
+typedef uint32_t mag_bitset_t;
 mag_static_assert(sizeof(mag_bitset_t) == 4);
 #define mag_bitset_size(n) (((n)+((4<<3)-1))>>5)
 #define mag_bitset_get(sets, i) (!!(sets[(i)>>5]&(1u<<((i)&((4<<3)-1)))))
@@ -368,7 +370,8 @@ mag_static_assert(sizeof(mag_bitset_t) == 4);
 #define mag_bitset_clear(sets, i) (sets[(i)>>5]&=~(1u<<((i)&((4<<3)-1))))
 #define mag_bitset_toggle(sets, i) (sets[(i)>>5]^=(1u<<((i)&((4<<3)-1))))
 
-typedef struct mag_hashset_t { /* Simple tensor hashset to ensure graph traversal node uniqueness. */
+/* Tensor hashset with linear probing. */
+typedef struct mag_hashset_t {
     size_t len;
     mag_bitset_t* used;
     const mag_tensor_t** keys;
@@ -398,6 +401,7 @@ static size_t mag_hashset_compute_hash_size(size_t sz) {
     return l < sizeof(prime_lut)/sizeof(*prime_lut) ? prime_lut[l] : sz|1;
 }
 
+/* Create a new hashset. */
 static mag_hashset_t mag_hashset_init(size_t size) {
     size = mag_hashset_compute_hash_size(size);
     mag_hashset_t set = {
@@ -409,6 +413,7 @@ static mag_hashset_t mag_hashset_init(size_t size) {
     return set;
 }
 
+/* Lookup a key in the hashset. Returns index or MAG_HASHSET_FULL if full. */
 static size_t mag_hashset_lookup(mag_hashset_t* set, const mag_tensor_t* key) {
     size_t k = mag_hashset_hash_fn(key) % set->len, i = k;
     while (mag_bitset_get(set->used, i) && set->keys[i] != key) { /* Simple linear probe. */
@@ -418,11 +423,13 @@ static size_t mag_hashset_lookup(mag_hashset_t* set, const mag_tensor_t* key) {
     return i;
 }
 
+/* Check if a key exists in the hashset. */
 static bool mag_hashset_contains_key(mag_hashset_t* set, const mag_tensor_t* key) {
     size_t i = mag_hashset_lookup(set, key);
     return mag_bitset_get(set->used, i) && i != MAG_HASHSET_FULL;
 }
 
+/* Insert a key into the hashset. Returns index or MAG_HASHSET_DUPLICATE if already exists. */
 static size_t mag_hashset_insert(mag_hashset_t* set, const mag_tensor_t* key) {
     size_t k = mag_hashset_hash_fn(key) % set->len, i = k;
     do { /* Simple linear probing */
@@ -437,10 +444,12 @@ static size_t mag_hashset_insert(mag_hashset_t* set, const mag_tensor_t* key) {
     return MAG_HASHSET_FULL; /* Full */
 }
 
+/* Reset the hashset. */
 static void mag_hashset_reset(mag_hashset_t* set) {
     memset(set->used, 0, mag_bitset_size(set->len)*sizeof(*set->used));
 }
 
+/* Clear the hashset. */
 static void mag_hashset_free(mag_hashset_t* set) {
     (*mag_alloc)(set->used, 0);
     (*mag_alloc)(set->keys, 0);
@@ -504,11 +513,11 @@ static bool MAG_AINLINE mag_imull64_ov(int64_t a, int64_t b, int64_t* c) {
     #endif
 }
 
-/* Initialize and reseed PRNG state. */
+/* Initialize and seed PRNG state. */
 void mag_prng_init(mag_prng_state_t* prng, mag_prng_algorithm_t algo, uint64_t seed) {
     seed = seed ? seed : 0x853c49e6748fea9bull;
     switch ((prng->algo = algo)) {
-        case MAG_PRNG_MERSENNE_TWISTER: {
+        case MAG_PRNG_MERSENNE_TWISTER: { /* Mersenne Twister */
             uint32_t* state = prng->mersenne.state;
             *state = (uint32_t)seed;
             for (size_t i=1; i < 624; ++i)
@@ -516,7 +525,7 @@ void mag_prng_init(mag_prng_state_t* prng, mag_prng_algorithm_t algo, uint64_t s
             prng->mersenne.next = 0;
             prng->mersenne.remaining = 1;
         } break;
-        case MAG_PRNG_PCG: {
+        case MAG_PRNG_PCG: { /* PCG-XSH-RR */
             prng->pcg.state = seed^0x853c49e6748fea9bull;
             prng->pcg.inc = 0xda3e39cb94b95bdbull;
         } break;
@@ -626,13 +635,13 @@ mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
     return ctx;
 }
 
-void mag_ctx_destroy(mag_ctx_t* ctx) {
-    mag_assert(ctx->num_tensors == 0, "%zu tensors have not been freed", ctx->num_tensors);
-    mag_assert(ctx->num_storages == 0, "%zu storages have not been freed", ctx->num_storages);
+void mag_ctx_destroy(mag_ctx_t* ctx) { /* Destroy magnetron context. */
+    mag_assert(ctx->num_tensors == 0, "%zu tensors have not been freed", ctx->num_tensors);     /* Leak check if all tensors are freed. */
+    mag_assert(ctx->num_storages == 0, "%zu storages have not been freed", ctx->num_storages);  /* Leak check if all storages are freed. */
     mag_fixed_intrusive_pool_destroy(&ctx->tensor_pool);
     mag_fixed_intrusive_pool_destroy(&ctx->storage_pool);
     mag_destroy_dynamic_device(ctx->device); ctx->device = NULL; /* Shutdown compute device. */
-    memset(ctx, 0, sizeof(*ctx)); /* Poison context memory. */
+    memset(ctx, 255, sizeof(*ctx)); /* Poison context memory range. */
     (*mag_alloc)(ctx, 0); /* Free ctx. */
     ctx = NULL;
     mag_log_info("magnetron context destroyed.");
@@ -819,7 +828,7 @@ uint32_t mag_pack_color_u8(uint8_t r, uint8_t g, uint8_t b) { return ((uint32_t)
 
 /* Pack rgb8 into a 32-bit color and normalize. Alpha channel unused. */
 uint32_t mag_pack_color_f32(mag_e8m23_t r, mag_e8m23_t g, mag_e8m23_t b) {
-    return (((uint32_t)(r*255.0f)&255)<<16)|(((uint32_t)(g*255.0f)&255)<<8)|((uint32_t)(b*255.0f)&255);
+    return mag_pack_color_u8((uint8_t)(r*255.f), (uint8_t)(g*255.f), (uint8_t)(b*255.f));
 }
 
 void mag_ctx_grad_recorder_start(mag_ctx_t* ctx) { ctx->flags |= MAG_CTX_FLAG_GRAD_RECORDER; }
@@ -1845,11 +1854,14 @@ static void mag_tensor_dtor(void* self) {
     mag_fixed_intrusive_pool_free(&ctx->tensor_pool, t);
 }
 
+/* Create a new tensor. The must be created on the same thread as the context. */
 static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const int64_t* dims, int64_t rank, mag_tensor_t* view, size_t view_offs) {
     uintptr_t tr_id = mag_thread_id();
+    /* Ensure that the tensor is created on the same thread as the context. */
     mag_assert(tr_id == ctx->tr_id, "%" PRIx64 " != %" PRIx64 " Tensor must be created on the same thread as the context.", tr_id, ctx->tr_id);
-    mag_assert(dims != NULL && rank >= 0 && rank <= MAG_MAX_DIMS, "Rank must be within (0, %d]", MAG_MAX_DIMS);
-    if (view) {
+    mag_assert(dims != NULL && rank >= 0 && rank <= MAG_MAX_DIMS, "Rank must be within (0, %d]", MAG_MAX_DIMS); /* Check rank */
+    if (view) { /* Check if we have a view (base) tensor. */
+        mag_assert(view_offs == 0, "NYI"); /* TODO: View offset is not support at the moment. */
         if (view->view_uplink) { /* Traverse view chain and accumulate offset */
             view_offs += view->view_offs;
             view = view->view_uplink;
@@ -1859,22 +1871,22 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
     int64_t numel = 1;
     for (int64_t i=0; i < rank; ++i) /* Calculate buffer size and check for overflow. */
         mag_assert2(dims[i] > 0 && !mag_imull64_ov(dims[i], numel, &numel)); /* Overflow in buffer size. Max: INT64_MAX. Reduce dimensions. */
-    int64_t numbytes = numel*dts;
+    int64_t numbytes = numel*dts; /* Total bytes required for the data. */
     mag_assert2(!view || !numbytes || numbytes + view_offs <= mag_tensor_get_data_size(view)); /* Slice must be within viewed tensor data range. *//* Allocate memory for tensor struct on CPU RAM. */
-    mag_tensor_t* t = mag_fixed_intrusive_pool_malloc(&ctx->tensor_pool);
+    mag_tensor_t* hdr = mag_fixed_intrusive_pool_malloc(&ctx->tensor_pool); /* Allocate tensor header. */
     #ifndef NDEBUG
-        memset(t, 0, sizeof(*t));
+        memset(hdr, 0, sizeof(*hdr));
     #endif
-    *t = (mag_tensor_t) {
+    *hdr = (mag_tensor_t) { /* Initialize tensor header. */
         .ctx = ctx,
-        .rc_control = mag_rc_control_init(t, &mag_tensor_dtor),
+        .rc_control = mag_rc_control_init(hdr, &mag_tensor_dtor), /* Initialize reference counter. */
         .rank = rank,
         .shape = {0},
         .strides = {0},
         .dtype = type,
         .storage = NULL,
         .numel = numel,
-        .flags = (view ? MAG_TFLAG_VIEW : MAG_TFLAG_OWNER) | (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER ? MAG_TFLAG_REQUIRES_GRAD : 0),
+        .flags = (view ? MAG_TFLAG_VIEW : MAG_TFLAG_OWNER) | (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER ? MAG_TFLAG_REQUIRES_GRAD : 0), /* Set flags. */
         .op = MAG_OP_NOP,
         .op_inputs = {0},
         .op_params = {mag_opp_pack_none()},
@@ -1886,43 +1898,40 @@ static mag_tensor_t* mag_tensor_create(mag_ctx_t* ctx, mag_dtype_t type, const i
         .name = "",
         .ud = NULL
     };
-    ++ctx->num_tensors;
+    ++ctx->num_tensors; /* Increase tensor count in context. */
     /* Allocate device memory */
     mag_compute_device_t* dvc = ctx->device;
-    void (*allocator)(mag_compute_device_t*, mag_storage_buffer_t**, size_t, mag_dtype_t) = dvc->alloc_storage;
+    void (*allocator)(mag_compute_device_t*, mag_storage_buffer_t**, size_t, mag_dtype_t) = dvc->alloc_storage; /* Get allocator function. */
     if (view) { /* Reference memory from view */
-        t->storage = view->storage;
-        mag_rc_control_incref(&view->storage->rc_control);
+        hdr->storage = view->storage;
+        mag_rc_control_incref(&view->storage->rc_control); /* Increase reference count of the view's storage. */
     }
-    else (*allocator)(dvc, &t->storage, numbytes, type); /* Else allocate new device memory */
+    else (*allocator)(dvc, &hdr->storage, numbytes, type); /* Else allocate new device memory */
     for (int i=0; i < MAG_MAX_DIMS; ++i)  {   /* Copy dimensions and set unused to identity. */
-        t->shape[i] = i < rank ? dims[i] : 1;
-        t->strides[i] = 1;
+        hdr->shape[i] = i < rank ? dims[i] : 1;
+        hdr->strides[i] = 1;
     }
-    t->strides[rank-1] = 1;
+    /* Compute strides and check for overflow. Strides follow C's row major convention, NO Fortran ordering. */
+    hdr->strides[rank-1] = 1;
     for (int64_t i=rank-2; i >= 0; --i) {
-        mag_assert(!mag_imull64_ov(t->strides[i+1], t->shape[i+1], t->strides+i), "Overflow while computing strides");
+        mag_assert(!mag_imull64_ov(hdr->strides[i+1], hdr->shape[i+1], hdr->strides+i), "Overflow while computing strides");
     }
-#ifdef MAG_DEBUG /* If tensor RC sanitize is enabled, insert into tracking list */
-    mag_tensor_node_t** head = &ctx->rc_tracked;
-    mag_tensor_node_t* node = (*mag_alloc)(NULL, sizeof(*node));
-    *node = (mag_tensor_node_t) {
-        .tensor = t,
-        .next = *head
-    };
-    *head = node;
-#endif
-    return t;
+    return hdr;
 }
 
-void mag_tensor_incref(mag_tensor_t* t) {
+void mag_tensor_incref(mag_tensor_t* t) { /* Increase reference count of the tensor. */
     mag_rc_control_incref(&t->rc_control);
 }
 
-bool mag_tensor_decref(mag_tensor_t* t) {
+bool mag_tensor_decref(mag_tensor_t* t) { /* Decrease reference count of the tensor. */
     return mag_rc_control_decref(&t->rc_control);
 }
 
+/*
+** Hash the tensor header metadata (shape, strides, dtype, numel), TODO @mario: these values are codependent and give no new source of entropy.
+** without the tensors data, opcode or parent tensors.
+**
+*/
 uint32_t mag_tensor_weak_hash(const mag_tensor_t* _Nonnull t) {
     uint32_t h = 0;
     for (int64_t i=0; i < t->rank; ++i) {
@@ -1965,44 +1974,45 @@ static void MAG_HOTPROC mag_op_exec(mag_tensor_t* R, mag_compute_device_t* dvc, 
     (*exec)(dvc, R); /* Dispatch to backend. */
 }
 
+/* Execute an operator on the active compute device and return result tensor. */
 static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
-    mag_ctx_t* ctx,
-    mag_op_t op,
-    bool inplace,
-    mag_tensor_t** inputs,
-    uint32_t numin,
-    const mag_opp_t* opps,
-    uint32_t numopps,
-    mag_gra_eval_t gra
+    mag_ctx_t* ctx,             /* Context to use. All involved tensors must be allocated from this context. */
+    mag_op_t op,                /* Operator code */
+    bool inplace,               /* Attempt to perform inplace operation? e.g.    r <- x += y    instead of      r <- x + y */
+    mag_tensor_t** inputs,      /* Input tensors. Must point to an array of 'numin' (N) non-null tensors. */
+    uint32_t numin,             /* Number of valid non-null input tensors in the inputs array. Must be same as specified in the op metadata. */
+    const mag_opp_t* opps,      /* Operation parameters or NULL. Must be same as specified in the op metadata. */
+    uint32_t numopps,           /* Number of operation parameters. Must be same as specified in the op metadata. */
+    mag_gra_eval_t gra          /* Graph evaluation direction. */
 ) {
     /* Validate inputs and params first */
     mag_assert2(op != MAG_OP_NOP);
     mag_assert(inputs && mag_check_are_inputs_valid(op, inputs, numin), "Invalid input tensors for operation %s.", mag_op_meta_of(op)->mnemonic);
     mag_assert(mag_check_are_op_params_valid(op, opps, numopps), "Invalid parameters for operation %s.", mag_op_meta_of(op)->mnemonic);
-       if (numin == 2) {
-           mag_assert(mag_check_are_dtypes_compatible(op, inputs[0], inputs[1]), "Invalid dtypes for operation %s.", mag_op_meta_of(op)->mnemonic);
-       }
+   if (numin == 2) {
+       mag_assert(mag_check_are_dtypes_compatible(op, inputs[0], inputs[1]), "Invalid dtypes for operation %s.", mag_op_meta_of(op)->mnemonic);
+   }
     const mag_op_meta_t* meta = mag_op_meta_of(op);
-    mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_opp_t*) = meta->r_alloc;
-    bool (*validate_op)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_opp_t*) = meta->validator;
-    mag_tensor_t* R = (inplace && numin && meta->inplace)                                                       /* Inplace requested? */
-        ? mag_tensor_create(ctx, (*inputs)->dtype, (*inputs)->shape, (*inputs)->rank, *inputs, 0)      /* View R <- X for inplace aliasing op. */
-        : (*r_alloc)(inputs, opps);                                                                             /* Construct new result tensor. */
-    mag_assert((*validate_op)(op, R, inputs, opps), "Invalid operation %s.", meta->mnemonic);                   /* Validate operation */
-    R->op = op;                                                                                                 /* Set operation for deferred execution mode. */
-    mag_assert2(numin <= MAG_MAX_OP_INPUTS);
-    for (uint32_t i=0; i < numin; ++i) {                                                                        /* Set input tensors and flags. */
+    mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_opp_t*) = meta->r_alloc;                             /* Get result allocator function. */
+    bool (*validate_op)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_opp_t*) = meta->validator;       /* Get validator function. */
+    mag_tensor_t* R = (inplace && numin && meta->inplace)                                                   /* Inplace requested and possible? */
+        ? mag_tensor_create(ctx, (*inputs)->dtype, (*inputs)->shape, (*inputs)->rank, *inputs, 0)   /* ->   then view R as X for inplace aliasing op. */
+        : (*r_alloc)(inputs, opps);                                                                         /* ->   else construct new result tensor. */
+    mag_assert((*validate_op)(op, R, inputs, opps), "Invalid operation %s.", meta->mnemonic);               /* Validate operation or panic. */
+    R->op = op;                                                                                             /* Set opcode. */
+    mag_assert2(numin <= MAG_MAX_OP_INPUTS);                                                                /* Assert correct input tensor count. */
+    for (uint32_t i=0; i < numin; ++i) {                                                                    /* Set input tensors and flags. */
         mag_tensor_t* input = inputs[i];
         R->op_inputs[i] = input;
-        if (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER) { /* Gradient recording is enabled */
-            R->flags |= input->flags & MAG_TFLAG_REQUIRES_GRAD;
-            mag_tensor_incref(input); /* Input must stay alive for backward pass. */
+        if (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER) {              /* Gradient recording is enabled */
+            R->flags |= input->flags & MAG_TFLAG_REQUIRES_GRAD;     /* Set gradient tracking flag */
+            mag_tensor_incref(input);                               /* Input must stay alive for backward pass. */
         }
     }
-    if (opps) memcpy(R->op_params, opps, numopps*sizeof(*opps));        /* Copy operation parameters */
-    if (mag_likely(ctx->exec_mode == MAG_EXEC_MODE_EAGER)) {            /* In eager execution mode, we execute immediately. */
-        mag_op_exec(R, ctx->device, gra);                               /* Execute the operation immediately. */
-        if (!(ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)) {               /* If not recording gradients, free parent tensors. */
+    if (opps) memcpy(R->op_params, opps, numopps*sizeof(*opps));    /* Copy operation parameters */
+    if (mag_likely(ctx->exec_mode == MAG_EXEC_MODE_EAGER)) {        /* In eager execution mode, we execute immediately. */
+        mag_op_exec(R, ctx->device, gra);                           /* Execute the operation immediately. */
+        if (!(ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)) {           /* If not recording gradients, free parent tensors. */
             memset(R->op_inputs, 0, sizeof(R->op_inputs));
         }
     }
