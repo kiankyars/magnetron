@@ -889,7 +889,7 @@ typedef enum mag_amd64_cap_t {
 } mag_amd64_cap_t;
 #undef _
 
-extern const char* const mag_amd64_cap_names[MAG_AMD64_CAP__NUM];
+extern const char* _Nullable const mag_amd64_cap_names[MAG_AMD64_CAP__NUM];
 
 #elif defined(__aarch64__) || defined(_M_ARM64) /* ARM 64 specific CPU features. */
 

@@ -1,29 +1,45 @@
 from functools import lru_cache
 from pathlib import Path
-from magnetron._ffi_cdecl_generated import __MAG_CDECLS
 from cffi import FFI
-
 import sys
 
-MAG_LIBS: list[tuple[str, str]] = [
-    ('win32', 'magnetron.dll'),
-    ('linux', 'libmagnetron.so'),
-    ('darwin', 'libmagnetron.dylib'),
-]
-
+from magnetron._ffi_cdecl_generated import __MAG_CDECLS
 
 @lru_cache(maxsize=1)
 def load_native_module() -> tuple[FFI, object]:
     platform = sys.platform
-    lib_name = next((lib for os, lib in MAG_LIBS if platform.startswith(os)), None)
-    assert lib_name, f'Unsupported platform: {platform}'
+    pkg_dir = Path(__file__).parent       # .../src/magnetron
+    root_dir = pkg_dir.parent             # .../src
 
-    # Locate the library in the package directory
-    pkg_path = Path(__file__).parent
-    lib_path = pkg_path / lib_name
-    assert lib_path.exists(), f'magnetron shared library not found: {lib_path}'
+    # decide which patterns to try
+    if platform.startswith("linux"):
+        patterns = ["libmagnetron.so", "magnetron*.so"]
+    elif platform.startswith("darwin"):
+        patterns = ["libmagnetron.dylib", "magnetron*.so"]
+    elif platform.startswith("win32"):
+        patterns = ["magnetron.dll"]
+    else:
+        raise RuntimeError(f"Unsupported platform: {platform!r}")
+
+    # search in both the package folder and its parent
+    lib_path = None
+    for search_dir in (pkg_dir, root_dir):
+        for pat in patterns:
+            hits = list(search_dir.glob(pat))
+            if hits:
+                lib_path = hits[0]
+                break
+        if lib_path:
+            break
+
+    if not lib_path or not lib_path.exists():
+        searched = "; ".join(f"{d!r}:{patterns}" for d in (pkg_dir, root_dir))
+        raise FileNotFoundError(
+            f"magnetron shared library not found. "
+            f"Searched: {searched}"
+        )
 
     ffi = FFI()
-    ffi.cdef(__MAG_CDECLS)  # Define the C declarations
-    lib = ffi.dlopen(str(lib_path))  # Load the shared library
+    ffi.cdef(__MAG_CDECLS)
+    lib = ffi.dlopen(str(lib_path))
     return ffi, lib

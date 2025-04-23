@@ -193,18 +193,6 @@ class no_grad(contextlib.ContextDecorator):
         """Re-enable gradient tracking when exiting the context."""
         Context.primary().start_grad_recorder()
 
-
-_ALLOC_DISPATCH: list[int, _ffi.CData] = {
-    1: _C.mag_tensor_create_1d,
-    2: _C.mag_tensor_create_2d,
-    3: _C.mag_tensor_create_3d,
-    4: _C.mag_tensor_create_4d,
-    5: _C.mag_tensor_create_5d,
-    6: _C.mag_tensor_create_6d,
-}
-assert len(_ALLOC_DISPATCH) == MAX_DIMS
-
-
 def _flatten_nested_lists(nested: object) -> tuple[tuple[int, ...], list[float]]:
     """Flatten a nested list and return its shape and flattened data."""
     if not isinstance(nested, list):
@@ -257,7 +245,8 @@ class Tensor:
         assert 0 < len(shape) <= MAX_DIMS, f'Invalid number of dimensions: {len(shape)}'
         assert all(0 < dim <= DIM_MAX for dim in shape), 'Invalid dimension size'
         self._ctx = ctx
-        self._ptr = _ALLOC_DISPATCH[len(shape)](ctx._ptr, dtype.enum_value, *shape)
+        dims: _ffi.CData = _ffi.new(f'int64_t[{len(shape)}]', shape)
+        self._ptr = _C.mag_tensor_empty(ctx._ptr, dtype.enum_value, len(shape), dims)
         self.requires_grad = requires_grad
         if name:
             self.name = name

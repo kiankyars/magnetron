@@ -28,7 +28,7 @@ dev = [
 ]
 
 # Optional dependencies for complex examples (install if you want to run the examples)
-examples = ["numpy", "matplotlib", "django", "tqdm"]
+examples = ["numpy", "matplotlib", "django", "tqdm", "scipy"]
 
 [tool.ruff]
 line-length = 120
