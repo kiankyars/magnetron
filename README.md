@@ -47,20 +47,66 @@
 </details>
 
 ## News
+- **[2025/01/14]** 📜 Magnetron's Python API is now very close to PyTorch's API.
 - **[2025/01/14]** 🎉 CPU backend now uses multiple threads with dynamic scaling and thread pooling.
 - **[2025/01/02]** 🎈 Magnetron released on GitHub.
 
 ## About
 
+### 🚧 Work in Progress
+* Magnetron is still in its early stages and some features are incomplete or not fully optimized.
+* Developed by a single developer in his free time.
+
 ![ScreenShot](media/xor.png)
 This project started as a learning experience and a way to understand the inner workings of PyTorch and other deep learning frameworks.<br>
 The goal is to create a minimalistic but still powerful deep learning framework that can be used for research and production.<br>
-The framework is written in C99 and Python and is designed to be easy to understand and modify.<br>
+Magnetron's core is implemented in a small C-99 codebase and the modern Python API is just a thin wrapper over it, but still feels Pythonic. <br>
+But see by yourself below. <br>
 
-### Work in Progress
-* The project is still in its early stages and many features are missing.
-* Developed by a single person in their free time.
-* The project is not yet fully optimized for performance.
+### Example
+A simple XOR neuronal network (MLP) trained using Magnetron's autodiff engine.
+Magnetron also provides high-level building blocks like PyTorch, for example `nn.Module`, `nn.Linear` and more.
+```python
+import magnetron as mag
+import magnetron.nn as nn
+import magnetron.optim as optim
+
+# Define our model architecture
+class XOR(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.l1 = nn.Linear(2, 2)
+        self.l2 = nn.Linear(2, 1)
+
+    def forward(self, x: mag.Tensor) -> mag.Tensor:
+        x = self.l1(x).tanh()
+        x = self.l2(x).tanh()
+        return x
+
+
+model = XOR()
+optimizer = optim.SGD(model.parameters(), lr=1e-1)
+criterion = nn.MSELoss()
+
+x = mag.Tensor.from_data([[0, 0], [0, 1], [1, 0], [1, 1]])
+y = mag.Tensor.from_data([[0], [1], [1], [0]])
+
+# Let's train 2k epochs
+for epoch in range(2000):
+    y_hat = model(x)
+    loss = criterion(y_hat, y)
+    loss.backward()             # Perform backward propagation.
+    optimizer.step()
+    optimizer.zero_grad()
+    if epoch % 100 == 0:
+        print(f'Epoch: {epoch}, Loss: {loss.item()}')
+
+# Let's inference
+with mag.no_grad():
+    y_hat = model(x)
+    print(y_hat.tolist())
+
+```
 
 ## Getting Started
 
@@ -96,13 +142,6 @@ For usage in C and C++ see the [Unit Tests](test) directory in the root of the p
 * Modern PRNGs: Mersenne Twister and PCG
 * Validation and friendly error messages
 * Custom compressed tensor file formats
-
-### Example
-Code from the XOR example:
-```python
-def forward(self, x: Tensor) -> Tensor:
-    return (self.weight @ x + self.bias).sigmoid()
-```
 
 ### Operators
 <table>
