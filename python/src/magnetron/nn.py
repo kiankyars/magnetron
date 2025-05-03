@@ -47,6 +47,10 @@ class Module(ABC):
     def __call__(self, *args: Tensor, **kwargs: dict) -> Tensor:
         return self.forward(*args, **kwargs)
 
+    def register_buffer(self, name: str, tensor: Tensor):
+        tensor = tensor.clone().detach() if isinstance(tensor, Tensor) else tensor
+        setattr(self, name, tensor)
+
 
 class ModuleList(Module, list):
     """A list of modules that can be used as a single module."""
@@ -87,8 +91,7 @@ class Linear(Module):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
-        weight = Tensor.full((out_features, in_features), fill_value=0.5)
-        self.weight = Parameter(weight)
+        self.weight = Parameter(Tensor.full((out_features, in_features), fill_value=0.5)) # TODO: proper init
         if bias:
             self.bias = Parameter(Tensor.zeros((out_features,), name='bias'))
 
@@ -98,6 +101,31 @@ class Linear(Module):
             x = x + self.bias.x
         return x
 
+class Embedding(Module):
+    def __init__(self, num_embeddings: int, embedding_dim: int) -> None:
+        super().__init__()
+        self.num_embeddings = num_embeddings
+        self.embedding_dim = embedding_dim
+        self.weight = Parameter(
+            Tensor.normal((num_embeddings, embedding_dim)) / embedding_dim
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.weight[x]
+
+class RMSNorm(Module):
+    def __init__(self, dim: int, eps: float = 1e-5):
+        super().__init__()
+        self.eps = eps
+        self.weight = Parameter(Tensor.zeros(shape=(dim,)))
+
+    def _norm(self, x: Tensor) -> Tensor:
+        rms = ((x**2).mean(axis=-1, keepdim=True) + self.eps) ** 0.5
+        return x / rms
+
+    def forward(self, x):
+        output = self._norm(x)
+        return output * self.weight
 
 class Loss(ABC):
     """Base class for all loss functions."""

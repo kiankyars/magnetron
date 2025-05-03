@@ -217,12 +217,30 @@ class Tensor:
 
     __slots__ = ('__weakref__', '_ctx', '_ptr')
 
-    def __init__(self, ptr: _ffi.CData | None = None) -> None:
+    def __init__(
+        self,
+        native_object: _ffi.CData | None = None,
+        *,
+        ctx: Context | None = None,
+        shape: tuple[int, ...] | None = None,
+        dtype: DataType = Context.primary().default_dtype,
+        requires_grad: bool = False,
+        name: str | None = None,
+    ) -> None:
         assert _MAIN_TID == threading.get_native_id(), (
             'Context must be created in the main thread'
         )
         self._ctx = None
-        self._ptr = ptr
+        self._ptr = native_object
+        if self._ptr is None: # If no existing native tensor is wrapped, we allocate a new, owned native tensor:
+            assert 0 < len(shape) <= MAX_DIMS, f'Invalid number of dimensions: {len(shape)}'
+            assert all(0 < dim <= DIM_MAX for dim in shape), 'Invalid dimension size'
+            self._ctx = ctx
+            dims: _ffi.CData = _ffi.new(f'int64_t[{len(shape)}]', shape)
+            self._ptr = _C.mag_tensor_empty(ctx._ptr, dtype.enum_value, len(shape), dims)
+            self.requires_grad = requires_grad
+            if name is not None:
+                self.name = name
 
     def __del__(self) -> None:
         if self._ptr is not None and self._ptr != _ffi.NULL:
@@ -233,24 +251,6 @@ class Tensor:
     def native_ptr(self) -> _ffi.CData:
         return self._ptr
 
-    def _new(
-        self,
-        ctx: Context,
-        *,
-        shape: tuple[int, ...],
-        dtype: DataType = Context.primary().default_dtype,
-        requires_grad: bool = False,
-        name: str | None = None,
-    ) -> None:
-        assert 0 < len(shape) <= MAX_DIMS, f'Invalid number of dimensions: {len(shape)}'
-        assert all(0 < dim <= DIM_MAX for dim in shape), 'Invalid dimension size'
-        self._ctx = ctx
-        dims: _ffi.CData = _ffi.new(f'int64_t[{len(shape)}]', shape)
-        self._ptr = _C.mag_tensor_empty(ctx._ptr, dtype.enum_value, len(shape), dims)
-        self.requires_grad = requires_grad
-        if name:
-            self.name = name
-
     @classmethod
     def empty(
         cls,
@@ -260,9 +260,9 @@ class Tensor:
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
-        tensor = cls(None)
-        tensor._new(
-            Context.primary(),
+        tensor = cls(
+            native_object=None,
+            ctx=Context.primary(),
             shape=shape,
             dtype=dtype,
             requires_grad=requires_grad,
@@ -271,25 +271,48 @@ class Tensor:
         return tensor
 
     @classmethod
-    def full(
+    def empty_like(
         cls,
-        shape: tuple[int, ...],
+        template: 'Tensor',
         *,
-        fill_value: float,
         dtype: DataType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
-        tensor = cls(None)
-        tensor._new(
-            Context.primary(),
+        return cls.empty(template.shape, dtype=dtype, requires_grad=requires_grad, name=name)
+
+    @classmethod
+    def full(
+        cls,
+        shape: tuple[int, ...],
+        *,
+        fill_value: int | float,
+        dtype: DataType = Context.primary().default_dtype,
+        requires_grad: bool = False,
+        name: str | None = None,
+    ) -> 'Tensor':
+        tensor = cls(
+            native_object=None,
+            ctx=Context.primary(),
             shape=shape,
             dtype=dtype,
             requires_grad=requires_grad,
             name=name,
         )
-        _C.mag_tensor_fill(tensor._ptr, fill_value)
+        tensor.fill_(fill_value)
         return tensor
+
+    @classmethod
+    def full_like(
+        cls,
+        template: 'Tensor',
+        *,
+        fill_value: int | float,
+        dtype: DataType = Context.primary().default_dtype,
+        requires_grad: bool = False,
+        name: str | None = None,
+    ) -> 'Tensor':
+       return cls.full(template.shape, fill_value=fill_value, dtype=dtype, requires_grad=requires_grad, name=name)
 
     @classmethod
     def from_data(
@@ -301,9 +324,9 @@ class Tensor:
         name: str | None = None,
     ) -> 'Tensor':
         shape, flattened_data = _flatten_nested_lists(data)
-        tensor = cls(None)
-        tensor._new(
-            Context.primary(),
+        tensor = cls(
+            native_object=None,
+            ctx=Context.primary(),
             shape=shape,
             dtype=dtype,
             requires_grad=requires_grad,
@@ -326,8 +349,43 @@ class Tensor:
         name: str | None = None,
     ) -> 'Tensor':
         return cls.full(
-            shape, fill_value=0.0, dtype=dtype, requires_grad=requires_grad, name=name
+            shape, fill_value=0, dtype=dtype, requires_grad=requires_grad, name=name
         )
+
+    @classmethod
+    def zeros_like(
+        cls,
+        template: 'Tensor',
+        *,
+        dtype: DataType = Context.primary().default_dtype,
+        requires_grad: bool = False,
+        name: str | None = None,
+    ) -> 'Tensor':
+        return cls.zeros(template.shape, dtype=dtype, requires_grad=requires_grad, name=name)
+
+    @classmethod
+    def ones(
+        cls,
+        shape: tuple[int, ...],
+        *,
+        dtype: DataType = Context.primary().default_dtype,
+        requires_grad: bool = False,
+        name: str | None = None,
+    ) -> 'Tensor':
+        return cls.full(
+            shape, fill_value=1, dtype=dtype, requires_grad=requires_grad, name=name
+        )
+
+    @classmethod
+    def ones_like(
+        cls,
+        template: 'Tensor',
+        *,
+        dtype: DataType = Context.primary().default_dtype,
+        requires_grad: bool = False,
+        name: str | None = None,
+    ) -> 'Tensor':
+        return cls.ones(template.shape, dtype=dtype, requires_grad=requires_grad, name=name)
 
     @classmethod
     def uniform(
@@ -339,17 +397,15 @@ class Tensor:
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
-        tensor = cls(None)
-        tensor._new(
-            Context.primary(),
+        tensor = cls(
+            native_object=None,
+            ctx=Context.primary(),
             shape=shape,
             dtype=dtype,
             requires_grad=requires_grad,
             name=name,
         )
-        if interval[1] < interval[0]:
-            interval = (interval[1], interval[0])
-        _C.mag_tensor_fill_random_uniform(tensor._ptr, interval[0], interval[1])
+        tensor.fill_random_uniform_(interval[0], interval[1])
         return tensor
 
     @classmethod
@@ -358,20 +414,20 @@ class Tensor:
         shape: tuple[int, ...],
         *,
         mean: float = 0.0,
-        stddev: float = 1.0,
+        std: float = 1.0,
         dtype: DataType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
-        tensor = cls(None)
-        tensor._new(
-            Context.primary(),
+        tensor = cls(
+            native_object=None,
+            ctx=Context.primary(),
             shape=shape,
             dtype=dtype,
             requires_grad=requires_grad,
             name=name,
         )
-        _C.mag_tensor_fill_random_normal(tensor._ptr, mean, stddev)
+        tensor.fill_random_normal_(mean, std)
         return tensor
 
     @property
@@ -496,6 +552,10 @@ class Tensor:
     def transpose(self) -> 'Tensor':
         return Tensor(_C.mag_transpose(self._ptr))
 
+    def detach(self) -> 'Tensor':
+        _C.mag_tensor_detach(self._ptr)
+        return self
+
     @property
     def T(self) -> 'Tensor':
         return Tensor(_C.mag_transpose(self._ptr))
@@ -517,6 +577,23 @@ class Tensor:
             for j in range(i + 1, MAX_DIMS):
                 assert axes[i] != axes[j], f'Duplicate axis: {axes[i]}'
         return Tensor(_C.mag_permute(self._ptr, *axes))
+
+    def fill_(self, value: float | int) -> None:
+        _C.mag_tensor_fill(self._ptr, float(value))
+
+    def fill_random_uniform_(self, min_val: float | int, max_val: float | int) -> None:
+        if max_val < min_val:
+            min_val, max_val = max_val, min_val
+        _C.mag_tensor_fill_random_uniform(self._ptr, float(min_val), float(max_val))
+
+    def fill_random_normal_(self, mean: float, std: float):
+        _C.mag_tensor_fill_random_normal(self._ptr, mean, std)
+
+    def zeros_(self) -> None:
+        self.fill_(0)
+
+    def ones_(self) -> None:
+        self.fill_(1)
 
     def mean(self) -> 'Tensor':
         return Tensor(_C.mag_mean(self._ptr))

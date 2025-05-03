@@ -3954,7 +3954,7 @@ const void* mag_hashmap_insert(mag_hashmap_t* map, const void* item) {
     return mag_hashmap_set_with_hash(map, item, mag_hashmap_get_hash(map, item));
 }
 
-const void *mag_hashmap_get_with_hash(mag_hashmap_t* map, const void* key, uint64_t hash) {
+const void* mag_hashmap_get_with_hash(mag_hashmap_t* map, const void* key, uint64_t hash) {
     hash = mag_hashmap_clip_hash(hash);
     size_t i = hash&map->mask;
     while(1) {

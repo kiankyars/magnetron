@@ -16,6 +16,10 @@ CMAKE_ROOT: str = os.path.abspath(
 NUM_JOBS: int = max(multiprocessing.cpu_count() - 1, 1)  # Use all but one core
 
 
+def get_dll_extension() -> str:
+    # TODO
+    return '.dylib'
+
 class BuildException(Exception):
     def __init__(self, message: str):
         super().__init__(message)
@@ -72,7 +76,7 @@ class CMakeBuildExecutor(build_ext):
 
         # 4) Copy/rename from CMake output into the Python extension path
         #    CMake put it at lib_output_dir/libmagnetron.so
-        built_lib = os.path.join(lib_output_dir, 'libmagnetron.so')
+        built_lib = os.path.join(lib_output_dir, 'libmagnetron' + get_dll_extension())
         if not os.path.isfile(built_lib):
             raise BuildException(f"Expected built library not found at {built_lib}")
 
