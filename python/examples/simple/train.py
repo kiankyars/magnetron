@@ -15,9 +15,7 @@ if not Path(fname).exists():
     print('downloading mnist.pkl.gz …')
     urllib.request.urlretrieve(url, fname)
 
-(train_x, train_y), (_, _), (test_images, test_labels) = pickle.load(
-    gzip.open(fname, 'rb'), encoding='latin1'
-)
+(train_x, train_y), (_, _), (test_images, test_labels) = pickle.load(gzip.open(fname, 'rb'), encoding='latin1')
 
 train_x = torch.tensor(train_x, dtype=torch.float32)
 train_y = torch.tensor(train_y, dtype=torch.long)

@@ -10,15 +10,14 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 
 BUILD_RELEASE: bool = True
-CMAKE_ROOT: str = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), '..')
-)  # Root directory of the CMake project
+CMAKE_ROOT: str = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))  # Root directory of the CMake project
 NUM_JOBS: int = max(multiprocessing.cpu_count() - 1, 1)  # Use all but one core
 
 
 def get_dll_extension() -> str:
     # TODO
     return '.dylib'
+
 
 class BuildException(Exception):
     def __init__(self, message: str):
@@ -41,10 +40,7 @@ class CMakeBuildExecutor(build_ext):
         try:
             print(subprocess.check_output(['cmake', '--version']))
         except OSError:
-            raise BuildException(
-                'CMake must be installed to build the magnetron binaries from source. '
-                'Please install CMake and try again.'
-            )
+            raise BuildException('CMake must be installed to build the magnetron binaries from source. Please install CMake and try again.')
         super().run()
         for ext in self.extensions:
             self.build_extension(ext)
@@ -55,9 +51,7 @@ class CMakeBuildExecutor(build_ext):
             os.makedirs(self.build_temp)
 
         # 2) Tell CMake to put the .so into build_lib/magnetron/
-        lib_output_dir = os.path.abspath(
-            os.path.join(self.build_lib, 'magnetron')
-        )
+        lib_output_dir = os.path.abspath(os.path.join(self.build_lib, 'magnetron'))
 
         cmake_args = [
             '-DMAGNETRON_ENABLE_CUDA=OFF',
@@ -65,7 +59,8 @@ class CMakeBuildExecutor(build_ext):
             f'-DCMAKE_BUILD_TYPE={"Release" if BUILD_RELEASE else "Debug"}',
         ]
         build_args = [
-            '--target', 'magnetron',
+            '--target',
+            'magnetron',
             f'-j{NUM_JOBS}',
             '-v',
         ]
@@ -78,7 +73,7 @@ class CMakeBuildExecutor(build_ext):
         #    CMake put it at lib_output_dir/libmagnetron.so
         built_lib = os.path.join(lib_output_dir, 'libmagnetron' + get_dll_extension())
         if not os.path.isfile(built_lib):
-            raise BuildException(f"Expected built library not found at {built_lib}")
+            raise BuildException(f'Expected built library not found at {built_lib}')
 
         #    setuptools wants something like build/lib/magnetron.cpython-311-x86_64-linux-gnu.so
         dest_path = self.get_ext_fullpath(ext.name)

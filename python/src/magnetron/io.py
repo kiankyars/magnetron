@@ -61,9 +61,7 @@ class StorageStream:
         """Opens a Magnetron storage file for reading."""
         if isinstance(file_path, str):
             file_path = Path(file_path)
-        handle = _C.mag_storage_stream_deserialize(
-            Context.primary().native_ptr, str(file_path).encode('utf-8')
-        )
+        handle = _C.mag_storage_stream_deserialize(Context.primary().native_ptr, str(file_path).encode('utf-8'))
         if handle == _ffi.NULL:
             raise RuntimeError(f'Failed to open storage stream from file: {file_path}')
         return cls(handle)
@@ -76,9 +74,7 @@ class StorageStream:
             raise ValueError('Invalid tensor provided.')
         key_utf8: bytes = key.encode('utf-8')
         if _C.mag_storage_stream_get_tensor(self._ptr, key_utf8) != _ffi.NULL:
-            raise RuntimeError(
-                f"Tensor with key '{key}' already exists in the storage stream"
-            )
+            raise RuntimeError(f"Tensor with key '{key}' already exists in the storage stream")
         if not _C.mag_storage_stream_put_tensor(self._ptr, key_utf8, tensor.native_ptr):
             raise RuntimeError('Failed to put tensor into storage stream')
 
@@ -99,7 +95,7 @@ class StorageStream:
         print(count[0])
         for i in range(count[0]):
             result.append(_ffi.string(keys[i]).decode('utf-8'))
-        _C.mag_storage_stream_get_all_tensor_keys_free_data(keys) # Free the keys data
+        _C.mag_storage_stream_get_all_tensor_keys_free_data(keys)  # Free the keys data
         return result
 
     def __getitem__(self, key: str) -> Tensor:
@@ -117,9 +113,5 @@ class StorageStream:
         """Serializes the storage stream to a file."""
         if self._closed:
             raise RuntimeError('Cannot serialize a closed StorageStream.')
-        if not _C.mag_storage_stream_serialize(
-            self._ptr, str(file_path).encode('utf-8')
-        ):
-            raise RuntimeError(
-                f'Failed to serialize storage stream to file: {file_path}'
-            )
+        if not _C.mag_storage_stream_serialize(self._ptr, str(file_path).encode('utf-8')):
+            raise RuntimeError(f'Failed to serialize storage stream to file: {file_path}')

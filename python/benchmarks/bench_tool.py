@@ -13,9 +13,7 @@ class BenchParticipant(ABC):
         self.name = name
         self.timings = []
 
-    def allocate_args(
-        self, shape_a: tuple[int, int], shape_b: tuple[int, int]
-    ) -> tuple:
+    def allocate_args(self, shape_a: tuple[int, int], shape_b: tuple[int, int]) -> tuple:
         pass
 
 
@@ -67,14 +65,8 @@ class PerformanceInfo:
             ax1.set_xticklabels(x_labels, rotation=45, ha='right')
 
             for i, participant in enumerate(self.participants):
-                total_elements = [
-                    (sa[0] * sa[1] + sb[0] * sb[1])
-                    for sa, sb in zip(self.shapes_a, self.shapes_b)
-                ]
-                gflops = [
-                    (elements * flops_per_op) / (time * 1e9)
-                    for elements, time in zip(total_elements, participant.timings)
-                ]
+                total_elements = [(sa[0] * sa[1] + sb[0] * sb[1]) for sa, sb in zip(self.shapes_a, self.shapes_b)]
+                gflops = [(elements * flops_per_op) / (time * 1e9) for elements, time in zip(total_elements, participant.timings)]
                 offset = (i - len(self.participants) / 2 + 0.5) * width
                 ax2.bar(
                     x + offset,
@@ -87,9 +79,7 @@ class PerformanceInfo:
             ax2.set_xticks(x)
             ax2.set_xticklabels(x_labels, rotation=45, ha='right')
         else:
-            dims = [
-                sa[0] for sa in self.shapes_a
-            ]  # For square matrices, any dimension works
+            dims = [sa[0] for sa in self.shapes_a]  # For square matrices, any dimension works
             markers = ['o', '+', 'x', '*', '.', 'x', '^']
 
             for i, participant in enumerate(self.participants):
@@ -103,14 +93,8 @@ class PerformanceInfo:
             ax1.set_xlabel('Matrix Size (NxN)')
 
             for i, participant in enumerate(self.participants):
-                total_elements = [
-                    (sa[0] * sa[1] + sb[0] * sb[1])
-                    for sa, sb in zip(self.shapes_a, self.shapes_b)
-                ]
-                gflops = [
-                    (elements * flops_per_op) / (time * 1e9)
-                    for elements, time in zip(total_elements, participant.timings)
-                ]
+                total_elements = [(sa[0] * sa[1] + sb[0] * sb[1]) for sa, sb in zip(self.shapes_a, self.shapes_b)]
+                gflops = [(elements * flops_per_op) / (time * 1e9) for elements, time in zip(total_elements, participant.timings)]
                 ax2.plot(
                     dims,
                     gflops,
@@ -135,18 +119,14 @@ class PerformanceInfo:
         plt.show()
 
 
-def generate_square_shapes(
-    max_dim: int, step: int
-) -> list[tuple[tuple[int, int], tuple[int, int]]]:
+def generate_square_shapes(max_dim: int, step: int) -> list[tuple[tuple[int, int], tuple[int, int]]]:
     shapes = []
     for n in range(step, max_dim + step, step):
         shapes.append(((n, n), (n, n)))
     return shapes
 
 
-def generate_matmul_shapes(
-    max_dim: int, step: int
-) -> list[tuple[tuple[int, int], tuple[int, int]]]:
+def generate_matmul_shapes(max_dim: int, step: int) -> list[tuple[tuple[int, int], tuple[int, int]]]:
     shapes = []
     for m in range(step, max_dim + step, step):
         for k in range(step, max_dim + step, step):
@@ -155,9 +135,7 @@ def generate_matmul_shapes(
     return shapes
 
 
-def generate_elementwise_shapes(
-    max_dim: int, step: int
-) -> list[tuple[tuple[int, int], tuple[int, int]]]:
+def generate_elementwise_shapes(max_dim: int, step: int) -> list[tuple[tuple[int, int], tuple[int, int]]]:
     shapes = []
     for m in range(step, max_dim + step, step):
         for n in range(step, max_dim + step, step):

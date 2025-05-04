@@ -12,16 +12,12 @@ from tqdm import tqdm
 
 def download_with_progress(url: str, filename: str) -> None:
     class TqdmBarUpdater(tqdm):
-        def update_to(
-            self, b: int = 1, bsize: int = 1, tsize: int | None = None
-        ) -> None:
+        def update_to(self, b: int = 1, bsize: int = 1, tsize: int | None = None) -> None:
             if tsize is not None:
                 self.total = tsize
             self.update(b * bsize - self.n)
 
-    with TqdmBarUpdater(
-        unit='B', unit_scale=True, miniters=1, desc=url.split('/')[-1]
-    ) as t:
+    with TqdmBarUpdater(unit='B', unit_scale=True, miniters=1, desc=url.split('/')[-1]) as t:
         urllib.request.urlretrieve(url, filename, reporthook=t.update_to)
 
 

@@ -5,21 +5,22 @@ import sys
 
 from magnetron._ffi_cdecl_generated import __MAG_CDECLS
 
+
 @lru_cache(maxsize=1)
 def load_native_module() -> tuple[FFI, object]:
     platform = sys.platform
-    pkg_dir = Path(__file__).parent       # .../src/magnetron
-    root_dir = pkg_dir.parent             # .../src
+    pkg_dir = Path(__file__).parent  # .../src/magnetron
+    root_dir = pkg_dir.parent  # .../src
 
     # decide which patterns to try
-    if platform.startswith("linux"):
-        patterns = ["libmagnetron.so", "magnetron*.so"]
-    elif platform.startswith("darwin"):
-        patterns = ["libmagnetron.dylib", "magnetron*.so"]
-    elif platform.startswith("win32"):
-        patterns = ["magnetron.dll"]
+    if platform.startswith('linux'):
+        patterns = ['libmagnetron.so', 'magnetron*.so']
+    elif platform.startswith('darwin'):
+        patterns = ['libmagnetron.dylib', 'magnetron*.so']
+    elif platform.startswith('win32'):
+        patterns = ['magnetron.dll']
     else:
-        raise RuntimeError(f"Unsupported platform: {platform!r}")
+        raise RuntimeError(f'Unsupported platform: {platform!r}')
 
     # search in both the package folder and its parent
     lib_path = None
@@ -33,11 +34,8 @@ def load_native_module() -> tuple[FFI, object]:
             break
 
     if not lib_path or not lib_path.exists():
-        searched = "; ".join(f"{d!r}:{patterns}" for d in (pkg_dir, root_dir))
-        raise FileNotFoundError(
-            f"magnetron shared library not found. "
-            f"Searched: {searched}"
-        )
+        searched = '; '.join(f'{d!r}:{patterns}' for d in (pkg_dir, root_dir))
+        raise FileNotFoundError(f'magnetron shared library not found. Searched: {searched}')
 
     ffi = FFI()
     ffi.cdef(__MAG_CDECLS)
