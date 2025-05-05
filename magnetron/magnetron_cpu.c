@@ -1,5 +1,7 @@
 /*
-** (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+** +=======================================================================+
+** | (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>                  |
+** +=======================================================================+
 **
 **
 ** Implement CPU dispatch to specialized runtime kernels generated from magnetron_cpu_blas.inl and multithreading logic for parallel computations.

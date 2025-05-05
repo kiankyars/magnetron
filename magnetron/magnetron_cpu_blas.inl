@@ -1,5 +1,7 @@
 /*
-** (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+** +=======================================================================+
+** | (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>                  |
+** +=======================================================================+
 **
 **
 ** !!! Make sure all functions in this file are static. This is required to correctly clone the impl for each specialized compilation unit.

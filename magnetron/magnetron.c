@@ -1,5 +1,7 @@
 /*
-** (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+** +=======================================================================+
+** | (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>                  |
+** +=======================================================================+
 **
 ** This file implements the magnetron runtime core:
 **  - The magnetron core API which is used from Python and C as declared in magnetron.h.
@@ -1204,6 +1206,7 @@ static bool mag_validate_op_matmul(mag_op_t op, mag_tensor_t* result, mag_tensor
 static bool mag_validate_op_repeat_rev(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
     return mag_check_is_shape_broadcastable(op, inputs[0], inputs[1]);
 }
+
 
 static mag_tensor_t* mag_result_constructor_routine_isomorph(mag_tensor_t** inputs, const mag_op_param_t* params) {
     return mag_tensor_empty_like(*inputs);

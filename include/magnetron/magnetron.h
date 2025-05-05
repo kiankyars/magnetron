@@ -1,8 +1,12 @@
 /*
-** (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+** +=======================================================================+
+** | (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>                  |
+** +=======================================================================+
+**
 ** Magnetron Machine Learning Framework, public C99 API. For a modern C++ API, see magnetron.hpp.
 ** This header is also used from Python and by the modern C++ API.
 */
+
 
 #ifndef MAGNETRON_H
 #define MAGNETRON_H

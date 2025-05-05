@@ -1,5 +1,7 @@
 /*
-** (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+** +=======================================================================+
+** | (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>                  |
+** +=======================================================================+
 **
 ** This file implements auxiliary functionality, mostly loading, saving and resizing image and audio tensors.
 ** Some libraries are directly embedded into this file.

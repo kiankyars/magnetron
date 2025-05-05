@@ -1,4 +1,9 @@
-// (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+/*
+** +=======================================================================+
+** | (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>                  |
+** +=======================================================================+
+*/
+
 // Magnetron Machine Learning Framework, public C++ 20 API.
 
 #pragma once
