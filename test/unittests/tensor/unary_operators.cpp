@@ -60,8 +60,31 @@ impl_unary_operator_test_group(ceil, e8m23, [](auto x) { return std::ceil(x); })
 impl_unary_operator_test_group(ceil, e5m10, [](auto x) { return std::ceil(x); })
 impl_unary_operator_test_group(round, e8m23, [](auto x) { return std::round(x); })
 impl_unary_operator_test_group(round, e5m10, [](auto x) { return std::round(x); })
-impl_unary_operator_test_group(softmax, e8m23, [](auto x) { return std::exp(x); })
-impl_unary_operator_test_group(softmax, e5m10, [](auto x) { return std::exp(x); })
+
+TEST(cpu_unary_tensor_ops, softmax_same_shape_e8m23) {
+    auto ctx = context{compute_device::cpu};
+    for_all_shape_perms(lim, /*BROADCAST=*/false ? 2 : 1, [&](std::span<const std::int64_t> shape) {
+        tensor t_a {ctx, dtype::e8m23, shape};
+        t_a.fill_rand_uniform(-10.0f, 10.0f);
+        std::vector<e8m23_t> d_a {t_a.to_vector()};
+        tensor t_r {t_a.softmax()};
+        if constexpr (/*INPLACE=*/false) {
+            ASSERT_EQ(t_a.data_ptr(), t_r.data_ptr());
+        } else {
+            ASSERT_NE(t_a.data_ptr(), t_r.data_ptr());
+        }
+        std::vector<e8m23_t> d_r {t_r.to_vector()};
+        ASSERT_EQ(d_a.size(), d_r.size());
+        ASSERT_EQ(t_a.dtype(), t_r.dtype());
+        std::vector<e8m23_t> d_correct {};
+        d_correct.resize(d_r.size());
+        softmax(d_a.data(), d_correct.data(), d_a.size());
+        for (std::int64_t i = 0; i < d_r.size(); ++i) {
+            ASSERT_NEAR(d_correct[i], d_r[i], test::dtype_traits<test::e8m23_t>::test_eps);
+        }
+    });
+}
+
 impl_unary_operator_test_group(sigmoid, e8m23, [](auto x) { return 1.0f / (1.0f + std::exp(-(x))); })
 impl_unary_operator_test_group(sigmoid, e5m10, [](auto x) { return 1.0f / (1.0f + std::exp(-(x))); })
 impl_unary_operator_test_group(hard_sigmoid, e8m23, [](auto x) { return std::min(1.0f, std::max(0.0f, (x + 3.0f) / 6.0f)); })

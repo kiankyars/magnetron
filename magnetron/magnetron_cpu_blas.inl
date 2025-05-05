@@ -548,7 +548,6 @@ static void mag_blas_init_rand_normal_e5m10(const mag_compute_payload_t* _Nonnul
 #define mag_e8m23_sfloor(x) (floorf(x))
 #define mag_e8m23_sceil(x) (ceilf(x))
 #define mag_e8m23_sround(x) (roundf(x))
-#define mag_e8m23_ssoftmax(x) (expf(x))
 #define mag_e8m23_ssoftmax_dv(x) (expf(x))
 #define mag_e8m23_ssigmoid(x) (1.0f / (1.0f + expf(-(x))))
 #define mag_e8m23_ssigmoid_dv(x) (mag_e8m23_ssigmoid(x) * (1.0f - mag_e8m23_ssigmoid(x)))
@@ -617,40 +616,40 @@ mag_cpu_blas_impl_reduce( \
     *br = acc; )
 
 static void MAG_HOTPROC mag_blas_softmax_e8m23(const mag_compute_payload_t* _Nonnull payload) {
-        mag_tensor_t* r = payload->node;
-        const mag_tensor_t* x = r->op_inputs[0];
-        mag_e8m23_t* br = mag_e8m23p_mut(r);
-        const mag_e8m23_t* bx = mag_e8m23p(x);
-        int64_t last_dim = r->shape[r->rank-1];
-        int64_t num_rows = r->numel / last_dim;
-        int64_t tc = payload->thread_num;
-        int64_t ti = payload->thread_idx;
-        int64_t rows_per_thread = (num_rows + tc - 1)/tc;
-        int64_t start_row = ti * rows_per_thread;
-        int64_t end_row = (start_row + rows_per_thread) < num_rows ? (start_row + rows_per_thread) : num_rows;
-        for (int64_t row = start_row; row < end_row; ++row) {
-            const mag_e8m23_t* row_in = bx + row * last_dim;
-            mag_bnd_chk(row_in, bx, mag_tensor_get_data_size(x));
-            mag_e8m23_t* row_out = br + row * last_dim;
-            mag_e8m23_t max_val = row_in[0];
-            for (int64_t i=1; i < last_dim; ++i) {
-                if (row_in[i] > max_val) {
-                    mag_bnd_chk(row_in+i, bx, mag_tensor_get_data_size(x));
-                    max_val = row_in[i];
-                }
-            }
-            mag_e8m23_t sum = 0.0f;
-            for (int64_t i=0; i < last_dim; ++i) {
+    mag_tensor_t* r = payload->node;
+    const mag_tensor_t* x = r->op_inputs[0];
+    mag_e8m23_t* br = mag_e8m23p_mut(r);
+    const mag_e8m23_t* bx = mag_e8m23p(x);
+    int64_t last_dim = r->shape[r->rank-1];
+    int64_t num_rows = r->numel / last_dim;
+    int64_t tc = payload->thread_num;
+    int64_t ti = payload->thread_idx;
+    int64_t rows_per_thread = (num_rows + tc - 1)/tc;
+    int64_t start_row = ti * rows_per_thread;
+    int64_t end_row = (start_row + rows_per_thread) < num_rows ? (start_row + rows_per_thread) : num_rows;
+    for (int64_t row = start_row; row < end_row; ++row) {
+        const mag_e8m23_t* row_in = bx + row * last_dim;
+        mag_bnd_chk(row_in, bx, mag_tensor_get_data_size(x));
+        mag_e8m23_t* row_out = br + row * last_dim;
+        mag_e8m23_t max_val = row_in[0]; /* Max val is computed for numerical stability */
+        for (int64_t i=1; i < last_dim; ++i) {
+            if (row_in[i] > max_val) {
                 mag_bnd_chk(row_in+i, bx, mag_tensor_get_data_size(x));
-                mag_bnd_chk(row_out+i, br, mag_tensor_get_data_size(r));
-                row_out[i] = expf(row_in[i] - max_val);
-                sum += row_out[i];
-            }
-            for (int64_t i=0; i < last_dim; ++i) {
-                row_out[i] /= sum;
+                max_val = row_in[i];
             }
         }
+        mag_e8m23_t sum = 0.0f;
+        for (int64_t i=0; i < last_dim; ++i) {
+            mag_bnd_chk(row_in+i, bx, mag_tensor_get_data_size(x));
+            mag_bnd_chk(row_out+i, br, mag_tensor_get_data_size(r));
+            row_out[i] = expf(row_in[i] - max_val); /* -max for numerical stability */
+            sum += row_out[i];
+        }
+        for (int64_t i=0; i < last_dim; ++i) {
+            row_out[i] /= sum;
+        }
     }
+}
 
 #define mag_e5m10_sadd(x, y) mag_e8m23_cvt_e5m10(mag_e8m23_sadd(mag_e5m10_cvt_e8m23(x), mag_e5m10_cvt_e8m23(y)))
 #define mag_e5m10_ssub(x, y) mag_e8m23_cvt_e5m10(mag_e8m23_ssub(mag_e5m10_cvt_e8m23(x), mag_e5m10_cvt_e8m23(y)))
@@ -675,7 +674,6 @@ static void MAG_HOTPROC mag_blas_softmax_e8m23(const mag_compute_payload_t* _Non
 #define mag_e5m10_sfloor(x) mag_e8m23_cvt_e5m10(mag_e8m23_sfloor(mag_e5m10_cvt_e8m23(x)))
 #define mag_e5m10_sceil(x) mag_e8m23_cvt_e5m10(mag_e8m23_sceil(mag_e5m10_cvt_e8m23(x)))
 #define mag_e5m10_sround(x) mag_e8m23_cvt_e5m10(mag_e8m23_sround(mag_e5m10_cvt_e8m23(x)))
-#define mag_e5m10_ssoftmax(x) mag_e8m23_cvt_e5m10(mag_e8m23_ssoftmax(mag_e5m10_cvt_e8m23(x)))
 #define mag_e5m10_ssoftmax_dv(x) mag_e8m23_cvt_e5m10(mag_e8m23_ssoftmax_dv(mag_e5m10_cvt_e8m23(x)))
 #define mag_e5m10_ssigmoid(x) mag_e8m23_cvt_e5m10(mag_e8m23_ssigmoid(mag_e5m10_cvt_e8m23(x)))
 #define mag_e5m10_ssigmoid_dv(x) mag_e8m23_cvt_e5m10(mag_e8m23_ssigmoid_dv(mag_e5m10_cvt_e8m23(x)))
@@ -702,7 +700,6 @@ mag_cpu_blas_impl_unary(e5m10, exp)
 mag_cpu_blas_impl_unary(e5m10, floor)
 mag_cpu_blas_impl_unary(e5m10, ceil)
 mag_cpu_blas_impl_unary(e5m10, round)
-mag_cpu_blas_impl_unary(e5m10, softmax)
 mag_cpu_blas_impl_unary(e5m10, softmax_dv)
 mag_cpu_blas_impl_unary(e5m10, sigmoid)
 mag_cpu_blas_impl_unary(e5m10, sigmoid_dv)
@@ -744,6 +741,44 @@ mag_cpu_blas_impl_reduce( \
     e5m10, max, mag_e8m23_t, -INFINITY, \
     acc = fmaxf(acc, mag_e5m10_cvt_e8m23(bx[off]));, \
     *br = mag_e8m23_cvt_e5m10(acc); )
+
+static void MAG_HOTPROC mag_blas_softmax_e5m10(const mag_compute_payload_t* _Nonnull payload) {
+        mag_tensor_t* r = payload->node;
+        const mag_tensor_t* x = r->op_inputs[0];
+        mag_e5m10_t* br = mag_e5m10p_mut(r);
+        const mag_e5m10_t* bx = mag_e5m10p(x);
+        int64_t last_dim = r->shape[r->rank-1];
+        int64_t num_rows = r->numel / last_dim;
+        int64_t tc = payload->thread_num;
+        int64_t ti = payload->thread_idx;
+        int64_t rows_per_thread = (num_rows + tc - 1)/tc;
+        int64_t start_row = ti * rows_per_thread;
+        int64_t end_row = (start_row + rows_per_thread) < num_rows ? (start_row + rows_per_thread) : num_rows;
+        for (int64_t row = start_row; row < end_row; ++row) {
+            const mag_e5m10_t* row_in = bx + row * last_dim;
+            mag_bnd_chk(row_in, bx, mag_tensor_get_data_size(x));
+            mag_e5m10_t* row_out = br + row * last_dim;
+            mag_e8m23_t max_val = mag_e5m10_cvt_e8m23(row_in[0]);  /* Max val is computed for numerical stability */
+            for (int64_t i=1; i < last_dim; ++i) {
+                mag_e8m23_t fp32_row = mag_e5m10_cvt_e8m23(row_in[i]);
+                if (fp32_row > max_val) {
+                    mag_bnd_chk(row_in+i, bx, mag_tensor_get_data_size(x));
+                    max_val = fp32_row;
+                }
+            }
+            mag_e8m23_t sum = 0.0f;
+            for (int64_t i=0; i < last_dim; ++i) {
+                mag_bnd_chk(row_in+i, bx, mag_tensor_get_data_size(x));
+                mag_bnd_chk(row_out+i, br, mag_tensor_get_data_size(r));
+                mag_e8m23_t fp32_row = mag_e5m10_cvt_e8m23(row_in[i]);
+                row_out[i] = mag_e8m23_cvt_e5m10(expf(fp32_row - max_val)); /* -max for numerical stability */
+                sum += fp32_row;
+            }
+            for (int64_t i=0; i < last_dim; ++i) {
+                row_out[i] = mag_e8m23_cvt_e5m10(mag_e5m10_cvt_e8m23(row_out[i]) / sum);
+            }
+        }
+    }
 
 #undef mag_cpu_blas_impl_unary_scalar
 #undef mag_cpu_blas_impl_unary

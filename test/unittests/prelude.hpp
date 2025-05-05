@@ -140,7 +140,6 @@ namespace magnetron::test {
         requires std::is_invocable_r_v<tensor, A, tensor> && std::is_invocable_v<B, e8m23_t>
     auto test_unary_operator(std::int64_t lim, e8m23_t eps, dtype ty, A&& a, B&& b, e8m23_t min = 0.0, e8m23_t max = 10.0) -> decltype(auto) {
         auto ctx = context{compute_device::cpu};
-        ctx.stop_grad_recorder();
         for_all_shape_perms(lim, BROADCAST ? 2 : 1, [&](std::span<const std::int64_t> shape) {
             tensor t_a {ctx, ty, shape};
             t_a.fill_rand_uniform(min, max);
@@ -185,6 +184,24 @@ namespace magnetron::test {
     template <typename T>
     [[nodiscard]] auto compute_std(const mag_tensor_t* tensor) -> mag_e11m52_t {
         return compute_std(std::span<const T>{reinterpret_cast<const T*>(mag_tensor_get_data_ptr(tensor)), static_cast<std::size_t>(tensor->numel)});
+    }
+
+    template <typename T>
+    auto softmax(const T* input, T* output, std::size_t length) -> void {
+        T max_input {input[0]};
+        for (std::size_t i {1}; i < length; ++i) {
+            if (input[i] > max_input) {
+                max_input = input[i];
+            }
+        }
+        T sum {};
+        for (std::size_t i{}; i < length; ++i) {
+            output[i] = std::exp(input[i] - max_input);
+            sum += output[i];
+        }
+        for (std::size_t i{}; i < length; ++i) {
+            output[i] /= sum;
+        }
     }
 
     // Tiny module-like library for testing training and models
