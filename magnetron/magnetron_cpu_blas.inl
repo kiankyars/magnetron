@@ -552,7 +552,7 @@ static void mag_blas_init_rand_normal_e5m10(const mag_compute_payload_t* _Nonnul
 #define mag_e8m23_ssoftmax_dv(x) (expf(x))
 #define mag_e8m23_ssigmoid(x) (1.0f / (1.0f + expf(-(x))))
 #define mag_e8m23_ssigmoid_dv(x) (mag_e8m23_ssigmoid(x) * (1.0f - mag_e8m23_ssigmoid(x)))
-#define mag_e8m23_shard_sigmoid(x) (1.0f / (1.0f + expf(-(x))))
+#define mag_e8m23_shard_sigmoid(x)( fminf(1.0f, fmaxf(0.0f, ((x) + 3.0f) / 6.0f)))
 #define mag_e8m23_ssilu(x) (x * mag_e8m23_ssigmoid(x))
 #define mag_e8m23_ssilu_dv(x) (mag_e8m23_ssigmoid(x) + x * mag_e8m23_ssigmoid(x))
 #define mag_e8m23_stanh(x) (tanhf(x))
