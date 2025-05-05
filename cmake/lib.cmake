@@ -9,6 +9,7 @@ set(MAGNETRON_SOURCES
     magnetron/magnetron_cpu_blas_fallback.c
     magnetron/magnetron_internal.h
     magnetron/magnetron_device_registry.c
+    magnetron/magnetron_ops.c
 )
 
 include(cmake/blas_tune.cmake)

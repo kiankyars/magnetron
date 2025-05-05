@@ -322,8 +322,14 @@ static uint64_t MAG_AINLINE mag_bswap64(uint64_t x) {
     return x;
 }
 
+#define MAG_FMT_DIM_BUF_SIZE ((21+4)*MAG_MAX_DIMS)
+
 extern MAG_NORET MAG_COLDPROC MAG_EXPORT void mag_panic(const char* _Nonnull msg, ...); /* Print error message and abort. */
 extern MAG_EXPORT bool mag_log_enabled; /* Enable/disable logging to stdout/stderr. */
+
+extern void MAG_COLDPROC mag_print_separator(FILE* _Nonnull f); /* Print a separator line. */
+extern void mag_fmt_dims(char (*_Nonnull buf)[MAG_FMT_DIM_BUF_SIZE], const int64_t (*_Nonnull dims)[MAG_MAX_DIMS], int64_t rank);
+
 /*
 ** Allocator function. Can be set to custom allocator.
 **   ! Never returns NULL, if re/allocation fails, it will abort the program by calling mag_panic().
