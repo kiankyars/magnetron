@@ -969,6 +969,12 @@ static mag_tensor_t* mag_tensor_inplace_view(mag_tensor_t* base) {
     return mag_tensor_init_internal(base->ctx, base->dtype, base->rank, base->shape, base, 0);
 }
 
+/*
+** ###################################################################################################################
+** Operator Validation Helpers
+** ###################################################################################################################
+*
+
 /* Check if the input tensors are not null and valid. Return true if valid, else false. */
 static bool mag_check_are_inputs_valid(mag_op_t op, mag_tensor_t** inputs, uint32_t numin) {
     const mag_op_meta_t* meta = mag_op_meta_of(op);
@@ -1207,6 +1213,11 @@ static bool mag_validate_op_repeat_rev(mag_op_t op, mag_tensor_t* result, mag_te
     return mag_check_is_shape_broadcastable(op, inputs[0], inputs[1]);
 }
 
+/*
+** ###################################################################################################################
+** Operator Result Constructors
+** ###################################################################################################################
+*/
 
 static mag_tensor_t* mag_result_constructor_routine_isomorph(mag_tensor_t** inputs, const mag_op_param_t* params) {
     return mag_tensor_empty_like(*inputs);
@@ -1285,6 +1296,12 @@ static mag_tensor_t* mag_result_constructor_routine_matmul(mag_tensor_t** inputs
 static mag_tensor_t* mag_result_constructor_routine_repeat_back(mag_tensor_t** inputs,  const mag_op_param_t* params) {
     return mag_tensor_init_internal(inputs[0]->ctx, inputs[0]->dtype, inputs[1]->rank, inputs[1]->shape, NULL, 0);
 }
+
+/*
+** ###################################################################################################################
+** Operator Backprop Impls
+** ###################################################################################################################
+*/
 
 static void mag_op_backward_clone(mag_tensor_t* node, mag_tensor_t** grads) {
     *grads = mag_clone(node->grad);
@@ -1515,6 +1532,12 @@ static void mag_op_backward_matmul(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_decref(xtc);
     mag_tensor_decref(xt);
 }
+
+/*
+** ###################################################################################################################
+** Operator Metadata List
+** ###################################################################################################################
+*/
 
 const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
     static const mag_op_meta_t infos[MAG_OP__NUM] = {
@@ -2062,8 +2085,6 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
     };
     return infos+opc;
 }
-
-#undef mag_validate_inputs
 
 int64_t mag_tensor_get_data_size(const mag_tensor_t* t) { return t->storage->size; }
 int64_t mag_tensor_get_numel(const mag_tensor_t* t) { return t->numel; }
