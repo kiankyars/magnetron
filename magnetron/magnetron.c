@@ -2329,12 +2329,10 @@ static bool mag_hashmap_resize0(mag_hashmap_t* map, size_t new_cap) {
     );
     for (size_t i=0; i < map->nbuckets; i++) {
         mag_bucket_t* entry = mag_hashmap_bucket_at(map, i);
-        if (!entry->dib) {
-            continue;
-        }
+        if (!entry->dib) continue;
         entry->dib = 1;
         size_t j = entry->hash & map2->mask;
-        while(1) {
+        for (;;) {
             mag_bucket_t* bucket = mag_hashmap_bucket_at(map2, j);
             if (bucket->dib == 0) {
                 memcpy(bucket, entry, map->bucketsz);
@@ -2410,7 +2408,7 @@ const void* mag_hashmap_insert(mag_hashmap_t* map, const void* item) {
 const void* mag_hashmap_get_with_hash(mag_hashmap_t* map, const void* key, uint64_t hash) {
     hash = mag_hashmap_clip_hash(hash);
     size_t i = hash&map->mask;
-    while(1) {
+    for (;;) {
         mag_bucket_t* bucket = mag_hashmap_bucket_at(map, i);
         if (!bucket->dib) return NULL;
         if (bucket->hash == hash) {
@@ -2437,7 +2435,7 @@ const void* mag_hashmap_delete_with_hash(mag_hashmap_t* map, const void* key, ui
     hash = mag_hashmap_clip_hash(hash);
     map->oom = false;
     size_t i = hash&map->mask;
-    while(1) {
+    for (;;) {
         mag_bucket_t* bucket = mag_hashmap_bucket_at(map, i);
         if (!bucket->dib) {
             return NULL;
@@ -2446,7 +2444,7 @@ const void* mag_hashmap_delete_with_hash(mag_hashmap_t* map, const void* key, ui
         if (bucket->hash == hash && (!map->cmp || (*map->cmp)(key, bitem, map->ud))) {
             memcpy(map->spare, bitem, map->elsize);
             bucket->dib = 0;
-            while(1) {
+            for (;;) {
                 mag_bucket_t* prev = bucket;
                 i = (i+1) & map->mask;
                 bucket = mag_hashmap_bucket_at(map, i);
@@ -2774,7 +2772,7 @@ static uint64_t mag_sto_tensor_kv_hash(const void* el, uint32_t seed) {
     return mag_hash(kv->key, kv->key_len, seed);
 }
 
-static bool mag_sto_tensor_kv_cmp(const void* a, const void *b, void* ud) {
+static bool mag_sto_tensor_kv_cmp(const void* a, const void* b, void* ud) {
     (void)ud;
     const mag_sto_tensor_kv_t* kva = (const mag_sto_tensor_kv_t*)a;
     const mag_sto_tensor_kv_t* kvb = (const mag_sto_tensor_kv_t*)b;
