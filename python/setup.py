@@ -5,6 +5,7 @@ import os
 import subprocess
 import multiprocessing
 import shutil
+import sys
 
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
@@ -15,8 +16,15 @@ NUM_JOBS: int = max(multiprocessing.cpu_count() - 1, 1)  # Use all but one core
 
 
 def get_dll_extension() -> str:
-    # TODO
-    return '.dylib'
+    platform = sys.platform
+    if platform.startswith('linux'):
+        return '.so'
+    elif platform == 'darwin':
+        return '.dylib'
+    elif platform == 'win32':
+        return '.dll'
+    else:
+        raise RuntimeError(f'Unsupported platform: {platform}. Please report this issue to the author.')
 
 
 class BuildException(Exception):

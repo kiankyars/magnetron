@@ -56,6 +56,10 @@
 extern "C" {
 #endif
 
+#if !defined(NDEBUG) || !NDEBUG
+#define MAG_DEBUG
+#endif
+
 #define mag_assert_name2(name, line) name ## line
 #define mag_assert_name(line) mag_assert_name2(_assert_, line)
 #define mag_static_assert(expr) extern void mag_assert_name(__LINE__)(bool STATIC_ASSERTION_FAILED[_Nonnull((expr)?1:-1)])
@@ -328,7 +332,7 @@ extern MAG_NORET MAG_COLDPROC MAG_EXPORT void mag_panic(const char* _Nonnull msg
 extern MAG_EXPORT bool mag_log_enabled; /* Enable/disable logging to stdout/stderr. */
 
 extern void MAG_COLDPROC mag_print_separator(FILE* _Nonnull f); /* Print a separator line. */
-extern void mag_fmt_dims(char (*_Nonnull buf)[MAG_FMT_DIM_BUF_SIZE], const int64_t (*_Nonnull dims)[MAG_MAX_DIMS], int64_t rank);
+extern void mag_fmt_shape(char (*_Nonnull buf)[MAG_FMT_DIM_BUF_SIZE], const int64_t (*_Nonnull dims)[MAG_MAX_DIMS], int64_t rank);
 
 /*
 ** Allocator function. Can be set to custom allocator.
@@ -382,7 +386,7 @@ extern MAG_EXPORT uintptr_t mag_thread_id(void); /* Get current native thread ID
 /* Panic if 'expr' is false. */
 #define mag_assert2(expr) mag_assert(expr, "")
 
-#if defined(MAG_DEBUG) || (!defined(NDEBUG) && !NDEBUG)
+#if defined(MAG_DEBUG)
 /* Panics if ptr ∉ [base, base+N). */
 #define mag_bnd_chk(ptr, base, N) \
     mag_assert((char*)(ptr) >= (char*)(base) && (char*)(ptr) < (char*)(base)+(N), \
@@ -691,6 +695,7 @@ typedef struct mag_op_meta_t {
 
     bool (*_Nullable const validator)(                      /* Validator function or NULL. */
         mag_op_t,
+        bool,
         mag_tensor_t* _Nonnull,
         mag_tensor_t* _Nonnull* _Nonnull,
         const mag_op_param_t* _Nullable
@@ -827,14 +832,6 @@ typedef struct mag_device_factory_t {
 extern mag_compute_device_t* _Nonnull mag_init_dynamic_device(mag_ctx_t* _Nonnull ctx, const mag_device_descriptor_t* _Nonnull desc);
 extern void mag_destroy_dynamic_device(mag_compute_device_t* _Nonnull dvc);
 
-#ifdef MAG_DEBUG
-typedef struct mag_tensor_node_t mag_tensor_node_t;
-struct mag_tensor_node_t {
-    mag_tensor_t* tensor;
-    mag_tensor_node_t* next;
-};
-#endif
-
 #if defined(__x86_64__) || defined(_M_X64) /* x86_64 or AMD64 specific CPU features. */
 #define mag_x86_64_feature_def(_, __) /* Enumerator | CPUDID Leaf | Register | Shift */\
     _(NONE                 , 0,         EAX,   0)__\
@@ -933,33 +930,36 @@ typedef enum mag_ctx_flags_t {
 */
 struct mag_ctx_t {
     struct {
-        char os_name[128];                              /* OS name. */
-        char cpu_name[128];                             /* CPU name. */
-        uint32_t cpu_virtual_cores;                     /* Virtual CPUs. */
-        uint32_t cpu_physical_cores;                    /* Physical CPU cores. */
-        uint32_t cpu_sockets;                           /* CPU sockets. */
-        uint64_t phys_mem_total;                        /* Total physical memory in bytes. */
-        uint64_t phys_mem_free;                         /* Free physical memory in bytes. */
+        char os_name[128];                        /* OS name. */
+        char cpu_name[128];                       /* CPU name. */
+        uint32_t cpu_virtual_cores;               /* Virtual CPUs. */
+        uint32_t cpu_physical_cores;              /* Physical CPU cores. */
+        uint32_t cpu_sockets;                     /* CPU sockets. */
+        uint64_t phys_mem_total;                  /* Total physical memory in bytes. */
+        uint64_t phys_mem_free;                   /* Free physical memory in bytes. */
 #if defined(__x86_64__) || defined(_M_X64)
-        uint64_t amd64_cpu_caps;                        /* x86-64 CPU features. Bitset of 1ull<<MAG_AMD64_CAP_* */
-        bool is_amd;                                    /* Is AMD CPU? */
+        uint64_t amd64_cpu_caps;                  /* x86-64 CPU features. Bitset of 1ull<<MAG_AMD64_CAP_* */
+        bool is_amd;                              /* Is AMD CPU? */
 #elif defined (__aarch64__) || defined(_M_ARM64)
-        uint64_t arm64_cpu_caps;                        /* ARM64 CPU features. */
-        int64_t arm64_cpu_sve_width;                    /* ARM64 SVE vector register width. */
+        uint64_t arm64_cpu_caps;                  /* ARM64 CPU features. */
+        int64_t arm64_cpu_sve_width;              /* ARM64 SVE vector register width. */
 #endif
     } machine;
-    size_t num_tensors;                                 /* Total tensor instances allocated. */
-    size_t num_storages;                                /* Total storage buffers allocated. */
-    mag_fixed_intrusive_pool tensor_pool;               /* Tensor struct memory pool. */
-    mag_fixed_intrusive_pool storage_pool;              /* Storage struct memory pool. */
-    mag_ctx_flags_t flags;                              /* Context flags. */
-    mag_prng_algorithm_t prng_algo;                     /* Active PRNG algorithm. */
-    uintptr_t tr_id;                                    /* Host thread ID. */
-    size_t sh_len;                                      /* Number of shutdown hooks. */
-    size_t sh_cap;                                      /* Maximum number of shutdown hooks. */
-    mag_compute_device_type_t device_type;              /* Active compute device. */
-    mag_compute_device_t* _Nonnull device;                       /* Active compute device. */
-    void* _Nullable ud; /* User data. */
+    size_t num_tensors;                           /* Total tensor instances allocated. */
+    size_t num_storages;                          /* Total storage buffers allocated. */
+    mag_fixed_intrusive_pool tensor_pool;         /* Tensor struct memory pool. */
+    mag_fixed_intrusive_pool storage_pool;        /* Storage struct memory pool. */
+    mag_ctx_flags_t flags;                        /* Context flags. */
+    mag_prng_algorithm_t prng_algo;               /* Active PRNG algorithm. */
+    uintptr_t tr_id;                              /* Host thread ID. */
+    size_t sh_len;                                /* Number of shutdown hooks. */
+    size_t sh_cap;                                /* Maximum number of shutdown hooks. */
+    mag_compute_device_type_t device_type;        /* Active compute device. */
+    mag_compute_device_t* _Nonnull device;        /* Active compute device. */
+    void* _Nullable ud;                           /* User data. */
+#ifdef MAG_DEBUG
+    mag_tensor_t* alive_head;                     /* List of alive tensors used for leak detection. */
+#endif
 };
 
 /* Tensor specific flags. */
@@ -980,7 +980,7 @@ mag_static_assert(MAG_TFLAG_LEN <= 0xff);
 ** A tensor can be a view, which references the storage buffer of another tensor, but views have their own header too.
 */
 struct mag_tensor_t {
-    mag_ctx_t*_Nonnull  ctx;                                /* Host context. */
+    mag_ctx_t* _Nonnull  ctx;                               /* Host context. */
     mag_rc_control_block_t rc_control;                      /* Reference counting control block. */
     int64_t rank;                                           /* Number of active dimensions. [1, MAX_DIMS] */
     int64_t shape[MAG_MAX_DIMS];                            /* Shape of the tensor. */
@@ -991,14 +991,17 @@ struct mag_tensor_t {
     mag_tensor_flags_t flags;                               /* Tensor flags. */
     mag_op_t op;                                            /* Opcode for operators. */
     mag_tensor_t* _Nullable op_inputs[MAG_MAX_OP_INPUTS];   /* Input tensors for operators. */
-    mag_op_param_t op_params[MAG_MAX_OP_PARAMS];                 /* Operator parameters. */
+    mag_op_param_t op_params[MAG_MAX_OP_PARAMS];            /* Operator parameters. */
     mag_init_op_t init_op;                                  /* Initialization op */
-    mag_op_param_t init_op_params[MAG_MAX_OP_PARAMS];            /* Init operator parameters */
+    mag_op_param_t init_op_params[MAG_MAX_OP_PARAMS];       /* Init operator parameters */
     mag_tensor_t* _Nullable view_uplink;                    /* View base tensor. */
     size_t view_offs;                                       /* Offset in view tensor. */
     mag_tensor_t* _Nullable grad;                           /* ∇f - Gradient tensor. */
     uint8_t name[MAG_MAX_TENSOR_NAME_LEN];                  /* Tensor debug name. */
     void* _Nullable ud;                                     /* User data. */
+#ifdef MAG_DEBUG
+    mag_tensor_t* alive_next;                               /* Next alive tensor used for leak detection. */
+#endif
 };
 
 /*

@@ -125,8 +125,8 @@ static bool mag_check_is_shape_eq(mag_op_t op, const mag_tensor_t* a, const mag_
     mag_print_separator(stderr);
     char shape_1[MAG_FMT_DIM_BUF_SIZE];
     char shape_2[MAG_FMT_DIM_BUF_SIZE];
-    mag_fmt_dims(&shape_1, &a->shape, a->rank);
-    mag_fmt_dims(&shape_2, &b->shape, b->rank);
+    mag_fmt_shape(&shape_1, &a->shape, a->rank);
+    mag_fmt_shape(&shape_2, &b->shape, b->rank);
     fprintf(stderr,
         "Failed to execute operation: %s.\n"
         "ERROR: Tensor shapes must be equal.\n"
@@ -150,8 +150,8 @@ static bool mag_check_is_shape_broadcastable(mag_op_t op, const mag_tensor_t* a,
     mag_print_separator(stderr);
     char shape_1[MAG_FMT_DIM_BUF_SIZE];
     char shape_2[MAG_FMT_DIM_BUF_SIZE];
-    mag_fmt_dims(&shape_1, &a->shape, a->rank);
-    mag_fmt_dims(&shape_2, &b->shape, b->rank);
+    mag_fmt_shape(&shape_1, &a->shape, a->rank);
+    mag_fmt_shape(&shape_2, &b->shape, b->rank);
     char bc[MAG_MAX_DIMS*2+3] = "[";
     int64_t pos = 1;
     int64_t mr = mag_xmax(a->rank, b->rank);
@@ -184,8 +184,8 @@ static bool mag_check_is_shape_matmulable(mag_op_t op, const mag_tensor_t* a, co
     mag_print_separator(stderr);
     char shape_1[MAG_FMT_DIM_BUF_SIZE];
     char shape_2[MAG_FMT_DIM_BUF_SIZE];
-    mag_fmt_dims(&shape_1, &a->shape, a->rank);
-    mag_fmt_dims(&shape_2, &b->shape, b->rank);
+    mag_fmt_shape(&shape_1, &a->shape, a->rank);
+    mag_fmt_shape(&shape_2, &b->shape, b->rank);
     fprintf(stderr,
         "Failed to execute operation: %s.\n"
         "ERROR: Input tensor shapes are not compatible for matrix multiplication. The rows of the first tensor must match the columns of the second tensor.\n"
@@ -208,11 +208,11 @@ static bool mag_check_is_contiguous(mag_op_t op, const mag_tensor_t* a) {
     if (mag_likely(mag_tensor_is_contiguous(a))) return true;
     mag_print_separator(stderr);
     char shape[MAG_FMT_DIM_BUF_SIZE];
-    mag_fmt_dims(&shape, &a->shape, a->rank);
+    mag_fmt_shape(&shape, &a->shape, a->rank);
     fprintf(stderr,
         "Failed to execute operation: %s.\n"
         "ERROR: Tensor '%s' must be contiguous. Shape: %s\n"
-        "    Hint: Make tensor contiguous using clone().\n",
+        "    Hint: Make tensor contiguous using contiguous().\n",
         meta->mnemonic,
         a->name,
         shape
@@ -223,36 +223,56 @@ static bool mag_check_is_contiguous(mag_op_t op, const mag_tensor_t* a) {
     return false;
 }
 
+static bool mag_check_is_not_recording_gradients_for_inplace_op(mag_op_t op, mag_tensor_t* result, bool is_inplace) {
+    if (mag_unlikely(is_inplace && result->ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER && result->flags & MAG_TFLAG_REQUIRES_GRAD)) {
+        fprintf(stderr,
+            "Failed to execute operation: %s.\n"
+            "ERROR: In-place operation on tensor with gradient recording enabled.\n"
+            "    Hint: Disable gradient recording temporarly for this op or use detach() to create a new detached tensor.\n",
+            mag_op_meta_of(result->op)->mnemonic
+        );
+        return false;
+    }
+    return true;
+}
+
 /* Generic function which validates the tensors for common unary operations such as abs, neg, etc. */
-static bool mag_validate_op_unary(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
-   return mag_check_is_shape_eq(op, result, inputs[0]);
+static bool mag_validate_op_unary(mag_op_t op, bool is_inplace, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
+    bool ok = true;
+    ok = ok && mag_check_is_not_recording_gradients_for_inplace_op(op, result, is_inplace);
+    ok = ok && mag_check_is_shape_eq(op, result, inputs[0]);
+    return ok;
 }
 
 /* Generic function which validates the tensors for common binary operations such as add, sub, etc. */
-static bool mag_validate_op_binary(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
-    bool valid = true;
-    valid = valid && mag_check_is_shape_eq(op, result, inputs[0]);
-    valid = valid && mag_check_is_shape_broadcastable(op, inputs[0], inputs[1]);
-    valid = valid && mag_check_is_contiguous(op, result);
-    return valid;
+static bool mag_validate_op_binary(mag_op_t op, bool is_inplace, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
+    bool ok = true;
+    ok = ok && mag_check_is_not_recording_gradients_for_inplace_op(op, result, is_inplace);
+    ok = ok && mag_check_is_shape_eq(op, result, inputs[0]);
+    ok = ok && mag_check_is_shape_broadcastable(op, inputs[0], inputs[1]);
+    ok = ok && mag_check_is_contiguous(op, result);
+    return ok;
 }
 
 /* Validation function for the transpose operation. */
-static bool mag_validate_op_transpose(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
+static bool mag_validate_op_transpose(mag_op_t op, bool is_inplace, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
     return true;
 }
 
 /* Generic function which validates scalar operations such as adds, subs etc. */
-static bool mag_validate_op_scalar(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
-    return mag_check_is_contiguous(op, inputs[0]);
+static bool mag_validate_op_scalar(mag_op_t op, bool is_inplace, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
+    bool ok = true;
+    ok = ok && mag_check_is_not_recording_gradients_for_inplace_op(op, result, is_inplace);
+    ok = ok && mag_check_is_contiguous(op, inputs[0]);
+    return ok;
 }
 
 /* Validation function for the matmul operation. */
-static bool mag_validate_op_matmul(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
+static bool mag_validate_op_matmul(mag_op_t op, bool is_inplace, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
     return mag_check_is_shape_matmulable(op, inputs[0], inputs[1]);
 }
 
-static bool mag_validate_op_repeat_rev(mag_op_t op, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
+static bool mag_validate_op_repeat_rev(mag_op_t op, bool is_inplace, mag_tensor_t* result, mag_tensor_t** inputs, const mag_op_param_t* params) {
     return mag_check_is_shape_broadcastable(op, inputs[0], inputs[1]);
 }
 
@@ -1122,7 +1142,7 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
             .num_inputs = 2,
             .num_params = 0,
             .param_types = {},
-            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
+            .flags = MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_matmul,
             .r_alloc = &mag_result_constructor_routine_matmul,
             .validator = &mag_validate_op_matmul,
@@ -1151,11 +1171,13 @@ static void MAG_HOTPROC mag_op_exec(mag_tensor_t* R, mag_compute_device_t* dvc, 
     (*exec)(dvc, R); /* Dispatch to backend. */
 }
 
+extern void mag_tensor_detach_inplace(mag_tensor_t* target);
+
 /* Execute an operator on the active compute device and return result tensor. */
 static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
     mag_ctx_t* ctx,             /* Context to use. All involved tensors must be allocated from this context. */
     mag_op_t op,                /* Operator code */
-    bool inplace,               /* Attempt to perform inplace operation? e.g.    r <- x += y    instead of      r <- x + y */
+    bool inplace,               /* Attempt to perform inplace operation? e.g. r <- x += y instead of      r <- x + y */
     mag_tensor_t** inputs,      /* Input tensors. Must point to an array of 'num_inputs' (N) non-null tensors. */
     uint32_t num_inputs,        /* Number of valid non-null input tensors in the inputs array. Must be same as specified in the op metadata. */
     const mag_op_param_t* params,    /* Operation parameters or NULL. Must be same as specified in the op metadata. */
@@ -1167,34 +1189,27 @@ static mag_tensor_t* MAG_HOTPROC mag_tensor_operator(
     /* Query validate and result constructor functions for the scheduled opcode. */
     const mag_op_meta_t* meta = mag_op_meta_of(op);
     mag_tensor_t* (*r_alloc)(mag_tensor_t**, const mag_op_param_t*) = meta->r_alloc;                         /* Get result allocator function. */
-    bool (*validate_op)(mag_op_t, mag_tensor_t*, mag_tensor_t**, const mag_op_param_t*) = meta->validator;   /* Get validator function. */
-
+    bool (*validate_op)(mag_op_t, bool, mag_tensor_t*, mag_tensor_t**, const mag_op_param_t*) = meta->validator;   /* Get validator function. */
     inplace &= !!(meta->flags & MAG_OP_FLAG_SUPPORTS_INPLACE);                                          /* Inplace operation requested and supported? */
     mag_tensor_t* result = inplace ? mag_tensor_inplace_view(*inputs) : (*r_alloc)(inputs, params);     /* If inplace, result views x (input 0), else a new result tensor is allocated. */
     result->op = op;                                                                                    /* Set opcode of result. */
-
-    mag_assert((*validate_op)(op, result, inputs, params), "Invalid operation %s.", meta->mnemonic);    /* Now validate the full operation and panic if something doesn't work out. */
+    mag_assert((*validate_op)(op, inplace, result, inputs, params), "Invalid operation %s.", meta->mnemonic);    /* Now validate the full operation and panic if something doesn't work out. */
     mag_assert2(num_inputs <= MAG_MAX_OP_INPUTS);                                                       /* Assert correct input tensor count. */
-
-    /* Apply input tensor's gradient rules and increase their lifetime. */
-    for (uint32_t i=0; i < num_inputs; ++i) {
+    bool is_recording_grads = !!(ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER);
+    for (uint32_t i=0; i < num_inputs; ++i) { /* Apply input tensor's gradient rules and increase their lifetime. */
         mag_tensor_t* input = inputs[i];
         result->op_inputs[i] = input;
-
         /* If gradient tracking is enabled, the result tensor inherits the input's gradient rules. */
-        if (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER) {
+        if (is_recording_grads) {
             result->flags |= input->flags & MAG_TFLAG_REQUIRES_GRAD; /* Set gradient tracking flag if set in input. */
             mag_tensor_incref(input);                                /* Keep input alive for the backward pass. */
         }
     }
-
     if (params) /* If available, copy operation parameters to result */
         memcpy(result->op_params, params, num_params*sizeof(*params));
-
     mag_op_exec(result, ctx->device, stage);  /* Now execute the operator. */
-
-    if (!(ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)) {
-        result = mag_tensor_detach(result); /* If gradient are not recorded, detach the tensor (clear parent and opcode). TODO: why are we doing this? */
+    if (!is_recording_grads) {
+        mag_tensor_detach_inplace(result); /* If gradient are not recorded, detach the tensor's parents (clear parent and opcode). TODO: why are we doing this? */
     }
     return result;
 }
@@ -1244,7 +1259,6 @@ mag_tensor_t* mag_abs(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_abs_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_ABS, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -1253,7 +1267,6 @@ mag_tensor_t* mag_sgn(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sgn_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SGN, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -1262,7 +1275,6 @@ mag_tensor_t* mag_neg(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_neg_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_NEG, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -1271,7 +1283,6 @@ mag_tensor_t* mag_log(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_log_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_LOG, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -1280,7 +1291,6 @@ mag_tensor_t* mag_sqr(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sqr_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SQR, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -1289,7 +1299,6 @@ mag_tensor_t* mag_sqrt(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sqrt_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SQRT, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -1298,7 +1307,6 @@ mag_tensor_t* mag_sin(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_sin_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SIN, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -1307,7 +1315,6 @@ mag_tensor_t* mag_cos(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_cos_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_COS, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -1316,7 +1323,6 @@ mag_tensor_t* mag_step(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_step_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_STEP, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -1325,7 +1331,6 @@ mag_tensor_t* mag_exp(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_exp_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_EXP, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -1334,7 +1339,6 @@ mag_tensor_t* mag_floor(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_floor_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_FLOOR, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -1343,7 +1347,6 @@ mag_tensor_t* mag_ceil(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_ceil_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_CEIL, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -1352,7 +1355,6 @@ mag_tensor_t* mag_round(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_round_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_ROUND, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -1361,7 +1363,6 @@ mag_tensor_t* mag_softmax(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_softmax_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
@@ -1370,7 +1371,6 @@ mag_tensor_t* mag_softmax_dv(mag_tensor_t* x) {
 }
 
 mag_tensor_t* mag_softmax_dv_(mag_tensor_t* x) {
-    mag_assert(!(x->flags&MAG_TFLAG_REQUIRES_GRAD), "inplace operations are not supported for gradient-tracking tensors");
     return mag_tensor_operator(x->ctx, MAG_OP_SOFTMAX_DV, true, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 

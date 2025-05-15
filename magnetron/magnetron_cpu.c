@@ -298,7 +298,7 @@ static void mag_threadpool_barrier(mag_threadpool_t* pool) {
     while (pool->num_completed != pool->num_allocated_workers) /* Wait for all workers to finish */
         mag_cv_wait(&pool->cv, &pool->mtx);
     #ifdef MAG_DEBUG
-        for (uint32_t i=0; i < pool->num_workers; ++i) /* Verify phases executed */
+        for (uint32_t i=0; i < pool->num_active_workers; ++i) /* Verify phases executed */
             mag_assert2(pool->workers[i].phase == pool->phase);
     #endif
     mag_mutex_unlock(&pool->mtx);

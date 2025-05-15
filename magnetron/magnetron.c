@@ -208,7 +208,7 @@ void MAG_COLDPROC mag_print_separator(FILE* f) { /* Print a separator line. */
 #define MAG_FMT_DIM_BUF_SIZE ((21+4)*MAG_MAX_DIMS)
 
 /* Format a dimension tuple into a Python-like string. e.g. (4, 12). */
-void mag_fmt_dims(char (*buf)[MAG_FMT_DIM_BUF_SIZE], const int64_t (*dims)[MAG_MAX_DIMS], int64_t rank) {
+void mag_fmt_shape(char (*buf)[MAG_FMT_DIM_BUF_SIZE], const int64_t (*dims)[MAG_MAX_DIMS], int64_t rank) {
     mag_static_assert(MAG_MAX_DIMS == 6);
     memset(*buf, 0, sizeof(*buf));
     char* p = *buf;
@@ -598,6 +598,42 @@ static MAG_COLDPROC void mag_ctx_dump_compiler_info(void) {
     mag_log_info("magnetron v.%d.%d - " __DATE__ " " __TIME__ " - %s %d.%d", mag_version_major(MAG_VERSION), mag_version_minor(MAG_VERSION), compiler_name, compiler_version_major, compiler_version_minor);
 }
 
+#ifdef MAG_DEBUG
+/* Leak detection helpers */
+
+static void mag_leak_detector_enqueue(mag_tensor_t* t) {
+    mag_ctx_t* ctx = t->ctx;
+    t->alive_next = ctx->alive_head;
+    ctx->alive_head = t;
+}
+
+static void mag_leak_detector_dequeue(mag_tensor_t* t) {
+    mag_ctx_t* ctx = t->ctx;
+    for (mag_tensor_t** p = &ctx->alive_head; *p; p = &(*p)->alive_next) {
+        if (*p == t) {
+            *p = t->alive_next;
+            break;
+        }
+    }
+}
+
+static MAG_COLDPROC void mag_leak_detector_dump_results(mag_ctx_t* ctx) {
+    for (mag_tensor_t* leaked = ctx->alive_head; leaked; leaked = leaked->alive_next) {
+        char shape[MAG_FMT_DIM_BUF_SIZE];
+        mag_fmt_shape(&shape, &leaked->shape, leaked->rank);
+        fprintf(
+            stderr,
+            MAG_CC_RED "[magnetron] " MAG_CC_RESET "Leaked tensor: %p, Name: %s, Shape: %s \n",
+            leaked,
+            mag_tensor_get_name(leaked),
+            shape
+        );
+    }
+    fflush(stderr);
+}
+
+#endif
+
 /* Create a magnetron context with the selected compute device. */
 mag_ctx_t* mag_ctx_create(mag_compute_device_type_t device) {
     const mag_device_descriptor_t info = {device};
@@ -638,8 +674,11 @@ mag_ctx_t* mag_ctx_create2(const mag_device_descriptor_t* device_info) {
 }
 
 void mag_ctx_destroy(mag_ctx_t* ctx) { /* Destroy magnetron context. */
-    mag_assert(ctx->num_tensors == 0, "%zu tensors have not been freed", ctx->num_tensors);     /* Leak check if all tensors are freed. */
-    mag_assert(ctx->num_storages == 0, "%zu storages have not been freed", ctx->num_storages);  /* Leak check if all storages are freed. */
+    #ifdef MAG_DEBUG
+        mag_leak_detector_dump_results(ctx);  /* Provide detailed leak check info */
+    #endif
+    mag_assert(ctx->num_tensors == 0, "Memory leak: %zu tensors have not been freed", ctx->num_tensors);     /* Leak check if all tensors are freed. */
+    mag_assert(ctx->num_storages == 0, "Memory leak: %zu storages have not been freed", ctx->num_storages);  /* Leak check if all storages are freed. */
     mag_fixed_intrusive_pool_destroy(&ctx->tensor_pool);
     mag_fixed_intrusive_pool_destroy(&ctx->storage_pool);
     mag_destroy_dynamic_device(ctx->device); ctx->device = NULL; /* Shutdown compute device. */
@@ -852,24 +891,7 @@ const mag_dtype_meta_t* mag_dtype_meta_of(mag_dtype_t type) {
     return &infos[type];
 }
 
-static void mag_tensor_dtor(void* self) {
-    mag_tensor_t* t = self;
-    mag_ctx_t* ctx = t->ctx;
-    mag_assert(ctx->num_tensors > 0, "double freed tensor");
-    --ctx->num_tensors;
-    if (t->grad) {
-        mag_tensor_decref(t->grad);
-        t->grad = NULL;
-    }
-    for (int i=0; i < MAG_MAX_OP_INPUTS; ++i)
-        if (t->op_inputs[i])
-            mag_tensor_decref(t->op_inputs[i]);
-    mag_rc_control_decref(&t->storage->rc_control);
-    #ifndef NDEBUG
-        memset(t, 0, sizeof(*t));
-    #endif
-    mag_fixed_intrusive_pool_free(&ctx->tensor_pool, t);
-}
+static void mag_tensor_dtor(void* self); /* Destructor forward declaration. */
 
 /* Create a new tensor. The must be created on the same thread as the context. */
 mag_tensor_t* mag_tensor_init_internal(mag_ctx_t* ctx, mag_dtype_t type, int64_t rank, const int64_t* shape, mag_tensor_t* view, size_t view_offs) {
@@ -915,6 +937,10 @@ mag_tensor_t* mag_tensor_init_internal(mag_ctx_t* ctx, mag_dtype_t type, int64_t
         .name = "",
         .ud = NULL
     };
+    #ifdef MAG_DEBUG
+        hdr->alive_next = NULL;
+        mag_leak_detector_enqueue(hdr);
+    #endif
     ++ctx->num_tensors; /* Increase tensor count in context. */
     /* Allocate device memory */
     mag_compute_device_t* dvc = ctx->device;
@@ -934,6 +960,26 @@ mag_tensor_t* mag_tensor_init_internal(mag_ctx_t* ctx, mag_dtype_t type, int64_t
         mag_assert(!mag_imull64_ov(hdr->strides[i+1], hdr->shape[i+1], hdr->strides+i), "Overflow while computing strides");
     }
     return hdr;
+}
+
+static void mag_tensor_dtor(void* self) {
+    mag_tensor_t* t = self;
+    mag_ctx_t* ctx = t->ctx;
+    mag_assert(ctx->num_tensors > 0, "double freed tensor");
+    --ctx->num_tensors;
+    if (t->grad) {
+        mag_tensor_decref(t->grad);
+        t->grad = NULL;
+    }
+    for (int i=0; i < MAG_MAX_OP_INPUTS; ++i)
+        if (t->op_inputs[i])
+            mag_tensor_decref(t->op_inputs[i]);
+    mag_rc_control_decref(&t->storage->rc_control);
+#ifdef MAG_DEBUG
+    mag_leak_detector_dequeue(t); /* Pop from alive list */
+    memset(t, 0, sizeof(*t));
+#endif
+    mag_fixed_intrusive_pool_free(&ctx->tensor_pool, t);
 }
 
 mag_tensor_t* mag_tensor_empty(mag_ctx_t* ctx, mag_dtype_t type, int64_t rank, const int64_t* shape) {
@@ -966,10 +1012,6 @@ mag_tensor_t* mag_tensor_full_like(mag_tensor_t* isomorph, float value) {
     return tensor;
 }
 
-static mag_tensor_t* mag_tensor_inplace_view(mag_tensor_t* base) {
-    return mag_tensor_init_internal(base->ctx, base->dtype, base->rank, base->shape, base, 0);
-}
-
 int64_t mag_tensor_get_data_size(const mag_tensor_t* t) { return t->storage->size; }
 int64_t mag_tensor_get_numel(const mag_tensor_t* t) { return t->numel; }
 
@@ -981,12 +1023,17 @@ bool mag_tensor_decref(mag_tensor_t* t) { /* Decrease reference count of the ten
     return mag_rc_control_decref(&t->rc_control);
 }
 
+void mag_tensor_detach_inplace(mag_tensor_t* target) {
+    target->op = MAG_OP_NOP; /* Detach from operations */
+    target->init_op = MAG_IOP_NOP;
+    target->flags &= ~MAG_TFLAG_REQUIRES_GRAD; /* Detach from gradient recording */
+    memset(target->op_inputs, 0, sizeof(target->op_inputs)); /* Clear op inputs */
+    memset(target->op_params, 0, sizeof(target->op_params));
+    memset(target->init_op_params, 0, sizeof(target->init_op_params));
+}
+
 mag_tensor_t* mag_tensor_detach(mag_tensor_t* t) {
-    t->op = MAG_OP_NOP;
-    t->init_op = MAG_IOP_NOP;
-    memset(t->op_inputs, 0, sizeof(t->op_inputs));
-    memset(t->op_params, 0, sizeof(t->op_params));
-    memset(t->init_op_params, 0, sizeof(t->init_op_params));
+   mag_tensor_detach_inplace(t);
     return t;
 }
 
@@ -995,7 +1042,7 @@ mag_tensor_t* mag_tensor_detach(mag_tensor_t* t) {
 ** without the tensors data, opcode or parent tensors.
 **
 */
-uint32_t mag_tensor_weak_hash(const mag_tensor_t* _Nonnull t) {
+uint32_t mag_tensor_weak_hash(const mag_tensor_t* t) {
     uint32_t h = 0;
     for (int64_t i=0; i < t->rank; ++i) {
         mag_hash_combine(&h, t->shape[i]^(t->shape[i]>>32));
@@ -1047,7 +1094,7 @@ const int64_t* mag_tensor_get_strides(const mag_tensor_t* t) { return t->strides
 mag_dtype_t mag_tensor_get_dtype(const mag_tensor_t* t) { return t->dtype; }
 void* mag_tensor_get_data_ptr(const mag_tensor_t* t) { return (void*)t->storage->base; }
 
-void* _Nonnull mag_tensor_get_raw_data_as_bytes(mag_tensor_t* _Nonnull t) {
+void* mag_tensor_get_raw_data_as_bytes(mag_tensor_t* t) {
     size_t size = t->storage->size;
     mag_assert2(size);
     void* dst = (*mag_alloc)(NULL, size); /* TODO: Use dynamic scratch buffer */
@@ -1056,7 +1103,7 @@ void* _Nonnull mag_tensor_get_raw_data_as_bytes(mag_tensor_t* _Nonnull t) {
     return dst;
 }
 
-void mag_tensor_get_raw_data_as_bytes_free(void* _Nonnull ret_val) {
+void mag_tensor_get_raw_data_as_bytes_free(void* ret_val) {
     (*mag_alloc)(ret_val, 0);
 }
 
@@ -1432,7 +1479,7 @@ void mag_tensor_img_draw_text(mag_tensor_t* t, int32_t x, int32_t y, int32_t siz
 }
 
 char* mag_tensor_to_string(const mag_tensor_t* t, bool with_header, size_t from_start_count, size_t from_end_count) {
-    return malloc(3); /* TODO */
+    return NULL;
 }
 
 void mag_tensor_to_string_free_data(char* ret_val) {
@@ -1972,7 +2019,7 @@ static MAG_COLDPROC void mag_graphviz_dump(const mag_tensor_t* node, FILE *fp, m
     }
     const char* fillcolor = is_input ? "palegreen" : "skyblue2";
     char dim_buf[150];
-    mag_fmt_dims(&dim_buf, &node->shape, node->rank);
+    mag_fmt_shape(&dim_buf, &node->shape, node->rank);
     bool gra = node->flags & MAG_TFLAG_REQUIRES_GRAD;
     fprintf(
         fp,

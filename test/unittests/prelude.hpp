@@ -277,7 +277,7 @@ namespace magnetron::test {
                 for (auto& param : params()) {
                     auto grad {param.grad()};
                     if (!grad.has_value()) [[unlikely]] {
-                        throw std::runtime_error("Parameter has no gradient");
+                        throw std::runtime_error{"Parameter has no gradient"};
                     }
                     tensor delta {param - *grad*lr};
                     param.fill_from(delta.data_ptr(), delta.data_size());
@@ -294,9 +294,9 @@ namespace magnetron::test {
                 tensor weight {ctx, type, out_features, in_features};
                 weight.set_name("weight");
                 weight.fill_rand_normal(0.0f, 1.0f);
-                tensor weight2 = weight/static_cast<e8m23_t>(std::sqrt(in_features + out_features));
-                register_param(weight2);
-                this->weight = weight2;
+                weight = weight / static_cast<e8m23_t>(std::sqrt(in_features + out_features));
+                register_param(weight);
+                this->weight = weight;
                 if (has_bias) {
                     tensor bias {ctx, type, out_features};
                     bias.fill(0);
@@ -308,7 +308,7 @@ namespace magnetron::test {
 
             [[nodiscard]] auto operator()(tensor x) const -> tensor {
                 tensor y {x & weight->T()};
-                if (bias.has_value())
+                if (bias)
                     y = y + *bias;
                 return y;
             }
