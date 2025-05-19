@@ -1172,8 +1172,7 @@ bool mag_tensor_requires_grad(const mag_tensor_t* t) {
 }
 
 void mag_tensor_set_requires_grad(mag_tensor_t* t, bool requires_grad) {
-    if (requires_grad && t->ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER)
-        t->flags |= MAG_TFLAG_REQUIRES_GRAD;
+    if (requires_grad) t->flags |= MAG_TFLAG_REQUIRES_GRAD;
     else t->flags &= ~MAG_TFLAG_REQUIRES_GRAD;
 }
 

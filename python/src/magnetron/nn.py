@@ -1,5 +1,5 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
-
+import math
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Callable, MutableMapping
 
@@ -181,12 +181,14 @@ class Linear(Module):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = Parameter(Tensor.full((out_features, in_features), fill_value=0.5))  # TODO: proper init
+        weight = Tensor.normal(shape=(out_features, in_features), mean=0.0, std=1.0)
+        weight = weight / math.sqrt(in_features + out_features)
+        self.weight = Parameter(weight)
         if bias:
             self.bias = Parameter(Tensor.zeros((out_features,), name='bias'))
 
     def forward(self, x: Tensor) -> Tensor:
-        x = x @ self.weight.x.T.clone()
+        x = x @ self.weight.x.T
         if self.bias is not None:
             x = x + self.bias.x
         return x

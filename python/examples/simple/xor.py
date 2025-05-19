@@ -14,7 +14,6 @@ class XOR(nn.Module):
         x = self.l2(x).tanh()
         return x
 
-
 model = XOR()
 optimizer = optim.SGD(model.parameters(), lr=1e-1)
 criterion = nn.MSELoss()
@@ -34,3 +33,7 @@ for epoch in range(2000):
 with mag.no_grad():
     y_hat = model(x)
     print(y_hat.tolist())
+
+del model
+del criterion
+del optimizer

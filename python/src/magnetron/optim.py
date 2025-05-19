@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from magnetron import Tensor
+from magnetron import Tensor, no_grad, Context
 from magnetron.nn import Parameter
 
 
@@ -21,8 +21,6 @@ class PolynomialDecayLRScheduler:
 class Optimizer(ABC):
     """Base class for all optimizers."""
 
-    __slots__ = ('params', 'lr')
-
     def __init__(self, params: list[Parameter], lr: float) -> None:
         self.params = params
         self.lr = lr
@@ -31,6 +29,7 @@ class Optimizer(ABC):
     def step(self) -> None:
         raise NotImplementedError
 
+    @no_grad()
     def zero_grad(self) -> None:
         for param in self.params:
             param.x.zero_grad()
@@ -42,9 +41,11 @@ class SGD(Optimizer):
     def __init__(self, params: list[Parameter], lr: float) -> None:
         super().__init__(params, lr)
 
+    @no_grad()
     def step(self) -> None:
         for param in self.params:
-            param.x -= param.x.grad * self.lr
+            param.x = param.x - param.x.grad * self.lr
+            param.x.requires_grad = True
 
 
 class Adam(Optimizer):
@@ -64,6 +65,7 @@ class Adam(Optimizer):
         self.m = [Tensor.zeros(p.x.shape) for p in self.params]
         self.v = [Tensor.zeros(p.x.shape) for p in self.params]
 
+    @no_grad()
     def step(self) -> None:
         self.t += 1
         for i, p in enumerate(self.params):

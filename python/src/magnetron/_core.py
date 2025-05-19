@@ -531,8 +531,11 @@ class Tensor:
         assert self.requires_grad, 'Tensor must require gradient tracking'
         _C.mag_tensor_zero_grad(self._ptr)
 
-    def export_graphviz(self, file_path: str) -> None:
-        _C.mag_tensor_export_graphviz(self._ptr, bytes(file_path, 'utf-8'))
+    def export_graphviz_forward(self, file_path: str) -> None:
+        _C.mag_tensor_export_forward_graph_graphviz(self._ptr, bytes(file_path, 'utf-8'))
+
+    def export_graphviz_backward(self, file_path: str) -> None:
+        _C.mag_tensor_export_backward_graph_graphviz(self._ptr, bytes(file_path, 'utf-8'))
 
     def clone(self) -> 'Tensor':
         return Tensor(_C.mag_clone(self._ptr))
