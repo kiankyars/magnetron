@@ -965,10 +965,9 @@ struct mag_ctx_t {
 /* Tensor specific flags. */
 typedef enum mag_tensor_flags_t {
     MAG_TFLAG_NONE = 0,
-    MAG_TFLAG_OWNER = 1<<0,             /* Tensor is the owner of the buffer. */
-    MAG_TFLAG_VIEW = 1<<1,              /* Tensor is a view. */
-    MAG_TFLAG_IS_GRAD = 1<<2,           /* Tensor is a gradient. */
-    MAG_TFLAG_REQUIRES_GRAD = 1<<3,     /* Tensor requires gradient. */
+    MAG_TFLAG_VIEW = 1<<0,              /* Tensor is a view. */
+    MAG_TFLAG_IS_GRAD = 1<<1,           /* Tensor is a gradient. */
+    MAG_TFLAG_REQUIRES_GRAD = 1<<2,     /* Tensor requires gradient. */
 
     MAG_TFLAG_LEN = 4                   /* Number of flags. */
 } mag_tensor_flags_t;

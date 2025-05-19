@@ -925,7 +925,7 @@ mag_tensor_t* mag_tensor_init_internal(mag_ctx_t* ctx, mag_dtype_t type, int64_t
         .dtype = type,
         .storage = NULL,
         .numel = numel,
-        .flags = (view ? MAG_TFLAG_VIEW : MAG_TFLAG_OWNER) | (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER ? MAG_TFLAG_REQUIRES_GRAD : 0), /* Set flags. */
+        .flags = view ? MAG_TFLAG_VIEW : MAG_TFLAG_NONE, /* Set flags. */
         .op = MAG_OP_NOP,
         .op_inputs = {0},
         .op_params = {mag_op_param_none()},
@@ -937,6 +937,8 @@ mag_tensor_t* mag_tensor_init_internal(mag_ctx_t* ctx, mag_dtype_t type, int64_t
         .name = "",
         .ud = NULL
     };
+    if (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER) {
+    }
     #ifdef MAG_DEBUG
         hdr->alive_next = NULL;
         mag_leak_detector_enqueue(hdr);
@@ -1265,7 +1267,6 @@ void mag_tensor_backward(mag_tensor_t* root) {
     mag_tensor_array_t post_order;
     mag_tensor_array_init(&post_order);
     mag_collect_topo_iterative(root, &post_order);
-    fflush(stdout);
     if (mag_unlikely(!post_order.size)) goto end;
     for (size_t i=0, j = post_order.size-1; i < j; ++i, --j)
         mag_swap(mag_tensor_t*, post_order.data[i], post_order.data[j]);

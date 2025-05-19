@@ -398,7 +398,7 @@ static void mag_op_backward_transpose(mag_tensor_t* node, mag_tensor_t** grads) 
 
 static void mag_op_backward_mean(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
-    mag_tensor_t* scale = mag_tensor_full_like(x, (float)(1.0f/(mag_e11m52_t)x->numel));
+    mag_tensor_t* scale = mag_tensor_full_like(x, (float)(1.0/(mag_e11m52_t)x->numel));
     *grads = mag_mul(scale, node->grad);
     mag_tensor_decref(scale);
 }

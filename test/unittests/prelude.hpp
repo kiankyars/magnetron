@@ -308,9 +308,7 @@ namespace magnetron::test {
 
             [[nodiscard]] auto operator()(tensor x) const -> tensor {
                 tensor y {x & weight->T()};
-                if (bias)
-                    y = y + *bias;
-                return y;
+                return bias ? y + *bias : y;
             }
 
             std::optional<tensor> weight {};
