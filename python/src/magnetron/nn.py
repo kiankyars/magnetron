@@ -1,7 +1,7 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 import math
 from abc import ABC, abstractmethod
-from collections.abc import Iterator, Callable, MutableMapping
+from collections.abc import Iterator, Callable, MutableMapping, dict_items, dict_keys, dict_values
 
 from magnetron import Tensor
 
@@ -144,19 +144,19 @@ class ModuleDict(Module, MutableMapping[str, Module]):
         del self._modules[name]
         delattr(self, name)
 
-    def __iter__(self):
+    def __iter__(self) -> None:
         return iter(self._modules)
 
     def __len__(self) -> int:
         return len(self._modules)
 
-    def keys(self):
+    def keys(self) -> dict_keys[str, Module]:
         return self._modules.keys()
 
-    def items(self):
+    def items(self) -> dict_items[str, Module]:
         return self._modules.items()
 
-    def values(self):
+    def values(self) -> dict_values[str, Module]:
         return self._modules.values()
 
     def parameters(self) -> list[Parameter]:
@@ -219,28 +219,19 @@ class RMSNorm(Module):
         output = self._norm(x)
         return output * self.weight
 
+
 class LayerNorm(Module):
     """Layer Normalization over the last dimension with optional affine transform."""
-    def __init__(
-        self,
-        normalized_shape: int,
-        eps: float = 1e-5,
-        elementwise_affine: bool = True
-    ) -> None:
+
+    def __init__(self, normalized_shape: int, eps: float = 1e-5, elementwise_affine: bool = True) -> None:
         super().__init__()
         self.normalized_shape = normalized_shape
         self.eps = eps
         self.elementwise_affine = elementwise_affine
 
         if self.elementwise_affine:
-            self.weight = Parameter(
-                Tensor.full((normalized_shape,), fill_value=1.0),
-                name='weight'
-            )
-            self.bias = Parameter(
-                Tensor.zeros((normalized_shape,)),
-                name='bias'
-            )
+            self.weight = Parameter(Tensor.full((normalized_shape,), fill_value=1.0), name='weight')
+            self.bias = Parameter(Tensor.zeros((normalized_shape,)), name='bias')
         else:
             self.weight = None
             self.bias = None

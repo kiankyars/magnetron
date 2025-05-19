@@ -841,5 +841,7 @@ class Tensor:
 
     def _validate_inplace_op(self) -> None:
         if Context.primary().is_grad_recording and self.requires_grad:
-            raise RuntimeError('In-place operations are not allowed when gradient recording is enabled. '
-                             'Either disable gradient recording or use the `detach()` method to create a new tensor without gradient tracking.')
+            raise RuntimeError(
+                'In-place operations are not allowed when gradient recording is enabled. '
+                'Either disable gradient recording or use the `detach()` method to create a new tensor without gradient tracking.'
+            )
