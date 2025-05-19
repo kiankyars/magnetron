@@ -343,7 +343,7 @@ extern MAG_EXPORT void mag_tensor_incref(mag_tensor_t* _Nonnull t);
 extern MAG_EXPORT bool mag_tensor_decref(mag_tensor_t* _Nonnull t);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_detach(mag_tensor_t* _Nonnull t);
 extern MAG_EXPORT uint32_t mag_tensor_weak_hash(const mag_tensor_t* _Nonnull t); /* Returns hash of the tensor properties, not including data. */
-extern MAG_EXPORT char* _Nonnull mag_tensor_to_string(const mag_tensor_t* _Nonnull t, bool with_header, size_t from_start_count, size_t from_end_count);
+extern MAG_EXPORT char* _Nonnull mag_tensor_to_string(mag_tensor_t* _Nonnull t, bool with_header, size_t from_start_count, size_t from_end_count);
 extern MAG_EXPORT void mag_tensor_to_string_free_data(char* _Nonnull ret_val);
 extern MAG_EXPORT void mag_tensor_img_draw_box(mag_tensor_t* _Nonnull t, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t wi, uint32_t rgb);
 extern MAG_EXPORT void mag_tensor_img_draw_text(mag_tensor_t* _Nonnull t, int32_t x, int32_t y, int32_t size, uint32_t rgb, const char* _Nonnull txt);

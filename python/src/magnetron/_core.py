@@ -813,7 +813,10 @@ class Tensor:
         return _C.mag_tensor_eq(self._ptr, other._ptr)
 
     def __str__(self) -> str:
-        return self.__repr__()
+        cstr: _ffi.CData = _C.mag_tensor_to_string(self._ptr, False, 0, 0)
+        result: str = _ffi.string(cstr).decode('utf-8')
+        _C.mag_tensor_to_string_free_data(cstr)
+        return result
 
     def __repr__(self) -> str:
         if self.name is not None and self.name != '':

@@ -995,19 +995,19 @@ mag_tensor_t* mag_tensor_empty_scalar(mag_ctx_t* ctx, mag_dtype_t type) {
     return  mag_tensor_empty(ctx, type, 1, (int64_t[1]){1});
 }
 
-mag_tensor_t* mag_tensor_scalar(mag_ctx_t* ctx, mag_dtype_t type, float value) {
+mag_tensor_t* mag_tensor_scalar(mag_ctx_t* ctx, mag_dtype_t type, mag_e8m23_t value) {
     mag_tensor_t* tensor = mag_tensor_empty_scalar(ctx, type);
     mag_tensor_fill(tensor, value);
     return tensor;
 }
 
-mag_tensor_t* mag_tensor_full(mag_ctx_t* ctx, mag_dtype_t type, int64_t rank, const int64_t* shape, float value) {
+mag_tensor_t* mag_tensor_full(mag_ctx_t* ctx, mag_dtype_t type, int64_t rank, const int64_t* shape, mag_e8m23_t value) {
     mag_tensor_t* tensor = mag_tensor_empty(ctx, type, rank, shape);
     mag_tensor_fill(tensor, value);
     return tensor;
 }
 
-mag_tensor_t* mag_tensor_full_like(mag_tensor_t* isomorph, float value) {
+mag_tensor_t* mag_tensor_full_like(mag_tensor_t* isomorph, mag_e8m23_t value) {
     mag_tensor_t* tensor = mag_tensor_empty_like(isomorph);
     mag_tensor_fill(tensor, value);
     return tensor;
@@ -1477,14 +1477,92 @@ void mag_tensor_img_draw_text(mag_tensor_t* t, int32_t x, int32_t y, int32_t siz
     }
 }
 
-char* mag_tensor_to_string(const mag_tensor_t* t, bool with_header, size_t from_start_count, size_t from_end_count) {
-    char* mem = (*mag_alloc)(NULL, 1);
-    *mem = 0;
-    return mem;
+typedef struct mag_dynstr_t {
+    char* buf;
+    size_t len;
+    size_t cap;
+} mag_dynstr_t;
+
+static void mag_dynstr_init(mag_dynstr_t* dy) {
+    memset(dy, 0, sizeof(*dy));
+    dy->cap = 0x200;
+    dy->len = 0;
+    dy->buf = (*mag_alloc)(NULL, dy->cap);
+    *dy->buf = '\0';
+}
+
+static void mag_dynstr_free(mag_dynstr_t* dy) {
+    (*mag_alloc)(dy->buf, 0);
+    memset(dy, 0, sizeof(*dy));
+}
+
+static void mag_dynstr_vappend(mag_dynstr_t* dy, const char* fmt, va_list ap) {
+    for (;;) {
+        va_list aq;
+        va_copy(aq, ap);
+        int need = vsnprintf(dy->buf+dy->len, dy->cap-dy->len, fmt, aq);
+        va_end(aq);
+        if (mag_unlikely(need < 0)) return; /* Nothing to write / error */
+        if ((size_t)need < dy->cap-dy->len) {
+            dy->len += (size_t)need;
+            return;
+        }
+        size_t newcap = dy->cap<<1;
+        char* p = (*mag_alloc)(dy->buf, newcap);
+        dy->buf = p;
+        dy->cap = newcap;
+    }
+}
+
+static void mag_dynstr_append(mag_dynstr_t* dy, const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    mag_dynstr_vappend(dy, fmt, ap);
+    va_end(ap);
+}
+
+static void mag_tensor_fmt_recursive(
+    mag_dynstr_t* dy,
+    const mag_e8m23_t* buf,
+    const int64_t* shape,
+    const int64_t* strides,
+    int64_t rank,
+    int depth,
+    int64_t moff
+) {
+    if (depth == rank) /* scalar leaf */ {
+        mag_dynstr_append(dy, "%g", (mag_e11m52_t)buf[moff]);
+        return;
+    }
+    mag_dynstr_append(dy, "[");
+    for (int64_t i=0; i < shape[depth]; ++i) {
+        mag_tensor_fmt_recursive(dy, buf, shape, strides, rank, depth+1, moff + i*strides[depth]); /* Recurse down */
+        if (i != shape[depth]-1) { /* separator */
+            mag_dynstr_append(dy, ",");
+            if (rank-depth > 1) { /* newline + indent for outer dims */
+                mag_dynstr_append(dy, "\n");
+                for (int j=0; j <= depth; ++j)
+                    mag_dynstr_append(dy, " ");
+            } else { /* simple space for last dim */
+                mag_dynstr_append(dy, " ");
+            }
+        }
+    }
+    mag_dynstr_append(dy, "]");
+}
+
+char* mag_tensor_to_string(mag_tensor_t* t, bool with_header, size_t from_start_count, size_t from_end_count) {
+    if (!from_end_count) from_end_count = UINT64_MAX;
+    mag_e8m23_t* buf = mag_tensor_get_data_as_floats(t); /* Offload data to float CPU buffer */
+    mag_dynstr_t dy;
+    mag_dynstr_init(&dy);
+    mag_tensor_fmt_recursive(&dy, buf, t->shape, t->strides, t->rank, 0, 0); /* Recursive format */
+    mag_tensor_get_data_as_floats_free(buf);
+    return dy.buf; /* Return the string, must be freed with mag_tensor_to_string_free_data. */
 }
 
 void mag_tensor_to_string_free_data(char* ret_val) {
-    (*mag_alloc)(ret_val, 0); /* TODO: use scratch buffer */
+    (*mag_alloc)(ret_val, 0);
 }
 
 mag_ctx_t* mag_tensor_get_ctx(const mag_tensor_t* t) { return t->ctx; }

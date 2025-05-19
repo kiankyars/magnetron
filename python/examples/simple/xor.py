@@ -31,9 +31,12 @@ for epoch in range(2000):
     if epoch % 100 == 0:
         print(f'Epoch: {epoch}, Loss: {loss.item()}')
 
+print("=== Final Predictions ===")
+
 with mag.no_grad():
     y_hat = model(x)
-    print(y_hat.tolist())
+    for i in range(x.shape[0]):
+        print(f'Expected: {y[i]}, Predicted: {y_hat[i]}')
 
 del model
 del criterion
