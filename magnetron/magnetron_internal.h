@@ -678,6 +678,7 @@ typedef enum mag_op_flags_t {
 /* Stores operator metadata such as operation type, number of inputs and parameters, and the types of the parameters. */
 typedef struct mag_op_meta_t {
     const char* const _Nonnull mnemonic;                    /* Operation mnemonic */
+    const char* const _Nonnull desc;                        /* Operation mnemonic */
     const uint8_t num_inputs;                               /* Number of inputs */
     const uint8_t num_params;                               /* Number of parameters */
     const mag_op_param_type_t param_types[MAG_MAX_OP_PARAMS];    /* Parameter types */
@@ -958,7 +959,7 @@ struct mag_ctx_t {
     mag_compute_device_t* _Nonnull device;        /* Active compute device. */
     void* _Nullable ud;                           /* User data. */
 #ifdef MAG_DEBUG
-    mag_tensor_t* alive_head;                     /* List of alive tensors used for leak detection. */
+    mag_tensor_t* _Nullable alive_head;           /* List of alive tensors used for leak detection. */
 #endif
 };
 
@@ -999,7 +1000,7 @@ struct mag_tensor_t {
     uint8_t name[MAG_MAX_TENSOR_NAME_LEN];                  /* Tensor debug name. */
     void* _Nullable ud;                                     /* User data. */
 #ifdef MAG_DEBUG
-    mag_tensor_t* alive_next;                               /* Next alive tensor used for leak detection. */
+    mag_tensor_t* _Nullable alive_next;                     /* Next alive tensor used for leak detection. */
 #endif
 };
 

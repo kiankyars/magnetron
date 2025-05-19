@@ -42,7 +42,7 @@ TEST(models, xor_e8m23) {
     tensor y {ctx, dtype::e8m23, 4, 1};
     y.fill_from(y_data);
 
-    constexpr std::int64_t epochs {1};
+    constexpr std::int64_t epochs {2000};
     for (std::int64_t epoch = 0; epoch < epochs; ++epoch) {
         tensor y_hat {model(x)};
         tensor loss {nn::optimizer::mse(y_hat, y)};

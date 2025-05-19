@@ -623,10 +623,11 @@ static MAG_COLDPROC void mag_leak_detector_dump_results(mag_ctx_t* ctx) {
         mag_fmt_shape(&shape, &leaked->shape, leaked->rank);
         fprintf(
             stderr,
-            MAG_CC_RED "[magnetron] " MAG_CC_RESET "Leaked tensor: %p, Name: %s, Shape: %s \n",
+            MAG_CC_RED "[magnetron] " MAG_CC_RESET "Leaked tensor: %p, Name: %s, Shape: %s, Op: %s \n",
             leaked,
             mag_tensor_get_name(leaked),
-            shape
+            shape,
+            mag_op_meta_of(leaked->op)->mnemonic
         );
     }
     fflush(stderr);
@@ -937,8 +938,6 @@ mag_tensor_t* mag_tensor_init_internal(mag_ctx_t* ctx, mag_dtype_t type, int64_t
         .name = "",
         .ud = NULL
     };
-    if (ctx->flags & MAG_CTX_FLAG_GRAD_RECORDER) {
-    }
     #ifdef MAG_DEBUG
         hdr->alive_next = NULL;
         mag_leak_detector_enqueue(hdr);
@@ -1255,6 +1254,8 @@ static void mag_collect_topo_iterative(mag_tensor_t* root, mag_tensor_array_t* o
 }
 
 static void mag_tensor_patch_grad(mag_tensor_t* dst, mag_tensor_t* grad) {
+    if (dst->grad)
+        mag_tensor_decref(dst->grad);
     mag_tensor_fmt_name(grad, "%s (grad)", dst->name);
     grad->flags = (grad->flags|MAG_TFLAG_IS_GRAD)&~MAG_TFLAG_REQUIRES_GRAD;
     dst->grad = grad;
@@ -1275,8 +1276,7 @@ void mag_tensor_backward(mag_tensor_t* root) {
         mag_assert2(child);
         const mag_op_meta_t* meta = mag_op_meta_of(child->op);
         if (!child->grad) {
-            mag_tensor_t* grad = mag_tensor_empty_like(child);
-            mag_tensor_fill(grad, 1.0f);
+            mag_tensor_t* grad = mag_tensor_full_like(child, 1.0f);
             mag_tensor_patch_grad(child, grad);
         }
         if (mag_unlikely(child->op == MAG_OP_NOP)) continue;
@@ -1296,7 +1296,6 @@ void mag_tensor_backward(mag_tensor_t* root) {
                 mag_tensor_patch_grad(input, gri);
             } else {
                 mag_tensor_t* acc = mag_add(gri, input->grad);
-                mag_tensor_decref(input->grad);
                 mag_tensor_patch_grad(input, acc);
                 mag_tensor_decref(gri);
             }
@@ -1480,7 +1479,9 @@ void mag_tensor_img_draw_text(mag_tensor_t* t, int32_t x, int32_t y, int32_t siz
 }
 
 char* mag_tensor_to_string(const mag_tensor_t* t, bool with_header, size_t from_start_count, size_t from_end_count) {
-    return NULL;
+    char* mem = (*mag_alloc)(NULL, 1);
+    *mem = 0;
+    return mem;
 }
 
 void mag_tensor_to_string_free_data(char* ret_val) {
