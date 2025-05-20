@@ -523,6 +523,22 @@ extern MAG_EXPORT void mag_thread_set_prio(mag_thread_sched_prio_t prio); /* Set
 extern MAG_EXPORT void mag_thread_set_name(const char* _Nonnull name); /* Set thread name. */
 extern MAG_EXPORT void mag_thread_yield(void); /* Yield current thread. */
 
+/* Dynamic zero-terminated string buffer. */
+typedef struct mag_strstream_t {
+    char* _Nonnull buf;
+    size_t len;
+    size_t cap;
+} mag_strstream_t;
+
+extern void mag_strstream_init(mag_strstream_t* _Nonnull ss);
+extern void mag_strstream_free(mag_strstream_t* _Nonnull ss);
+extern void mag_strstream_reserve_more(mag_strstream_t* _Nonnull ss, size_t extra);
+extern void mag_strstream_vappend(mag_strstream_t* _Nonnull ss, const char* _Nonnull fmt, va_list ap);
+extern void mag_strstream_append(mag_strstream_t* _Nonnull ss, const char* _Nonnull fmt, ...);
+extern void mag_strstream_append_strn(mag_strstream_t* _Nonnull ss, const char* _Nonnull str, size_t len);
+extern void mag_strstream_putc(mag_strstream_t* _Nonnull ss, char c);
+extern void mag_strstream_flush(mag_strstream_t* _Nonnull ss, FILE* _Nonnull f);
+
 /* Operation parameter */
 
 /* Operation parameter type tag. */
@@ -534,6 +550,8 @@ typedef enum mag_op_param_type_t {
 
     MAG_OPP__NUM
 } mag_op_param_type_t;
+
+extern const char* const mag_op_param_type_names[MAG_OPP__NUM]; /* Operation parameter type names. */
 
 /*
 ** The opp (Operation Parameter) is used to pass additional data to the operation. For example:

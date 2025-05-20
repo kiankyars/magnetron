@@ -55,14 +55,25 @@ static bool mag_check_are_inputs_valid(mag_op_t op, mag_tensor_t** inputs, uint3
 /* Check if the op parameters exist and have valid types. Return true if valid, else false. */
 static bool mag_check_are_op_params_valid(mag_op_t op, const mag_op_param_t* params, uint32_t numparams) {
     const mag_op_meta_t* meta = mag_op_meta_of(op);
-    if (!meta->op_param_count) return true; /* No parameters to validate. */
-    if (mag_unlikely(meta->op_param_count != numparams || numparams > MAG_MAX_OP_PARAMS)) {
+
+    bool has_required = false;
+    for (int i=0; i < MAG_MAX_OP_PARAMS; ++i) { /* If we have no required op params, skip check */
+        if (meta->op_param_layout[i].is_required) {
+            has_required = true;
+            break;
+        }
+    }
+    if (!has_required) return true; /* No required op params, skip check. */
+
+    if (mag_unlikely(numparams > MAG_MAX_OP_PARAMS)) {
         mag_print_separator(stderr);
         fprintf(stderr,
             "Failed to execute operation: %s.\n"
-            "ERROR: Operation requires at most %u parameters, but %u were provided.\n"
+            "ERROR: Too many operation parameters provided.\n"
+            "    - Maximum: %u\n"
+            "    - Provided: %u\n"
             "    Hint: Ensure the correct number of operation parameters are provided.\n",
-            meta->mnemonic, MAG_MAX_OP_PARAMS, meta->op_param_count
+            meta->mnemonic, MAG_MAX_OP_PARAMS, numparams
         );
         mag_print_separator(stderr);
         fputc('\n', stderr);
@@ -82,17 +93,23 @@ static bool mag_check_are_op_params_valid(mag_op_t op, const mag_op_param_t* par
         fflush(stderr);
         return false;
     }
-    for (uint32_t i=0; i < meta->op_param_count; ++i) {
-        if (mag_unlikely(params[i].type != meta->op_param_layout[i])) {
+    for (uint32_t i=0; i < numparams; ++i) {
+        if (mag_unlikely(meta->op_param_layout[i].is_required && params[i].type != meta->op_param_layout[i].type)) {
             mag_print_separator(stderr);
             fprintf(stderr,
                 "Failed to execute operation: %s.\n"
-                "ERROR: Operation parameter %u type mismatch.\n"
-                "    - Expected type id: %d\n"
-                "    - Provided type id: %d\n"
-                "    Hint: Ensure the correct parameter types are provided.\n",
-                meta->mnemonic, i, meta->op_param_layout[i], params[i].type
+                "ERROR: Operation parameter %u has invalid type.\n"
+                "    - Expected: %s\n"
+                "    - Provided: %s\n"
+                "    Hint: Ensure the operation parameters are of the correct type.\n",
+                meta->mnemonic, i,
+                mag_op_param_type_names[meta->op_param_layout[i].type],
+                mag_op_param_type_names[params[i].type]
             );
+            mag_print_separator(stderr);
+            fputc('\n', stderr);
+            fflush(stderr);
+            return false;
         }
     }
     return true;

@@ -756,6 +756,75 @@ void mag_thread_yield(void) {
     #endif
 }
 
+void mag_strstream_init(mag_strstream_t* ss) {
+    memset(ss, 0, sizeof(*ss));
+    ss->cap = 0x200;
+    ss->len = 0;
+    ss->buf = (*mag_alloc)(NULL, ss->cap);
+    *ss->buf = '\0';
+}
+
+void mag_strstream_free(mag_strstream_t* ss) {
+    (*mag_alloc)(ss->buf, 0);
+    memset(ss, 0, sizeof(*ss));
+}
+
+void mag_strstream_reserve_more(mag_strstream_t* ss, size_t extra) {
+    size_t want = ss->len+extra+1; /* +1 for terminator */
+    if (want <= ss->cap) return;
+    while (ss->cap < want) ss->cap <<= 1; /* geometric growth */
+    ss->buf = (*mag_alloc)(ss->buf, ss->cap);
+}
+
+void mag_strstream_vappend(mag_strstream_t* ss, const char* fmt, va_list ap0) {
+    va_list ap;
+    va_copy(ap, ap0);
+    int need = vsnprintf(NULL, 0, fmt, ap);
+    va_end(ap);
+    if (mag_unlikely(need < 0)) return;
+    size_t want = ss->len + (size_t)need+1; /* +1 for terminator */
+    if (want > ss->cap) {
+        while (ss->cap < want) ss->cap <<= 1; /* geometric growth */
+        ss->buf = (*mag_alloc)(ss->buf, ss->cap);
+    }
+    va_copy(ap, ap0);
+    vsnprintf(ss->buf + ss->len, ss->cap - ss->len, fmt, ap);
+    va_end(ap);
+    ss->len += (size_t)need;
+}
+
+void mag_strstream_append(mag_strstream_t* ss, const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    mag_strstream_vappend(ss, fmt, ap);
+    va_end(ap);
+}
+
+void mag_strstream_append_strn(mag_strstream_t* ss, const char* str, size_t len) {
+    if (mag_unlikely(!len)) return;
+    mag_strstream_reserve_more(ss, len);
+    memcpy(ss->buf + ss->len, str, len);
+    ss->len += len;
+    ss->buf[ss->len] = '\0';
+}
+
+void mag_strstream_putc(mag_strstream_t* ss, char c){
+    mag_strstream_reserve_more(ss, 1);
+    ss->buf[ss->len++] = c;
+    ss->buf[ss->len] = '\0';
+}
+
+void mag_strstream_flush(mag_strstream_t* ss, FILE *f) {
+   fprintf(f, "%s", ss->buf);
+}
+
+const char* const mag_op_param_type_names[MAG_OPP__NUM] = {
+    "none",
+    "e8m23",
+    "i64",
+    "u64"
+};
+
 /* Allocate a new linear chunk for a fixed pool. */
 static mag_intrusive_chunk* mag_fixed_pool_chunk_new(size_t block_size, size_t block_align, size_t blocks_per_chunk) {
     size_t cap = blocks_per_chunk*block_size;
@@ -1477,52 +1546,8 @@ void mag_tensor_img_draw_text(mag_tensor_t* t, int32_t x, int32_t y, int32_t siz
     }
 }
 
-typedef struct mag_dynstr_t {
-    char* buf;
-    size_t len;
-    size_t cap;
-} mag_dynstr_t;
-
-static void mag_dynstr_init(mag_dynstr_t* dy) {
-    memset(dy, 0, sizeof(*dy));
-    dy->cap = 0x200;
-    dy->len = 0;
-    dy->buf = (*mag_alloc)(NULL, dy->cap);
-    *dy->buf = '\0';
-}
-
-static void mag_dynstr_free(mag_dynstr_t* dy) {
-    (*mag_alloc)(dy->buf, 0);
-    memset(dy, 0, sizeof(*dy));
-}
-
-static void mag_dynstr_vappend(mag_dynstr_t* dy, const char* fmt, va_list ap) {
-    for (;;) {
-        va_list aq;
-        va_copy(aq, ap);
-        int need = vsnprintf(dy->buf+dy->len, dy->cap-dy->len, fmt, aq);
-        va_end(aq);
-        if (mag_unlikely(need < 0)) return; /* Nothing to write / error */
-        if ((size_t)need < dy->cap-dy->len) {
-            dy->len += (size_t)need;
-            return;
-        }
-        size_t newcap = dy->cap<<1;
-        char* p = (*mag_alloc)(dy->buf, newcap);
-        dy->buf = p;
-        dy->cap = newcap;
-    }
-}
-
-static void mag_dynstr_append(mag_dynstr_t* dy, const char* fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    mag_dynstr_vappend(dy, fmt, ap);
-    va_end(ap);
-}
-
 static void mag_tensor_fmt_recursive(
-    mag_dynstr_t* dy,
+    mag_strstream_t* dy,
     const mag_e8m23_t* buf,
     const int64_t* shape,
     const int64_t* strides,
@@ -1531,31 +1556,31 @@ static void mag_tensor_fmt_recursive(
     int64_t moff
 ) {
     if (depth == rank) /* scalar leaf */ {
-        mag_dynstr_append(dy, "%g", (mag_e11m52_t)buf[moff]);
+        mag_strstream_append(dy, "%g", (mag_e11m52_t)buf[moff]);
         return;
     }
-    mag_dynstr_append(dy, "[");
+    mag_strstream_append(dy, "[");
     for (int64_t i=0; i < shape[depth]; ++i) {
         mag_tensor_fmt_recursive(dy, buf, shape, strides, rank, depth+1, moff + i*strides[depth]); /* Recurse down */
         if (i != shape[depth]-1) { /* separator */
-            mag_dynstr_append(dy, ",");
+            mag_strstream_append(dy, ",");
             if (rank-depth > 1) { /* newline + indent for outer dims */
-                mag_dynstr_append(dy, "\n");
+                mag_strstream_append(dy, "\n");
                 for (int j=0; j <= depth; ++j)
-                    mag_dynstr_append(dy, " ");
+                    mag_strstream_append(dy, " ");
             } else { /* simple space for last dim */
-                mag_dynstr_append(dy, " ");
+                mag_strstream_append(dy, " ");
             }
         }
     }
-    mag_dynstr_append(dy, "]");
+    mag_strstream_append(dy, "]");
 }
 
 char* mag_tensor_to_string(mag_tensor_t* t, bool with_header, size_t from_start_count, size_t from_end_count) {
     if (!from_end_count) from_end_count = UINT64_MAX;
     mag_e8m23_t* buf = mag_tensor_get_data_as_floats(t); /* Offload data to float CPU buffer */
-    mag_dynstr_t dy;
-    mag_dynstr_init(&dy);
+    mag_strstream_t dy;
+    mag_strstream_init(&dy);
     mag_tensor_fmt_recursive(&dy, buf, t->shape, t->strides, t->rank, 0, 0); /* Recursive format */
     mag_tensor_get_data_as_floats_free(buf);
     return dy.buf; /* Return the string, must be freed with mag_tensor_to_string_free_data. */
