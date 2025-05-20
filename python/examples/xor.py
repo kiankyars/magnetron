@@ -1,8 +1,15 @@
+# This example demonstrates how to implement a simple XOR neural network using Magnetron.
+# The XOR problem is a classic example in machine learning, where the model learns to output 1 if the inputs are different and 0 if they are the same.
+# The model consists of two linear layers with a tanh activation function.
+# The model is trained using the Mean Squared Error (MSE) loss function and the Stochastic Gradient Descent (SGD) optimizer.
+
 import magnetron as mag
 import magnetron.nn as nn
 import magnetron.optim as optim
 
 from matplotlib import pyplot as plt
+
+EPOCHS: int = 2000
 
 # Define the XOR model architecture
 class XOR(nn.Module):
@@ -26,7 +33,7 @@ x = mag.Tensor.from_data([[0, 0], [0, 1], [1, 0], [1, 1]])
 y = mag.Tensor.from_data([[0], [1], [1], [0]])
 
 # Train the model
-for epoch in range(2000):
+for epoch in range(EPOCHS):
     y_hat = model(x)
     loss = criterion(y_hat, y)
     loss.backward()

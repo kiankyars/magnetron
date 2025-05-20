@@ -21,20 +21,20 @@ static mag_tensor_t* mag_tensor_inplace_view(mag_tensor_t* base) {
 /* Check if the input tensors are not null and valid. Return true if valid, else false. */
 static bool mag_check_are_inputs_valid(mag_op_t op, mag_tensor_t** inputs, uint32_t numin) {
     const mag_op_meta_t* meta = mag_op_meta_of(op);
-    if (mag_unlikely(meta->num_inputs != numin || numin > MAG_MAX_OP_INPUTS)) {
+    if (mag_unlikely(meta->input_count != numin || numin > MAG_MAX_OP_INPUTS)) {
         mag_print_separator(stderr);
         fprintf(stderr,
             "Failed to execute operation: %s.\n"
             "ERROR: Operation requires %u input tensors, but %u were provided.\n"
             "    Hint: Ensure the correct number of input tensors are provided.\n",
-            meta->mnemonic, meta->num_inputs, numin
+            meta->mnemonic, meta->input_count, numin
         );
         mag_print_separator(stderr);
         fputc('\n', stderr);
         fflush(stderr);
         return false;
     }
-    for (uint32_t i=0; i < meta->num_inputs; ++i) {
+    for (uint32_t i=0; i < meta->input_count; ++i) {
         if (mag_unlikely(!inputs[i])) {
             mag_print_separator(stderr);
             fprintf(stderr,
@@ -55,14 +55,14 @@ static bool mag_check_are_inputs_valid(mag_op_t op, mag_tensor_t** inputs, uint3
 /* Check if the op parameters exist and have valid types. Return true if valid, else false. */
 static bool mag_check_are_op_params_valid(mag_op_t op, const mag_op_param_t* params, uint32_t numparams) {
     const mag_op_meta_t* meta = mag_op_meta_of(op);
-    if (!meta->num_params) return true; /* No parameters to validate. */
-    if (mag_unlikely(meta->num_params != numparams || numparams > MAG_MAX_OP_PARAMS)) {
+    if (!meta->op_param_count) return true; /* No parameters to validate. */
+    if (mag_unlikely(meta->op_param_count != numparams || numparams > MAG_MAX_OP_PARAMS)) {
         mag_print_separator(stderr);
         fprintf(stderr,
             "Failed to execute operation: %s.\n"
             "ERROR: Operation requires at most %u parameters, but %u were provided.\n"
             "    Hint: Ensure the correct number of operation parameters are provided.\n",
-            meta->mnemonic, MAG_MAX_OP_PARAMS, meta->num_params
+            meta->mnemonic, MAG_MAX_OP_PARAMS, meta->op_param_count
         );
         mag_print_separator(stderr);
         fputc('\n', stderr);
@@ -82,8 +82,8 @@ static bool mag_check_are_op_params_valid(mag_op_t op, const mag_op_param_t* par
         fflush(stderr);
         return false;
     }
-    for (uint32_t i=0; i < meta->num_params; ++i) {
-        if (mag_unlikely(params[i].type != meta->param_types[i])) {
+    for (uint32_t i=0; i < meta->op_param_count; ++i) {
+        if (mag_unlikely(params[i].type != meta->op_param_layout[i])) {
             mag_print_separator(stderr);
             fprintf(stderr,
                 "Failed to execute operation: %s.\n"
@@ -91,7 +91,7 @@ static bool mag_check_are_op_params_valid(mag_op_t op, const mag_op_param_t* par
                 "    - Expected type id: %d\n"
                 "    - Provided type id: %d\n"
                 "    Hint: Ensure the correct parameter types are provided.\n",
-                meta->mnemonic, i, meta->param_types[i], params[i].type
+                meta->mnemonic, i, meta->op_param_layout[i], params[i].type
             );
         }
     }
@@ -483,7 +483,7 @@ static void mag_op_backward_softmax(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* x = node->op_inputs[0];
     mag_tensor_t* y = mag_softmax(x);
     mag_tensor_t* tmp = mag_mul(node->grad, y);
-    mag_tensor_t* sum_tmp = mag_sum(tmp);
+    mag_tensor_t* sum_tmp = mag_sum(tmp, NULL, 0, false);
     mag_tensor_t* diff = mag_sub(node->grad, sum_tmp);
     grads[0] = mag_mul(y, diff);
     mag_tensor_decref(tmp);
@@ -631,9 +631,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_NOP] = {
             .mnemonic = "nop",
             .desc = "nop",
-            .num_inputs = 0,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 0,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_NONE,
             .backward = NULL,
             .r_alloc = NULL,
@@ -642,9 +650,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_CLONE] = {
             .mnemonic = "clone",
             .desc = "clone",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_NONE,
             .backward = &mag_op_backward_clone,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -653,9 +669,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_VIEW] = {
             .mnemonic = "view",
             .desc = "view",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_NONE,
             .backward = &mag_op_backward_view,
             .r_alloc = &mag_result_constructor_routine_view,
@@ -664,9 +688,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_TRANSPOSE] = {
             .mnemonic = "transpose",
             .desc = "𝑥ᵀ",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_NONE,
             .backward = &mag_op_backward_transpose,
             .r_alloc = &mag_result_constructor_routine_transposed,
@@ -675,15 +707,16 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_PERMUTE] = {
             .mnemonic = "permute",
             .desc = "permute",
-            .num_inputs = 1,
-            .num_params = MAG_MAX_DIMS,
-            .param_types = {
-                MAG_OPP_U64,
-                MAG_OPP_U64,
-                MAG_OPP_U64,
-                MAG_OPP_U64,
-                MAG_OPP_U64,
-                MAG_OPP_U64,
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_U64, .is_required=true}, /* perm axis : u32 */
+                {.type=MAG_OPP_U64, .is_required=true}, /* perm axis : u32 */
+                {.type=MAG_OPP_U64, .is_required=true}, /* perm axis : u32 */
+                {.type=MAG_OPP_U64, .is_required=true}, /* perm axis : u32 */
+                {.type=MAG_OPP_U64, .is_required=true}, /* perm axis : u32 */
+                {.type=MAG_OPP_U64, .is_required=true}, /* perm axis : u32 */
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
             },
             .flags = MAG_OP_FLAG_NONE,
             .backward = NULL,
@@ -693,9 +726,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_MEAN] = {
             .mnemonic = "mean",
             .desc = "(∑𝑥)∕𝑛",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_U64, .is_required=true},  /* reduction dim count : u32 */
+                {.type=MAG_OPP_U64, .is_required=true},  /* keepdim : bool */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+            },
             .flags = MAG_OP_FLAG_NONE,
             .backward = &mag_op_backward_mean,
             .r_alloc = &mag_result_constructor_routine_scalar,
@@ -704,9 +745,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_MIN] = {
             .mnemonic = "min",
             .desc = "min(𝑥)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_U64, .is_required=true},  /* reduction dim count : u32 */
+                {.type=MAG_OPP_U64, .is_required=true},  /* keepdim : bool */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+            },
             .flags = MAG_OP_FLAG_NONE,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_scalar,
@@ -715,9 +764,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_MAX] = {
             .mnemonic = "max",
             .desc = "max(𝑥)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_U64, .is_required=true},  /* reduction dim count : u32 */
+                {.type=MAG_OPP_U64, .is_required=true},  /* keepdim : bool */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+            },
             .flags = MAG_OP_FLAG_NONE,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_scalar,
@@ -726,9 +783,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_SUM] = {
             .mnemonic = "sum",
             .desc = "∑𝑥",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_U64, .is_required=true},  /* reduction dim count : u32 */
+                {.type=MAG_OPP_U64, .is_required=true},  /* keepdim : bool */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+                {.type=MAG_OPP_U64, .is_required=false}, /* reduction dim : u32 [optional] */
+            },
             .flags = MAG_OP_FLAG_NONE,
             .backward = &mag_op_backward_sum,
             .r_alloc = &mag_result_constructor_routine_scalar,
@@ -737,9 +802,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_ABS] = {
             .mnemonic = "abs",
             .desc = "|𝑥|",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_abs,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -752,9 +825,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_SGN] = {
             .mnemonic = "sgn",
             .desc = "𝑥⁄",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -767,9 +848,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_NEG] = {
             .mnemonic = "neg",
             .desc = "−𝑥",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_neg,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -782,9 +871,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_LOG] = {
             .mnemonic = "log",
             .desc = "log₁₀(𝑥)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_log,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -797,9 +894,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_SQR] = {
             .mnemonic = "sqr",
             .desc = "𝑥²",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_sqr,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -812,9 +917,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_SQRT] = {
             .mnemonic = "sqrt",
             .desc = "√𝑥",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags =  MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_sqrt,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -827,9 +940,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_SIN] = {
             .mnemonic = "sin",
             .desc = "sin(𝑥)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_sin,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -842,9 +963,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_COS] = {
             .mnemonic = "cos",
             .desc = "cos(𝑥)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_cos,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -857,9 +986,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_STEP] = {
             .mnemonic = "step",
             .desc = "𝐻(𝑥)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -872,9 +1009,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_EXP] = {
             .mnemonic = "exp",
             .desc = "𝑒ˣ",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_exp,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -887,9 +1032,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_FLOOR] = {
             .mnemonic = "floor",
             .desc = "⌊𝑥⌋",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -902,9 +1055,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_CEIL] = {
             .mnemonic = "ceil",
             .desc = "⌈𝑥⌉",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -917,9 +1078,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_ROUND] = {
             .mnemonic = "round",
             .desc = "⟦𝑥⟧",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -932,9 +1101,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_SOFTMAX] = {
             .mnemonic = "softmax",
             .desc = "𝑒ˣⁱ∕∑𝑒ˣʲ",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_softmax,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -947,9 +1124,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_SOFTMAX_DV] = {
             .mnemonic = "softmax_dv",
             .desc = "𝑑⁄𝑑𝑥 softmax(𝑥)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -962,9 +1147,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_SIGMOID] = {
             .mnemonic = "sigmoid",
             .desc = "1∕(1 + 𝑒⁻ˣ)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = mag_op_backward_sigmoid,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -977,9 +1170,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_SIGMOID_DV] = {
             .mnemonic = "sigmoid_dv",
             .desc = "𝑑⁄𝑑𝑥 sigmoid(𝑥)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -992,9 +1193,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_HARD_SIGMOID] = {
             .mnemonic = "hard_sigmoid",
             .desc = "max(0,min(1,0.2×𝑥+0.5))",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1007,9 +1216,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_SILU] = {
             .mnemonic = "silu",
             .desc = "𝑥∕(1+𝑒⁻ˣ)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_silu,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1022,9 +1239,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_SILU_DV] = {
             .mnemonic = "silu_dv",
             .desc = "𝑑⁄𝑑𝑥 silu(𝑥)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1037,9 +1262,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_TANH] = {
             .mnemonic = "tanh",
             .desc = "tanh(𝑥)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_tanh,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1052,9 +1285,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_TANH_DV] = {
             .mnemonic = "tanh_dv",
             .desc = "𝑑⁄𝑑𝑥 tanh(𝑥)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1067,9 +1308,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_RELU] = {
             .mnemonic = "relu",
             .desc = "max(0, 𝑥)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_relu,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1082,9 +1331,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_RELU_DV] = {
             .mnemonic = "relu_dv",
             .desc = "𝑑⁄𝑑𝑥 relu(𝑥)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1097,9 +1354,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_GELU] = {
             .mnemonic = "gelu",
             .desc = "0.5×𝑥×(1+erf(𝑥∕√2))",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_gelu,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1112,9 +1377,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_GELU_DV] = {
             .mnemonic = "gelu_dv",
             .desc = "𝑑⁄𝑑𝑥 gelu(𝑥)",
-            .num_inputs = 1,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 1,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1127,9 +1400,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_ADD] = {
             .mnemonic = "add",
             .desc = "𝑥 + 𝑦",
-            .num_inputs = 2,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 2,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_add,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1142,9 +1423,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_SUB] = {
             .mnemonic = "sub",
             .desc = "𝑥 − 𝑦",
-            .num_inputs = 2,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 2,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_sub,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1157,9 +1446,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_MUL] = {
             .mnemonic = "mul",
             .desc = "𝑥 ⊙ 𝑦",
-            .num_inputs = 2,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 2,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_mul,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1172,9 +1469,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         [MAG_OP_DIV] = {
             .mnemonic = "div",
             .desc = "𝑥 ∕ 𝑦",
-            .num_inputs = 2,
-            .num_params = 0,
-            .param_types = {MAG_OPP_NONE},
+            .input_count = 2,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_div,
             .r_alloc = &mag_result_constructor_routine_isomorph,
@@ -1186,9 +1491,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         },
         [MAG_OP_MATMUL] = {
             .mnemonic = "matmul",
-            .num_inputs = 2,
-            .num_params = 0,
-            .param_types = {},
+            .input_count = 2,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
             .backward = &mag_op_backward_matmul,
             .r_alloc = &mag_result_constructor_routine_matmul,
@@ -1200,9 +1513,17 @@ const mag_op_meta_t* mag_op_meta_of(mag_op_t opc) {
         },
         [MAG_OP_REPEAT_BACK] = {
             .mnemonic = "repeat_rev",
-            .num_inputs = 2,
-            .num_params = 0,
-            .param_types = {},
+            .input_count = 2,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
             .flags = MAG_OP_FLAG_SUPPORTS_INPLACE,
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_repeat_back,
@@ -1272,32 +1593,80 @@ mag_tensor_t* mag_transpose(mag_tensor_t* x) {
     return mag_tensor_operator(x->ctx, MAG_OP_TRANSPOSE, false, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
-mag_tensor_t* mag_permute(mag_tensor_t* x, uint32_t d0, uint32_t d1, uint32_t d2, uint32_t d3, uint32_t d4, uint32_t d5) {
-    mag_op_param_t params[MAG_MAX_OP_PARAMS] = {
-        mag_op_param_wrap_u64(d0),
-        mag_op_param_wrap_u64(d1),
-        mag_op_param_wrap_u64(d2),
-        mag_op_param_wrap_u64(d3),
-        mag_op_param_wrap_u64(d4),
-        mag_op_param_wrap_u64(d5),
-    };
-    return mag_tensor_operator(x->ctx, MAG_OP_PERMUTE, false, &x, 1, params, sizeof(params)/sizeof(*params), MAG_STAGE_EVAL);
+mag_tensor_t* mag_permute(mag_tensor_t* x, const int64_t* _Nonnull dims, uint32_t num_dims) {
+    mag_assert(dims != NULL, "Invalid permutation dimensions");
+    mag_assert(num_dims <= MAG_MAX_DIMS, "Invalid permutation dimensions count, max %d but is %u", MAG_MAX_DIMS, num_dims);
+    mag_op_param_layout_t layout;
+    mag_op_param_layout_init(&layout);
+    for (uint32_t i=0; i < num_dims; ++i)
+        mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(dims[i]));
+    return mag_tensor_operator(x->ctx, MAG_OP_PERMUTE, false, &x, 1, layout.slots, layout.count, MAG_STAGE_EVAL);
 }
 
-mag_tensor_t* mag_mean(mag_tensor_t* x) {
-    return mag_tensor_operator(x->ctx, MAG_OP_MEAN, false, &x, 1, NULL, 0, MAG_STAGE_EVAL);
+mag_tensor_t* mag_mean(mag_tensor_t* x, const int64_t* dims, uint32_t num_dims, bool keepdim) {
+    mag_assert(num_dims <= MAG_MAX_DIMS, "Invalid reduction dimensions count, max %d but is %u", MAG_MAX_DIMS, num_dims);
+    mag_op_param_layout_t layout;
+    mag_op_param_layout_init(&layout);
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(num_dims)); /* Store number of reduction axes in op_params[0] */
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(!!keepdim)); /* Store keepdim in op_params[1] */
+    for (uint32_t i=2; i < num_dims; ++i) /* Store reduction axes in op_params[2:] */
+        mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(dims[i]));
+    return mag_tensor_operator(x->ctx, MAG_OP_MEAN, false, &x, 1, layout.slots, layout.count, MAG_STAGE_EVAL);
 }
 
-mag_tensor_t* mag_min(mag_tensor_t* x) {
-    return mag_tensor_operator(x->ctx, MAG_OP_MIN, false, &x, 1, NULL, 0, MAG_STAGE_EVAL);
+mag_tensor_t* mag_min(mag_tensor_t* x, const int64_t* dims, uint32_t num_dims, bool keepdim) {
+    mag_assert(num_dims <= MAG_MAX_DIMS, "Invalid reduction dimensions count, max %d but is %u", MAG_MAX_DIMS, num_dims);
+    mag_op_param_layout_t layout;
+    mag_op_param_layout_init(&layout);
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(num_dims)); /* Store number of reduction axes in op_params[0] */
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(!!keepdim)); /* Store keepdim in op_params[1] */
+    for (uint32_t i=2; i < num_dims; ++i) /* Store reduction axes in op_params[2:] */
+        mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(dims[i]));
+    return mag_tensor_operator(x->ctx, MAG_OP_MIN, false, &x, 1, layout.slots, layout.count, MAG_STAGE_EVAL);
 }
 
-mag_tensor_t* mag_max(mag_tensor_t* x) {
-    return mag_tensor_operator(x->ctx, MAG_OP_MAX, false, &x, 1, NULL, 0, MAG_STAGE_EVAL);
+mag_tensor_t* mag_max(mag_tensor_t* x, const int64_t* dims, uint32_t num_dims, bool keepdim) {
+    mag_assert(num_dims <= MAG_MAX_DIMS, "Invalid reduction dimensions count, max %d but is %u", MAG_MAX_DIMS, num_dims);
+    mag_op_param_layout_t layout;
+    mag_op_param_layout_init(&layout);
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(num_dims)); /* Store number of reduction axes in op_params[0] */
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(!!keepdim)); /* Store keepdim in op_params[1] */
+    for (uint32_t i=2; i < num_dims; ++i) /* Store reduction axes in op_params[2:] */
+        mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(dims[i]));
+    return mag_tensor_operator(x->ctx, MAG_OP_MAX, false, &x, 1, layout.slots, layout.count, MAG_STAGE_EVAL);
 }
 
-mag_tensor_t* mag_sum(mag_tensor_t* x) {
-    return mag_tensor_operator(x->ctx, MAG_OP_SUM, false, &x, 1, NULL, 0, MAG_STAGE_EVAL);
+mag_tensor_t* mag_sum(mag_tensor_t* x, const int64_t* dims, uint32_t num_dims, bool keepdim) {
+    mag_assert(num_dims <= MAG_MAX_DIMS, "Invalid reduction dimensions count, max %d but is %u", MAG_MAX_DIMS, num_dims);
+    mag_op_param_layout_t layout;
+    mag_op_param_layout_init(&layout);
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(num_dims)); /* Store number of reduction axes in op_params[0] */
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(!!keepdim)); /* Store keepdim in op_params[1] */
+    for (uint32_t i=2; i < num_dims; ++i) /* Store reduction axes in op_params[2:] */
+        mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(dims[i]));
+    return mag_tensor_operator(x->ctx, MAG_OP_SUM, false, &x, 1, layout.slots, layout.count, MAG_STAGE_EVAL);
+}
+
+mag_tensor_t* mag_argmin(mag_tensor_t* x, const int64_t* dims, uint32_t num_dims, bool keepdim) {
+    mag_assert(num_dims <= MAG_MAX_DIMS, "Invalid reduction dimensions count, max %d but is %u", MAG_MAX_DIMS, num_dims);
+    mag_op_param_layout_t layout;
+    mag_op_param_layout_init(&layout);
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(num_dims)); /* Store number of reduction axes in op_params[0] */
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(!!keepdim)); /* Store keepdim in op_params[1] */
+    for (uint32_t i=2; i < num_dims; ++i) /* Store reduction axes in op_params[2:] */
+        mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(dims[i]));
+    return mag_tensor_operator(x->ctx, MAG_OP_MIN, false, &x, 1, layout.slots, layout.count, MAG_STAGE_EVAL);
+}
+
+mag_tensor_t* mag_argmax(mag_tensor_t* x, const int64_t* dims, uint32_t num_dims, bool keepdim) {
+    mag_assert(num_dims <= MAG_MAX_DIMS, "Invalid reduction dimensions count, max %d but is %u", MAG_MAX_DIMS, num_dims);
+    mag_op_param_layout_t layout;
+    mag_op_param_layout_init(&layout);
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(num_dims)); /* Store number of reduction axes in op_params[0] */
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(!!keepdim)); /* Store keepdim in op_params[1] */
+    for (uint32_t i=2; i < num_dims; ++i) /* Store reduction axes in op_params[2:] */
+        mag_op_param_layout_insert(&layout, mag_op_param_wrap_u64(dims[i]));
+    return mag_tensor_operator(x->ctx, MAG_OP_MAX, false, &x, 1, layout.slots, layout.count, MAG_STAGE_EVAL);
 }
 
 mag_tensor_t* mag_abs(mag_tensor_t* x) {
@@ -1612,22 +1981,31 @@ void mag_tensor_fill_from_raw_bytes(mag_tensor_t* t, const void* data, size_t le
 
 void mag_tensor_fill(mag_tensor_t* t, mag_e8m23_t x) {
     t->init_op = MAG_IOP_BROADCAST;
-    t->init_op_params[0] = mag_op_param_wrap_e8m23(x);
+    mag_op_param_layout_t layout;
+    mag_op_param_layout_init(&layout);
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_e8m23(x));
+    mag_op_param_layout_transfer(&layout, &t->init_op_params);
     mag_op_exec(t, t->ctx->device, MAG_STAGE_INIT);
 }
 
 void mag_tensor_fill_random_uniform(mag_tensor_t* t, mag_e8m23_t min, mag_e8m23_t max) {
     mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
     t->init_op = MAG_IOP_RAND_UNIFORM;
-    t->init_op_params[0] = mag_op_param_wrap_e8m23(min);
-    t->init_op_params[1] = mag_op_param_wrap_e8m23(max);
+    mag_op_param_layout_t layout;
+    mag_op_param_layout_init(&layout);
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_e8m23(min));
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_e8m23(max));
+    mag_op_param_layout_transfer(&layout, &t->init_op_params);
     mag_op_exec(t, t->ctx->device, MAG_STAGE_INIT);
 }
 
 void mag_tensor_fill_random_normal(mag_tensor_t* t, mag_e8m23_t mean, mag_e8m23_t stddev) {
     mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
     t->init_op = MAG_IOP_RAND_NORMAL;
-    t->init_op_params[0] = mag_op_param_wrap_e8m23(mean);
-    t->init_op_params[1] = mag_op_param_wrap_e8m23(stddev);
+    mag_op_param_layout_t layout;
+    mag_op_param_layout_init(&layout);
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_e8m23(mean));
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_e8m23(stddev));
+    mag_op_param_layout_transfer(&layout, &t->init_op_params);
     mag_op_exec(t, t->ctx->device, MAG_STAGE_INIT);
 }

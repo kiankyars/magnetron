@@ -599,6 +599,36 @@ static MAG_AINLINE uint64_t mag_op_param_unpack_u64_or(mag_op_param_t pa, uint64
     return pa.type == MAG_OPP_U64 ? mag_op_param_unpack_u64_or_panic(pa) : fallback;
 }
 
+/* Helper for filling the operation parameters array and validating the amount. */
+typedef struct mag_op_param_layout_t {
+    mag_op_param_t slots[MAG_MAX_OP_PARAMS];
+    size_t count;
+} mag_op_param_layout_t;
+
+static inline void mag_op_param_layout_init(mag_op_param_layout_t* set) {
+    set->count = 0;
+    for (int i=0; i < MAG_MAX_OP_PARAMS; ++i)
+        set->slots[i] = mag_op_param_none();
+}
+
+static inline size_t mag_op_param_layout_insert(mag_op_param_layout_t* set, mag_op_param_t param) {
+    mag_assert(set->count < MAG_MAX_OP_PARAMS, "Too many operation parameters");
+    set->slots[set->count] = param;
+    return set->count++;
+}
+
+static inline void mag_op_param_layout_store(mag_op_param_layout_t* set, size_t idx, mag_op_param_t param) {
+    mag_assert(idx < set->count, "Invalid operation parameter index");
+    mag_assert(set->slots[idx].type == MAG_OPP_NONE, "Operation parameter already set");
+    set->slots[idx] = param;
+}
+
+static inline void mag_op_param_layout_transfer(const mag_op_param_layout_t* set, mag_op_param_t (*out)[MAG_MAX_OP_PARAMS]) {
+    memcpy(*out, set->slots, set->count*sizeof(*set->slots));
+    for (size_t i=set->count; i < MAG_MAX_OP_PARAMS; ++i)
+        (*out)[i] = mag_op_param_none();
+}
+
 /* Standard opcodes, not including initialization operators. */
 typedef enum mag_op_t {
     /* Pseudo */
@@ -675,13 +705,17 @@ typedef enum mag_op_flags_t {
     MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING = 1<<1,      /* Supports multithreading on CPU. */
 } mag_op_flags_t;
 
+typedef struct mag_op_param_slot_t {
+    mag_op_param_type_t type;           /* Type of the parameter. */
+    bool is_required;                   /* Is the parameter required? */
+} mag_op_param_slot_t;
+
 /* Stores operator metadata such as operation type, number of inputs and parameters, and the types of the parameters. */
 typedef struct mag_op_meta_t {
     const char* const _Nonnull mnemonic;                    /* Operation mnemonic */
     const char* const _Nonnull desc;                        /* Operation mnemonic */
-    const uint8_t num_inputs;                               /* Number of inputs */
-    const uint8_t num_params;                               /* Number of parameters */
-    const mag_op_param_type_t param_types[MAG_MAX_OP_PARAMS];    /* Parameter types */
+    const uint8_t input_count;                               /* Number of inputs */
+    const mag_op_param_slot_t op_param_layout[MAG_MAX_OP_PARAMS];    /* Parameter types */
     const mag_op_flags_t flags;                             /* Operation flags */
 
     void (*_Nullable const backward)(                       /* Backward pass function or NULL. */

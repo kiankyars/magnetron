@@ -278,11 +278,13 @@ namespace magnetron {
         [[nodiscard]] auto view() const noexcept -> tensor { return tensor{mag_view(m_tensor)}; }
         [[nodiscard]] auto T() const noexcept -> tensor { return tensor{mag_transpose(m_tensor)}; }
         [[nodiscard]] auto transpose() const noexcept -> tensor { return tensor{mag_transpose(m_tensor)}; }
-        [[nodiscard]] auto permute(const std::array<std::int64_t, k_max_dims>& axes) const noexcept -> tensor { return tensor{mag_permute(m_tensor, axes[0], axes[1], axes[2], axes[3], axes[4], axes[5])}; }
-        [[nodiscard]] auto mean() const noexcept -> tensor { return tensor{mag_mean(m_tensor)}; }
-        [[nodiscard]] auto min() const noexcept -> tensor { return tensor{mag_min(m_tensor)}; }
-        [[nodiscard]] auto max() const noexcept -> tensor { return tensor{mag_max(m_tensor)}; }
-        [[nodiscard]] auto sum() const noexcept -> tensor { return tensor{mag_sum(m_tensor)}; }
+        [[nodiscard]] auto permute(const std::array<std::int64_t, k_max_dims>& axes) const noexcept -> tensor { return tensor{mag_permute(m_tensor, axes.data(), axes.size())}; }
+        [[nodiscard]] auto mean() const noexcept -> tensor { return tensor{mag_mean(m_tensor, nullptr, 0, false)}; }
+        [[nodiscard]] auto min() const noexcept -> tensor { return tensor{mag_min(m_tensor, nullptr, 0, false)}; }
+        [[nodiscard]] auto max() const noexcept -> tensor { return tensor{mag_max(m_tensor, nullptr, 0, false)}; }
+        [[nodiscard]] auto sum() const noexcept -> tensor { return tensor{mag_sum(m_tensor, nullptr, 0, false)}; }
+        [[nodiscard]] auto argmin() const noexcept -> tensor { return tensor{mag_argmin(m_tensor, nullptr, 0, false)}; }
+        [[nodiscard]] auto argmax() const noexcept -> tensor { return tensor{mag_argmax(m_tensor, nullptr, 0, false)}; }
         [[nodiscard]] auto abs() const noexcept -> tensor { return tensor{mag_abs(m_tensor)}; }
         [[nodiscard]] auto abs_() const noexcept -> tensor { return tensor{mag_abs_(m_tensor)}; }
         [[nodiscard]] auto sgn() const noexcept -> tensor { return tensor{mag_sgn(m_tensor)}; }

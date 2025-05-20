@@ -259,3 +259,10 @@ class MSELoss(Loss):
     def __call__(self, y_hat: Tensor, y: Tensor) -> Tensor:
         d = y_hat - y
         return (d * d).mean()
+
+class CrossEntropyLoss(Loss):
+    """Cross Entropy Loss."""
+
+    def __call__(self, y_hat: Tensor, y: Tensor) -> Tensor:
+        y_hat = y_hat.softmax()
+        return -(y * y_hat.log()).sum(dim=-1).mean()

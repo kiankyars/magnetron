@@ -1231,7 +1231,7 @@ static void mag_collect_topo_iterative(mag_tensor_t* root, mag_tensor_array_t* o
     while (sta_len) { /* Iterative DFS */
         mag_topo_stack_record_t* top = &stack[sta_len - 1];
         mag_tensor_t* cur_tensor = top->tensor;
-        if (top->next_child_idx < mag_op_meta_of(cur_tensor->op)->num_inputs) {
+        if (top->next_child_idx < mag_op_meta_of(cur_tensor->op)->input_count) {
             mag_tensor_t* child = cur_tensor->op_inputs[top->next_child_idx++];
             if (child && (child->flags & MAG_TFLAG_REQUIRES_GRAD)) {
                 if (!mag_hashset_contains_key(&visited, child)) {
@@ -1283,7 +1283,7 @@ void mag_tensor_backward(mag_tensor_t* root) {
         void (*op_bwd)(mag_tensor_t*, mag_tensor_t**) = meta->backward;
         mag_assert2(op_bwd);
         (*op_bwd)(child, grads);
-        uint32_t numin = meta->num_inputs;
+        uint32_t numin = meta->input_count;
         mag_assert2(numin <= MAG_MAX_OP_INPUTS);
         for (uint32_t i=0; i < numin; ++i) {
             mag_tensor_t* input = child->op_inputs[i];
@@ -2164,7 +2164,7 @@ MAG_COLDPROC void mag_tensor_export_backward_graph_graphviz(mag_tensor_t* t, con
     for (size_t i=0; i < post_order.size; ++i) {
         mag_tensor_t* node = post_order.data[i];
         const mag_op_meta_t* meta = mag_op_meta_of(node->op);
-        for (uint32_t j = 0; j < meta->num_inputs; ++j) {
+        for (uint32_t j = 0; j < meta->input_count; ++j) {
             mag_tensor_t* input = node->op_inputs[j];
             if (input) {
                 fprintf(fp, "    \"%p\" -> \"%p\" [label=\"input %u\"];\n", node, input, j);

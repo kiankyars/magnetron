@@ -587,17 +587,29 @@ class Tensor:
     def ones_(self) -> None:
         self.fill_(1)
 
-    def mean(self) -> 'Tensor':
-        return Tensor(_C.mag_mean(self._ptr))
+    def mean(self, dim: int | tuple[int] | None = None, keepdim: bool = False) -> 'Tensor':
+        dims, num_dims = self._get_reduction_axes(dim)
+        return Tensor(_C.mag_mean(self._ptr, dims, num_dims, keepdim))
 
-    def min(self) -> 'Tensor':
-        return Tensor(_C.mag_min(self._ptr))
+    def min(self, dim: int | tuple[int] | None = None, keepdim: bool = False) -> 'Tensor':
+        dims, num_dims = self._get_reduction_axes(dim)
+        return Tensor(_C.mag_min(self._ptr, dims, num_dims, keepdim))
 
-    def max(self) -> 'Tensor':
-        return Tensor(_C.mag_max(self._ptr))
+    def max(self, dim: int | tuple[int] | None = None, keepdim: bool = False) -> 'Tensor':
+        dims, num_dims = self._get_reduction_axes(dim)
+        return Tensor(_C.mag_max(self._ptr, dims, num_dims, keepdim))
 
-    def sum(self) -> 'Tensor':
-        return Tensor(_C.mag_sum(self._ptr))
+    def sum(self, dim: int | tuple[int] | None = None, keepdim: bool = False) -> 'Tensor':
+        dims, num_dims = self._get_reduction_axes(dim)
+        return Tensor(_C.mag_sum(self._ptr, dims, num_dims, keepdim))
+
+    def argmin(self, dim: int | tuple[int] | None = None, keepdim: bool = False) -> 'Tensor':
+        dims, num_dims = self._get_reduction_axes(dim)
+        return Tensor(_C.mag_argmin(self._ptr, dims, num_dims, keepdim))
+
+    def argmax(self, dim: int | tuple[int] | None = None, keepdim: bool = False) -> 'Tensor':
+        dims, num_dims = self._get_reduction_axes(dim)
+        return Tensor(_C.mag_argmax(self._ptr, dims, num_dims, keepdim))
 
     def abs(self) -> 'Tensor':
         return Tensor(_C.mag_abs(self._ptr))
@@ -848,3 +860,16 @@ class Tensor:
                 'In-place operations are not allowed when gradient recording is enabled. '
                 'Either disable gradient recording or use the `detach()` method to create a new tensor without gradient tracking.'
             )
+
+    @staticmethod
+    def _get_reduction_axes(dim: int | tuple[int] | None) -> tuple[_ffi.CData, int]:
+        if dim is None:
+            return _ffi.NULL, 0
+        if isinstance(dim, int):
+            return _ffi.new('int64_t[1]', [dim]), 1
+        elif isinstance(dim, tuple):
+            num: int = len(dim)
+            axes: _ffi.CData = _ffi.new(f'int64_t[{num}]', dim),
+            return axes, num
+        else:
+            raise TypeError('Dimension must be an int or a tuple of ints.')

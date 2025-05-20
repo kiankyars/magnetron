@@ -25,7 +25,7 @@ extern "C" {
 #define MAG_MAX_DIMS 6                      /* Maximum number of dimensions for a tensor */
 #define MAG_MAX_TENSOR_NAME_LEN 64          /* Maximum length for tensor name */
 #define MAG_MAX_OP_INPUTS 2                 /* Maximum number of input tensors for an operation */
-#define MAG_MAX_OP_PARAMS 6                 /* Maximum number of parameters for an operation */
+#define MAG_MAX_OP_PARAMS 8                 /* Maximum number of parameters for an operation */
 
 #ifndef MAG_EXPORT
 #ifdef MAG_SHARED
@@ -162,12 +162,14 @@ extern MAG_EXPORT mag_tensor_t* _Nonnull mag_tensor_full_like(mag_tensor_t* _Non
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_clone(mag_tensor_t* _Nonnull x);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_view(mag_tensor_t* _Nonnull x);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_transpose(mag_tensor_t* _Nonnull x);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_permute(mag_tensor_t* _Nonnull x, uint32_t d0, uint32_t d1, uint32_t d2, uint32_t d3, uint32_t d4, uint32_t d5);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_permute(mag_tensor_t* _Nonnull x, const int64_t* _Nonnull dims, uint32_t num_dims);
 
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_mean(mag_tensor_t* _Nonnull x);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_min(mag_tensor_t* _Nonnull x);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_max(mag_tensor_t* _Nonnull x);
-extern MAG_EXPORT mag_tensor_t* _Nonnull mag_sum(mag_tensor_t* _Nonnull x);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_mean(mag_tensor_t* _Nonnull x, const int64_t* _Nullable dims, uint32_t num_dims, bool keepdim);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_min(mag_tensor_t* _Nonnull x, const int64_t* _Nullable dims, uint32_t num_dims, bool keepdim);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_max(mag_tensor_t* _Nonnull x, const int64_t* _Nullable dims, uint32_t num_dims, bool keepdim);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_sum(mag_tensor_t* _Nonnull x, const int64_t* _Nullable dims, uint32_t num_dims, bool keepdim);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_argmin(mag_tensor_t* _Nonnull x, const int64_t* _Nullable dims, uint32_t num_dims, bool keepdim);
+extern MAG_EXPORT mag_tensor_t* _Nonnull mag_argmax(mag_tensor_t* _Nonnull x, const int64_t* _Nullable dims, uint32_t num_dims, bool keepdim);
 
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_abs(mag_tensor_t* _Nonnull x);
 extern MAG_EXPORT mag_tensor_t* _Nonnull mag_abs_(mag_tensor_t* _Nonnull x);
