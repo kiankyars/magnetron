@@ -24,7 +24,8 @@ dev = [
     "numpy",                # In generally optional, but Magnetron provides some extension if installed
     "ruff",                 # Linter
     "pillow",               # Required by the dataset_converter to load tensors
-    "pyqt5"                 # Required by the dataset_explorer for the GUI
+    "pyqt5",                # Required by the dataset_explorer for the GUI
+    "twine"                 # For uploading to PyPI
 ]
 
 # Optional dependencies for complex examples (install if you want to run the examples)
