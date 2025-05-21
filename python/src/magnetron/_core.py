@@ -869,7 +869,7 @@ class Tensor:
             return _ffi.new('int64_t[1]', [dim]), 1
         elif isinstance(dim, tuple):
             num: int = len(dim)
-            axes: _ffi.CData = _ffi.new(f'int64_t[{num}]', dim),
+            axes: _ffi.CData = (_ffi.new(f'int64_t[{num}]', dim),)
             return axes, num
         else:
             raise TypeError('Dimension must be an int or a tuple of ints.')

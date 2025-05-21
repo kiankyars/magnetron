@@ -16,6 +16,7 @@ test_labels = mag.Tensor.zeros((BATCH, 10))
 
 # Define the model architecture
 
+
 class MNIST(nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -26,6 +27,7 @@ class MNIST(nn.Module):
         x = self.l1(x).relu()
         x = self.l2(x)
         return x
+
 
 model = MNIST()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
@@ -47,8 +49,8 @@ for epoch in range(EPOCHS):
 
     with mag.no_grad():
         pred = model(test_images).argmax(1)
-        #acc = (pred == test_labels).float().mean().item()
-    #print(f'epoch {epoch + 1}/{EPOCHS}, acc {acc:.4f}')
+        # acc = (pred == test_labels).float().mean().item()
+    # print(f'epoch {epoch + 1}/{EPOCHS}, acc {acc:.4f}')
 
 # Plot the loss
 
