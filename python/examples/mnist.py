@@ -1,4 +1,4 @@
-from random import random
+import random
 
 import magnetron as mag
 import magnetron.nn as nn
@@ -14,22 +14,7 @@ train_y = mag.Tensor.zeros((BATCH, 10))
 test_images = mag.Tensor.zeros((BATCH, 784))
 test_labels = mag.Tensor.zeros((BATCH, 10))
 
-# Define the model architecture
-
-
-class MNIST(nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-        self.l1 = nn.Linear(784, 128)
-        self.l2 = nn.Linear(128, 10)
-
-    def forward(self, x: mag.Tensor) -> mag.Tensor:
-        x = self.l1(x).relu()
-        x = self.l2(x)
-        return x
-
-
-model = MNIST()
+model = nn.Sequential(nn.Linear(784, 128), nn.ReLU(), nn.Linear(128, 10))
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 criterion = nn.CrossEntropyLoss()
 

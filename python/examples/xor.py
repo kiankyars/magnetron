@@ -4,9 +4,7 @@
 # The model is trained using the Mean Squared Error (MSE) loss function and the Stochastic Gradient Descent (SGD) optimizer.
 
 import magnetron as mag
-import magnetron.nn as nn
-import magnetron.optim as optim
-
+from magnetron import optim, nn
 from matplotlib import pyplot as plt
 
 EPOCHS: int = 2000
