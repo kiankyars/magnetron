@@ -50,9 +50,3 @@ plt.ylabel('MSE Loss')
 plt.title('Training Loss over Time')
 plt.grid(True)
 plt.show()
-
-# Cleanup
-
-del model
-del criterion
-del optimizer
