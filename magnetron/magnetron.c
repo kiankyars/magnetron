@@ -814,8 +814,8 @@ void mag_strstream_putc(mag_strstream_t* ss, char c){
     ss->buf[ss->len] = '\0';
 }
 
-void mag_strstream_flush(mag_strstream_t* ss, FILE *f) {
-   fprintf(f, "%s", ss->buf);
+void mag_strstream_flush(mag_strstream_t* ss, FILE* f) {
+   fputs(ss->buf, f);
 }
 
 const char* const mag_op_param_type_names[MAG_OPP__NUM] = {
@@ -1547,7 +1547,7 @@ void mag_tensor_img_draw_text(mag_tensor_t* t, int32_t x, int32_t y, int32_t siz
 }
 
 static void mag_tensor_fmt_recursive(
-    mag_strstream_t* dy,
+    mag_strstream_t* ss,
     const mag_e8m23_t* buf,
     const int64_t* shape,
     const int64_t* strides,
@@ -1556,34 +1556,34 @@ static void mag_tensor_fmt_recursive(
     int64_t moff
 ) {
     if (depth == rank) /* scalar leaf */ {
-        mag_strstream_append(dy, "%g", (mag_e11m52_t)buf[moff]);
+        mag_strstream_append(ss, "%g", (mag_e11m52_t)buf[moff]);
         return;
     }
-    mag_strstream_append(dy, "[");
+    mag_strstream_putc(ss, '[');
     for (int64_t i=0; i < shape[depth]; ++i) {
-        mag_tensor_fmt_recursive(dy, buf, shape, strides, rank, depth+1, moff + i*strides[depth]); /* Recurse down */
+        mag_tensor_fmt_recursive(ss, buf, shape, strides, rank, depth+1, moff + i*strides[depth]); /* Recurse down */
         if (i != shape[depth]-1) { /* separator */
-            mag_strstream_append(dy, ",");
+            mag_strstream_putc(ss, ',');
             if (rank-depth > 1) { /* newline + indent for outer dims */
-                mag_strstream_append(dy, "\n");
+                mag_strstream_putc(ss, '\n');
                 for (int j=0; j <= depth; ++j)
-                    mag_strstream_append(dy, " ");
+                    mag_strstream_putc(ss, ' ');
             } else { /* simple space for last dim */
-                mag_strstream_append(dy, " ");
+                mag_strstream_putc(ss, ' ');
             }
         }
     }
-    mag_strstream_append(dy, "]");
+    mag_strstream_putc(ss, ']');
 }
 
 char* mag_tensor_to_string(mag_tensor_t* t, bool with_header, size_t from_start_count, size_t from_end_count) {
     if (!from_end_count) from_end_count = UINT64_MAX;
     mag_e8m23_t* buf = mag_tensor_get_data_as_floats(t); /* Offload data to float CPU buffer */
-    mag_strstream_t dy;
-    mag_strstream_init(&dy);
-    mag_tensor_fmt_recursive(&dy, buf, t->shape, t->strides, t->rank, 0, 0); /* Recursive format */
+    mag_strstream_t ss;
+    mag_strstream_init(&ss);
+    mag_tensor_fmt_recursive(&ss, buf, t->shape, t->strides, t->rank, 0, 0); /* Recursive format */
     mag_tensor_get_data_as_floats_free(buf);
-    return dy.buf; /* Return the string, must be freed with mag_tensor_to_string_free_data. */
+    return ss.buf; /* Return the string, must be freed with mag_tensor_to_string_free_data. */
 }
 
 void mag_tensor_to_string_free_data(char* ret_val) {

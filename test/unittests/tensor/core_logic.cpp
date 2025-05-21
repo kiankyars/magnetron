@@ -535,5 +535,6 @@ TEST(core_tensor_logic, init_6d) {
     ASSERT_EQ(internal->grad, nullptr); // gradient is allocated lazily
     ASSERT_EQ(internal->ud, nullptr);
 
-    std::cout << t.to_string() << std::endl;
+    auto str = t.to_string();
+    std::cout << str << std::endl;
 }
