@@ -1,5 +1,7 @@
 /*
-** (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+** +=======================================================================+
+** | (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>                  |
+** +=======================================================================+
 **
 **
 ** Implement CPU dispatch to specialized runtime kernels generated from magnetron_cpu_blas.inl and multithreading logic for parallel computations.
@@ -124,55 +126,6 @@ static bool mag_blas_detect_optimal_specialization(const mag_ctx_t* ctx, mag_ker
     return false; /* No spec used, fallback is active */
 }
 
-typedef struct mag_cpu_op_info_t {
-    bool mt_support;
-    mag_e11m52_t growth;
-    int64_t threshold;
-} mag_cpu_op_info_t;
-
-static const mag_cpu_op_info_t mag_cpu_op_infos[MAG_OP__NUM] = {
-    [MAG_OP_NOP]            = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_CLONE]          = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_VIEW]           = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_TRANSPOSE]      = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_PERMUTE]        = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_MEAN]           = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_MIN]            = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_MAX]            = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_SUM]            = {.mt_support = false, .growth = 0.0, .threshold = 0},
-    [MAG_OP_ABS]            = {.mt_support = true,  .growth = 0.1, .threshold = 0},
-    [MAG_OP_NEG]            = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_LOG]            = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SQR]            = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SQRT]           = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SIN]            = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_COS]            = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_STEP]           = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SOFTMAX]        = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SOFTMAX_DV]     = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SIGMOID]        = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SIGMOID_DV]     = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_HARD_SIGMOID]   = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SILU]           = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_SILU_DV]        = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_TANH]           = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_TANH_DV]        = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_RELU]           = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_RELU_DV]        = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_GELU]           = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_GELU_DV]        = {.mt_support = true,  .growth = 0.1, .threshold = 250000},
-    [MAG_OP_ADD]            = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_SUB]            = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_MUL]            = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_DIV]            = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_ADDS]           = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_SUBS]           = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_MULS]           = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_DIVS]           = {.mt_support = true,  .growth = 0.2, .threshold = 250000},
-    [MAG_OP_MATMUL]         = {.mt_support = true,  .growth = 3.0, .threshold =  10000},
-    [MAG_OP_REPEAT_BACK]    = {.mt_support = false, .growth = 3.0, .threshold =  10000},
-};
-
 typedef struct mag_worker_t mag_worker_t;
 typedef struct mag_threadpool_t {
     mag_alignas(MAG_DESTRUCTIVE_INTERFERENCE_SIZE) volatile bool interrupt;   /* Interrupt flag, 1=stop */
@@ -185,9 +138,8 @@ typedef struct mag_threadpool_t {
     volatile mag_atomic_t num_workers_online;       /* Number of workers that are online */
     mag_worker_t* workers;                          /* Array of workers */
     const mag_kernel_registry_t* kernels;           /* Specialized compute kernel registry */
-    mag_kernel_context_t* kernel_ctx;               /* Kernel context */
     mag_thread_sched_prio_t sched_prio;             /* Scheduling priority */
-    mag_ctx_t* host_ctx;                                 /* Host context */
+    mag_ctx_t* host_ctx;                            /* Host context */
 } mag_threadpool_t;
 
 struct mag_worker_t {
@@ -204,7 +156,6 @@ typedef struct mag_cpu_device_t {
     mag_threadpool_t* pool;             /* Thread pool. NULL if num_allocated_workers <= 1 */
     uint32_t num_allocated_workers;     /* Amount of worker thread used. if == 1 then single threaded mode and thread pool is not created */
     mag_kernel_registry_t kernels;      /* Compute kernels. Specialized by arch optimized version at boot (e.g. AVX, AVX512 etc..) */
-    mag_kernel_context_t kernel_ctx;    /* Kernel context */
     mag_prng_state_t primary_prng;      /* Primary prng context. */
 } mag_cpu_device_t;
 
@@ -223,7 +174,7 @@ static bool mag_worker_await_work(mag_worker_t* worker, mag_threadpool_t* pool) 
 }
 
 /* Execute the operation on the current thread */
-static void mag_worker_exec_thread_local(const mag_kernel_registry_t* kernels, mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
+static void mag_worker_exec_thread_local(const mag_kernel_registry_t* kernels, mag_compute_payload_t* payload) {
     if (mag_unlikely(!payload->node)) return;
     mag_op_t op = payload->node->op;
     mag_init_op_t iop = payload->node->init_op;
@@ -231,18 +182,16 @@ static void mag_worker_exec_thread_local(const mag_kernel_registry_t* kernels, m
     mag_assert2(op >= 0 && op < MAG_OP__NUM);
     mag_assert2(iop >= 0 && iop < MAG_IOP__NUM);
     mag_assert2(dtype >= 0 && dtype < MAG_DTYPE__NUM);
-    void (*kernel)(const mag_compute_payload_t*, mag_kernel_context_t* ctx)
-        = payload->gra_eval == MAG_GRA_INIT
-        ? kernels->init[iop][dtype] : payload->gra_eval == MAG_GRA_FWD
-        ? kernels->fwd[op][dtype] : kernels->bwd[op][dtype];
-    (*kernel)(payload, ctx);
+    void (*kernel)(const mag_compute_payload_t*) = payload->stage == MAG_STAGE_INIT ? kernels->init[iop][dtype] : kernels->fwd[op][dtype];
+    mag_assert(kernel, "no kernel found for op '%s' (iop #%d) with dtype %s", mag_op_meta_of(op)->mnemonic, iop, mag_dtype_meta_of(dtype)->name);
+    (*kernel)(payload);
     payload->node = NULL;
 }
 
 /* Execute the operation and broadcast completion if last chunk was done */
-static void mag_worker_exec_and_broadcast(mag_threadpool_t* pool, const mag_kernel_registry_t* kernels, mag_compute_payload_t* payload, mag_kernel_context_t* ctx) {
+static void mag_worker_exec_and_broadcast(mag_threadpool_t* pool, const mag_kernel_registry_t* kernels, mag_compute_payload_t* payload) {
     if (mag_likely(payload->thread_idx < pool->num_active_workers)) /* Execute the operation if we are an active thread. */
-        mag_worker_exec_thread_local(kernels, payload, ctx);
+        mag_worker_exec_thread_local(kernels, payload);
     mag_mutex_lock(&pool->mtx);
     if (++pool->num_completed == pool->num_allocated_workers) /* If we are the last to finish, wake the main thread */
         mag_cv_broadcast(&pool->cv);
@@ -255,7 +204,6 @@ static MAG_HOTPROC void* mag_worker_thread_exec_op(void* arg) {
     mag_threadpool_t* pool = worker->pool;
     mag_compute_payload_t* payload = &worker->payload;
     const mag_kernel_registry_t* kernels = pool->kernels;
-    mag_kernel_context_t* ctx = pool->kernel_ctx;
     char name[32];
     snprintf(name, sizeof(name), "mag_worker_%" PRIx64, payload->thread_idx);
     mag_thread_set_name(name);
@@ -263,13 +211,13 @@ static MAG_HOTPROC void* mag_worker_thread_exec_op(void* arg) {
     mag_prng_init(&worker->prng, pool->host_ctx->prng_algo, mag_thread_id()^(uintptr_t)worker);
     mag_atomic_fetch_add(&pool->num_workers_online, 1, MAG_MO_SEQ_CST);
     while (mag_likely(mag_worker_await_work(worker, pool)))  /* Main work loop: wait, work, signal status */
-        mag_worker_exec_and_broadcast(pool, kernels, payload, ctx);
+        mag_worker_exec_and_broadcast(pool, kernels, payload);
     mag_atomic_fetch_sub(&pool->num_workers_online, 1, MAG_MO_SEQ_CST);
     return MAG_THREAD_RET_NONE;
 }
 
 /* Create thread pool and allocate threads */
-static mag_threadpool_t* mag_threadpool_create(mag_ctx_t* host_ctx, uint32_t num_workers, const mag_kernel_registry_t* kernels, mag_kernel_context_t* ctx, mag_thread_sched_prio_t prio) { /* Create a thread pool */
+static mag_threadpool_t* mag_threadpool_create(mag_ctx_t* host_ctx, uint32_t num_workers, const mag_kernel_registry_t* kernels, mag_thread_sched_prio_t prio) { /* Create a thread pool */
     mag_threadpool_t* pool = mag_alloc_aligned(sizeof(*pool), __alignof(mag_threadpool_t));
     memset(pool, 0, sizeof(*pool));
     mag_worker_t* workers = mag_alloc_aligned(num_workers*sizeof(*workers), __alignof(mag_worker_t));
@@ -283,7 +231,6 @@ static mag_threadpool_t* mag_threadpool_create(mag_ctx_t* host_ctx, uint32_t num
         .num_workers_online = 0,  /* Main thread as worker 0 */
         .workers = workers,
         .kernels = kernels,
-        .kernel_ctx = ctx,
         .sched_prio = prio,
         .host_ctx = host_ctx
     };
@@ -297,7 +244,7 @@ static mag_threadpool_t* mag_threadpool_create(mag_ctx_t* host_ctx, uint32_t num
                 .thread_num = num_workers,
                 .thread_idx = ti,
                 .node = NULL,
-                .gra_eval = MAG_GRA_FWD,
+                .stage = MAG_STAGE_EVAL,
                 .local_prng = NULL
             },
             .pool = pool,
@@ -331,14 +278,14 @@ static void mag_threadpool_destroy(mag_threadpool_t* pool) {
 }
 
 /* Submits work payload and awakens all threads */
-static void mag_threadpool_kickoff(mag_threadpool_t* pool, mag_tensor_t* node, mag_gra_eval_t gra_eval, uint32_t num_active_workers) {
+static void mag_threadpool_kickoff(mag_threadpool_t* pool, mag_tensor_t* node, mag_exec_stage_t stage, uint32_t num_active_workers) {
     mag_mutex_lock(&pool->mtx);
     pool->num_active_workers = num_active_workers;
     for (uint32_t i=0; i < pool->num_allocated_workers; ++i) { /* Set up payload */
         mag_compute_payload_t* payload = &pool->workers[i].payload;
         payload->thread_num = num_active_workers;
         payload->node = node;
-        payload->gra_eval = gra_eval;
+        payload->stage = stage;
     }
     ++pool->phase;
     pool->num_completed = 0; /* Reset completion counter */
@@ -351,57 +298,46 @@ static void mag_threadpool_barrier(mag_threadpool_t* pool) {
     while (pool->num_completed != pool->num_allocated_workers) /* Wait for all workers to finish */
         mag_cv_wait(&pool->cv, &pool->mtx);
     #ifdef MAG_DEBUG
-        for (uint32_t i=0; i < pool->num_workers; ++i) /* Verify phases executed */
+        for (uint32_t i=0; i < pool->num_active_workers; ++i) /* Verify phases executed */
             mag_assert2(pool->workers[i].phase == pool->phase);
     #endif
     mag_mutex_unlock(&pool->mtx);
 }
 
 /* Execute an operator tensor on the CPU */
-static MAG_HOTPROC void mag_threadpool_parallel_compute(mag_threadpool_t* pool, mag_tensor_t* node, mag_gra_eval_t gra_eval, uint32_t num_active_workers) {
+static MAG_HOTPROC void mag_threadpool_parallel_compute(mag_threadpool_t* pool, mag_tensor_t* node, mag_exec_stage_t stage, uint32_t num_active_workers) {
     mag_assert2(pool != NULL);
-    mag_threadpool_kickoff(pool, node, gra_eval, num_active_workers);                                     /* Kick off workers */
-    mag_cv_broadcast(&pool->cv);                                                                        /* Wake up all workers */
-    mag_worker_exec_and_broadcast(pool, pool->kernels, &pool->workers->payload, pool->kernel_ctx);      /* Main thread does work too */
-    mag_threadpool_barrier(pool);                                                                       /* Wait for all workers to finish */
+    mag_threadpool_kickoff(pool, node, stage, num_active_workers);               /* Kick off workers */
+    mag_cv_broadcast(&pool->cv);                                                    /* Wake up all workers */
+    mag_worker_exec_and_broadcast(pool, pool->kernels, &pool->workers->payload);    /* Main thread does work too */
+    mag_threadpool_barrier(pool);                                                   /* Wait for all workers to finish */
 }
 
 static uint32_t mag_cpu_dynamic_work_scaling(mag_cpu_device_t* dvc, mag_op_t op, int64_t numel);
 
-static MAG_HOTPROC void mag_cpu_exec(mag_compute_device_t* dvc, mag_gra_eval_t gra_eval, mag_tensor_t* node) {
+static MAG_HOTPROC void mag_cpu_exec(mag_compute_device_t* dvc, mag_exec_stage_t stage, mag_tensor_t* node) {
     mag_cpu_device_t* cpu_dvc = dvc->impl;
-    const mag_kernel_registry_t* kernels = &cpu_dvc->kernels;
-    mag_kernel_context_t* kctx = &cpu_dvc->kernel_ctx; /* Setup pre/post kernel context */
-    kctx->node = node;
-    kctx->alloced_threads = cpu_dvc->num_allocated_workers;
-    uint32_t (*pre)(mag_kernel_context_t*) = gra_eval == MAG_GRA_FWD ? kernels->fwd_pre[node->op] : kernels->bwd_pre[node->op];      /* Fetch pre exec kernel */
-    void (*post)(mag_kernel_context_t*) = gra_eval == MAG_GRA_BWD ? kernels->fwd_post[node->op] : kernels->bwd_post[node->op];       /* Fetch post exec kernel */
-    uint32_t intraop_workers = gra_eval == MAG_GRA_INIT ? 0 : pre ? (*pre)(kctx) : mag_cpu_dynamic_work_scaling(cpu_dvc, node->op, node->numel);   /* Use thread count recommended by pre-kernel or compute general thread count heuristic. */
+    uint32_t intraop_workers = stage == MAG_STAGE_INIT ? 0 : mag_cpu_dynamic_work_scaling(cpu_dvc, node->op, node->numel);   /* Use thread count recommended by pre-kernel or compute general thread count heuristic. */
     if (intraop_workers <= 1) { /* Main thread does the work (single threaded mode). */
         mag_compute_payload_t payload = {
             .node = node,
             .thread_idx = 0,
             .thread_num = 1,
-            .gra_eval = gra_eval,
+            .stage = stage,
             .local_prng = &cpu_dvc->primary_prng
         };
-        mag_worker_exec_thread_local(&cpu_dvc->kernels, &payload, kctx);
-        goto epilogue;
+        mag_worker_exec_thread_local(&cpu_dvc->kernels, &payload);
+        return; /* We're done */
     }
-    mag_threadpool_parallel_compute(cpu_dvc->pool, node, gra_eval, intraop_workers); /* Multithreaded exec + barrier */
-    epilogue: if (post) (*post)(kctx); /* Post-exec */
+    mag_threadpool_parallel_compute(cpu_dvc->pool, node, stage, intraop_workers); /* Multithreaded exec + barrier */
 }
 
 static void mag_cpu_exec_init(mag_compute_device_t* dvc, mag_tensor_t* node) {
-    mag_cpu_exec(dvc, MAG_GRA_INIT, node);
+    mag_cpu_exec(dvc, MAG_STAGE_INIT, node);
 }
 
 static void mag_cpu_exec_fwd(mag_compute_device_t* dvc, mag_tensor_t* node) {
-    mag_cpu_exec(dvc, MAG_GRA_FWD, node);
-}
-
-static void mag_cpu_exec_bwd(mag_compute_device_t* dvc, mag_tensor_t* node) {
-    mag_cpu_exec(dvc, MAG_GRA_BWD, node);
+    mag_cpu_exec(dvc, MAG_STAGE_EVAL, node);
 }
 
 static void mag_cpu_buf_broadcast(mag_storage_buffer_t* sto, size_t offs, const void* src, size_t stride) {
@@ -515,13 +451,12 @@ static mag_cpu_device_t* mag_cpu_init_device(mag_ctx_t* ctx, uint32_t num_thread
         .pool = NULL,
         .num_allocated_workers = 0,
         .kernels = {},
-        .kernel_ctx = {},
         .primary_prng = {}
     };
     mag_blas_detect_optimal_specialization(ctx, &dvc->kernels);
     mag_prng_init(&dvc->primary_prng, ctx->prng_algo, num_threads);
     if (num_threads > 1) {
-        dvc->pool = mag_threadpool_create(ctx, num_threads, &dvc->kernels, &dvc->kernel_ctx, sched_prio);
+        dvc->pool = mag_threadpool_create(ctx, num_threads, &dvc->kernels, sched_prio);
         dvc->num_allocated_workers = num_threads;
     }
     return dvc;
@@ -533,10 +468,11 @@ static mag_cpu_device_t* mag_cpu_init_device(mag_ctx_t* ctx, uint32_t num_thread
 ** TODO: This can be improved by using a more sophisticated heuristic and a benchmarked, numerical approach.
 */
 static uint32_t mag_cpu_dynamic_work_scaling(mag_cpu_device_t* dvc, mag_op_t op, int64_t numel) {
-    const mag_cpu_op_info_t* info = mag_cpu_op_infos+op;
-    if (!dvc->pool || !info->mt_support || numel < info->threshold) return 1;           /* Use a single worker (main thread). */
-    numel -= info->threshold;                                                           /* Saturate threshold */
-    uint32_t workers = (uint32_t)ceil(info->growth * log2((mag_e11m52_t)numel));        /* Logarithmic scaling */
+    const mag_op_meta_t* meta = mag_op_meta_of(op);
+    if (!dvc->pool || !(meta->flags & MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING) || numel < meta->cpu.thread_treshold)  /* Use a single worker (main thread). */
+        return 1;
+    numel -= meta->cpu.thread_treshold;                                                             /* Saturate threshold */
+    uint32_t workers = (uint32_t)ceil(meta->cpu.thread_growth * log2((mag_e11m52_t)numel));         /* Logarithmic scaling */
     workers = mag_xmin(dvc->num_allocated_workers, mag_xmax(1, workers));
     return workers;
 }
@@ -558,7 +494,6 @@ static mag_compute_device_t* mag_cpu_init_interface(mag_ctx_t* ctx, uint32_t num
         .type = MAG_COMPUTE_DEVICE_TYPE_CPU,
         .eager_exec_init = &mag_cpu_exec_init,
         .eager_exec_fwd = &mag_cpu_exec_fwd,
-        .eager_exec_bwd = &mag_cpu_exec_bwd,
         .alloc_storage = &mag_cpu_alloc_storage,
     };
     snprintf(dvc->name, sizeof(dvc->name), "%s", ctx->machine.cpu_name);

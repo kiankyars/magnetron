@@ -8,14 +8,21 @@ TEST(cpu_autograd, simple) {
     context ctx {compute_device::cpu};
     tensor x {ctx, dtype::e8m23, 1};
     x.fill(3.0f);
+    x.requires_grad(true);
     tensor y {ctx, dtype::e8m23, 1};
     y.fill(2.0f);
+    y.requires_grad(true);
     tensor k {ctx, dtype::e8m23, 1};
     k.fill(10.0f);
+    k.requires_grad(true);
 
     tensor z {(x + y)*(x - y)/k};
     z.backward();
 
+    ASSERT_TRUE(x.requires_grad());
+    ASSERT_TRUE(y.requires_grad());
+    ASSERT_TRUE(k.requires_grad());
+    ASSERT_TRUE(z.requires_grad());
     ASSERT_TRUE(x.grad().has_value());
     ASSERT_TRUE(y.grad().has_value());
     ASSERT_TRUE(k.grad().has_value());
@@ -47,14 +54,22 @@ TEST(cpu_autograd, scalar_complex) {
     context ctx {compute_device::cpu};
     tensor two {ctx, dtype::e8m23, 1};
     two.fill(2.0f);
+    two.requires_grad(true);
     tensor x {ctx, dtype::e8m23, 1};
     x.fill(-4.0f);
+    x.requires_grad(true);
     tensor z {two*x+two+x};
     tensor q {z.relu()+z*x};
     tensor h {(z*z).relu()};
     tensor y {h+q+q*x};
     y.backward();
 
+    ASSERT_TRUE(two.requires_grad());
+    ASSERT_TRUE(x.requires_grad());
+    ASSERT_TRUE(z.requires_grad());
+    ASSERT_TRUE(q.requires_grad());
+    ASSERT_TRUE(h.requires_grad());
+    ASSERT_TRUE(y.requires_grad());
     ASSERT_TRUE(two.grad().has_value());
     ASSERT_TRUE(x.grad().has_value());
     ASSERT_TRUE(z.grad().has_value());
@@ -83,14 +98,21 @@ TEST(cpu_autograd, broadcast) {
     context ctx {compute_device::cpu};
     tensor x {ctx, dtype::e8m23, 3, 3, 3, 3};
     x.fill(3.0f);
+    x.requires_grad(true);
     tensor y {ctx, dtype::e8m23, 3, 3, };
     y.fill(2.0f);
+    y.requires_grad(true);
     tensor k {ctx, dtype::e8m23, 1};
     k.fill(10.0f);
+    k.requires_grad(true);
 
     tensor z {((x + y)*(x - y)/k).sum()};
     z.backward();
 
+    ASSERT_TRUE(x.requires_grad());
+    ASSERT_TRUE(y.requires_grad());
+    ASSERT_TRUE(k.requires_grad());
+    ASSERT_TRUE(z.requires_grad());
     ASSERT_TRUE(x.grad().has_value());
     ASSERT_TRUE(y.grad().has_value());
     ASSERT_TRUE(k.grad().has_value());

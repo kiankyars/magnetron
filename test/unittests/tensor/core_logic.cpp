@@ -16,54 +16,54 @@ TEST(core_tensor_logic, dynamic_graph_complex) {
 
     mag_tensor_t* ta {&*a};
     ASSERT_EQ(ta->op, MAG_OP_NOP);
-    ASSERT_EQ(ta->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    ASSERT_EQ(ta->flags, 0);
     for (std::size_t i {}; i < k_max_input_tensors; ++i) {
         ASSERT_EQ(ta->op_inputs[i], nullptr);
     }
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(ta->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(ta->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(ta->init_op, MAG_IOP_BROADCAST);
-    ASSERT_EQ(mag_opp_unpack_type(ta->init_op_params[0]), MAG_OPP_E8M23);
-    ASSERT_FLOAT_EQ(mag_opp_unpack_e8m23_or_panic(ta->init_op_params[0]), 2.5f);
+    ASSERT_EQ(ta->init_op_params[0].type, MAG_OPP_E8M23);
+    ASSERT_FLOAT_EQ(mag_op_param_unpack_e8m23_or_panic(ta->init_op_params[0]), 2.5f);
 
     mag_tensor_t* tb {&*b};
     ASSERT_EQ(tb->op, MAG_OP_CLONE);
-    ASSERT_EQ(tb->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    ASSERT_EQ(tb->flags, 0);
     ASSERT_EQ(tb->op_inputs[0], ta);
     ASSERT_EQ(tb->op_inputs[1], nullptr);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(tb->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(tb->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(tb->init_op, MAG_IOP_NOP);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(tb->init_op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(tb->init_op_params[i].type, MAG_OPP_NONE);
     }
 
     mag_tensor_t* tc {&*c};
     ASSERT_EQ(tc->op, MAG_OP_MUL);
-    ASSERT_EQ(tc->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    ASSERT_EQ(tc->flags, 0);
     ASSERT_EQ(tc->op_inputs[0], ta);
     ASSERT_EQ(tc->op_inputs[1], tb);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(tc->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(tc->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(tc->init_op, MAG_IOP_NOP);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(tc->init_op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(tc->init_op_params[i].type, MAG_OPP_NONE);
     }
 
     mag_tensor_t* td {&*d};
     ASSERT_EQ(td->op, MAG_OP_TANH);
-    ASSERT_EQ(td->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    ASSERT_EQ(td->flags, 0);
     ASSERT_EQ(td->op_inputs[0], tc);
     ASSERT_EQ(td->op_inputs[1], nullptr);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(td->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(td->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(td->init_op, MAG_IOP_NOP);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(td->init_op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(td->init_op_params[i].type, MAG_OPP_NONE);
     }
 }
 
@@ -74,18 +74,18 @@ TEST(core_tensor_logic, dynamic_graph_init_op) {
 
     mag_tensor_t* ta {&*a};
     ASSERT_EQ(ta->op, MAG_OP_NOP);
-    ASSERT_EQ(ta->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    ASSERT_EQ(ta->flags, 0);
     for (std::size_t i {}; i < k_max_input_tensors; ++i) {
         ASSERT_EQ(ta->op_inputs[i], nullptr);
     }
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(ta->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(ta->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(ta->init_op, MAG_IOP_RAND_UNIFORM);
-    ASSERT_EQ(mag_opp_unpack_type(ta->init_op_params[0]), MAG_OPP_E8M23);
-    ASSERT_FLOAT_EQ(mag_opp_unpack_e8m23_or_panic(ta->init_op_params[0]), 0.0f);
-    ASSERT_EQ(mag_opp_unpack_type(ta->init_op_params[1]), MAG_OPP_E8M23);
-    ASSERT_FLOAT_EQ(mag_opp_unpack_e8m23_or_panic(ta->init_op_params[1]), 1.0f);
+    ASSERT_EQ(ta->init_op_params[0].type, MAG_OPP_E8M23);
+    ASSERT_FLOAT_EQ(mag_op_param_unpack_e8m23_or_panic(ta->init_op_params[0]), 0.0f);
+    ASSERT_EQ(ta->init_op_params[1].type, MAG_OPP_E8M23);
+    ASSERT_FLOAT_EQ(mag_op_param_unpack_e8m23_or_panic(ta->init_op_params[1]), 1.0f);
 }
 
 TEST(core_tensor_logic, dynamic_graph_binary_op) {
@@ -96,43 +96,43 @@ TEST(core_tensor_logic, dynamic_graph_binary_op) {
 
     mag_tensor_t* ta {&*a};
     ASSERT_EQ(ta->op, MAG_OP_NOP);
-    ASSERT_EQ(ta->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    ASSERT_EQ(ta->flags, 0);
     for (std::size_t i {}; i < k_max_input_tensors; ++i) {
         ASSERT_EQ(ta->op_inputs[i], nullptr);
     }
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(ta->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(ta->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(ta->init_op, MAG_IOP_NOP);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(ta->init_op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(ta->init_op_params[i].type, MAG_OPP_NONE);
     }
 
     mag_tensor_t* tb {&*b};
     ASSERT_EQ(tb->op, MAG_OP_NOP);
-    ASSERT_EQ(tb->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    ASSERT_EQ(tb->flags, 0);
     for (std::size_t i {}; i < k_max_input_tensors; ++i) {
         ASSERT_EQ(tb->op_inputs[i], nullptr);
     }
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(tb->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(tb->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(tb->init_op, MAG_IOP_NOP);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(tb->init_op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(tb->init_op_params[i].type, MAG_OPP_NONE);
     }
 
     mag_tensor_t* tc {&*c};
     ASSERT_EQ(tc->op, MAG_OP_ADD);
-    ASSERT_EQ(tc->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    ASSERT_EQ(tc->flags, 0);
     ASSERT_EQ(tc->op_inputs[0], ta);
     ASSERT_EQ(tc->op_inputs[1], tb);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(tc->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(tc->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(tc->init_op, MAG_IOP_NOP);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(tc->init_op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(tc->init_op_params[i].type, MAG_OPP_NONE);
     }
 }
 
@@ -143,29 +143,29 @@ TEST(core_tensor_logic, dynamic_graph_unary_op) {
 
     mag_tensor_t* ta {&*a};
     ASSERT_EQ(ta->op, MAG_OP_NOP);
-    ASSERT_EQ(ta->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    ASSERT_EQ(ta->flags, 0);
     for (std::size_t i {}; i < k_max_input_tensors; ++i) {
         ASSERT_EQ(ta->op_inputs[i], nullptr);
     }
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(ta->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(ta->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(ta->init_op, MAG_IOP_NOP);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(ta->init_op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(ta->init_op_params[i].type, MAG_OPP_NONE);
     }
 
     mag_tensor_t* tb {&*b};
     ASSERT_EQ(tb->op, MAG_OP_NEG);
-    ASSERT_EQ(tb->flags, MAG_TFLAG_REQUIRES_GRAD|MAG_TFLAG_OWNER);
+    ASSERT_EQ(tb->flags, 0);
     ASSERT_EQ(tb->op_inputs[0], ta);
     ASSERT_EQ(tb->op_inputs[1], nullptr);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(tb->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(tb->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(tb->init_op, MAG_IOP_NOP);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(tb->init_op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(tb->init_op_params[i].type, MAG_OPP_NONE);
     }
 }
 
@@ -263,17 +263,7 @@ TEST(core_tensor_logic, init_1d) {
     ASSERT_EQ(t.dtype(), dtype::e8m23);
     ASSERT_EQ(t.rank(), 1);
     ASSERT_EQ(t.shape()[0], 10);
-    ASSERT_EQ(t.shape()[1], 1);
-    ASSERT_EQ(t.shape()[2], 1);
-    ASSERT_EQ(t.shape()[3], 1);
-    ASSERT_EQ(t.shape()[4], 1);
-    ASSERT_EQ(t.shape()[5], 1);
     ASSERT_EQ(t.strides()[0], 1);
-    ASSERT_EQ(t.strides()[1], 10);
-    ASSERT_EQ(t.strides()[2], 10);
-    ASSERT_EQ(t.strides()[3], 10);
-    ASSERT_EQ(t.strides()[4], 10);
-    ASSERT_EQ(t.strides()[5], 10);
     ASSERT_NE(t.data_ptr(), nullptr);
     ASSERT_EQ(t.data_size(), 10 * sizeof(e8m23_t));
     ASSERT_EQ(t.numel(), 10);
@@ -296,15 +286,17 @@ TEST(core_tensor_logic, init_1d) {
         ASSERT_EQ(internal->op_inputs[i], nullptr);
     }
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(internal->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(internal->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(internal->init_op, MAG_IOP_NOP);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(internal->init_op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(internal->init_op_params[i].type, MAG_OPP_NONE);
     }
-    ASSERT_EQ(internal->flags, MAG_TFLAG_OWNER|MAG_TFLAG_REQUIRES_GRAD);
+    ASSERT_EQ(internal->flags, 0);
     ASSERT_EQ(internal->grad, nullptr); // gradient is allocated lazily
     ASSERT_EQ(internal->ud, nullptr);
+
+    std::cout << t.to_string() << std::endl;
 }
 
 TEST(core_tensor_logic, init_2d) {
@@ -314,16 +306,8 @@ TEST(core_tensor_logic, init_2d) {
     ASSERT_EQ(t.rank(), 2);
     ASSERT_EQ(t.shape()[0], 10);
     ASSERT_EQ(t.shape()[1], 10);
-    ASSERT_EQ(t.shape()[2], 1);
-    ASSERT_EQ(t.shape()[3], 1);
-    ASSERT_EQ(t.shape()[4], 1);
-    ASSERT_EQ(t.shape()[5], 1);
-    ASSERT_EQ(t.strides()[0], 1);
-    ASSERT_EQ(t.strides()[1], 10);
-    ASSERT_EQ(t.strides()[2], 100);
-    ASSERT_EQ(t.strides()[3], 100);
-    ASSERT_EQ(t.strides()[4], 100);
-    ASSERT_EQ(t.strides()[5], 100);
+    ASSERT_EQ(t.strides()[0], 10);
+    ASSERT_EQ(t.strides()[1], 1);
     ASSERT_NE(t.data_ptr(), nullptr);
     ASSERT_EQ(t.numel(), 10*10);
     ASSERT_EQ(t.data_size(), t.numel() * sizeof(e8m23_t));
@@ -346,15 +330,17 @@ TEST(core_tensor_logic, init_2d) {
         ASSERT_EQ(internal->op_inputs[i], nullptr);
     }
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(internal->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(internal->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(internal->init_op, MAG_IOP_NOP);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(internal->init_op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(internal->init_op_params[i].type, MAG_OPP_NONE);
     }
-    ASSERT_EQ(internal->flags, MAG_TFLAG_OWNER|MAG_TFLAG_REQUIRES_GRAD);
+    ASSERT_EQ(internal->flags, 0);
     ASSERT_EQ(internal->grad, nullptr); // gradient is allocated lazily
     ASSERT_EQ(internal->ud, nullptr);
+
+    std::cout << t.to_string() << std::endl;
 }
 
 TEST(core_tensor_logic, init_3d) {
@@ -365,15 +351,9 @@ TEST(core_tensor_logic, init_3d) {
     ASSERT_EQ(t.shape()[0], 10);
     ASSERT_EQ(t.shape()[1], 10);
     ASSERT_EQ(t.shape()[2], 10);
-    ASSERT_EQ(t.shape()[3], 1);
-    ASSERT_EQ(t.shape()[4], 1);
-    ASSERT_EQ(t.shape()[5], 1);
-    ASSERT_EQ(t.strides()[0], 1);
+    ASSERT_EQ(t.strides()[0], 100);
     ASSERT_EQ(t.strides()[1], 10);
-    ASSERT_EQ(t.strides()[2], 100);
-    ASSERT_EQ(t.strides()[3], 1000);
-    ASSERT_EQ(t.strides()[4], 1000);
-    ASSERT_EQ(t.strides()[5], 1000);
+    ASSERT_EQ(t.strides()[2], 1);
     ASSERT_NE(t.data_ptr(), nullptr);
     ASSERT_EQ(t.data_size(), 10*10*10 * sizeof(e8m23_t));
     ASSERT_EQ(t.numel(), 10*10*10);
@@ -396,15 +376,17 @@ TEST(core_tensor_logic, init_3d) {
         ASSERT_EQ(internal->op_inputs[i], nullptr);
     }
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(internal->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(internal->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(internal->init_op, MAG_IOP_NOP);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(internal->init_op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(internal->init_op_params[i].type, MAG_OPP_NONE);
     }
-    ASSERT_EQ(internal->flags, MAG_TFLAG_OWNER|MAG_TFLAG_REQUIRES_GRAD);
+    ASSERT_EQ(internal->flags, 0);
     ASSERT_EQ(internal->grad, nullptr); // gradient is allocated lazily
     ASSERT_EQ(internal->ud, nullptr);
+
+    std::cout << t.to_string() << std::endl;
 }
 
 TEST(core_tensor_logic, init_4d) {
@@ -416,14 +398,9 @@ TEST(core_tensor_logic, init_4d) {
     ASSERT_EQ(t.shape()[1], 10);
     ASSERT_EQ(t.shape()[2], 10);
     ASSERT_EQ(t.shape()[3], 10);
-    ASSERT_EQ(t.shape()[4], 1);
-    ASSERT_EQ(t.shape()[5], 1);
-    ASSERT_EQ(t.strides()[0], 1);
-    ASSERT_EQ(t.strides()[1], 10);
-    ASSERT_EQ(t.strides()[2], 100);
-    ASSERT_EQ(t.strides()[3], 1000);
-    ASSERT_EQ(t.strides()[4], 10000);
-    ASSERT_EQ(t.strides()[5], 10000);
+    ASSERT_EQ(t.strides()[0], 1000);
+    ASSERT_EQ(t.strides()[1], 100);
+    ASSERT_EQ(t.strides()[2], 10);
     ASSERT_NE(t.data_ptr(), nullptr);
     ASSERT_EQ(t.data_size(), 10*10*10*10 * sizeof(e8m23_t));
     ASSERT_EQ(t.numel(), 10*10*10*10);
@@ -446,15 +423,17 @@ TEST(core_tensor_logic, init_4d) {
         ASSERT_EQ(internal->op_inputs[i], nullptr);
     }
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(internal->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(internal->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(internal->init_op, MAG_IOP_NOP);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(internal->init_op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(internal->init_op_params[i].type, MAG_OPP_NONE);
     }
-    ASSERT_EQ(internal->flags, MAG_TFLAG_OWNER|MAG_TFLAG_REQUIRES_GRAD);
+    ASSERT_EQ(internal->flags, 0);
     ASSERT_EQ(internal->grad, nullptr); // gradient is allocated lazily
     ASSERT_EQ(internal->ud, nullptr);
+
+    std::cout << t.to_string() << std::endl;
 }
 
 TEST(core_tensor_logic, init_5d) {
@@ -467,13 +446,11 @@ TEST(core_tensor_logic, init_5d) {
     ASSERT_EQ(t.shape()[2], 10);
     ASSERT_EQ(t.shape()[3], 10);
     ASSERT_EQ(t.shape()[4], 10);
-    ASSERT_EQ(t.shape()[5], 1);
-    ASSERT_EQ(t.strides()[0], 1);
-    ASSERT_EQ(t.strides()[1], 10);
+    ASSERT_EQ(t.strides()[0], 10000);
+    ASSERT_EQ(t.strides()[1], 1000);
     ASSERT_EQ(t.strides()[2], 100);
-    ASSERT_EQ(t.strides()[3], 1000);
-    ASSERT_EQ(t.strides()[4], 10000);
-    ASSERT_EQ(t.strides()[5], 100000);
+    ASSERT_EQ(t.strides()[3], 10);
+    ASSERT_EQ(t.strides()[4], 1);
     ASSERT_NE(t.data_ptr(), nullptr);
     ASSERT_EQ(t.data_size(), 10*10*10*10*10 * sizeof(e8m23_t));
     ASSERT_EQ(t.numel(), 10*10*10*10*10);
@@ -496,15 +473,17 @@ TEST(core_tensor_logic, init_5d) {
         ASSERT_EQ(internal->op_inputs[i], nullptr);
     }
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(internal->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(internal->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(internal->init_op, MAG_IOP_NOP);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(internal->init_op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(internal->init_op_params[i].type, MAG_OPP_NONE);
     }
-    ASSERT_EQ(internal->flags, MAG_TFLAG_OWNER|MAG_TFLAG_REQUIRES_GRAD);
+    ASSERT_EQ(internal->flags, 0);
     ASSERT_EQ(internal->grad, nullptr); // gradient is allocated lazily
     ASSERT_EQ(internal->ud, nullptr);
+
+    std::cout << t.to_string() << std::endl;
 }
 
 TEST(core_tensor_logic, init_6d) {
@@ -518,12 +497,12 @@ TEST(core_tensor_logic, init_6d) {
     ASSERT_EQ(t.shape()[3], 10);
     ASSERT_EQ(t.shape()[4], 10);
     ASSERT_EQ(t.shape()[5], 10);
-    ASSERT_EQ(t.strides()[0], 1);
-    ASSERT_EQ(t.strides()[1], 10);
-    ASSERT_EQ(t.strides()[2], 100);
-    ASSERT_EQ(t.strides()[3], 1000);
-    ASSERT_EQ(t.strides()[4], 10000);
-    ASSERT_EQ(t.strides()[5], 100000);
+    ASSERT_EQ(t.strides()[0], 100000);
+    ASSERT_EQ(t.strides()[1], 10000);
+    ASSERT_EQ(t.strides()[2], 1000);
+    ASSERT_EQ(t.strides()[3], 100);
+    ASSERT_EQ(t.strides()[4], 10);
+    ASSERT_EQ(t.strides()[5], 1);
     ASSERT_NE(t.data_ptr(), nullptr);
     ASSERT_EQ(t.numel(), 10*10*10*10*10*10);
     ASSERT_EQ(t.data_size(), t.numel() * sizeof(e8m23_t));
@@ -546,13 +525,16 @@ TEST(core_tensor_logic, init_6d) {
         ASSERT_EQ(internal->op_inputs[i], nullptr);
     }
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(internal->op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(internal->op_params[i].type, MAG_OPP_NONE);
     }
     ASSERT_EQ(internal->init_op, MAG_IOP_NOP);
     for (std::size_t i {}; i < k_max_op_params; ++i) {
-        ASSERT_EQ(mag_opp_unpack_type(internal->init_op_params[i]), MAG_OPP_NONE);
+        ASSERT_EQ(internal->init_op_params[i].type, MAG_OPP_NONE);
     }
-    ASSERT_EQ(internal->flags, MAG_TFLAG_OWNER|MAG_TFLAG_REQUIRES_GRAD);
+    ASSERT_EQ(internal->flags, 0);
     ASSERT_EQ(internal->grad, nullptr); // gradient is allocated lazily
     ASSERT_EQ(internal->ud, nullptr);
+
+    auto str = t.to_string();
+    std::cout << str << std::endl;
 }

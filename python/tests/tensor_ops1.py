@@ -4,7 +4,7 @@ from magnetron import *
 
 
 def test_tensor_clone() -> None:
-    a = Tensor.const([[1, 2], [3, 4]])
+    a = Tensor.from_data([[1, 2], [3, 4]])
     b = a.clone()
     assert a.shape == b.shape
     assert a.numel == b.numel
@@ -25,11 +25,7 @@ def test_tensor_transpose() -> None:
     assert a.tolist() == [1, 1, 1, 1, 1, 1]
     assert b.tolist() == [1, 1, 1, 1, 1, 1]
     assert a.is_contiguous
-    assert not a.is_transposed
-    assert not a.is_permuted
     assert not b.is_contiguous
-    assert b.is_transposed
-    assert b.is_permuted
 
 
 """
@@ -65,11 +61,7 @@ def test_tensor_permute() -> None:
     assert a.tolist() == [1, 1, 1, 1, 1, 1]
     assert b.tolist() == [1, 1, 1, 1, 1, 1]
     assert a.is_contiguous
-    assert not a.is_transposed
-    assert not a.is_permuted
     assert not b.is_contiguous
-    assert b.is_transposed
-    assert b.is_permuted
 
 
 def test_tensor_permute_6d() -> None:
@@ -84,8 +76,4 @@ def test_tensor_permute_6d() -> None:
     assert a.tolist() == [1] * 720
     assert b.tolist() == [1] * 720
     assert a.is_contiguous
-    assert not a.is_transposed
-    assert not a.is_permuted
     assert not b.is_contiguous
-    assert b.is_transposed
-    assert b.is_permuted

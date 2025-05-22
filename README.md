@@ -4,7 +4,6 @@
 [![Issues][issues-shield]][issues-url]
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/MarioSieg/magnetron/cmake-multi-platform.yml?style=for-the-badge)
 
-
 <br />
 <div align="center">
   <a href="https://github.com/MarioSieg/magnetron">
@@ -13,12 +12,12 @@
 
 <h3 align="center">magnetron</h3>
   <p align="center">
-    Minimalistic homemade PyTorch alternative, written in C99 and Python.
+    Super minimalistic machine-learning framework.
     <br />
     <a href="https://github.com/MarioSieg/magnetron/tree/master/python/examples/simple"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/MarioSieg/magnetron/blob/master/python/examples/simple/xor.py">View Demo</a>
+    <a href="https://github.com/MarioSieg/magnetron/blob/master/python/examples/xor.py">View Example</a>
     |
     <a href="https://github.com/MarioSieg/magnetron/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     |
@@ -26,41 +25,78 @@
   </p>
 </div>
 
-<details>
-  <summary>Table of Contents</summary>
-  <ol>
-    <li>
-      <a href="#about-the-project">About The Project</a>
-    </li>
-    <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
-    </li>
-    <li><a href="#usage">Usage</a></li>
-    <li><a href="#roadmap">Roadmap</a></li>
-    <li><a href="#contributing">Contributing</a></li>
-    <li><a href="#license">License</a></li>
-  </ol>
-</details>
-
-## News
-- **[2025/01/14]** 🎉 CPU backend now uses multiple threads with dynamic scaling and thread pooling.
-- **[2025/01/02]** 🎈 Magnetron released on GitHub.
-
 ## About
 
-![ScreenShot](media/xor.png)
-This project started as a learning experience and a way to understand the inner workings of PyTorch and other deep learning frameworks.<br>
-The goal is to create a minimalistic but still powerful deep learning framework that can be used for research and production.<br>
-The framework is written in C99 and Python and is designed to be easy to understand and modify.<br>
+Magnetron is a minimalistic, PyTorch-style machine-learning framework designed for IoT and other resource-limited environments.<br>
+The tiny C99 core - wrapped in a modern Python API - gives you dynamic graphs, automatic differentiation and network building blocks without the bloat.<br>
+A CUDA backend is also WIP.<br>
 
-### Work in Progress
-* The project is still in its early stages and many features are missing.
-* Developed by a single person in their free time.
-* The project is not yet fully optimized for performance.
+### Key features
+* N-dimensional, flattened tensors
+* Automatic differentiation on dynamic computation graphs
+* CPU multithreading + SIMD (SSE4, AVX2/AVX512, ARM NEON)
+* PyTorch-like Python API
+* Broadcasting-aware operators with in-place variants
+* High-level neural-net building blocks
+* float32 and float16 datatypes
+* Modern PRNGs (Mersenne Twister, PCG)
+* Clear validation and error messages
+* Custom compressed tensor file formats
+* No C and Python dependencies (except CFFI for the Python wrapper)
+
+## XOR Training Example
+A simple XOR neuronal network (MLP) trained with Magnetron. Copy and paste the code below into a file called `xor.py` and run it with Python.
+```python
+import magnetron as mag
+from magnetron import optim, nn
+from matplotlib import pyplot as plt
+
+EPOCHS: int = 2000
+
+# Create the model, optimizer, and loss function
+model = nn.Sequential(nn.Linear(2, 2), nn.Tanh(), nn.Linear(2, 1), nn.Tanh())
+optimizer = optim.SGD(model.parameters(), lr=1e-1)
+criterion = nn.MSELoss()
+loss_values: list[float] = []
+
+x = mag.Tensor.from_data([[0, 0], [0, 1], [1, 0], [1, 1]])
+y = mag.Tensor.from_data([[0], [1], [1], [0]])
+
+# Train the model
+for epoch in range(EPOCHS):
+    y_hat = model(x)
+    loss = criterion(y_hat, y)
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()
+
+    loss_values.append(loss.item())
+
+    if epoch % 100 == 0:
+        print(f'Epoch: {epoch}, Loss: {loss.item()}')
+
+# Print the final predictions after the training
+print('=== Final Predictions ===')
+
+with mag.no_grad():
+    y_hat = model(x)
+    for i in range(x.shape[0]):
+        print(f'Expected: {y[i]}, Predicted: {y_hat[i]}')
+
+# Plot the loss
+
+plt.figure()
+plt.plot(loss_values)
+plt.xlabel('Epoch')
+plt.ylabel('MSE Loss')
+plt.title('Training Loss over Time')
+plt.grid(True)
+plt.show()
+```
+
+This results in the following output:
+
+![ScreenShot](media/xor.png)
 
 ## Getting Started
 
@@ -82,151 +118,63 @@ Some examples use matplotlib and numpy for plotting and data generation, but the
 5. `python examples/simple/xor.py` Run the XOR example.
 
 ## Usage
-See the [Examples](python/examples) directory for examples on how to use the framework.
-For usage in C and C++ see the [Unit Tests](test) directory in the root of the project.
-
-## Features
-* 6 Dimensional, linearized tensors
-* Automatic Differentiation
-* Multithreaded CPU Compute, SIMD optimized operators (SSE4, AVX2, AVX512, ARM NEON)
-* Modern Python API (similar to PyTorch)
-* Many operators with broadcasting support and in-place variants
-* High level neural network building blocks
-* Dynamic computation graph (eager evaluation)
-* Modern PRNGs: Mersenne Twister and PCG
-* Validation and friendly error messages
-* Custom compressed tensor file formats
-
-### Example
-Code from the XOR example:
-```python
-def forward(self, x: Tensor) -> Tensor:
-    return (self.weight @ x + self.bias).sigmoid()
-```
+See the [Examples](python/examples) directory which contains various models and training examples.<br>
+For usage in C or C++ see the [Unit Tests](test) directory.
 
 ### Operators
-<table>
-  <thead>
-    <tr>
-      <th>Operation</th>
-      <th><div align="center">Description</div></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>clone(x)</td>
-      <td><div align="center">Creates a copy of the tensor</div></td>
-    </tr>
-    <tr>
-      <td>view(x)</td>
-      <td><div align="center">Reshapes without changing data</div></td>
-    </tr>
-    <tr>
-      <td>transpose(x)</td>
-      <td><div align="center">Swaps tensor dimensions</div></td>
-    </tr>
-    <tr>
-      <td>permute(x, d0, ...)</td>
-      <td><div align="center">Reorders tensor dimensions</div></td>
-    </tr>
-    <tr>
-      <td>mean(x)</td>
-      <td><div align="center">Mean across dimensions</div></td>
-    </tr>
-    <tr>
-      <td>min(x)</td>
-      <td><div align="center">Minimum value of tensor</div></td>
-    </tr>
-    <tr>
-      <td>max(x)</td>
-      <td><div align="center">Maximum value of tensor</div></td>
-    </tr>
-    <tr>
-      <td>sum(x)</td>
-      <td><div align="center">Sum of elements</div></td>
-    </tr>
-    <tr>
-      <td>abs(x)</td>
-      <td><div align="center">Element-wise absolute value</div></td>
-    </tr>
-    <tr>
-      <td>neg(x)</td>
-      <td><div align="center">Element-wise negation</div></td>
-    </tr>
-    <tr>
-      <td>log(x)</td>
-      <td><div align="center">Element-wise natural logarithm</div></td>
-    </tr>
-    <tr>
-      <td>sqr(x)</td>
-      <td><div align="center">Element-wise square</div></td>
-    </tr>
-    <tr>
-      <td>sqrt(x)</td>
-      <td><div align="center">Element-wise square root</div></td>
-    </tr>
-    <tr>
-      <td>sin(x)</td>
-      <td><div align="center">Element-wise sine</div></td>
-    </tr>
-    <tr>
-      <td>cos(x)</td>
-      <td><div align="center">Element-wise cosine</div></td>
-    </tr>
-    <tr>
-      <td>softmax(x)</td>
-      <td><div align="center">Softmax along dimension</div></td>
-    </tr>
-    <tr>
-      <td>sigmoid(x)</td>
-      <td><div align="center">Element-wise sigmoid</div></td>
-    </tr>
-    <tr>
-      <td>relu(x)</td>
-      <td><div align="center">ReLU activation</div></td>
-    </tr>
-    <tr>
-      <td>gelu(x)</td>
-      <td><div align="center">GELU activation</div></td>
-    </tr>
-    <tr>
-      <td>add(x, y)</td>
-      <td><div align="center">Element-wise addition</div></td>
-    </tr>
-    <tr>
-      <td>sub(x, y)</td>
-      <td><div align="center">Element-wise subtraction</div></td>
-    </tr>
-    <tr>
-      <td>mul(x, y)</td>
-      <td><div align="center">Element-wise multiplication</div></td>
-    </tr>
-    <tr>
-      <td>div(x, y)</td>
-      <td><div align="center">Element-wise division</div></td>
-    </tr>
-    <tr>
-      <td>matmul(A, B)</td>
-      <td><div align="center">Matrix multiplication</div></td>
-    </tr>
-  </tbody>
-</table>
+The following table lists all available operators and their properties.
 
-## Roadmap
+|Mnemonic    |Desc                                |IN |OUT|Params |Flags|Inplace|Backward|Result        |Validation|CPU-Parallel|Type     |
+|------------|------------------------------------|---|---|-------|-----|-------|--------|--------------|----------|------------|---------|
+|NOP         |no-op                               |0  |0  |N/A    |N/A  |NO     |NO      |N/A           |NO        |NO          |NO-OP    |
+|CLONE       |strided copy                        |1  |1  |N/A    |N/A  |NO     |YES     |ISOMORPH      |YES       |NO          |Morph    |
+|VIEW        |memory view                         |1  |1  |N/A    |N/A  |NO     |YES     |ISOMORPH      |YES       |NO          |Morph    |
+|TRANSPOSE   |𝑥ᵀ                                 |1  |1  |N/A    |N/A  |NO     |YES     |TRANSPOSED    |YES       |NO          |Morph    |
+|PERMUTE     |swap axes by index                  |1  |1  |U64 [6]|N/A  |NO     |NO      |PERMUTED      |YES       |NO          |Morph    |
+|MEAN        |(∑𝑥) ∕ 𝑛                          |1  |1  |N/A    |N/A  |NO     |YES     |SCALAR/REDUCED|YES       |NO          |Reduction|
+|MIN         |min(𝑥)                             |1  |1  |N/A    |N/A  |NO     |NO      |SCALAR/REDUCED|YES       |NO          |Reduction|
+|MAX         |max(𝑥)                             |1  |1  |N/A    |N/A  |NO     |NO      |SCALAR/REDUCED|YES       |NO          |Reduction|
+|SUM         |∑𝑥                                 |1  |1  |N/A    |N/A  |NO     |YES     |SCALAR/REDUCED|YES       |NO          |Reduction|
+|ABS         |&#124;𝑥&#124;                                |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|SGN         |𝑥⁄                                 |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|NEG         |−𝑥                                 |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|LOG         |log₁₀(𝑥)                           |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|SQR         |𝑥²                                 |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|SQRT        |√𝑥                                 |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|SIN         |sin(𝑥)                             |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|COS         |cos(𝑥)                             |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|STEP        |𝐻(𝑥)                              |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|EXP         |𝑒ˣ                                 |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|FLOOR       |⌊𝑥⌋                                |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|CEIL        |⌈𝑥⌉                                |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|ROUND       |⟦𝑥⟧                                |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|SOFTMAX     |𝑒ˣⁱ ∕ ∑𝑒ˣʲ                        |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|SOFTMAX_DV  |𝑑⁄𝑑𝑥 softmax(𝑥)                 |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|SIGMOID     |1 ∕ (1 + 𝑒⁻ˣ)                      |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|SIGMOID_DV  |𝑑⁄𝑑𝑥 sigmoid(𝑥)                 |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|HARD_SIGMOID|max(0, min(1, 0.2×𝑥 + 0.5))        |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|SILU        |𝑥 ∕ (1 + 𝑒⁻ˣ)                     |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|SILU_DV     |𝑑⁄𝑑𝑥 silu(𝑥)                    |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|TANH        |tanh(𝑥)                            |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|TANH_DV     |𝑑⁄𝑑𝑥 tanh(𝑥)                    |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|RELU        |max(0, 𝑥)                          |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|RELU_DV     |𝑑⁄𝑑𝑥 relu(𝑥)                    |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|GELU        |0.5×𝑥×(1 + erf(𝑥 ∕ √2))           |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|GELU_DV     |𝑑⁄𝑑𝑥 gelu(𝑥)                    |1  |1  |N/A    |N/A  |YES    |YES     |ISOMORPH      |YES       |YES         |Unary OP |
+|ADD         |𝑥 + 𝑦                             |2  |1  |N/A    |N/A  |YES    |YES     |BROADCASTED   |YES       |YES         |Binary OP|
+|SUB         |𝑥 − 𝑦                             |2  |1  |N/A    |N/A  |YES    |YES     |BROADCASTED   |YES       |YES         |Binary OP|
+|MUL         |𝑥 ⊙ 𝑦                             |2  |1  |N/A    |N/A  |YES    |YES     |BROADCASTED   |YES       |YES         |Binary OP|
+|DIV         |𝑥 ∕ 𝑦                             |2  |1  |N/A    |N/A  |YES    |YES     |BROADCASTED   |YES       |YES         |Binary OP|
+|MATMUL      |𝑥𝑦                                |2  |1  |N/A    |N/A  |YES    |YES     |MATRIX        |YES       |YES         |Binary OP|
+|REPEAT_BACK |gradient broadcast to repeated shape|2  |1  |N/A    |N/A  |YES    |YES     |BROADCASTED   |YES       |NO          |Binary OP|
 
-The goal is to implement training and inference for LLMs and other state of the art models, while providing a simple and small codebase that is easy to understand and modify.
-
-- [ ] Compute on GPU (Cuda)
-- [ ] Low-precision datatypes (f16, bf16, int8)
-- [ ] Distributed Training and Inference
-- [ ] CPU and GPU kernel JIT compilation
-- [ ] Better examples with real world models (LLMs and state of the art models)
 
 ## Contributing
 Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
 
 ## License
+(c) 2025 Mario "Neo" Sieg. mario.sieg.64@gmail.com<br>
 Distributed under the Apache 2 License. See `LICENSE.txt` for more information.
 
 ## Similar Projects

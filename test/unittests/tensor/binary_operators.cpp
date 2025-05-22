@@ -9,7 +9,7 @@ static constexpr std::int64_t lim {4};
 static constexpr std::int64_t broadcast_lim {lim-1};
 
 #if 0
-TEST(cpu_tensor_bin_ops, print_test_info) {
+TEST(cpu_tensor_binary_ops, print_test_info) {
     std::cout << "=== Binary Operators ===" << std::endl;
     std::set<std::vector<std::int64_t>> perms {};
     test::for_all_shape_perms(lim, 1, [&](std::span<const std::int64_t> shape) {
@@ -26,25 +26,25 @@ TEST(cpu_tensor_bin_ops, print_test_info) {
 #endif
 
 #define impl_binary_operator_test_group(name, op, data_type) \
-    TEST(cpu_tensor_bin_ops, name##_same_shape_##data_type) { \
+    TEST(cpu_tensor_binary_ops, name##_same_shape_##data_type) { \
         test::test_binary_operator<false, false>(lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op b; }, \
             [](float a, float b) -> float { return a op b; } \
         ); \
     } \
-    TEST(cpu_tensor_bin_ops, name##_broadcast_##data_type) { \
+    TEST(cpu_tensor_binary_ops, name##_broadcast_##data_type) { \
         test::test_binary_operator<true, false>(broadcast_lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op b; }, \
             [](float a, float b) -> float { return a op b; } \
         ); \
     } \
-    TEST(cpu_tensor_bin_ops, name##_inplace_same_shape_##data_type) { \
+    TEST(cpu_tensor_binary_ops, name##_inplace_same_shape_##data_type) { \
         test::test_binary_operator<false, true>(lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op##= b; }, \
             [](float a, float b) -> float { return a op b; } \
         ); \
     } \
-    TEST(cpu_tensor_bin_ops, name##_inplace_broadcast_##data_type) { \
+    TEST(cpu_tensor_binary_ops, name##_inplace_broadcast_##data_type) { \
         test::test_binary_operator<true, true>(broadcast_lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op##= b; }, \
             [](float a, float b) -> float { return a op b; } \
@@ -82,7 +82,7 @@ static auto naive_matmul(
     }
 }
 
-TEST(cpu_tensor_bin_ops, matmul_naive) {
+TEST(cpu_tensor_binary_ops, matmul_naive) {
     static constexpr std::array<e8m23_t, 6> A {
         1.0f, 2.0f,
         3.0f, 4.0f,
@@ -96,7 +96,15 @@ TEST(cpu_tensor_bin_ops, matmul_naive) {
     ASSERT_FLOAT_EQ(C[2], -3.5f);
 }
 
-TEST(cpu_tensor_bin_ops, matmul_square) {
+template <const std::size_t M, const std::size_t N, typename T>
+[[nodiscard]] auto flatten(const std::array<std::array<T, N>, M>& array) -> std::span<const e8m23_t> {
+    return std::span<const T> {
+        reinterpret_cast<const T*>(&array),
+        M*N
+    };
+}
+
+TEST(cpu_tensor_binary_ops, matmul_square_e8m23) {
     static constexpr std::array<std::array<e8m23_t, 2>, 2> A {
         std::array<e8m23_t, 2>{1.6354027f, -1.3607267f},
         std::array<e8m23_t, 2>{1.8556793f, 1.1689897f}
@@ -112,12 +120,11 @@ TEST(cpu_tensor_bin_ops, matmul_square) {
     context ctx {compute_device::cpu};
     tensor a {ctx, dtype::e8m23, A.size(), A[0].size()};
     tensor b {ctx, dtype::e8m23, B.size(), B[0].size()};
-    a.copy_buffer_from(&A, sizeof(A));
-    b.copy_buffer_from(&B, sizeof(B));
+    a.fill_from(flatten(A));
+    b.fill_from(flatten(B));
     tensor c {a&b};
     ASSERT_EQ(c.shape()[0], 2);
     ASSERT_EQ(c.shape()[1], 2);
-    ASSERT_EQ(c.shape()[2], 1);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 4);
     ASSERT_EQ(c.numel(), a.numel());
@@ -128,7 +135,38 @@ TEST(cpu_tensor_bin_ops, matmul_square) {
     }
 }
 
-TEST(cpu_tensor_bin_ops, matmul_non_square) {
+TEST(cpu_tensor_binary_ops, matmul_square_e5m10) {
+    static constexpr std::array<std::array<e8m23_t, 2>, 2> A {
+        std::array<e8m23_t, 2>{1.6354027f, -1.3607267f},
+        std::array<e8m23_t, 2>{1.8556793f, 1.1689897f}
+    };
+    static constexpr std::array<std::array<e8m23_t, 2>, 2> B {
+        std::array<e8m23_t, 2>{-0.6105532f, 0.10695228f},
+        std::array<e8m23_t, 2>{-1.0069681f, -0.40955952f}
+    };
+    static constexpr std::array<std::array<e8m23_t, 2>, 2> C {
+        std::array<e8m23_t, 2>{0.3717081f, 0.7322086f},
+        std::array<e8m23_t, 2>{-2.3101263f, -0.28030172f}
+    };
+    context ctx {compute_device::cpu};
+    tensor a {ctx, dtype::e5m10, A.size(), A[0].size()};
+    tensor b {ctx, dtype::e5m10, B.size(), B[0].size()};
+    a.fill_from(flatten(A));
+    b.fill_from(flatten(B));
+    tensor c {a&b};
+    ASSERT_EQ(c.shape()[0], 2);
+    ASSERT_EQ(c.shape()[1], 2);
+    ASSERT_EQ(c.rank(), 2);
+    ASSERT_EQ(c.numel(), 4);
+    ASSERT_EQ(c.numel(), a.numel());
+    ASSERT_EQ(c.numel(), b.numel());
+    std::vector<e8m23_t> cr {c.to_vector()};
+    for (std::int64_t i {}; i < c.numel(); ++i) {
+        ASSERT_NEAR(cr[i], reinterpret_cast<const e8m23_t*>(&C)[i], 1e-2);
+    }
+}
+
+TEST(cpu_tensor_binary_ops, matmul_non_square_e8m23) {
     static constexpr std::array<std::array<e8m23_t, 2>, 3> A {
         std::array<e8m23_t, 2>{1.0f, 2.0f},
         std::array<e8m23_t, 2>{3.0f, 4.0f},
@@ -146,12 +184,11 @@ TEST(cpu_tensor_bin_ops, matmul_non_square) {
     context ctx {compute_device::cpu};
     tensor a {ctx, dtype::e8m23, A.size(), A[0].size()};
     tensor b {ctx, dtype::e8m23, B.size(), B[0].size()};
-    a.copy_buffer_from(&A, sizeof(A));
-    b.copy_buffer_from(&B, sizeof(B));
+    a.fill_from(flatten(A));
+    b.fill_from(flatten(B));
     tensor c {a&b};
     ASSERT_EQ(c.shape()[0], 3);
     ASSERT_EQ(c.shape()[1], 4);
-    ASSERT_EQ(c.shape()[2], 1);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 12);
     std::vector<e8m23_t> cr {c.to_vector()};
@@ -160,7 +197,38 @@ TEST(cpu_tensor_bin_ops, matmul_non_square) {
     }
 }
 
-TEST(cpu_tensor_bin_ops, matmul_square_zero) {
+TEST(cpu_tensor_binary_ops, matmul_non_square_e5m10) {
+    static constexpr std::array<std::array<e8m23_t, 2>, 3> A {
+        std::array<e8m23_t, 2>{1.0f, 2.0f},
+        std::array<e8m23_t, 2>{3.0f, 4.0f},
+        std::array<e8m23_t, 2>{5.0f, 6.0f}
+    };
+    static constexpr std::array<std::array<e8m23_t, 4>, 2> B {
+        std::array<e8m23_t, 4>{7.0f, 8.0f, 9.0f, 10.0f},
+        std::array<e8m23_t, 4>{11.0f, 12.0f, 13.0f, 14.0f}
+    };
+    static constexpr std::array<std::array<e8m23_t, 4>, 3> C{{
+        {{1.0f*7.0f + 2.0f*11, 1.0f*8 + 2.0f*12.0f, 1.0f*9.0f + 2.0f*13.0f, 1.0f*10.0f + 2.0f*14.0f}},
+        {{3.0f*7.0f + 4.0f*11, 3.0f*8 + 4.0f*12.0f, 3.0f*9.0f + 4.0f*13.0f, 3.0f*10.0f + 4.0f*14.0f}},
+        {{5.0f*7.0f + 6.0f*11, 5.0f*8 + 6.0f*12.0f, 5.0f*9.0f + 6.0f*13.0f, 5.0f*10.0f + 6.0f*14.0f}}
+    }};
+    context ctx {compute_device::cpu};
+    tensor a {ctx, dtype::e5m10, A.size(), A[0].size()};
+    tensor b {ctx, dtype::e5m10, B.size(), B[0].size()};
+    a.fill_from(flatten(A));
+    b.fill_from(flatten(B));
+    tensor c {a&b};
+    ASSERT_EQ(c.shape()[0], 3);
+    ASSERT_EQ(c.shape()[1], 4);
+    ASSERT_EQ(c.rank(), 2);
+    ASSERT_EQ(c.numel(), 12);
+    std::vector<e8m23_t> cr {c.to_vector()};
+    for (std::int64_t i {}; i < c.numel(); ++i) {
+        ASSERT_NEAR(cr[i], reinterpret_cast<const e8m23_t*>(&C)[i], 1e-2);
+    }
+}
+
+TEST(cpu_tensor_binary_ops, matmul_square_zero_e8m23) {
     static constexpr std::array<std::array<e8m23_t, 2>, 2> A {
         std::array<e8m23_t, 2>{1.6354027f, -1.3607267f},
         std::array<e8m23_t, 2>{1.8556793f, 1.1689897f}
@@ -172,12 +240,11 @@ TEST(cpu_tensor_bin_ops, matmul_square_zero) {
     context ctx {compute_device::cpu};
     tensor a {ctx, dtype::e8m23, A.size(), A[0].size()};
     tensor b {ctx, dtype::e8m23, B.size(), B[0].size()};
-    a.copy_buffer_from(&A, sizeof(A));
-    b.copy_buffer_from(&B, sizeof(B));
+    a.fill_from(flatten(A));
+    b.fill_from(flatten(B));
     tensor c {a&b};
     ASSERT_EQ(c.shape()[0], 2);
     ASSERT_EQ(c.shape()[1], 2);
-    ASSERT_EQ(c.shape()[2], 1);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 4);
     ASSERT_EQ(c.numel(), a.numel());
@@ -188,7 +255,34 @@ TEST(cpu_tensor_bin_ops, matmul_square_zero) {
     }
 }
 
-TEST(cpu_tensor_bin_ops, matmul_square_identity) {
+TEST(cpu_tensor_binary_ops, matmul_square_zero_e5m10) {
+    static constexpr std::array<std::array<e8m23_t, 2>, 2> A {
+        std::array<e8m23_t, 2>{1.6354027f, -1.3607267f},
+        std::array<e8m23_t, 2>{1.8556793f, 1.1689897f}
+    };
+    static constexpr std::array<std::array<e8m23_t, 2>, 2> B {
+        std::array<e8m23_t, 2>{0.0f, 0.0f},
+        std::array<e8m23_t, 2>{0.0f, 0.0f}
+    };
+    context ctx {compute_device::cpu};
+    tensor a {ctx, dtype::e5m10, A.size(), A[0].size()};
+    tensor b {ctx, dtype::e5m10, B.size(), B[0].size()};
+    a.fill_from(flatten(A));
+    b.fill_from(flatten(B));
+    tensor c {a&b};
+    ASSERT_EQ(c.shape()[0], 2);
+    ASSERT_EQ(c.shape()[1], 2);
+    ASSERT_EQ(c.rank(), 2);
+    ASSERT_EQ(c.numel(), 4);
+    ASSERT_EQ(c.numel(), a.numel());
+    ASSERT_EQ(c.numel(), b.numel());
+    std::vector<e8m23_t> cr {c.to_vector()};
+    for (std::int64_t i {}; i < c.numel(); ++i) {
+        ASSERT_FLOAT_EQ(cr[i], 0.0f);
+    }
+}
+
+TEST(cpu_tensor_binary_ops, matmul_square_identity_e8m23) {
     static constexpr std::array<std::array<e8m23_t, 2>, 2> A {
         std::array<e8m23_t, 2>{1.6354027f, -1.3607267f},
         std::array<e8m23_t, 2>{1.8556793f, 1.1689897f}
@@ -201,12 +295,11 @@ TEST(cpu_tensor_bin_ops, matmul_square_identity) {
     context ctx {compute_device::cpu};
     tensor a {ctx, dtype::e8m23, A.size(), A[0].size()};
     tensor b {ctx, dtype::e8m23, B.size(), B[0].size()};
-    a.copy_buffer_from(&A, sizeof(A));
-    b.copy_buffer_from(&B, sizeof(B));
+    a.fill_from(flatten(A));
+    b.fill_from(flatten(B));
     tensor c {a&b};
     ASSERT_EQ(c.shape()[0], 2);
     ASSERT_EQ(c.shape()[1], 2);
-    ASSERT_EQ(c.shape()[2], 1);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 4);
     ASSERT_EQ(c.numel(), a.numel());
@@ -217,7 +310,35 @@ TEST(cpu_tensor_bin_ops, matmul_square_identity) {
     }
 }
 
-TEST(cpu_tensor_bin_ops, matmul_matrix_vector) {
+TEST(cpu_tensor_binary_ops, matmul_square_identity_e5m10) {
+    static constexpr std::array<std::array<e8m23_t, 2>, 2> A {
+        std::array<e8m23_t, 2>{1.6354027f, -1.3607267f},
+        std::array<e8m23_t, 2>{1.8556793f, 1.1689897f}
+    };
+    static constexpr std::array<std::array<e8m23_t, 2>, 2> B {
+        std::array<e8m23_t, 2>{1.0f, 0.0f},
+        std::array<e8m23_t, 2>{0.0f, 1.0f}
+    };
+    static constexpr std::array<std::array<e8m23_t, 2>, 2> C {A};
+    context ctx {compute_device::cpu};
+    tensor a {ctx, dtype::e5m10, A.size(), A[0].size()};
+    tensor b {ctx, dtype::e5m10, B.size(), B[0].size()};
+    a.fill_from(flatten(A));
+    b.fill_from(flatten(B));
+    tensor c {a&b};
+    ASSERT_EQ(c.shape()[0], 2);
+    ASSERT_EQ(c.shape()[1], 2);
+    ASSERT_EQ(c.rank(), 2);
+    ASSERT_EQ(c.numel(), 4);
+    ASSERT_EQ(c.numel(), a.numel());
+    ASSERT_EQ(c.numel(), b.numel());
+    std::vector<e8m23_t> cr {c.to_vector()};
+    for (std::int64_t i {}; i < c.numel(); ++i) {
+        ASSERT_NEAR(cr[i], reinterpret_cast<const e8m23_t*>(&C)[i], 1e-2);
+    }
+}
+
+TEST(cpu_tensor_binary_ops, matmul_matrix_vector_e8m23) {
     static constexpr std::array<std::array<e8m23_t, 2>, 3> A {
         std::array<e8m23_t, 2>{1.0f, 2.0f},
         std::array<e8m23_t, 2>{3.0f, 4.0f},
@@ -232,12 +353,38 @@ TEST(cpu_tensor_bin_ops, matmul_matrix_vector) {
     context ctx {compute_device::cpu};
     tensor a {ctx, dtype::e8m23, A.size(), A[0].size()};
     tensor b {ctx, dtype::e8m23, B.size()};
-    a.copy_buffer_from(&A, sizeof(A));
-    b.copy_buffer_from(&B, sizeof(B));
+    a.fill_from(flatten(A));
+    b.fill_from(B);
     tensor c {a&b};
     ASSERT_EQ(c.shape()[0], 3);
-    ASSERT_EQ(c.shape()[1], 1);
-    ASSERT_EQ(c.shape()[2], 1);
+    ASSERT_EQ(c.rank(), 1);
+    ASSERT_EQ(c.numel(), 3);
+    ASSERT_NE(c.numel(), a.numel());
+    ASSERT_NE(c.numel(), b.numel());
+    for (std::int64_t i {}; i < c.numel(); ++i) {
+        ASSERT_FLOAT_EQ(c(i), C[i]);
+    }
+}
+
+TEST(cpu_tensor_binary_ops, matmul_matrix_vector_e5m10) {
+    static constexpr std::array<std::array<e8m23_t, 2>, 3> A {
+        std::array<e8m23_t, 2>{1.0f, 2.0f},
+        std::array<e8m23_t, 2>{3.0f, 4.0f},
+        std::array<e8m23_t, 2>{5.0f, 6.0f},
+    };
+    static constexpr std::array<e8m23_t, 2> B {
+        0.5f, -1.0f
+    };
+    static constexpr std::array<e8m23_t, 3> C {
+        {-1.5f, -2.5f, -3.5f}
+    };
+    context ctx {compute_device::cpu};
+    tensor a {ctx, dtype::e5m10, A.size(), A[0].size()};
+    tensor b {ctx, dtype::e5m10, B.size()};
+    a.fill_from(flatten(A));
+    b.fill_from(B);
+    tensor c {a&b};
+    ASSERT_EQ(c.shape()[0], 3);
     ASSERT_EQ(c.rank(), 1);
     ASSERT_EQ(c.numel(), 3);
     ASSERT_NE(c.numel(), a.numel());

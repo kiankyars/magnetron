@@ -1,5 +1,7 @@
 /*
-** (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+** +=======================================================================+
+** | (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>                  |
+** +=======================================================================+
 **
 ** This file implements auxiliary functionality, mostly loading, saving and resizing image and audio tensors.
 ** Some libraries are directly embedded into this file.
@@ -109,7 +111,7 @@ mag_tensor_t* mag_tensor_load_image(mag_ctx_t* ctx, const char* file, mag_color_
        return t;
     #endif
    }
-   mag_tensor_t* t = mag_tensor_create_3d(ctx, MAG_DTYPE_E8M23, whc[2], whc[1], whc[0]);
+   mag_tensor_t* t = mag_tensor_empty(ctx, MAG_DTYPE_E8M23, 3, (int64_t[3]){whc[2], whc[1], whc[0]});
    mag_e8m23_t* dst = mag_tensor_get_data_ptr(t);
    for (int64_t k = 0; k < whc[2]; ++k) { /* Convert from interleaved to planar representation. */
      for (int64_t j = 0; j < whc[1]; ++j) {

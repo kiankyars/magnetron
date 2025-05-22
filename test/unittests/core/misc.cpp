@@ -30,3 +30,10 @@ TEST(misc, get_set_allocator) {
     allocator(prev);
     ASSERT_EQ(allocator(), prev);
 }
+
+TEST(misc, hash_function) {
+    ASSERT_EQ(mag_hash("hello", 5, 0), 15821672119091348640ull);
+    ASSERT_EQ(mag_hash("hello", 5, 0), 15821672119091348640ull);
+    ASSERT_NE(mag_hash("hello", 5, 1), 15821672119091348640ull);
+    ASSERT_NE(mag_hash("helli", 5, 0), 15821672119091348640ull);
+}

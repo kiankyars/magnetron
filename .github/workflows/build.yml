@@ -40,6 +40,21 @@ jobs:
         shell: bash
         run: echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
+      - name: Install Packages
+        if: runner.os != 'windows'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            gcc \
+            g++ \
+            clang \
+            python3 \
+            python3-pip \
+            python3-setuptools \
+            python3-wheel
+
       - name: Configure CMake
         shell: bash
         run: |

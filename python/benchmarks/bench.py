@@ -39,8 +39,8 @@ class MagnetronBenchmark(BenchParticipant):
         super().__init__('Magnetron')
 
     def allocate_args(self, shape_a: tuple[int, int], shape_b: tuple[int, int]) -> None:
-        x = mag.Tensor.full(shape_a, fill_value=1.0, dtype=mag.DType.F32)
-        y = mag.Tensor.full(shape_b, fill_value=2.0, dtype=mag.DType.F32)
+        x = mag.Tensor.full(shape_a, fill_value=1.0, dtype=mag.f32)
+        y = mag.Tensor.full(shape_b, fill_value=2.0, dtype=mag.f32)
         return x, y
 
 

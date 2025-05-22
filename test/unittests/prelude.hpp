@@ -13,9 +13,10 @@
 #include <gmock/gmock.h>
 
 #include "prelude.hpp"
-using namespace testing;
 
 #include <half.hpp>
+
+using namespace testing;
 
 namespace magnetron::test {
     using e8m23_t = float;
@@ -52,12 +53,12 @@ namespace magnetron::test {
         return {std::begin(internal->op_inputs), std::end(internal->op_inputs)};
     }
 
-    [[nodiscard]] inline auto op_params_as_vec(tensor t) -> std::vector<mag_opp_t> {
+    [[nodiscard]] inline auto op_params_as_vec(tensor t) -> std::vector<mag_op_param_t> {
         mag_tensor_t* internal {&*t};
         return {std::begin(internal->op_params), std::end(internal->op_params)};
     }
 
-    [[nodiscard]] inline auto init_op_params_as_vec(tensor t) -> std::vector<mag_opp_t> {
+    [[nodiscard]] inline auto init_op_params_as_vec(tensor t) -> std::vector<mag_op_param_t> {
         mag_tensor_t* internal {&*t};
         return {std::begin(internal->init_op_params), std::end(internal->init_op_params)};
     }
@@ -135,6 +136,29 @@ namespace magnetron::test {
         });
     }
 
+    template <bool BROADCAST, bool INPLACE, typename A, typename B>
+        requires std::is_invocable_r_v<tensor, A, tensor> && std::is_invocable_v<B, e8m23_t>
+    auto test_unary_operator(std::int64_t lim, e8m23_t eps, dtype ty, A&& a, B&& b, e8m23_t min = 0.0, e8m23_t max = 10.0) -> decltype(auto) {
+        auto ctx = context{compute_device::cpu};
+        for_all_shape_perms(lim, BROADCAST ? 2 : 1, [&](std::span<const std::int64_t> shape) {
+            tensor t_a {ctx, ty, shape};
+            t_a.fill_rand_uniform(min, max);
+            std::vector<e8m23_t> d_a {t_a.to_vector()};
+            tensor t_r {std::invoke(a, t_a)};
+            if constexpr (INPLACE) {
+                ASSERT_EQ(t_a.data_ptr(), t_r.data_ptr());
+            } else {
+                ASSERT_NE(t_a.data_ptr(), t_r.data_ptr());
+            }
+            std::vector<e8m23_t> d_r {t_r.to_vector()};
+            ASSERT_EQ(d_a.size(), d_r.size());
+            ASSERT_EQ(t_a.dtype(), t_r.dtype());
+            for (std::int64_t i = 0; i < d_r.size(); ++i) {
+                ASSERT_NEAR(std::invoke(b, d_a[i]), d_r[i], eps);
+            }
+        });
+    }
+
     template <typename T>
     [[nodiscard]] auto compute_mean(std::span<const T> data) -> mag_e8m23_t {
         mag_e8m23_t sum {};
@@ -160,6 +184,24 @@ namespace magnetron::test {
     template <typename T>
     [[nodiscard]] auto compute_std(const mag_tensor_t* tensor) -> mag_e11m52_t {
         return compute_std(std::span<const T>{reinterpret_cast<const T*>(mag_tensor_get_data_ptr(tensor)), static_cast<std::size_t>(tensor->numel)});
+    }
+
+    template <typename T>
+    auto softmax(const T* input, T* output, std::size_t length) -> void {
+        T max_input {input[0]};
+        for (std::size_t i {1}; i < length; ++i) {
+            if (input[i] > max_input) {
+                max_input = input[i];
+            }
+        }
+        T sum {};
+        for (std::size_t i{}; i < length; ++i) {
+            output[i] = std::exp(input[i] - max_input);
+            sum += output[i];
+        }
+        for (std::size_t i{}; i < length; ++i) {
+            output[i] /= sum;
+        }
     }
 
     // Tiny module-like library for testing training and models
@@ -235,10 +277,10 @@ namespace magnetron::test {
                 for (auto& param : params()) {
                     auto grad {param.grad()};
                     if (!grad.has_value()) [[unlikely]] {
-                        throw std::runtime_error("Parameter has no gradient");
+                        throw std::runtime_error{"Parameter has no gradient"};
                     }
                     tensor delta {param - *grad*lr};
-                    param.copy_buffer_from(delta.data_ptr(), delta.data_size());
+                    param.fill_from(delta.data_ptr(), delta.data_size());
                 }
             }
 
@@ -248,15 +290,15 @@ namespace magnetron::test {
         // Linear/Dense layer
         class linear_layer final : public module {
         public:
-            linear_layer(context& ctx, std::int64_t in_features, std::int64_t out_features, bool has_bias = true) {
-                tensor weight {ctx, dtype::e8m23, out_features, in_features};
+            linear_layer(context& ctx, std::int64_t in_features, std::int64_t out_features, dtype type = dtype::e8m23, bool has_bias = true) {
+                tensor weight {ctx, type, out_features, in_features};
                 weight.set_name("weight");
                 weight.fill_rand_normal(0.0f, 1.0f);
-                tensor weight2 = weight/static_cast<e8m23_t>(std::sqrt(in_features + out_features));
-                register_param(weight2);
-                this->weight = weight2;
+                weight = weight / static_cast<e8m23_t>(std::sqrt(in_features + out_features));
+                register_param(weight);
+                this->weight = weight;
                 if (has_bias) {
-                    tensor bias {ctx, dtype::e8m23, out_features};
+                    tensor bias {ctx, type, out_features};
                     bias.fill(0);
                     bias.set_name("bias");
                     register_param(bias);
@@ -265,8 +307,8 @@ namespace magnetron::test {
             }
 
             [[nodiscard]] auto operator()(tensor x) const -> tensor {
-                tensor y {x & weight->T().clone()};
-                if (bias.has_value())
+                tensor y {x & weight->T()};
+                if (bias)
                     y = y + *bias;
                 return y;
             }
