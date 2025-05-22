@@ -551,7 +551,7 @@ typedef enum mag_op_param_type_t {
     MAG_OPP__NUM
 } mag_op_param_type_t;
 
-extern const char* const mag_op_param_type_names[MAG_OPP__NUM]; /* Operation parameter type names. */
+extern const char* _Nonnull const mag_op_param_type_names[MAG_OPP__NUM]; /* Operation parameter type names. */
 
 /*
 ** The opp (Operation Parameter) is used to pass additional data to the operation. For example:
@@ -623,25 +623,25 @@ typedef struct mag_op_param_layout_t {
     size_t count;
 } mag_op_param_layout_t;
 
-static inline void mag_op_param_layout_init(mag_op_param_layout_t* set) {
+static inline void mag_op_param_layout_init(mag_op_param_layout_t* _Nonnull set) {
     set->count = 0;
     for (int i=0; i < MAG_MAX_OP_PARAMS; ++i)
         set->slots[i] = mag_op_param_none();
 }
 
-static inline size_t mag_op_param_layout_insert(mag_op_param_layout_t* set, mag_op_param_t param) {
+static inline size_t mag_op_param_layout_insert(mag_op_param_layout_t* _Nonnull set, mag_op_param_t param) {
     mag_assert(set->count < MAG_MAX_OP_PARAMS, "Too many operation parameters");
     set->slots[set->count] = param;
     return set->count++;
 }
 
-static inline void mag_op_param_layout_store(mag_op_param_layout_t* set, size_t idx, mag_op_param_t param) {
+static inline void mag_op_param_layout_store(mag_op_param_layout_t* _Nonnull set, size_t idx, mag_op_param_t param) {
     mag_assert(idx < set->count, "Invalid operation parameter index");
     mag_assert(set->slots[idx].type == MAG_OPP_NONE, "Operation parameter already set");
     set->slots[idx] = param;
 }
 
-static inline void mag_op_param_layout_transfer(const mag_op_param_layout_t* set, mag_op_param_t (*out)[MAG_MAX_OP_PARAMS]) {
+static inline void mag_op_param_layout_transfer(const mag_op_param_layout_t* _Nonnull set, mag_op_param_t (*_Nonnull out)[MAG_MAX_OP_PARAMS]) {
     memcpy(*out, set->slots, set->count*sizeof(*set->slots));
     for (size_t i=set->count; i < MAG_MAX_OP_PARAMS; ++i)
         (*out)[i] = mag_op_param_none();
