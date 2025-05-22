@@ -4,27 +4,13 @@
 # The model is trained using the Mean Squared Error (MSE) loss function and the Stochastic Gradient Descent (SGD) optimizer.
 
 import magnetron as mag
-import magnetron.nn as nn
-import magnetron.optim as optim
-
+from magnetron import optim, nn
 from matplotlib import pyplot as plt
 
 EPOCHS: int = 2000
 
-# Define the XOR model architecture
-class XOR(nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-        self.l1 = nn.Linear(2, 2)
-        self.l2 = nn.Linear(2, 1)
-
-    def forward(self, x: mag.Tensor) -> mag.Tensor:
-        x = self.l1(x).tanh()
-        x = self.l2(x).tanh()
-        return x
-
 # Create the model, optimizer, and loss function
-model = XOR()
+model = nn.Sequential(nn.Linear(2, 2), nn.Tanh(), nn.Linear(2, 1), nn.Tanh())
 optimizer = optim.SGD(model.parameters(), lr=1e-1)
 criterion = nn.MSELoss()
 loss_values: list[float] = []
@@ -46,7 +32,7 @@ for epoch in range(EPOCHS):
         print(f'Epoch: {epoch}, Loss: {loss.item()}')
 
 # Print the final predictions after the training
-print("=== Final Predictions ===")
+print('=== Final Predictions ===')
 
 with mag.no_grad():
     y_hat = model(x)
@@ -62,9 +48,3 @@ plt.ylabel('MSE Loss')
 plt.title('Training Loss over Time')
 plt.grid(True)
 plt.show()
-
-# Cleanup
-
-del model
-del criterion
-del optimizer

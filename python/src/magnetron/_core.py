@@ -824,6 +824,9 @@ class Tensor:
     def __eq__(self, other: 'Tensor') -> bool:
         return _C.mag_tensor_eq(self._ptr, other._ptr)
 
+    def __len__(self) -> int:
+        return self.shape[0]
+
     def __str__(self) -> str:
         cstr: _ffi.CData = _C.mag_tensor_to_string(self._ptr, False, 0, 0)
         result: str = _ffi.string(cstr).decode('utf-8')
@@ -869,7 +872,7 @@ class Tensor:
             return _ffi.new('int64_t[1]', [dim]), 1
         elif isinstance(dim, tuple):
             num: int = len(dim)
-            axes: _ffi.CData = _ffi.new(f'int64_t[{num}]', dim),
+            axes: _ffi.CData = (_ffi.new(f'int64_t[{num}]', dim),)
             return axes, num
         else:
             raise TypeError('Dimension must be an int or a tuple of ints.')
