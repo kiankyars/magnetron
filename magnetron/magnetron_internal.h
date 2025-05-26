@@ -747,7 +747,7 @@ typedef struct mag_op_meta_t {
     );
 
     bool (*_Nullable const validator)(                      /* Validator function or NULL. */
-        mag_op_t,
+        mag_strstream_t* _Nullable* _Nonnull,
         bool,
         mag_tensor_t* _Nonnull,
         mag_tensor_t* _Nonnull* _Nonnull,
