@@ -531,11 +531,12 @@ class Tensor:
         assert self.requires_grad, 'Tensor must require gradient tracking'
         _C.mag_tensor_zero_grad(self._ptr)
 
-    def export_graphviz_forward(self, file_path: str) -> None:
-        _C.mag_tensor_export_forward_graph_graphviz(self._ptr, bytes(file_path, 'utf-8'))
-
-    def export_graphviz_backward(self, file_path: str) -> None:
-        _C.mag_tensor_export_backward_graph_graphviz(self._ptr, bytes(file_path, 'utf-8'))
+    def dump_graph_dot(self, file_path: str, forward: bool) -> None:
+        file_path = bytes(file_path, 'utf-8')
+        if forward:
+            _C.mag_tensor_export_forward_graph_graphviz(self._ptr, file_path)
+        else:
+            _C.mag_tensor_export_backward_graph_graphviz(self._ptr, file_path)
 
     def clone(self) -> 'Tensor':
         return Tensor(_C.mag_clone(self._ptr))
@@ -571,14 +572,17 @@ class Tensor:
         return Tensor(_C.mag_permute(self._ptr, *axes))
 
     def fill_(self, value: float | int) -> None:
+        self._validate_inplace_op()
         _C.mag_tensor_fill(self._ptr, float(value))
 
     def fill_random_uniform_(self, min_val: float | int, max_val: float | int) -> None:
+        self._validate_inplace_op()
         if max_val < min_val:
             min_val, max_val = max_val, min_val
         _C.mag_tensor_fill_random_uniform(self._ptr, float(min_val), float(max_val))
 
     def fill_random_normal_(self, mean: float, std: float) -> None:
+        self._validate_inplace_op()
         _C.mag_tensor_fill_random_normal(self._ptr, mean, std)
 
     def zeros_(self) -> None:

@@ -286,9 +286,7 @@ static void mag_op_backward_view(mag_tensor_t* node, mag_tensor_t** grads) {
 }
 
 static void mag_op_backward_transpose(mag_tensor_t* node, mag_tensor_t** grads) {
-    mag_tensor_t* t = mag_transpose(node->grad);
-    *grads = mag_clone(t);
-    mag_tensor_decref(t);
+    *grads = mag_transpose(node->grad);
 }
 
 static void mag_op_backward_mean(mag_tensor_t* node, mag_tensor_t** grads) {
@@ -501,20 +499,15 @@ static void mag_op_backward_matmul(mag_tensor_t* node, mag_tensor_t** grads) {
     mag_tensor_t* y = node->op_inputs[1];
     if (x->flags & MAG_TFLAG_REQUIRES_GRAD) {
         mag_tensor_t* yt = mag_transpose(y);
-        mag_tensor_t* ytc = mag_clone(yt);
-        grads[0] = mag_matmul(node->grad, ytc);
-        mag_tensor_decref(ytc);
+        grads[0] = mag_matmul(node->grad, yt);
         mag_tensor_decref(yt);
     }
     if (y->flags & MAG_TFLAG_REQUIRES_GRAD) {
         mag_tensor_t* xt = mag_transpose(x);
-        mag_tensor_t* xtc = mag_clone(xt);
-        grads[1] = mag_matmul(xtc, node->grad);
-        mag_tensor_decref(xtc);
+        grads[1] = mag_matmul(xt, node->grad);
         mag_tensor_decref(xt);
     }
 }
-
 
 /* Execute init/normal operator on R. */
 static void MAG_HOTPROC mag_op_exec(mag_tensor_t* R, mag_compute_device_t* dvc, mag_exec_stage_t stage) {
