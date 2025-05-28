@@ -569,21 +569,33 @@ typedef struct mag_op_param_t {
 } mag_op_param_t;
 
 static MAG_AINLINE mag_op_param_t mag_op_param_none() {
-    return (mag_op_param_t){.type=MAG_OPP_NONE, .u64=0};
+    mag_op_param_t p;
+    p.type = MAG_OPP_NONE;
+    p.u64 = 0;
+    return p;
 }
 
 static MAG_AINLINE mag_op_param_t mag_op_param_wrap_e8m23(mag_e8m23_t x) {
     uint32_t u32;
     memcpy(&u32, &x, sizeof(u32));
-    return (mag_op_param_t){.type=MAG_OPP_E8M23, .u64=u32};
+    mag_op_param_t p;
+    p.type = MAG_OPP_E8M23;
+    p.u64 = u32;
+    return p;
 }
 
 static MAG_AINLINE mag_op_param_t mag_op_param_wrap_i64(int64_t x) {
-    return (mag_op_param_t){.type=MAG_OPP_I64, .i64=x};
+    mag_op_param_t p;
+    p.type = MAG_OPP_I64;
+    p.i64 = x;
+    return p;
 }
 
 static MAG_AINLINE mag_op_param_t mag_op_param_wrap_u64(uint64_t x) {
-    return (mag_op_param_t){.type=MAG_OPP_U64, .u64=x};
+    mag_op_param_t p;
+    p.type = MAG_OPP_U64;
+    p.u64 = x;
+    return p;
 }
 
 /* Unpack value from packed opp. Panics if the type is not the expected type. */
