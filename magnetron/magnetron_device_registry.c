@@ -6,7 +6,7 @@
 
 #include "magnetron_internal.h"
 
-extern mag_compute_device_t* mag_init_device_cpu(mag_ctx_t* ctx, const mag_device_descriptor_t* desc);   /* Initialize CPU compute device. Implemented in magnetron_cpu.c */
+extern mag_compute_device_t* mag_init_device_cpu(mag_Context* ctx, const mag_ComputeDeviceDesc* desc);   /* Initialize CPU compute device. Implemented in magnetron_cpu.c */
 extern void mag_destroy_device_cpu(mag_compute_device_t* dvc);      /* Destroy CPU compute device. Implemented in magnetron_cpu.c */
 
 #ifdef MAG_ENABLE_CUDA
@@ -32,9 +32,9 @@ static const mag_device_factory_t* const mag_device_factories[MAG_COMPUTE_DEVICE
 #endif
 };
 
-mag_compute_device_t* mag_init_dynamic_device(mag_ctx_t* ctx, const mag_device_descriptor_t* desc) {
+mag_compute_device_t* mag_init_dynamic_device(mag_Context* ctx, const mag_ComputeDeviceDesc* desc) {
     mag_assert2(ctx && desc);
-    mag_compute_device_type_t type = desc->type;
+    mag_ComputeDeviceType type = desc->type;
     mag_assert2(type < MAG_COMPUTE_DEVICE_TYPE__NUM);
     mag_assert2(mag_device_factories[MAG_DEVICE_FALLBACK]);     /* Fallback factory must be present. */
     const mag_device_factory_t* factory = mag_device_factories[type];

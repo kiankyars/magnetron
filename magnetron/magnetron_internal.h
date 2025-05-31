@@ -519,7 +519,7 @@ typedef pthread_cond_t mag_cond_var_t;
 
 #endif
 
-extern MAG_EXPORT void mag_thread_set_prio(mag_thread_sched_prio_t prio); /* Set thread scheduling priority of current thread. */
+extern MAG_EXPORT void mag_thread_set_prio(mag_ThreadPrio prio); /* Set thread scheduling priority of current thread. */
 extern MAG_EXPORT void mag_thread_set_name(const char* _Nonnull name); /* Set thread name. */
 extern MAG_EXPORT void mag_thread_yield(void); /* Yield current thread. */
 
@@ -749,20 +749,20 @@ typedef struct mag_op_meta_t {
     const mag_op_flags_t flags;                             /* Operation flags */
 
     void (*_Nullable const backward)(                       /* Backward pass function or NULL. */
-        mag_tensor_t* _Nonnull,
-        mag_tensor_t* _Nonnull* _Nonnull
+        mag_Tensor* _Nonnull,
+        mag_Tensor* _Nonnull* _Nonnull
     );
 
-    mag_tensor_t* _Nonnull (*_Nullable const r_alloc)(      /* Result allocator function or NULL. */
-        mag_tensor_t* _Nonnull* _Nonnull,
+    mag_Tensor* _Nonnull (*_Nullable const r_alloc)(      /* Result allocator function or NULL. */
+        mag_Tensor* _Nonnull* _Nonnull,
         const mag_op_param_t* _Nullable
     );
 
     bool (*_Nullable const validator)(                      /* Validator function or NULL. */
         mag_strstream_t* _Nullable* _Nonnull,
         bool,
-        mag_tensor_t* _Nonnull,
-        mag_tensor_t* _Nonnull* _Nonnull,
+        mag_Tensor* _Nonnull,
+        mag_Tensor* _Nonnull* _Nonnull,
         const mag_op_param_t* _Nullable
     );
 
@@ -847,13 +847,13 @@ typedef enum mag_transfer_op_t {
 /* Buffer interface on a compute device */
 typedef struct mag_storage_buffer_t mag_storage_buffer_t;
 struct mag_storage_buffer_t {
-    mag_ctx_t* _Nonnull ctx;
+    mag_Context* _Nonnull ctx;
     mag_rc_control_block_t rc_control;      /* Reference count control block. */
     uintptr_t base;                         /* Pointer to buffer on device. Might point to GPU or any other device memory. */
     size_t size;                            /* Size of buffer in bytes. */
     size_t alignment;                       /* Alignment of buffer. */
     size_t granularity;                     /* Element size granularity. */
-    mag_dtype_t dtype;                      /* Data type of buffer. */
+    mag_DType dtype;                      /* Data type of buffer. */
     mag_compute_device_t* _Nonnull host;    /* Host device. */
 
     /* Broadcast (fill) buffer with x. */
@@ -877,24 +877,24 @@ struct mag_storage_buffer_t {
 
 /* Device interface to any compute backend device (CPU, GPU, TPU etc..) */
 struct mag_compute_device_t {
-    mag_ctx_t* _Nonnull ctx;
+    mag_Context* _Nonnull ctx;
     char name[128];                                                                                                 /* Device name. */
     void* _Nonnull impl;                                                                                            /* Device specific implementation, if applicable. */
     bool is_async;                                                                                                  /* If device is async. */
-    mag_compute_device_type_t type;                                                                                 /* Device type enum. */
-    void (*_Nonnull eager_exec_init)(mag_compute_device_t* _Nonnull dvc, mag_tensor_t* _Nonnull root);                                         /* Execute a single init op. */
-    void (*_Nonnull eager_exec_fwd)(mag_compute_device_t* _Nonnull dvc, mag_tensor_t* _Nonnull root);                                          /* Execute a single op forward. */
-    void (*_Nonnull alloc_storage)(mag_compute_device_t* _Nonnull dvc, mag_storage_buffer_t* _Nonnull* _Nonnull out, size_t size, mag_dtype_t dtype);   /* Allocate storage buffer in device memory */
+    mag_ComputeDeviceType type;                                                                                 /* Device type enum. */
+    void (*_Nonnull eager_exec_init)(mag_compute_device_t* _Nonnull dvc, mag_Tensor* _Nonnull root);                                         /* Execute a single init op. */
+    void (*_Nonnull eager_exec_fwd)(mag_compute_device_t* _Nonnull dvc, mag_Tensor* _Nonnull root);                                          /* Execute a single op forward. */
+    void (*_Nonnull alloc_storage)(mag_compute_device_t* _Nonnull dvc, mag_storage_buffer_t* _Nonnull* _Nonnull out, size_t size, mag_DType dtype);   /* Allocate storage buffer in device memory */
 };
 
 /* Device creation and destruction. */
 typedef struct mag_device_factory_t {
-    mag_compute_device_t* _Nonnull (*_Nonnull init)(mag_ctx_t* _Nonnull ctx, const mag_device_descriptor_t* _Nonnull desc);      /* Initialize device. */
+    mag_compute_device_t* _Nonnull (*_Nonnull init)(mag_Context* _Nonnull ctx, const mag_ComputeDeviceDesc* _Nonnull desc);      /* Initialize device. */
     void (*_Nonnull destroy)(mag_compute_device_t* _Nonnull dvc);         /* Destroy device. */
 } mag_device_factory_t;
 
 /* Global device factories. Implemented in magnetron_device_registry.c */
-extern mag_compute_device_t* _Nonnull mag_init_dynamic_device(mag_ctx_t* _Nonnull ctx, const mag_device_descriptor_t* _Nonnull desc);
+extern mag_compute_device_t* _Nonnull mag_init_dynamic_device(mag_Context* _Nonnull ctx, const mag_ComputeDeviceDesc* _Nonnull desc);
 extern void mag_destroy_dynamic_device(mag_compute_device_t* _Nonnull dvc);
 
 #if defined(__x86_64__) || defined(_M_X64) /* x86_64 or AMD64 specific CPU features. */
@@ -988,12 +988,7 @@ typedef enum mag_ctx_flags_t {
     MAG_CTX_FLAG_GRAD_RECORDER = 1<<0,     /* Gradient recording is currently active. */
 } mag_ctx_flags_t;
 
-/*
-** Context contains all isolated state and data.
-** Lifetimes of tensors and compute graphs are bound to the context - the context is the owner.
-** Context itself is not thread-safe, use a thread-local context or synchronize access. (Multiple contexts can be used.)
-*/
-struct mag_ctx_t {
+struct mag_Context {
     struct {
         char os_name[128];                        /* OS name. */
         char cpu_name[128];                       /* CPU name. */
@@ -1015,15 +1010,15 @@ struct mag_ctx_t {
     mag_fixed_intrusive_pool tensor_pool;         /* Tensor struct memory pool. */
     mag_fixed_intrusive_pool storage_pool;        /* Storage struct memory pool. */
     mag_ctx_flags_t flags;                        /* Context flags. */
-    mag_prng_algorithm_t prng_algo;               /* Active PRNG algorithm. */
+    mag_PRNGAlgo prng_algo;               /* Active PRNG algorithm. */
     uintptr_t tr_id;                              /* Host thread ID. */
     size_t sh_len;                                /* Number of shutdown hooks. */
     size_t sh_cap;                                /* Maximum number of shutdown hooks. */
-    mag_compute_device_type_t device_type;        /* Active compute device. */
+    mag_ComputeDeviceType device_type;        /* Active compute device. */
     mag_compute_device_t* _Nonnull device;        /* Active compute device. */
     void* _Nullable ud;                           /* User data. */
 #ifdef MAG_DEBUG
-    mag_tensor_t* _Nullable alive_head;           /* List of alive tensors used for leak detection. */
+    mag_Tensor* _Nullable alive_head;           /* List of alive tensors used for leak detection. */
 #endif
 };
 
@@ -1043,28 +1038,28 @@ mag_static_assert(MAG_TFLAG_LEN <= 0xff);
 ** The actual data buffer is compute-device specific and can be only accessed via the storage buffer.
 ** A tensor can be a view, which references the storage buffer of another tensor, but views have their own header too.
 */
-struct mag_tensor_t {
-    mag_ctx_t* _Nonnull  ctx;                               /* Host context. */
+struct mag_Tensor {
+    mag_Context* _Nonnull  ctx;                               /* Host context. */
     mag_rc_control_block_t rc_control;                      /* Reference counting control block. */
     int64_t rank;                                           /* Number of active dimensions. [1, MAX_DIMS] */
     int64_t shape[MAG_MAX_DIMS];                            /* Shape of the tensor. */
     int64_t strides[MAG_MAX_DIMS];                          /* Strides of the tensor. We store the strides in element counts and NOT in bytes. */
-    mag_dtype_t dtype;                                      /* Data type of the tensor. */
+    mag_DType dtype;                                      /* Data type of the tensor. */
     mag_storage_buffer_t* _Nonnull storage;                 /* Storage buffer. */
     int64_t numel;                                          /* Number of elements in the tensor. */
     mag_tensor_flags_t flags;                               /* Tensor flags. */
     mag_op_t op;                                            /* Opcode for operators. */
-    mag_tensor_t* _Nullable op_inputs[MAG_MAX_OP_INPUTS];   /* Input tensors for operators. */
+    mag_Tensor* _Nullable op_inputs[MAG_MAX_OP_INPUTS];   /* Input tensors for operators. */
     mag_op_param_t op_params[MAG_MAX_OP_PARAMS];            /* Operator parameters. */
     mag_init_op_t init_op;                                  /* Initialization op */
     mag_op_param_t init_op_params[MAG_MAX_OP_PARAMS];       /* Init operator parameters */
-    mag_tensor_t* _Nullable view_uplink;                    /* View base tensor. */
+    mag_Tensor* _Nullable view_uplink;                    /* View base tensor. */
     size_t view_offs;                                       /* Offset in view tensor. */
-    mag_tensor_t* _Nullable grad;                           /* ∇f - Gradient tensor. */
+    mag_Tensor* _Nullable grad;                           /* ∇f - Gradient tensor. */
     uint8_t name[MAG_MAX_TENSOR_NAME_LEN];                  /* Tensor debug name. */
     void* _Nullable ud;                                     /* User data. */
 #ifdef MAG_DEBUG
-    mag_tensor_t* _Nullable alive_next;                     /* Next alive tensor used for leak detection. */
+    mag_Tensor* _Nullable alive_next;                     /* Next alive tensor used for leak detection. */
 #endif
 };
 
@@ -1104,17 +1099,17 @@ typedef struct mag_prng_state_t {
             uint32_t state[624];
         } mersenne;
     };
-    mag_prng_algorithm_t algo; /* PRNG algorithm. */
+    mag_PRNGAlgo algo; /* PRNG algorithm. */
 } mag_prng_state_t;
 
 /* Initialize and seed PRNG with specific algorithm. */
-void mag_prng_init(mag_prng_state_t* _Nonnull prng, mag_prng_algorithm_t algo, uint64_t seed);
+void mag_prng_init(mag_prng_state_t* _Nonnull prng, mag_PRNGAlgo algo, uint64_t seed);
 
 /* Compute kernel payload passed to each CPU thread. */
 typedef struct mag_compute_payload_t {
     int64_t thread_num;                     /* Total number of threads involved. */
     int64_t thread_idx;                     /* Current thread index used to compute thread-local partition. */
-    mag_tensor_t* _Nonnull node;            /* Result tensor. Stores input tensors and all other op-specific data. */
+    mag_Tensor* _Nonnull node;            /* Result tensor. Stores input tensors and all other op-specific data. */
     mag_exec_stage_t stage;                /* Graph evaluation type. */
     mag_prng_state_t* _Nonnull local_prng;  /* Thread-local CPU PRNG state. */
 } mag_compute_payload_t;
@@ -1128,7 +1123,7 @@ typedef struct mag_compute_payload_t {
 typedef struct mag_kernel_registry_t {
     void (*_Nonnull init[MAG_IOP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t* _Nonnull);   /* Initialization operator kernels. */
     void (*_Nonnull fwd[MAG_OP__NUM][MAG_DTYPE__NUM])(const mag_compute_payload_t* _Nonnull);     /* Forward operator kernels. */
-    void (*_Nonnull vector_cast)(size_t nb, const void* _Nonnull src, mag_dtype_t src_t, void* _Nonnull dst, mag_dtype_t dst_t); /* Vector cast (dtype conversion) kernel. */
+    void (*_Nonnull vector_cast)(size_t nb, const void* _Nonnull src, mag_DType src_t, void* _Nonnull dst, mag_DType dst_t); /* Vector cast (dtype conversion) kernel. */
 } mag_kernel_registry_t;
 
 /* Combine two hash values. */

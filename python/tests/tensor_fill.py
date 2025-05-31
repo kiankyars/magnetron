@@ -41,7 +41,7 @@ def test_tensor_fill_uniform3() -> None:
 def test_tensor_fill_normal() -> None:
     mean = 0.0
     stddev = 1
-    tensor = Tensor.normal((1, 2, 3, 4, 5, 6), mean=mean, stddev=stddev)
+    tensor = Tensor.normal((1, 2, 3, 4, 5, 6), mean=mean, std=stddev)
     data = tensor.tolist()
     assert len(data) == 1 * 2 * 3 * 4 * 5 * 6
     # assert all([abs(x - mean) <= 3 * stddev for x in data]) TODO

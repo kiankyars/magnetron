@@ -92,14 +92,12 @@ class Context:
 
     def __init__(self, device: ComputeDevice.CPU | ComputeDevice.CUDA = Config.compute_device) -> None:
         assert _MAIN_TID == threading.get_native_id(), 'Context must be created in the main thread'
-        descriptor: _ffi.CData = _ffi.new('mag_device_descriptor_t*')
+        desc: _ffi.CData = _ffi.new('mag_ComputeDeviceDesc*')
         if isinstance(device, ComputeDevice.CPU):
-            descriptor.type = 0
-            descriptor.thread_count = abs(device.num_threads)
+            desc[0] = _C.mag_compute_device_desc_cpu(device.num_threads)
         elif isinstance(device, ComputeDevice.CUDA):
-            descriptor.type = 1
-            descriptor.cuda_device_id = abs(device.device_id)
-        self._ptr = _C.mag_ctx_create2(descriptor)
+            desc[0] = _C.mag_compute_device_desc_cuda(device.device_id)
+        self._ptr = _C.mag_ctx_create2(desc)
         self.default_dtype = Config.default_dtype
 
     @property
@@ -619,7 +617,7 @@ class Tensor:
         return Tensor(_C.mag_abs(self._ptr))
 
     def abs_(self) -> 'Tensor':
-        self.verify_inplace()
+        self._validate_inplace_op()
         return Tensor(_C.mag_abs_(self._ptr))
 
     def neg(self) -> 'Tensor':

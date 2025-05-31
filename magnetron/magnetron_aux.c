@@ -31,7 +31,7 @@
 #include <stb/stb_image_write.h>
 #include <stb/stb_image_resize2.h>
 
-mag_tensor_t* mag_tensor_load_image(mag_ctx_t* ctx, const char* file, mag_color_channels_t channels, uint32_t rw, uint32_t rh) {
+mag_Tensor* mag_tensor_load_image(mag_Context* ctx, const char* file, mag_ColorChannels channels, uint32_t rw, uint32_t rh) {
    mag_assert2(file && *file);
    int w, h, c, dc;
    switch (channels) {
@@ -111,7 +111,7 @@ mag_tensor_t* mag_tensor_load_image(mag_ctx_t* ctx, const char* file, mag_color_
        return t;
     #endif
    }
-   mag_tensor_t* t = mag_tensor_empty(ctx, MAG_DTYPE_E8M23, 3, (int64_t[3]){whc[2], whc[1], whc[0]});
+   mag_Tensor* t = mag_tensor_empty(ctx, MAG_DTYPE_E8M23, 3, (int64_t[3]){whc[2], whc[1], whc[0]});
    mag_e8m23_t* dst = mag_tensor_get_data_ptr(t);
    for (int64_t k = 0; k < whc[2]; ++k) { /* Convert from interleaved to planar representation. */
      for (int64_t j = 0; j < whc[1]; ++j) {
@@ -126,7 +126,7 @@ mag_tensor_t* mag_tensor_load_image(mag_ctx_t* ctx, const char* file, mag_color_
    return t;
 }
 
-void mag_tensor_save_image(const mag_tensor_t* t, const char* file) {
+void mag_tensor_save_image(const mag_Tensor* t, const char* file) {
    int64_t rank = mag_tensor_get_rank(t);
    mag_assert(rank == 3, "Tensor rank must be 3, but is: %" PRIi64, (size_t)rank);
    int64_t w = mag_tensor_get_width(t);
