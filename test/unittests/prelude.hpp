@@ -53,12 +53,12 @@ namespace magnetron::test {
         return {std::begin(internal->op_inputs), std::end(internal->op_inputs)};
     }
 
-    [[nodiscard]] inline auto op_params_as_vec(tensor t) -> std::vector<mag_op_param_t> {
+    [[nodiscard]] inline auto op_params_as_vec(tensor t) -> std::vector<mag_OPParam> {
         mag_Tensor* internal {&*t};
         return {std::begin(internal->op_params), std::end(internal->op_params)};
     }
 
-    [[nodiscard]] inline auto init_op_params_as_vec(tensor t) -> std::vector<mag_op_param_t> {
+    [[nodiscard]] inline auto init_op_params_as_vec(tensor t) -> std::vector<mag_OPParam> {
         mag_Tensor* internal {&*t};
         return {std::begin(internal->init_op_params), std::end(internal->init_op_params)};
     }
@@ -160,29 +160,29 @@ namespace magnetron::test {
     }
 
     template <typename T>
-    [[nodiscard]] auto compute_mean(std::span<const T> data) -> mag_e8m23_t {
-        mag_e8m23_t sum {};
+    [[nodiscard]] auto compute_mean(std::span<const T> data) -> mag_E8M23 {
+        mag_E8M23 sum {};
         for (const T x : data) sum += x;
-        return sum / static_cast<mag_e8m23_t>(data.size());
+        return sum / static_cast<mag_E8M23>(data.size());
     }
 
     template <typename T>
-    [[nodiscard]] auto compute_mean(const mag_Tensor* tensor) -> mag_e8m23_t {
+    [[nodiscard]] auto compute_mean(const mag_Tensor* tensor) -> mag_E8M23 {
         return compute_mean(std::span<const T>{reinterpret_cast<const T*>(mag_tensor_get_data_ptr(tensor)), static_cast<std::size_t>(tensor->numel)});
     }
 
     template <typename T>
-    [[nodiscard]] auto compute_std(std::span<const T> data) -> mag_e11m52_t {
-        mag_e8m23_t sum {};
-        mag_e8m23_t mean {compute_mean(data)};
+    [[nodiscard]] auto compute_std(std::span<const T> data) -> mag_E11M52 {
+        mag_E8M23 sum {};
+        mag_E8M23 mean {compute_mean(data)};
         for (const T x : data) {
             sum += std::pow(x-mean, 2.0f);
         }
-        return std::sqrt(sum / static_cast<mag_e8m23_t>(data.size()));
+        return std::sqrt(sum / static_cast<mag_E8M23>(data.size()));
     }
 
     template <typename T>
-    [[nodiscard]] auto compute_std(const mag_Tensor* tensor) -> mag_e11m52_t {
+    [[nodiscard]] auto compute_std(const mag_Tensor* tensor) -> mag_E11M52 {
         return compute_std(std::span<const T>{reinterpret_cast<const T*>(mag_tensor_get_data_ptr(tensor)), static_cast<std::size_t>(tensor->numel)});
     }
 

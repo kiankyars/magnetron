@@ -6,7 +6,7 @@ using namespace magnetron;
 
 class hash_map_test : public Test {
 protected:
-    mag_hashmap_t* map {};
+    mag_HashMap* map {};
     auto SetUp() -> void override {
         map = mag_hashmap_create(
             sizeof(int),

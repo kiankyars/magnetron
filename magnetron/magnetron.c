@@ -181,18 +181,18 @@ void* (*mag_get_alloc_fn(void))(void* blk, size_t size) { return mag_alloc; } /*
 void mag_set_alloc_fn(void* (*alloc)(void* blk, size_t size)) { mag_assert2(alloc); mag_alloc = alloc; } /* Set global allocator. */
 
 /* Humanize memory size. Format and convert a memory size to the appropriate unit. For example. 1024 => 1 KiB */
-void mag_humanize_memory_size(size_t n, mag_e11m52_t* out, const char** unit) {
+void mag_humanize_memory_size(size_t n, mag_E11M52* out, const char** unit) {
     if (n < (1<<10)) {
-        *out = (mag_e11m52_t)n;
+        *out = (mag_E11M52)n;
         *unit = "B";
     } else if (n < (1<<20)) {
-        *out = (mag_e11m52_t)n/(mag_e11m52_t)(1<<10);
+        *out = (mag_E11M52)n/(mag_E11M52)(1<<10);
         *unit = "KiB";
     } else if (n < (1<<30)) {
-        *out = (mag_e11m52_t)n/(mag_e11m52_t)(1<<20);
+        *out = (mag_E11M52)n/(mag_E11M52)(1<<20);
         *unit = "MiB";
     } else {
-        *out = (mag_e11m52_t)n/(mag_e11m52_t)(1<<30);
+        *out = (mag_E11M52)n/(mag_E11M52)(1<<30);
         *unit = "GiB";
     }
 }
@@ -328,7 +328,7 @@ const char* const mag_amd64_cap_names[MAG_AMD64_CAP__NUM] = {
 #undef _
 #elif defined(__aarch64__)
 #define _(ident) #ident
-const char* const mag_arm64_cap_names[MAG_ARM64_CAP__NUM] = {
+const char* const mag_arm64_cpu_caps_names[MAG_ARM64_CAP__NUM] = {
     mag_arm64_feature_def(_, MAG_SEP)
 };
 #endif
@@ -358,15 +358,15 @@ static uint64_t mag_hpc_clock_ns(void) { /* High precision clock in nanoseconds.
 static uint64_t mag_hpc_clock_elapsed_ns(uint64_t start) { /* High precision clock elapsed time in microseconds. */
     return (uint64_t)llabs((long long)mag_hpc_clock_ns() - (long long)start);
 }
-static mag_e11m52_t mag_hpc_clock_elapsed_ms(uint64_t start) { /* High precision clock elapsed time in milliseconds. */
-    return (mag_e11m52_t)mag_hpc_clock_elapsed_ns(start) / 1e6;
+static mag_E11M52 mag_hpc_clock_elapsed_ms(uint64_t start) { /* High precision clock elapsed time in milliseconds. */
+    return (mag_E11M52)mag_hpc_clock_elapsed_ns(start) / 1e6;
 }
 #define mag_clock_cycles() ((uint64_t)clock())
 #define mag_cycles_per_ms() ((uint64_t)CLOCKS_PER_SEC/1000)
 
 /* Bitset for 32-bit integers. */
-typedef uint32_t mag_bitset_t;
-mag_static_assert(sizeof(mag_bitset_t) == 4);
+typedef uint32_t mag_BitSet;
+mag_static_assert(sizeof(mag_BitSet) == 4);
 #define mag_bitset_size(n) (((n)+((4<<3)-1))>>5)
 #define mag_bitset_get(sets, i) (!!(sets[(i)>>5]&(1u<<((i)&((4<<3)-1)))))
 #define mag_bitset_set(sets, i) (sets[(i)>>5]|=(1u<<((i)&((4<<3)-1))))
@@ -374,11 +374,11 @@ mag_static_assert(sizeof(mag_bitset_t) == 4);
 #define mag_bitset_toggle(sets, i) (sets[(i)>>5]^=(1u<<((i)&((4<<3)-1))))
 
 /* Tensor hashset with linear probing. */
-typedef struct mag_hashset_t {
+typedef struct mag_HashSet {
     size_t len;
-    mag_bitset_t* used;
+    mag_BitSet* used;
     const mag_Tensor** keys;
-} mag_hashset_t;
+} mag_HashSet;
 #define MAG_HASHSET_FULL ((size_t)-1)
 #define MAG_HASHSET_DUPLICATE ((size_t)-2)
 #define MAG_HASHSET_MAX ((size_t)-3) /* Must be last. */
@@ -405,9 +405,9 @@ static size_t mag_hashset_compute_hash_size(size_t sz) {
 }
 
 /* Create a new hashset. */
-static mag_hashset_t mag_hashset_init(size_t size) {
+static mag_HashSet mag_hashset_init(size_t size) {
     size = mag_hashset_compute_hash_size(size);
-    mag_hashset_t set = {
+    mag_HashSet set = {
         .len = size,
         .used = (*mag_alloc)(NULL, mag_bitset_size(size)*sizeof(*set.used)),
         .keys = (*mag_alloc)(NULL, size*sizeof(*set.keys)),
@@ -417,7 +417,7 @@ static mag_hashset_t mag_hashset_init(size_t size) {
 }
 
 /* Lookup a key in the hashset. Returns index or MAG_HASHSET_FULL if full. */
-static size_t mag_hashset_lookup(mag_hashset_t* set, const mag_Tensor* key) {
+static size_t mag_hashset_lookup(mag_HashSet* set, const mag_Tensor* key) {
     size_t k = mag_hashset_hash_fn(key) % set->len, i = k;
     while (mag_bitset_get(set->used, i) && set->keys[i] != key) { /* Simple linear probe. */
         i = (i+1) % set->len;
@@ -427,13 +427,13 @@ static size_t mag_hashset_lookup(mag_hashset_t* set, const mag_Tensor* key) {
 }
 
 /* Check if a key exists in the hashset. */
-static bool mag_hashset_contains_key(mag_hashset_t* set, const mag_Tensor* key) {
+static bool mag_hashset_contains_key(mag_HashSet* set, const mag_Tensor* key) {
     size_t i = mag_hashset_lookup(set, key);
     return mag_bitset_get(set->used, i) && i != MAG_HASHSET_FULL;
 }
 
 /* Insert a key into the hashset. Returns index or MAG_HASHSET_DUPLICATE if already exists. */
-static size_t mag_hashset_insert(mag_hashset_t* set, const mag_Tensor* key) {
+static size_t mag_hashset_insert(mag_HashSet* set, const mag_Tensor* key) {
     size_t k = mag_hashset_hash_fn(key) % set->len, i = k;
     do { /* Simple linear probing */
         if (!mag_bitset_get(set->used, i)) { /* Insert key. */
@@ -448,23 +448,23 @@ static size_t mag_hashset_insert(mag_hashset_t* set, const mag_Tensor* key) {
 }
 
 /* Reset the hashset. */
-static void mag_hashset_reset(mag_hashset_t* set) {
+static void mag_hashset_reset(mag_HashSet* set) {
     memset(set->used, 0, mag_bitset_size(set->len)*sizeof(*set->used));
 }
 
 /* Clear the hashset. */
-static void mag_hashset_free(mag_hashset_t* set) {
+static void mag_hashset_free(mag_HashSet* set) {
     (*mag_alloc)(set->used, 0);
     (*mag_alloc)(set->keys, 0);
 }
 
 /* Eval Chebyshev coeffs steps for some x. f(x) : [a, b] -> ℝ. */
-static mag_e11m52_t mag_chebyshev_eval(mag_e11m52_t x, mag_e11m52_t a, mag_e11m52_t b, const mag_e11m52_t* coeffs, uint32_t steps) {
-    mag_e11m52_t scale = 4.0/(b - a);
-    mag_e11m52_t rls = -2.0 + (x - a)*scale;
-    mag_e11m52_t k1 = 0.0, k2 = 0.0;
+static mag_E11M52 mag_chebyshev_eval(mag_E11M52 x, mag_E11M52 a, mag_E11M52 b, const mag_E11M52* coeffs, uint32_t steps) {
+    mag_E11M52 scale = 4.0/(b - a);
+    mag_E11M52 rls = -2.0 + (x - a)*scale;
+    mag_E11M52 k1 = 0.0, k2 = 0.0;
     for (uint32_t j = steps-1; j; --j) {
-        mag_e11m52_t tmp = k1;
+        mag_E11M52 tmp = k1;
         k1 = rls*k1 - k2 + coeffs[j];
         k2 = tmp;
     }
@@ -472,20 +472,20 @@ static mag_e11m52_t mag_chebyshev_eval(mag_e11m52_t x, mag_e11m52_t a, mag_e11m5
 }
 
 /* Generate Chebyshev coeffs for f(x) : [a, b] -> ℝ. */
-static mag_e11m52_t* mag_chebyshev_setup(mag_e11m52_t (*f)(mag_e11m52_t), mag_e11m52_t a, mag_e11m52_t b, uint32_t steps, bool linear_l, bool linear_r) {
+static mag_E11M52* mag_chebyshev_setup(mag_E11M52 (*f)(mag_E11M52), mag_E11M52 a, mag_E11M52 b, uint32_t steps, bool linear_l, bool linear_r) {
     mag_assert2(steps);
-    mag_e11m52_t* r = (*mag_alloc)(NULL, sizeof(*r)*steps);
+    mag_E11M52* r = (*mag_alloc)(NULL, sizeof(*r)*steps);
     memset(r, 0, sizeof(*r)*steps);
-    mag_e11m52_t dsteps = (mag_e11m52_t)steps;
+    mag_E11M52 dsteps = (mag_E11M52)steps;
     for (uint32_t i=0; i < steps; ++i) {
         for (uint32_t j=0; j < steps; ++j) {
-            mag_e11m52_t wav = 0.5*(1.0 + cos(M_PI*(j + 0.5)/dsteps));
-            mag_e11m52_t x = a + (b - a)*wav, y = (*f)(x);
-            mag_e11m52_t weight = cos(M_PI*(mag_e11m52_t)i*(j + 0.5)/dsteps);
+            mag_E11M52 wav = 0.5*(1.0 + cos(M_PI*(j + 0.5)/dsteps));
+            mag_E11M52 x = a + (b - a)*wav, y = (*f)(x);
+            mag_E11M52 weight = cos(M_PI*(mag_E11M52)i*(j + 0.5)/dsteps);
             r[i] += 2.0*y*weight/dsteps;
         }
     }
-    mag_e11m52_t xmi = 0.0, xma = 0.0;
+    mag_E11M52 xmi = 0.0, xma = 0.0;
     if (linear_l) xmi = (*f)(a) - mag_chebyshev_eval(a, a, b, r, steps);
     if (linear_r) xma = (*f)(b) - mag_chebyshev_eval(b, a, b, r, steps);
     r[0] += 2.0*(xma + xmi)*0.5;
@@ -531,7 +531,7 @@ mag_ComputeDeviceDesc mag_compute_device_desc_cuda(uint32_t cuda_device_id) {
 }
 
 /* Initialize and seed PRNG state. */
-void mag_prng_init(mag_prng_state_t* prng, mag_PRNGAlgo algo, uint64_t seed) {
+void mag_prng_seed(mag_PRNGState* prng, mag_PRNGAlgo algo, uint64_t seed) {
     seed = seed ? seed : 0x853c49e6748fea9bull;
     switch ((prng->algo = algo)) {
         case MAG_PRNG_MERSENNE_TWISTER: { /* Mersenne Twister */
@@ -578,17 +578,17 @@ static void mag_system_host_info_dump(mag_Context* ctx) {
             printf(MAG_CC_CYAN "[magnetron] " MAG_CC_RESET "%s caps: ", cpu_arch);
             for (uint32_t i=0; i < MAG_ARM64_CAP__NUM; ++i)
                 if (ctx->machine.arm64_cpu_caps & (1ull<<i))
-                    printf("%s ", mag_arm64_cap_names[i]);
+                    printf("%s ", mag_arm64_cpu_caps_names[i]);
             putchar('\n');
         }
     #endif
     /* Now print memory information. */
-    mag_e11m52_t mem_total, mem_free, mem_used;
+    mag_E11M52 mem_total, mem_free, mem_used;
     const char* mem_unit_total, *mem_unit_free, *mem_unit_used;
     mag_humanize_memory_size(ctx->machine.phys_mem_total, &mem_total, &mem_unit_total);
     mag_humanize_memory_size(ctx->machine.phys_mem_free, &mem_free, &mem_unit_free);
     mag_humanize_memory_size((size_t)llabs((int64_t)ctx->machine.phys_mem_total-(int64_t)ctx->machine.phys_mem_free), &mem_used, &mem_unit_used);
-    mag_e11m52_t mem_used_percent = fabs((mag_e11m52_t)(ctx->machine.phys_mem_total-ctx->machine.phys_mem_free))/(mag_e11m52_t)ctx->machine.phys_mem_total*100.0;
+    mag_E11M52 mem_used_percent = fabs((mag_E11M52)(ctx->machine.phys_mem_total-ctx->machine.phys_mem_free))/(mag_E11M52)ctx->machine.phys_mem_total*100.0;
     mag_log_info("Physical Machine Memory: %.03f %s, Free: %.03f %s, Used: %.03f %s (%.02f%%)", mem_total, mem_unit_total, mem_free, mem_unit_free, mem_used, mem_unit_used, mem_used_percent);
 }
 
@@ -668,7 +668,7 @@ mag_Context* mag_ctx_create2(const mag_ComputeDeviceDesc* device_info) {
 
     /* Init memory pools */
     mag_fixed_intrusive_pool_init(&ctx->tensor_pool, sizeof(mag_Tensor), __alignof(mag_Tensor), 0x1000);
-    mag_fixed_intrusive_pool_init(&ctx->storage_pool, sizeof(mag_storage_buffer_t), __alignof(mag_storage_buffer_t), 0x1000);
+    mag_fixed_intrusive_pool_init(&ctx->storage_pool, sizeof(mag_IStorageBuffer), __alignof(mag_IStorageBuffer), 0x1000);
 
     ctx->tr_id = mag_thread_id(); /* Get thread ID. */
     ctx->flags |= MAG_CTX_FLAG_GRAD_RECORDER; /* Enable gradient recording by default. */
@@ -770,7 +770,7 @@ void mag_thread_yield(void) {
     #endif
 }
 
-void mag_strstream_init(mag_strstream_t* ss) {
+void mag_strstream_init(mag_StrStream* ss) {
     memset(ss, 0, sizeof(*ss));
     ss->cap = 0x200;
     ss->len = 0;
@@ -778,19 +778,19 @@ void mag_strstream_init(mag_strstream_t* ss) {
     *ss->buf = '\0';
 }
 
-void mag_strstream_free(mag_strstream_t* ss) {
+void mag_strstream_free(mag_StrStream* ss) {
     (*mag_alloc)(ss->buf, 0);
     memset(ss, 0, sizeof(*ss));
 }
 
-void mag_strstream_reserve_more(mag_strstream_t* ss, size_t extra) {
+void mag_strstream_reserve_more(mag_StrStream* ss, size_t extra) {
     size_t want = ss->len+extra+1; /* +1 for terminator */
     if (want <= ss->cap) return;
     while (ss->cap < want) ss->cap <<= 1; /* geometric growth */
     ss->buf = (*mag_alloc)(ss->buf, ss->cap);
 }
 
-void mag_strstream_vappend(mag_strstream_t* ss, const char* fmt, va_list ap0) {
+void mag_strstream_vappend(mag_StrStream* ss, const char* fmt, va_list ap0) {
     va_list ap;
     va_copy(ap, ap0);
     int need = vsnprintf(NULL, 0, fmt, ap);
@@ -807,14 +807,14 @@ void mag_strstream_vappend(mag_strstream_t* ss, const char* fmt, va_list ap0) {
     ss->len += (size_t)need;
 }
 
-void mag_strstream_append(mag_strstream_t* ss, const char* fmt, ...) {
+void mag_strstream_append(mag_StrStream* ss, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
     mag_strstream_vappend(ss, fmt, ap);
     va_end(ap);
 }
 
-void mag_strstream_append_strn(mag_strstream_t* ss, const char* str, size_t len) {
+void mag_strstream_append_strn(mag_StrStream* ss, const char* str, size_t len) {
     if (mag_unlikely(!len)) return;
     mag_strstream_reserve_more(ss, len);
     memcpy(ss->buf + ss->len, str, len);
@@ -822,13 +822,13 @@ void mag_strstream_append_strn(mag_strstream_t* ss, const char* str, size_t len)
     ss->buf[ss->len] = '\0';
 }
 
-void mag_strstream_putc(mag_strstream_t* ss, char c){
+void mag_strstream_putc(mag_StrStream* ss, char c){
     mag_strstream_reserve_more(ss, 1);
     ss->buf[ss->len++] = c;
     ss->buf[ss->len] = '\0';
 }
 
-void mag_strstream_flush(mag_strstream_t* ss, FILE* f) {
+void mag_strstream_flush(mag_StrStream* ss, FILE* f) {
    fputs(ss->buf, f);
 }
 
@@ -840,15 +840,15 @@ const char* const mag_op_param_type_names[MAG_OPP__NUM] = {
 };
 
 /* Allocate a new linear chunk for a fixed pool. */
-static mag_intrusive_chunk* mag_fixed_pool_chunk_new(size_t block_size, size_t block_align, size_t blocks_per_chunk) {
+static mag_PoolChunk* mag_fixed_pool_chunk_new(size_t block_size, size_t block_align, size_t blocks_per_chunk) {
     size_t cap = blocks_per_chunk*block_size;
     uintptr_t size = 0;
-    mag_pincr((void**)&size, sizeof(mag_intrusive_chunk), __alignof(mag_intrusive_chunk));
+    mag_pincr((void**)&size, sizeof(mag_PoolChunk), __alignof(mag_PoolChunk));
     mag_pincr((void**)&size, cap, block_align);
     void* base = (*mag_alloc)(NULL, size), *pos = base;
-    mag_intrusive_chunk* chunk = mag_pincr(&pos, sizeof(mag_intrusive_chunk), __alignof(mag_intrusive_chunk));
+    mag_PoolChunk* chunk = mag_pincr(&pos, sizeof(mag_PoolChunk), __alignof(mag_PoolChunk));
     uint8_t* bot = mag_pincr(&pos, cap, block_align);
-    *chunk = (mag_intrusive_chunk) {
+    *chunk = (mag_PoolChunk) {
         .bot = bot,
         .top = bot+cap,
         .next = NULL
@@ -857,11 +857,11 @@ static mag_intrusive_chunk* mag_fixed_pool_chunk_new(size_t block_size, size_t b
 }
 
 /* Initialize fixed intrusive pool and allocate start chunk. */
-void mag_fixed_intrusive_pool_init(mag_fixed_intrusive_pool* pool, size_t block_size, size_t block_align, size_t blocks_per_chunk) {
+void mag_fixed_intrusive_pool_init(mag_Pool* pool, size_t block_size, size_t block_align, size_t blocks_per_chunk) {
     mag_assert2(blocks_per_chunk);
     block_size = mag_xmax(sizeof(void*), block_size); /* Ensure block size is at least sizeof(void*) to store intrusive free list. */
-    mag_intrusive_chunk* chunk = mag_fixed_pool_chunk_new(block_size, block_align, blocks_per_chunk);
-    *pool = (mag_fixed_intrusive_pool) {
+    mag_PoolChunk* chunk = mag_fixed_pool_chunk_new(block_size, block_align, blocks_per_chunk);
+    *pool = (mag_Pool) {
         .block_size = block_size,
         .block_align = block_align,
         .blocks_per_chunk = blocks_per_chunk,
@@ -876,7 +876,7 @@ void mag_fixed_intrusive_pool_init(mag_fixed_intrusive_pool* pool, size_t block_
 }
 
 /* Allocate a new fixed block from the pool. Memory is uninitialized. */
-void* mag_fixed_intrusive_pool_malloc(mag_fixed_intrusive_pool* pool) {
+void* mag_fixed_intrusive_pool_malloc(mag_Pool* pool) {
     ++pool->num_allocs;
     if (mag_likely(pool->free_list)) { /* 1. Try to pop from free_list (fastest path) */
         ++pool->num_freelist_hits;
@@ -884,7 +884,7 @@ void* mag_fixed_intrusive_pool_malloc(mag_fixed_intrusive_pool* pool) {
         pool->free_list = *(void**)blk; /* Next free block is stored at block [0..sizeof(void*)-1] */
         return blk;
     }
-    mag_intrusive_chunk* chunk = pool->chunk_head;
+    mag_PoolChunk* chunk = pool->chunk_head;
     mag_assert2(chunk);
     uint8_t* top = chunk->top-pool->block_size;
     if (mag_likely(top >= chunk->bot)) {  /* 2. Allocate from the last pool if possible (fast path) */
@@ -893,7 +893,7 @@ void* mag_fixed_intrusive_pool_malloc(mag_fixed_intrusive_pool* pool) {
         return top;
     }
     /* 3. Current chunk is exhausted, allocate new (slow path) */
-    mag_intrusive_chunk* new_chunk = mag_fixed_pool_chunk_new(pool->block_size, pool->block_align, pool->blocks_per_chunk);
+    mag_PoolChunk* new_chunk = mag_fixed_pool_chunk_new(pool->block_size, pool->block_align, pool->blocks_per_chunk);
     chunk->next = new_chunk;
     pool->chunk_head = new_chunk;
     new_chunk->top -= pool->block_size;
@@ -902,16 +902,16 @@ void* mag_fixed_intrusive_pool_malloc(mag_fixed_intrusive_pool* pool) {
 }
 
 /* Free a fixed block back to the pool. This effectively pushes it into the freelist. */
-void mag_fixed_intrusive_pool_free(mag_fixed_intrusive_pool* pool, void* blk) {
+void mag_fixed_intrusive_pool_free(mag_Pool* pool, void* blk) {
     *(void**)blk = pool->free_list;
     pool->free_list = blk;
 }
 
 /* Destroy fixed intrusive pool and free all allocated memory. */
-void mag_fixed_intrusive_pool_destroy(mag_fixed_intrusive_pool* pool) {
-    mag_intrusive_chunk* chunk = pool->chunks;
+void mag_fixed_intrusive_pool_destroy(mag_Pool* pool) {
+    mag_PoolChunk* chunk = pool->chunks;
     while (chunk) {
-        mag_intrusive_chunk* next = chunk->next;
+        mag_PoolChunk* next = chunk->next;
         (*mag_alloc)(chunk, 0);
         chunk = next;
     }
@@ -919,7 +919,7 @@ void mag_fixed_intrusive_pool_destroy(mag_fixed_intrusive_pool* pool) {
 }
 
 /* Print pool information and allocation stats. */
-MAG_COLDPROC void mag_fixed_intrusive_pool_print_info(mag_fixed_intrusive_pool* pool, const char* name) {
+MAG_COLDPROC void mag_fixed_intrusive_pool_print_info(mag_Pool* pool, const char* name) {
     mag_log_info("Fixed Intrusive Pool: %s", name);
     mag_log_info(
         "\tBlock Size: %zu B, Block Align: %zu B, Blocks Per Chunk: %zu B",
@@ -934,7 +934,7 @@ MAG_COLDPROC void mag_fixed_intrusive_pool_print_info(mag_fixed_intrusive_pool* 
         (size_t)pool->num_freelist_hits,
         (size_t)pool->num_pool_hits
     );
-    mag_e11m52_t mem_alloced, pool_mem;
+    mag_E11M52 mem_alloced, pool_mem;
     const char* mem_unit_alloced, *mem_unit_pool;
     mag_humanize_memory_size(pool->num_chunks*pool->blocks_per_chunk*pool->block_size, &mem_alloced, &mem_unit_alloced);
     mag_humanize_memory_size(pool->num_allocs*pool->block_size, &pool_mem, &mem_unit_pool);
@@ -945,7 +945,7 @@ MAG_COLDPROC void mag_fixed_intrusive_pool_print_info(mag_fixed_intrusive_pool* 
 uint32_t mag_pack_color_u8(uint8_t r, uint8_t g, uint8_t b) { return ((uint32_t)r<<16)|((uint32_t)g<<8)|(uint32_t)b; }
 
 /* Pack rgb8 into a 32-bit color and normalize. Alpha channel unused. */
-uint32_t mag_pack_color_f32(mag_e8m23_t r, mag_e8m23_t g, mag_e8m23_t b) {
+uint32_t mag_pack_color_f32(mag_E8M23 r, mag_E8M23 g, mag_E8M23 b) {
     return mag_pack_color_u8((uint8_t)(r*255.f), (uint8_t)(g*255.f), (uint8_t)(b*255.f));
 }
 
@@ -965,13 +965,13 @@ const mag_DTypeMetadata* mag_dtype_meta_of(mag_DType type) {
     static const mag_DTypeMetadata infos[MAG_DTYPE__NUM] = {
         [MAG_DTYPE_E8M23] = {
             .name="e8m23",
-            .size=sizeof(mag_e8m23_t),
-            .align=__alignof__(mag_e8m23_t),
+            .size=sizeof(mag_E8M23),
+            .align=__alignof__(mag_E8M23),
         },
         [MAG_DTYPE_E5M10] = {
             .name="e5m10",
-            .size=sizeof(mag_e5m10_t),
-            .align=__alignof__(mag_e5m10_t),
+            .size=sizeof(mag_E5M10),
+            .align=__alignof__(mag_E5M10),
         },
     };
     return &infos[type];
@@ -1029,8 +1029,8 @@ mag_Tensor* mag_tensor_init_internal(mag_Context* ctx, mag_DType type, int64_t r
     #endif
     ++ctx->num_tensors; /* Increase tensor count in context. */
     /* Allocate device memory */
-    mag_compute_device_t* dvc = ctx->device;
-    void (*allocator)(mag_compute_device_t*, mag_storage_buffer_t**, size_t, mag_DType) = dvc->alloc_storage; /* Get allocator function. */
+    mag_IComputeDevice* dvc = ctx->device;
+    void (*allocator)(mag_IComputeDevice*, mag_IStorageBuffer**, size_t, mag_DType) = dvc->alloc_storage; /* Get allocator function. */
     if (view) { /* Reference memory from view */
         hdr->storage = view->storage;
         mag_rc_control_incref(&view->storage->rc_control); /* Increase reference count of the view's storage. */
@@ -1080,19 +1080,19 @@ mag_Tensor* mag_tensor_empty_scalar(mag_Context* ctx, mag_DType type) {
     return  mag_tensor_empty(ctx, type, 1, (int64_t[1]){1});
 }
 
-mag_Tensor* mag_tensor_scalar(mag_Context* ctx, mag_DType type, mag_e8m23_t value) {
+mag_Tensor* mag_tensor_scalar(mag_Context* ctx, mag_DType type, mag_E8M23 value) {
     mag_Tensor* tensor = mag_tensor_empty_scalar(ctx, type);
     mag_tensor_fill(tensor, value);
     return tensor;
 }
 
-mag_Tensor* mag_tensor_full(mag_Context* ctx, mag_DType type, int64_t rank, const int64_t* shape, mag_e8m23_t value) {
+mag_Tensor* mag_tensor_full(mag_Context* ctx, mag_DType type, int64_t rank, const int64_t* shape, mag_E8M23 value) {
     mag_Tensor* tensor = mag_tensor_empty(ctx, type, rank, shape);
     mag_tensor_fill(tensor, value);
     return tensor;
 }
 
-mag_Tensor* mag_tensor_full_like(mag_Tensor* isomorph, mag_e8m23_t value) {
+mag_Tensor* mag_tensor_full_like(mag_Tensor* isomorph, mag_E8M23 value) {
     mag_Tensor* tensor = mag_tensor_empty_like(isomorph);
     mag_tensor_fill(tensor, value);
     return tensor;
@@ -1184,8 +1184,8 @@ void* mag_tensor_get_raw_data_as_bytes(mag_Tensor* t) {
     size_t size = t->storage->size;
     mag_assert2(size);
     void* dst = (*mag_alloc)(NULL, size); /* TODO: Use dynamic scratch buffer */
-    mag_storage_buffer_t* sto = t->storage;
-    (*sto->transfer)(sto, MAG_TRANSFER_DIR_D2H, MAG_TRANSFER_OP_CPY, 0, dst, size);
+    mag_IStorageBuffer* sto = t->storage;
+    (*sto->transfer)(sto, MAG_TRANSFER_DIR_D2H, MAG_TRANSFER_OP_COPY, 0, dst, size);
     return dst;
 }
 
@@ -1194,16 +1194,16 @@ void mag_tensor_get_raw_data_as_bytes_free(void* ret_val) {
 }
 
 
-mag_e8m23_t* mag_tensor_get_data_as_floats(mag_Tensor* t) {
-    size_t size = t->numel*sizeof(mag_e8m23_t);
+mag_E8M23* mag_tensor_get_data_as_floats(mag_Tensor* t) {
+    size_t size = t->numel*sizeof(mag_E8M23);
     mag_assert2(size);
-    mag_e8m23_t* dst = (*mag_alloc)(NULL, size); /* TODO: Use dynamic scratch buffer */
-    mag_storage_buffer_t* sto = t->storage;
-    (*sto->transfer)(sto, MAG_TRANSFER_DIR_D2H, MAG_TRANSFER_OP_CVT_E8M23, 0, dst, size);
+    mag_E8M23* dst = (*mag_alloc)(NULL, size); /* TODO: Use dynamic scratch buffer */
+    mag_IStorageBuffer* sto = t->storage;
+    (*sto->transfer)(sto, MAG_TRANSFER_DIR_D2H, MAG_TRANSFER_OP_CONVERT_E8M23, 0, dst, size);
     return dst;
 }
 
-void mag_tensor_get_data_as_floats_free(mag_e8m23_t* ret_val) {
+void mag_tensor_get_data_as_floats_free(mag_E8M23* ret_val) {
     (*mag_alloc)(ret_val, 0);
 }
 
@@ -1261,30 +1261,30 @@ void mag_tensor_set_requires_grad(mag_Tensor* t, bool requires_grad) {
     else t->flags &= ~MAG_TFLAG_REQUIRES_GRAD;
 }
 
-typedef struct mag_topo_stack_record_t {
+typedef struct mag_TopoStackRecord {
     mag_Tensor* tensor;
     uint32_t next_child_idx;
-} mag_topo_stack_record_t;
+} mag_TopoStackRecord;
 
-typedef struct mag_tensor_array_t {
+typedef struct mag_TensorCollection {
     mag_Tensor** data;
     size_t size;
     size_t capacity;
-} mag_tensor_array_t;
+} mag_TensorCollection;
 
-static void mag_tensor_array_init(mag_tensor_array_t* arr) {
+static void mag_tensor_array_init(mag_TensorCollection* arr) {
     arr->data = NULL;
     arr->size = 0;
     arr->capacity = 0;
 }
 
-static void mag_tensor_array_free(mag_tensor_array_t* arr) {
+static void mag_tensor_array_free(mag_TensorCollection* arr) {
     (*mag_alloc)(arr->data, 0);
     arr->size = 0;
     arr->capacity = 0;
 }
 
-static void mag_tensor_array_push(mag_tensor_array_t* arr, mag_Tensor* t) {
+static void mag_tensor_array_push(mag_TensorCollection* arr, mag_Tensor* t) {
     if (arr->size == arr->capacity) {
         size_t cap = !arr->capacity ? 16 : arr->capacity<<1;
         arr->data = (*mag_alloc)(arr->data, cap*sizeof(*arr->data));
@@ -1293,9 +1293,9 @@ static void mag_tensor_array_push(mag_tensor_array_t* arr, mag_Tensor* t) {
     arr->data[arr->size++] = t;
 }
 
-static void mag_collect_topo_iterative(mag_Tensor* root, mag_tensor_array_t* out_array) {
+static void mag_collect_topo_iterative(mag_Tensor* root, mag_TensorCollection* out_array) {
     size_t sta_len = 0, sta_cap = 0;
-    mag_topo_stack_record_t* stack = NULL;
+    mag_TopoStackRecord* stack = NULL;
 
     #define mag_sta_push(_t) do { \
         if (sta_len == sta_cap) { \
@@ -1311,10 +1311,10 @@ static void mag_collect_topo_iterative(mag_Tensor* root, mag_tensor_array_t* out
     #define mag_sta_pop() (stack[--sta_len])
 
     if (!(root->flags & MAG_TFLAG_REQUIRES_GRAD)) return;
-    mag_hashset_t visited = mag_hashset_init(8192); // todo dynamic
+    mag_HashSet visited = mag_hashset_init(8192); // todo dynamic
     mag_sta_push(root);
     while (sta_len) { /* Iterative DFS */
-        mag_topo_stack_record_t* top = &stack[sta_len - 1];
+        mag_TopoStackRecord* top = &stack[sta_len - 1];
         mag_Tensor* cur_tensor = top->tensor;
         if (top->next_child_idx < mag_op_meta_of(cur_tensor->op)->input_count) {
             mag_Tensor* child = cur_tensor->op_inputs[top->next_child_idx++];
@@ -1349,7 +1349,7 @@ void mag_tensor_backward(mag_Tensor* root) {
     mag_assert(root->flags & MAG_TFLAG_REQUIRES_GRAD, "Tensor must require grad to back-propagate");
     mag_assert(root->rank == 1 && root->numel == 1, "Tensor must be a scalar to back-propagate");
     mag_ctx_grad_recorder_stop(root->ctx);
-    mag_tensor_array_t post_order;
+    mag_TensorCollection post_order;
     mag_tensor_array_init(&post_order);
     mag_collect_topo_iterative(root, &post_order);
     if (mag_unlikely(!post_order.size)) goto end;
@@ -1358,7 +1358,7 @@ void mag_tensor_backward(mag_Tensor* root) {
     for (size_t id=0; id < post_order.size; ++id) {
         mag_Tensor* child = post_order.data[id];
         mag_assert2(child);
-        const mag_op_meta_t* meta = mag_op_meta_of(child->op);
+        const mag_OPMetadata* meta = mag_op_meta_of(child->op);
         if (!child->grad) {
             mag_Tensor* grad = mag_tensor_full_like(child, 1.0f);
             mag_tensor_patch_grad(child, grad);
@@ -1395,20 +1395,20 @@ void mag_tensor_zero_grad(mag_Tensor* t) {
         mag_tensor_fill(t->grad, 0.0f);
 }
 
-mag_e8m23_t mag_tensor_subscript_get_multi(mag_Tensor* t, int64_t i0, int64_t i1, int64_t i2, int64_t i3, int64_t i4, int64_t i5) {
+mag_E8M23 mag_tensor_subscript_get_multi(mag_Tensor* t, int64_t i0, int64_t i1, int64_t i2, int64_t i3, int64_t i4, int64_t i5) {
     mag_static_assert(MAG_MAX_DIMS == 6);
     mag_load_local_storage_group(t, s, strides);
-    mag_storage_buffer_t* sto = t->storage;
-    mag_e8m23_t val;
-    (*sto->transfer)(sto, MAG_TRANSFER_DIR_D2H, MAG_TRANSFER_OP_CVT_E8M23, sto->granularity*mag_address_dotprod6(i, s), &val, sizeof(val));
+    mag_IStorageBuffer* sto = t->storage;
+    mag_E8M23 val;
+    (*sto->transfer)(sto, MAG_TRANSFER_DIR_D2H, MAG_TRANSFER_OP_CONVERT_E8M23, sto->granularity*mag_address_dotprod6(i, s), &val, sizeof(val));
     return val;
 }
 
-void mag_tensor_subscript_set_multi(mag_Tensor* t, int64_t i0, int64_t i1, int64_t i2, int64_t i3, int64_t i4, int64_t i5, mag_e8m23_t val) {
+void mag_tensor_subscript_set_multi(mag_Tensor* t, int64_t i0, int64_t i1, int64_t i2, int64_t i3, int64_t i4, int64_t i5, mag_E8M23 val) {
     mag_static_assert(MAG_MAX_DIMS == 6);
     mag_load_local_storage_group(t, s, strides);
-    mag_storage_buffer_t* sto = t->storage;
-    (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CVT_E8M23, sto->granularity*mag_address_dotprod6(i, s), &val, sizeof(val));
+    mag_IStorageBuffer* sto = t->storage;
+    (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CONVERT_E8M23, sto->granularity*mag_address_dotprod6(i, s), &val, sizeof(val));
 }
 
 static MAG_AINLINE void mag_tensor_unravel_index(const mag_Tensor* t, int64_t v_idx, int64_t(*p_idx)[MAG_MAX_DIMS]) {
@@ -1422,40 +1422,40 @@ static MAG_AINLINE void mag_tensor_unravel_index(const mag_Tensor* t, int64_t v_
     (*p_idx)[0] =  v_idx - (*p_idx)[5]*d4*d3*d2*d1*d0 - (*p_idx)[4]*d3*d2*d1*d0 - (*p_idx)[3]*d2*d1*d0 - (*p_idx)[2]*d1*d0 - (*p_idx)[1]*d0;
 }
 
-mag_e8m23_t mag_tensor_subscript_get_flattened(mag_Tensor* t, int64_t idx) {
+mag_E8M23 mag_tensor_subscript_get_flattened(mag_Tensor* t, int64_t idx) {
     if (!mag_tensor_is_contiguous(t)) {
         int64_t pidx[MAG_MAX_DIMS];
         mag_tensor_unravel_index(t, idx, &pidx);
         return mag_tensor_subscript_get_multi(t, pidx[0], pidx[1], pidx[2], pidx[3], pidx[4], pidx[5]);
     }
-    mag_storage_buffer_t* sto = t->storage;
-    mag_e8m23_t val;
-    (*sto->transfer)(sto, MAG_TRANSFER_DIR_D2H, MAG_TRANSFER_OP_CVT_E8M23, sto->granularity*idx, &val, sizeof(val));
+    mag_IStorageBuffer* sto = t->storage;
+    mag_E8M23 val;
+    (*sto->transfer)(sto, MAG_TRANSFER_DIR_D2H, MAG_TRANSFER_OP_CONVERT_E8M23, sto->granularity*idx, &val, sizeof(val));
     return val;
 }
 
-void mag_tensor_subscript_set_flattened(mag_Tensor* t, int64_t idx, mag_e8m23_t val) {
+void mag_tensor_subscript_set_flattened(mag_Tensor* t, int64_t idx, mag_E8M23 val) {
     if (!mag_tensor_is_contiguous(t)) {
         int64_t pidx[MAG_MAX_DIMS];
         mag_tensor_unravel_index(t, idx, &pidx);
         mag_tensor_subscript_set_multi(t, pidx[0], pidx[1], pidx[2], pidx[3], pidx[4], pidx[5], val);
         return;
     }
-    mag_storage_buffer_t* sto = t->storage;
-    (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CVT_E8M23, sto->granularity*idx, &val, sizeof(val));
+    mag_IStorageBuffer* sto = t->storage;
+    (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CONVERT_E8M23, sto->granularity*idx, &val, sizeof(val));
 }
 
 void mag_tensor_img_draw_box(mag_Tensor* t, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t wi, uint32_t rgb) {
     mag_assert(t->rank == 3, "Tensor must be 3D image tensor");
     mag_assert2(x2 > x1 && y2 > y1 && x1 > 0 && y1 > 0 && x2 > 0 && y2 > 0);
-    mag_e8m23_t* buf = mag_tensor_get_data_ptr(t);
+    mag_E8M23* buf = mag_tensor_get_data_ptr(t);
     int32_t w = (int32_t)mag_tensor_get_width(t);
     int32_t h = (int32_t)mag_tensor_get_height(t);
     int32_t c = (int32_t)mag_tensor_get_channels(t);
     mag_assert2(w && h && c == 3);
-    mag_e8m23_t r = (mag_e8m23_t)((rgb>>16)&0xff) / 255.0f;
-    mag_e8m23_t g = (mag_e8m23_t)((rgb>>8)&0xff) / 255.0f;
-    mag_e8m23_t b = (mag_e8m23_t)(rgb&0xff) / 255.0f;
+    mag_E8M23 r = (mag_E8M23)((rgb>>16)&0xff) / 255.0f;
+    mag_E8M23 g = (mag_E8M23)((rgb>>8)&0xff) / 255.0f;
+    mag_E8M23 b = (mag_E8M23)(rgb&0xff) / 255.0f;
     wi = mag_xmax(1, wi);
     for (int32_t i=0; i < wi; ++i) {
         int32_t xx1 = x1+i;
@@ -1467,12 +1467,12 @@ void mag_tensor_img_draw_box(mag_Tensor* t, int32_t x1, int32_t y1, int32_t x2, 
         if (mag_unlikely(yy1 >= h)) yy1 = h-1;
         if (mag_unlikely(yy2 >= h)) yy2 = h-1;
         for (int32_t j=xx1; j <= xx2; ++j) {
-            mag_e8m23_t* r1 = buf + j + yy1*w + 0*w*h;
-            mag_e8m23_t* r2 = buf + j + yy2*w + 0*w*h;
-            mag_e8m23_t* g1 = buf + j + yy1*w + 1*w*h;
-            mag_e8m23_t* g2 = buf + j + yy2*w + 1*w*h;
-            mag_e8m23_t* b1 = buf + j + yy1*w + 2*w*h;
-            mag_e8m23_t* b2 = buf + j + yy2*w + 2*w*h;
+            mag_E8M23* r1 = buf + j + yy1*w + 0*w*h;
+            mag_E8M23* r2 = buf + j + yy2*w + 0*w*h;
+            mag_E8M23* g1 = buf + j + yy1*w + 1*w*h;
+            mag_E8M23* g2 = buf + j + yy2*w + 1*w*h;
+            mag_E8M23* b1 = buf + j + yy1*w + 2*w*h;
+            mag_E8M23* b2 = buf + j + yy2*w + 2*w*h;
             mag_bnd_chk(r1, buf, mag_tensor_get_data_size(t));
             mag_bnd_chk(r2, buf, mag_tensor_get_data_size(t));
             mag_bnd_chk(g1, buf, mag_tensor_get_data_size(t));
@@ -1484,12 +1484,12 @@ void mag_tensor_img_draw_box(mag_Tensor* t, int32_t x1, int32_t y1, int32_t x2, 
             *b1 = *b2 = b;
         }
         for (int32_t j = yy1; j <= yy2; ++j) {
-            mag_e8m23_t* r1 = buf + xx1 + j*w + 0*w*h;
-            mag_e8m23_t* r2 = buf + xx2 + j*w + 0*w*h;
-            mag_e8m23_t* g1 = buf + xx1 + j*w + 1*w*h;
-            mag_e8m23_t* g2 = buf + xx2 + j*w + 1*w*h;
-            mag_e8m23_t* b1 = buf + xx1 + j*w + 2*w*h;
-            mag_e8m23_t* b2 = buf + xx2 + j*w + 2*w*h;
+            mag_E8M23* r1 = buf + xx1 + j*w + 0*w*h;
+            mag_E8M23* r2 = buf + xx2 + j*w + 0*w*h;
+            mag_E8M23* g1 = buf + xx1 + j*w + 1*w*h;
+            mag_E8M23* g2 = buf + xx2 + j*w + 1*w*h;
+            mag_E8M23* b1 = buf + xx1 + j*w + 2*w*h;
+            mag_E8M23* b2 = buf + xx2 + j*w + 2*w*h;
             mag_bnd_chk(r1, buf, mag_tensor_get_data_size(t));
             mag_bnd_chk(r2, buf, mag_tensor_get_data_size(t));
             mag_bnd_chk(g1, buf, mag_tensor_get_data_size(t));
@@ -1533,17 +1533,17 @@ void mag_tensor_img_draw_text(mag_Tensor* t, int32_t x, int32_t y, int32_t size,
     mag_assert(t->rank == 3, "Tensor must be a 3D image tensor");
     mag_assert2(x >= 0 && y >= 0 && size >= 8 && txt && *txt);
     mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
-    mag_e8m23_t* buf = (mag_e8m23_t*)t->storage->base;
+    mag_E8M23* buf = (mag_E8M23*)t->storage->base;
     int32_t w = (int32_t)mag_tensor_get_width(t);
     int32_t h = (int32_t)mag_tensor_get_height(t);
     int32_t c = (int32_t)mag_tensor_get_channels(t);
     mag_assert2(w && h && c == 3);
-    mag_e8m23_t* pr = buf;
-    mag_e8m23_t* pg = buf + w*h;
-    mag_e8m23_t* pb = buf + w*h*2;
-    mag_e8m23_t r = (mag_e8m23_t)((rgb>>16)&0xff) / 255.0f;
-    mag_e8m23_t g = (mag_e8m23_t)((rgb>>8)&0xff) / 255.0f;
-    mag_e8m23_t b = (mag_e8m23_t)(rgb&0xff) / 255.0f;
+    mag_E8M23* pr = buf;
+    mag_E8M23* pg = buf + w*h;
+    mag_E8M23* pb = buf + w*h*2;
+    mag_E8M23 r = (mag_E8M23)((rgb>>16)&0xff) / 255.0f;
+    mag_E8M23 g = (mag_E8M23)((rgb>>8)&0xff) / 255.0f;
+    mag_E8M23 b = (mag_E8M23)(rgb&0xff) / 255.0f;
     int32_t ly = y;
     for (int32_t lx = x; *txt; lx = (*txt == '\n' ? x : lx+8), ly = (*txt == '\n' ? ly+14 : ly), txt++) {
         if (mag_unlikely(!isprint(*txt))) continue;
@@ -1563,8 +1563,8 @@ void mag_tensor_img_draw_text(mag_Tensor* t, int32_t x, int32_t y, int32_t size,
 }
 
 static void mag_tensor_fmt_recursive(
-    mag_strstream_t* ss,
-    const mag_e8m23_t* buf,
+    mag_StrStream* ss,
+    const mag_E8M23* buf,
     const int64_t* shape,
     const int64_t* strides,
     int64_t rank,
@@ -1572,7 +1572,7 @@ static void mag_tensor_fmt_recursive(
     int64_t moff
 ) {
     if (depth == rank) /* scalar leaf */ {
-        mag_strstream_append(ss, "%g", (mag_e11m52_t)buf[moff]);
+        mag_strstream_append(ss, "%g", (mag_E11M52)buf[moff]);
         return;
     }
     mag_strstream_putc(ss, '[');
@@ -1594,8 +1594,8 @@ static void mag_tensor_fmt_recursive(
 
 char* mag_tensor_to_string(mag_Tensor* t, bool with_header, size_t from_start_count, size_t from_end_count) {
     if (!from_end_count) from_end_count = UINT64_MAX;
-    mag_e8m23_t* buf = mag_tensor_get_data_as_floats(t); /* Offload data to float CPU buffer */
-    mag_strstream_t ss;
+    mag_E8M23* buf = mag_tensor_get_data_as_floats(t); /* Offload data to float CPU buffer */
+    mag_StrStream ss;
     mag_strstream_init(&ss);
     mag_tensor_fmt_recursive(&ss, buf, t->shape, t->strides, t->rank, 0, 0); /* Recursive format */
     mag_tensor_get_data_as_floats_free(buf);
@@ -2127,7 +2127,7 @@ static void MAG_COLDPROC mag_machine_probe(mag_Context* ctx) {
     if (mag_unlikely(!*ctx->machine.cpu_name)) snprintf(ctx->machine.cpu_name, sizeof(ctx->machine.cpu_name), "Unknown");
 }
 
-static MAG_COLDPROC void mag_graphviz_dump(const mag_Tensor* node, FILE *fp, mag_hashset_t* visited) {
+static MAG_COLDPROC void mag_graphviz_dump(const mag_Tensor* node, FILE *fp, mag_HashSet* visited) {
     if (mag_hashset_contains_key(visited, node)) return;
     mag_hashset_insert(visited, node);
     bool is_input = true;
@@ -2169,7 +2169,7 @@ MAG_COLDPROC void mag_tensor_export_forward_graph_graphviz(mag_Tensor* t, const 
     fprintf(f, "  rankdir=TD;\n");
     fprintf(f, "  node [fontname=\"Helvetica\", shape=box];\n");
     fprintf(f, "  edge [fontname=\"Helvetica\"];\n");
-    mag_hashset_t visited = mag_hashset_init(0xffff);
+    mag_HashSet visited = mag_hashset_init(0xffff);
     mag_graphviz_dump(t, f, &visited);
     mag_hashset_free(&visited);
     fprintf(f, "}\n");
@@ -2177,7 +2177,7 @@ MAG_COLDPROC void mag_tensor_export_forward_graph_graphviz(mag_Tensor* t, const 
 }
 
 MAG_COLDPROC void mag_tensor_export_backward_graph_graphviz(mag_Tensor* t, const char* file) {
-    mag_tensor_array_t post_order;
+    mag_TensorCollection post_order;
     mag_tensor_array_init(&post_order);
     mag_collect_topo_iterative(t, &post_order);
     for (size_t i=0, j=post_order.size - 1; i < j; ++i, --j) {
@@ -2193,7 +2193,7 @@ MAG_COLDPROC void mag_tensor_export_backward_graph_graphviz(mag_Tensor* t, const
     fprintf(fp, "    node [shape=record, style=\"rounded,filled\", fontname=\"Helvetica\"];\n");
     for (size_t i=0; i < post_order.size; ++i) {
         mag_Tensor* node = post_order.data[i];
-        const mag_op_meta_t* meta = mag_op_meta_of(node->op);
+        const mag_OPMetadata* meta = mag_op_meta_of(node->op);
         fprintf(fp, "    \"%p\" [label=\"%s\\nShape: (", node, meta->mnemonic);
         for (int r = 0; r < node->rank; ++r) {
             fprintf(fp, "%zu", (size_t)node->shape[r]);
@@ -2204,7 +2204,7 @@ MAG_COLDPROC void mag_tensor_export_backward_graph_graphviz(mag_Tensor* t, const
     }
     for (size_t i=0; i < post_order.size; ++i) {
         mag_Tensor* node = post_order.data[i];
-        const mag_op_meta_t* meta = mag_op_meta_of(node->op);
+        const mag_OPMetadata* meta = mag_op_meta_of(node->op);
         for (uint32_t j = 0; j < meta->input_count; ++j) {
             mag_Tensor* input = node->op_inputs[j];
             if (input) {
@@ -2355,13 +2355,13 @@ uint32_t mag_crc32c(const void* buffer, size_t size) {
     return ~crc;
 }
 
-typedef struct mag_bucket_t {
+typedef struct mag_Bucket {
     uint64_t hash : 48;
     uint64_t dib : 16;
-} mag_bucket_t;
-mag_static_assert(sizeof(mag_bucket_t) == 8);
+} mag_Bucket;
+mag_static_assert(sizeof(mag_Bucket) == 8);
 
-struct mag_hashmap_t {
+struct mag_HashMap {
     size_t elsize;
     size_t cap;
     uint32_t seed;
@@ -2386,24 +2386,24 @@ struct mag_hashmap_t {
     double load_fac;
 };
 
-void mag_hashmap_set_grow_by_power(mag_hashmap_t* map, size_t pow) {
+void mag_hashmap_set_grow_by_power(mag_HashMap* map, size_t pow) {
     map->growpower = pow < 1 ? 1 : pow > 16 ? 16 : pow;
 }
 static double mag_hashmap_clamp_load_factor(double fac, double def) {
     return isnan(fac) ? def : fac < 0.50 ? 0.50 : fac > 0.95 ? 0.95 : fac;
 }
-void mag_hashmap_set_load_factor(mag_hashmap_t* map, double factor) {
+void mag_hashmap_set_load_factor(mag_HashMap* map, double factor) {
     factor = mag_hashmap_clamp_load_factor(factor, map->loadfactor/100.0);
     map->loadfactor = (uint8_t)(factor*100.0);
     map->growat = (size_t)((double)map->nbuckets*(map->loadfactor/100.0));
 }
-static mag_bucket_t* mag_hashmap_bucket_at0(void* buckets, size_t bucketsz, size_t i) { return (mag_bucket_t*)((char*)buckets + bucketsz*i); }
-static mag_bucket_t* mag_hashmap_bucket_at(mag_hashmap_t* map, size_t index) { return mag_hashmap_bucket_at0(map->buckets, map->bucketsz, index); }
-static void* mag_hashmap_bucket_item(mag_bucket_t* entry) { return (char*)entry+sizeof(mag_bucket_t); }
+static mag_Bucket* mag_hashmap_bucket_at0(void* buckets, size_t bucketsz, size_t i) { return (mag_Bucket*)((char*)buckets + bucketsz*i); }
+static mag_Bucket* mag_hashmap_bucket_at(mag_HashMap* map, size_t index) { return mag_hashmap_bucket_at0(map->buckets, map->bucketsz, index); }
+static void* mag_hashmap_bucket_item(mag_Bucket* entry) { return (char*)entry+sizeof(mag_Bucket); }
 static uint64_t mag_hashmap_clip_hash(uint64_t hash) {return hash & 0xffffffffffff; }
-static uint64_t mag_hashmap_get_hash(mag_hashmap_t* map, const void* key) { return mag_hashmap_clip_hash((*map->hash)(key, map->seed)); }
+static uint64_t mag_hashmap_get_hash(mag_HashMap* map, const void* key) { return mag_hashmap_clip_hash((*map->hash)(key, map->seed)); }
 
-mag_hashmap_t* mag_hashmap_create(
+mag_HashMap* mag_hashmap_create(
     size_t elsize,
     size_t cap,
     uint32_t seed,
@@ -2424,11 +2424,11 @@ mag_hashmap_t* mag_hashmap_create(
         while (ncap < cap) ncap <<= 1;
         cap = ncap;
     }
-    size_t bsz = sizeof(mag_bucket_t)+elsize;
+    size_t bsz = sizeof(mag_Bucket)+elsize;
     for (; bsz&7; ++bsz);
-    size_t sz = sizeof(mag_hashmap_t)+(bsz<<1);
-    mag_hashmap_t* map = (*mag_alloc)(NULL, sz);
-    memset(map, 0, sizeof(mag_hashmap_t));
+    size_t sz = sizeof(mag_HashMap)+(bsz<<1);
+    mag_HashMap* map = (*mag_alloc)(NULL, sz);
+    memset(map, 0, sizeof(mag_HashMap));
     map->elsize = elsize;
     map->bucketsz = bsz;
     map->seed = seed;
@@ -2436,7 +2436,7 @@ mag_hashmap_t* mag_hashmap_create(
     map->cmp = cmp;
     map->elfree = elfree;
     map->ud = ud;
-    map->spare = (char*)map+sizeof(mag_hashmap_t);
+    map->spare = (char*)map+sizeof(mag_HashMap);
     map->edata = (char*)map->spare+bsz;
     map->cap = cap;
     map->nbuckets = cap;
@@ -2453,16 +2453,16 @@ mag_hashmap_t* mag_hashmap_create(
     return map;
 }
 
-static void mag_hashmap_free_elems(mag_hashmap_t* map) {
+static void mag_hashmap_free_elems(mag_HashMap* map) {
     if (map->elfree) {
         for (size_t i=0; i < map->nbuckets; i++) {
-            mag_bucket_t* bucket = mag_hashmap_bucket_at(map, i);
+            mag_Bucket* bucket = mag_hashmap_bucket_at(map, i);
             if (bucket->dib) map->elfree(mag_hashmap_bucket_item(bucket));
         }
     }
 }
 
-void mag_hashmap_clear(mag_hashmap_t* map, bool update_cap) {
+void mag_hashmap_clear(mag_HashMap* map, bool update_cap) {
     map->count = 0;
     mag_hashmap_free_elems(map);
     if (update_cap) {
@@ -2481,8 +2481,8 @@ void mag_hashmap_clear(mag_hashmap_t* map, bool update_cap) {
     map->shrinkat = (size_t)((double)map->nbuckets*map->shrink_fac);
 }
 
-static bool mag_hashmap_resize0(mag_hashmap_t* map, size_t new_cap) {
-    mag_hashmap_t* map2 = mag_hashmap_create(
+static bool mag_hashmap_resize0(mag_HashMap* map, size_t new_cap) {
+    mag_HashMap* map2 = mag_hashmap_create(
         map->elsize,
         new_cap,
         map->seed,
@@ -2495,12 +2495,12 @@ static bool mag_hashmap_resize0(mag_hashmap_t* map, size_t new_cap) {
         map->load_fac
     );
     for (size_t i=0; i < map->nbuckets; i++) {
-        mag_bucket_t* entry = mag_hashmap_bucket_at(map, i);
+        mag_Bucket* entry = mag_hashmap_bucket_at(map, i);
         if (!entry->dib) continue;
         entry->dib = 1;
         size_t j = entry->hash & map2->mask;
         for (;;) {
-            mag_bucket_t* bucket = mag_hashmap_bucket_at(map2, j);
+            mag_Bucket* bucket = mag_hashmap_bucket_at(map2, j);
             if (bucket->dib == 0) {
                 memcpy(bucket, entry, map->bucketsz);
                 break;
@@ -2524,11 +2524,11 @@ static bool mag_hashmap_resize0(mag_hashmap_t* map, size_t new_cap) {
     return true;
 }
 
-static bool mag_hashmap_resize(mag_hashmap_t* map, size_t new_cap) {
+static bool mag_hashmap_resize(mag_HashMap* map, size_t new_cap) {
     return mag_hashmap_resize0(map, new_cap);
 }
 
-const void* mag_hashmap_set_with_hash(mag_hashmap_t* map, const void* item, uint64_t hash) {
+const void* mag_hashmap_set_with_hash(mag_HashMap* map, const void* item, uint64_t hash) {
     hash = mag_hashmap_clip_hash(hash);
     map->oom = false;
     if (map->count >= map->growat) {
@@ -2537,7 +2537,7 @@ const void* mag_hashmap_set_with_hash(mag_hashmap_t* map, const void* item, uint
             return NULL;
         }
     }
-    mag_bucket_t* entry = map->edata;
+    mag_Bucket* entry = map->edata;
     entry->hash = hash;
     entry->dib = 1;
     void* eitem = mag_hashmap_bucket_item(entry);
@@ -2545,7 +2545,7 @@ const void* mag_hashmap_set_with_hash(mag_hashmap_t* map, const void* item, uint
     void* bitem;
     size_t i = entry->hash&map->mask;
     for (;;) {
-        mag_bucket_t* bucket = mag_hashmap_bucket_at(map, i);
+        mag_Bucket* bucket = mag_hashmap_bucket_at(map, i);
         if (bucket->dib == 0) {
             memcpy(bucket, entry, map->bucketsz);
             ++map->count;
@@ -2568,15 +2568,15 @@ const void* mag_hashmap_set_with_hash(mag_hashmap_t* map, const void* item, uint
     }
 }
 
-const void* mag_hashmap_insert(mag_hashmap_t* map, const void* item) {
+const void* mag_hashmap_insert(mag_HashMap* map, const void* item) {
     return mag_hashmap_set_with_hash(map, item, mag_hashmap_get_hash(map, item));
 }
 
-const void* mag_hashmap_get_with_hash(mag_hashmap_t* map, const void* key, uint64_t hash) {
+const void* mag_hashmap_get_with_hash(mag_HashMap* map, const void* key, uint64_t hash) {
     hash = mag_hashmap_clip_hash(hash);
     size_t i = hash&map->mask;
     for (;;) {
-        mag_bucket_t* bucket = mag_hashmap_bucket_at(map, i);
+        mag_Bucket* bucket = mag_hashmap_bucket_at(map, i);
         if (!bucket->dib) return NULL;
         if (bucket->hash == hash) {
             void* bitem = mag_hashmap_bucket_item(bucket);
@@ -2588,22 +2588,22 @@ const void* mag_hashmap_get_with_hash(mag_hashmap_t* map, const void* key, uint6
     }
 }
 
-const void* mag_hashmap_lookup(mag_hashmap_t* map, const void* key) { return mag_hashmap_get_with_hash(map, key, mag_hashmap_get_hash(map, key)); }
-const void* mag_hashmap_probe(mag_hashmap_t* map, uint64_t position) {
+const void* mag_hashmap_lookup(mag_HashMap* map, const void* key) { return mag_hashmap_get_with_hash(map, key, mag_hashmap_get_hash(map, key)); }
+const void* mag_hashmap_probe(mag_HashMap* map, uint64_t position) {
     size_t i = position & map->mask;
-    mag_bucket_t* bucket = mag_hashmap_bucket_at(map, i);
+    mag_Bucket* bucket = mag_hashmap_bucket_at(map, i);
     if (!bucket->dib) {
         return NULL;
     }
     return mag_hashmap_bucket_item(bucket);
 }
 
-const void* mag_hashmap_delete_with_hash(mag_hashmap_t* map, const void* key, uint64_t hash) {
+const void* mag_hashmap_delete_with_hash(mag_HashMap* map, const void* key, uint64_t hash) {
     hash = mag_hashmap_clip_hash(hash);
     map->oom = false;
     size_t i = hash&map->mask;
     for (;;) {
-        mag_bucket_t* bucket = mag_hashmap_bucket_at(map, i);
+        mag_Bucket* bucket = mag_hashmap_bucket_at(map, i);
         if (!bucket->dib) {
             return NULL;
         }
@@ -2612,7 +2612,7 @@ const void* mag_hashmap_delete_with_hash(mag_hashmap_t* map, const void* key, ui
             memcpy(map->spare, bitem, map->elsize);
             bucket->dib = 0;
             for (;;) {
-                mag_bucket_t* prev = bucket;
+                mag_Bucket* prev = bucket;
                 i = (i+1) & map->mask;
                 bucket = mag_hashmap_bucket_at(map, i);
                 if (bucket->dib <= 1) {
@@ -2632,24 +2632,24 @@ const void* mag_hashmap_delete_with_hash(mag_hashmap_t* map, const void* key, ui
     }
 }
 
-const void *mag_hashmap_delete(mag_hashmap_t* map, const void* key) {
+const void *mag_hashmap_delete(mag_HashMap* map, const void* key) {
     return mag_hashmap_delete_with_hash(map, key, mag_hashmap_get_hash(map, key));
 }
 
-size_t mag_hashmap_count(mag_hashmap_t* map) { return map->count; }
+size_t mag_hashmap_count(mag_HashMap* map) { return map->count; }
 
-void mag_hashmap_destroy(mag_hashmap_t* map) {
+void mag_hashmap_destroy(mag_HashMap* map) {
     if (!map) return;
     mag_hashmap_free_elems(map);
     (*mag_alloc)(map->buckets, 0);
     (*mag_alloc)(map, 0);
 }
 
-bool mag_hashmap_is_oom(mag_hashmap_t* map) { return map->oom; }
+bool mag_hashmap_is_oom(mag_HashMap* map) { return map->oom; }
 
-bool mag_hashmap_scan(mag_hashmap_t* map, bool (*iter)(const void* item, void* ud), void* ud) {
+bool mag_hashmap_scan(mag_HashMap* map, bool (*iter)(const void* item, void* ud), void* ud) {
     for (size_t i=0; i < map->nbuckets; i++) {
-        mag_bucket_t* bucket = mag_hashmap_bucket_at(map, i);
+        mag_Bucket* bucket = mag_hashmap_bucket_at(map, i);
         if (bucket->dib && !iter(mag_hashmap_bucket_item(bucket), ud)) {
             return false;
         }
@@ -2657,8 +2657,8 @@ bool mag_hashmap_scan(mag_hashmap_t* map, bool (*iter)(const void* item, void* u
     return true;
 }
 
-bool mag_hashmap_iter(mag_hashmap_t* map, size_t* i, void** item) {
-    mag_bucket_t* bucket;
+bool mag_hashmap_iter(mag_HashMap* map, size_t* i, void** item) {
+    mag_Bucket* bucket;
     do {
         if (*i >= map->nbuckets) return false;
         bucket = mag_hashmap_bucket_at(map, *i);
@@ -2917,8 +2917,8 @@ static bool mag_sto_read_tensor_data(FILE* f, mag_Tensor* t) {
         #if MAG_BE /* Byteswap data if system is big-endian */
             mag_bswap_block_le(data, t->numel, mag_dtype_meta_of(t->dtype)->size);
         #endif
-        mag_storage_buffer_t* sto = t->storage;
-        (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_CPY, 0, data, size);
+        mag_IStorageBuffer* sto = t->storage;
+        (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_COPY, 0, data, size);
         (*mag_alloc)(data, 0);
     }
     long end = ftell(f);
@@ -2928,33 +2928,33 @@ static bool mag_sto_read_tensor_data(FILE* f, mag_Tensor* t) {
 
 mag_static_assert(sizeof(char) == sizeof(uint8_t));
 
-typedef struct mag_sto_tensor_kv_t {
+typedef struct mag_KeyTensorPair {
     const uint8_t* const key;
     const size_t key_len;
     mag_Tensor*  tensor;
-} mag_sto_tensor_kv_t;
+} mag_KeyTensorPair;
 
 static uint64_t mag_sto_tensor_kv_hash(const void* el, uint32_t seed) {
-    mag_sto_tensor_kv_t* kv = (mag_sto_tensor_kv_t*)el;
+    mag_KeyTensorPair* kv = (mag_KeyTensorPair*)el;
     return mag_hash(kv->key, kv->key_len, seed);
 }
 
 static bool mag_sto_tensor_kv_cmp(const void* a, const void* b, void* ud) {
     (void)ud;
-    const mag_sto_tensor_kv_t* kva = (const mag_sto_tensor_kv_t*)a;
-    const mag_sto_tensor_kv_t* kvb = (const mag_sto_tensor_kv_t*)b;
+    const mag_KeyTensorPair* kva = (const mag_KeyTensorPair*)a;
+    const mag_KeyTensorPair* kvb = (const mag_KeyTensorPair*)b;
     return kva->key_len == kvb->key_len && memcmp(kva->key, kvb->key, kva->key_len) == 0;
 }
 
 static void mag_sto_tensor_kv_free(void* el) {
-    mag_sto_tensor_kv_t* kv = (mag_sto_tensor_kv_t*)el;
+    mag_KeyTensorPair* kv = (mag_KeyTensorPair*)el;
     (*mag_alloc)((void*)kv->key, 0);
     mag_tensor_decref(kv->tensor);
 }
 
 struct mag_StorageStream {
     mag_Context* ctx;
-    mag_hashmap_t* tensors;
+    mag_HashMap* tensors;
 };
 
 mag_StorageStream* mag_storage_stream_new(mag_Context* ctx) {
@@ -2962,7 +2962,7 @@ mag_StorageStream* mag_storage_stream_new(mag_Context* ctx) {
     mag_StorageStream* stream = (*mag_alloc)(NULL, sizeof(*stream));
     stream->ctx = ctx;
     stream->tensors = mag_hashmap_create(
-        sizeof(mag_sto_tensor_kv_t),
+        sizeof(mag_KeyTensorPair),
         32,
         MAG_STO_TENSOR_KEY_HASH_SEED,
         &mag_sto_tensor_kv_hash,
@@ -2995,7 +2995,7 @@ bool mag_storage_stream_serialize(mag_StorageStream* st, const char* path) {
     size_t i=0;
     void* el;
     while (mag_hashmap_iter(st->tensors, &i, &el)) { /* Write tensor headers */
-        const mag_sto_tensor_kv_t* bucket = (const mag_sto_tensor_kv_t*)el;
+        const mag_KeyTensorPair* bucket = (const mag_KeyTensorPair*)el;
         mag_Tensor* tensor = bucket->tensor;
         mag_sto_sanitize(
             mag_sto_write_tensor_hdr(f, bucket->key, bucket->key_len, &tensor->shape, &tensor->name, tensor->rank, tensor->dtype),
@@ -3073,7 +3073,7 @@ bool mag_storage_stream_put_tensor(mag_StorageStream* st, const char* key, mag_T
     mag_tensor_incref(t);
     size_t len;
     uint8_t* u8key = mag_utf8_strclone(key, &len);
-    const void* prev = mag_hashmap_insert(st->tensors, &(mag_sto_tensor_kv_t) {
+    const void* prev = mag_hashmap_insert(st->tensors, &(mag_KeyTensorPair) {
         .key = u8key,
         .key_len = len,
         .tensor = t
@@ -3087,12 +3087,12 @@ bool mag_storage_stream_put_tensor(mag_StorageStream* st, const char* key, mag_T
 
 mag_Tensor* mag_storage_stream_get_tensor(mag_StorageStream* st, const char* key) {
     if (mag_unlikely(!key || !*key)) return NULL;
-    const void* el = mag_hashmap_lookup(st->tensors, &(mag_sto_tensor_kv_t) {
+    const void* el = mag_hashmap_lookup(st->tensors, &(mag_KeyTensorPair) {
         .key = (const uint8_t*)key,
         .key_len = strlen(key),
     });
     if (el) {
-        mag_sto_tensor_kv_t* kv = (mag_sto_tensor_kv_t*)el;
+        mag_KeyTensorPair* kv = (mag_KeyTensorPair*)el;
         mag_tensor_incref(kv->tensor);
         return kv->tensor;
     }
@@ -3105,7 +3105,7 @@ const char** mag_storage_stream_get_all_tensor_keys(mag_StorageStream* st, size_
     char** keys = (*mag_alloc)(NULL, (*count+1)*sizeof(*keys));
     size_t j=0;
     for (size_t i=0; mag_hashmap_iter(st->tensors, &i, &el); ++j) {
-        mag_sto_tensor_kv_t* kv = (mag_sto_tensor_kv_t*)el;
+        mag_KeyTensorPair* kv = (mag_KeyTensorPair*)el;
         char* clone = (*mag_alloc)(NULL, kv->key_len+1);
         memcpy(clone, kv->key, kv->key_len);
         clone[kv->key_len] = '\0';
