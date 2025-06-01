@@ -1395,6 +1395,29 @@ void mag_tensor_zero_grad(mag_Tensor* t) {
         mag_tensor_fill(t->grad, 0.0f);
 }
 
+/*
+** Load all 6 elements of a 6-element array into local storage.
+** Used for compute kernels to help the compiler to hold shape and stride values inside registers.
+*/
+#define mag_load_local_storage_group_arr(arr, prefix) \
+    const int64_t prefix##0 = (arr)[0]; \
+    const int64_t prefix##1 = (arr)[1]; \
+    const int64_t prefix##2 = (arr)[2]; \
+    const int64_t prefix##3 = (arr)[3]; \
+    const int64_t prefix##4 = (arr)[4]; \
+    const int64_t prefix##5 = (arr)[5]; \
+    (void)prefix##0; \
+    (void)prefix##1; \
+    (void)prefix##2; \
+    (void)prefix##3; \
+    (void)prefix##4; \
+    (void)prefix##5
+
+#define mag_load_local_storage_group(xk, prefix, var) mag_load_local_storage_group_arr((xk)->var, prefix)
+
+/* Compute dot product of 6 integers. Used to compute offsets in 6-dimensional index space. */
+#define mag_address_dotprod6(x,y) ((x##0*y##0)+(x##1*y##1)+(x##2*y##2)+(x##3*y##3)+(x##4*y##4)+(x##5*y##5))
+
 mag_E8M23 mag_tensor_subscript_get_multi(mag_Tensor* t, int64_t i0, int64_t i1, int64_t i2, int64_t i3, int64_t i4, int64_t i5) {
     mag_static_assert(MAG_MAX_DIMS == 6);
     mag_load_local_storage_group(t, s, strides);

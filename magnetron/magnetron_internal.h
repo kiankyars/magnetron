@@ -1039,18 +1039,18 @@ struct mag_Context {
         int64_t arm64_cpu_sve_width;              /* ARM64 SVE vector register width. */
 #endif
     } machine;
-    size_t num_tensors;                           /* Total tensor instances allocated. */
-    size_t num_storages;                          /* Total storage buffers allocated. */
-    mag_Pool tensor_pool;         /* Tensor struct memory pool. */
-    mag_Pool storage_pool;        /* Storage struct memory pool. */
-    mag_ContextFlags flags;                        /* Context flags. */
-    mag_PRNGAlgo prng_algo;               /* Active PRNG algorithm. */
-    uintptr_t tr_id;                              /* Host thread ID. */
-    size_t sh_len;                                /* Number of shutdown hooks. */
-    size_t sh_cap;                                /* Maximum number of shutdown hooks. */
-    mag_ComputeDeviceType device_type;        /* Active compute device. */
-    mag_IComputeDevice* _Nonnull device;        /* Active compute device. */
-    void* _Nullable ud;                           /* User data. */
+    size_t num_tensors;                         /* Total tensor instances allocated. */
+    size_t num_storages;                        /* Total storage buffers allocated. */
+    mag_Pool tensor_pool;                       /* Tensor struct memory pool. */
+    mag_Pool storage_pool;                      /* Storage struct memory pool. */
+    mag_ContextFlags flags;                     /* Context flags. */
+    mag_PRNGAlgo prng_algo;                     /* Active PRNG algorithm. */
+    uintptr_t tr_id;                            /* Context thread ID. */
+    size_t sh_len;                              /* Number of shutdown hooks. */
+    size_t sh_cap;                              /* Maximum number of shutdown hooks. */
+    mag_ComputeDeviceType device_type;          /* Active compute device type. */
+    mag_IComputeDevice* _Nonnull device;        /* Active compute device interface. */
+    void* _Nullable ud;                         /* User data. */
 #ifdef MAG_DEBUG
     mag_Tensor* _Nullable alive_head;           /* List of alive tensors used for leak detection. */
 #endif
@@ -1073,52 +1073,29 @@ mag_static_assert(MAG_TFLAG_LEN <= 0xff);
 ** A tensor can be a view, which references the storage buffer of another tensor, but views have their own header too.
 */
 struct mag_Tensor {
-    mag_Context* _Nonnull  ctx;                               /* Host context. */
-    mag_RCControlBlock rc_control;                      /* Reference counting control block. */
+    mag_Context* _Nonnull  ctx;                             /* Host context. */
+    mag_RCControlBlock rc_control;                          /* Reference counting control block. */
     int64_t rank;                                           /* Number of active dimensions. [1, MAX_DIMS] */
     int64_t shape[MAG_MAX_DIMS];                            /* Shape of the tensor. */
     int64_t strides[MAG_MAX_DIMS];                          /* Strides of the tensor. We store the strides in element counts and NOT in bytes. */
-    mag_DType dtype;                                      /* Data type of the tensor. */
-    mag_IStorageBuffer* _Nonnull storage;                 /* Storage buffer. */
+    mag_DType dtype;                                        /* Data type of the tensor. */
+    mag_IStorageBuffer* _Nonnull storage;                   /* Storage buffer. */
     int64_t numel;                                          /* Number of elements in the tensor. */
-    mag_TensorFlags flags;                               /* Tensor flags. */
-    mag_Operator op;                                            /* Opcode for operators. */
-    mag_Tensor* _Nullable op_inputs[MAG_MAX_OP_INPUTS];   /* Input tensors for operators. */
-    mag_OPParam op_params[MAG_MAX_OP_PARAMS];            /* Operator parameters. */
-    mag_InitOperator init_op;                                  /* Initialization op */
-    mag_OPParam init_op_params[MAG_MAX_OP_PARAMS];       /* Init operator parameters */
-    mag_Tensor* _Nullable view_uplink;                    /* View base tensor. */
+    mag_TensorFlags flags;                                  /* Tensor flags. */
+    mag_Operator op;                                        /* Opcode for operators. */
+    mag_Tensor* _Nullable op_inputs[MAG_MAX_OP_INPUTS];     /* Input tensors for operators. */
+    mag_OPParam op_params[MAG_MAX_OP_PARAMS];               /* Operator parameters. */
+    mag_InitOperator init_op;                               /* Initialization op */
+    mag_OPParam init_op_params[MAG_MAX_OP_PARAMS];          /* Init operator parameters */
+    mag_Tensor* _Nullable view_uplink;                      /* View base tensor. */
     size_t view_offs;                                       /* Offset in view tensor. */
-    mag_Tensor* _Nullable grad;                           /* ∇f - Gradient tensor. */
+    mag_Tensor* _Nullable grad;                             /* ∇f - Gradient tensor. */
     uint8_t name[MAG_MAX_TENSOR_NAME_LEN];                  /* Tensor debug name. */
     void* _Nullable ud;                                     /* User data. */
 #ifdef MAG_DEBUG
-    mag_Tensor* _Nullable alive_next;                     /* Next alive tensor used for leak detection. */
+    mag_Tensor* _Nullable alive_next;                       /* Next alive tensor used for leak detection. */
 #endif
 };
-
-/*
-** Load all 6 elements of a 6-element array into local storage.
-** Used for compute kernels to help the compiler to hold shape and stride values inside registers.
-*/
-#define mag_load_local_storage_group_arr(arr, prefix) \
-    const int64_t prefix##0 = (arr)[0]; \
-    const int64_t prefix##1 = (arr)[1]; \
-    const int64_t prefix##2 = (arr)[2]; \
-    const int64_t prefix##3 = (arr)[3]; \
-    const int64_t prefix##4 = (arr)[4]; \
-    const int64_t prefix##5 = (arr)[5]; \
-    (void)prefix##0; \
-    (void)prefix##1; \
-    (void)prefix##2; \
-    (void)prefix##3; \
-    (void)prefix##4; \
-    (void)prefix##5
-
-#define mag_load_local_storage_group(xk, prefix, var) mag_load_local_storage_group_arr((xk)->var, prefix)
-
-/* Compute dot product of 6 integers. Used to compute offsets in 6-dimensional index space. */
-#define mag_address_dotprod6(x,y) ((x##0*y##0)+(x##1*y##1)+(x##2*y##2)+(x##3*y##3)+(x##4*y##4)+(x##5*y##5))
 
 /* PRNG state for random number generation. */
 typedef struct mag_PRNGState {
