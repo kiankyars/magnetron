@@ -941,6 +941,28 @@ static MAG_AINLINE void mag_mm_scatter_back_r_e8m23(const mag_E8M23* _Nonnull rb
             pr[mag_offset_rmn(r, b, i, n)] = rbuf[i*N + n];
 }
 
+typedef struct mag_MMScratchBuf {
+    void* _Nonnull p;
+    size_t cap;
+} mag_MMScratchBuf;
+
+#define MAG_MM_SCRATCH_BUG_ALIGN MAG_DESTRUCTIVE_INTERFERENCE_SIZE
+
+static void* _Nonnull mag_mm_scratch_acquire(mag_MMScratchBuf* _Nonnull sb, size_t size) {
+    if (size <= sb->cap) return sb->p; /* We have enough space */
+    void* p = mag_alloc_aligned(size, MAG_MM_SCRATCH_BUG_ALIGN);
+    mag_free_aligned(sb->p);
+    sb->p = p;
+    sb->cap = size;
+    return p;
+}
+
+static void mag_mm_scratch_release(mag_MMScratchBuf* _Nonnull sb) {
+    if (sb->p) mag_free_aligned(sb->p);
+    sb->p = NULL;
+    sb->cap = 0;
+}
+
 static void MAG_HOTPROC mag_blas_matmul_e8m23(const mag_CPUKernelPayload* _Nonnull payload) {
     if (payload->thread_idx != 0) return;
     mag_Tensor* r = payload->node;
@@ -963,9 +985,18 @@ static void MAG_HOTPROC mag_blas_matmul_e8m23(const mag_CPUKernelPayload* _Nonnu
     int64_t by_batch = (y->rank == 3) ? y->shape[0] : 1;
     bool x_row = mag_tensor_is_contiguous(x) && x->strides[x->rank-1] == 1;
     bool r_row = mag_tensor_is_contiguous(r) && (r->rank == 1 || r->strides[r->rank-1] == 1);
-    mag_E8M23* xbuf = x_row ? NULL : (*mag_alloc)(NULL, M*K*sizeof(*xbuf)); /*MK*/
-    mag_E8M23* ybuf = (*mag_alloc)(NULL, K*N*sizeof(*ybuf)); /*KN*/
-    mag_E8M23* rbuf = r_row ? NULL : (*mag_alloc)(NULL, M*N*sizeof(*rbuf)); /*MN*/
+
+    size_t scratch_size = K*N; /* Scratch buffer size. Y panel is mandatory */
+    if (!x_row) scratch_size += M*K;
+    if (!r_row) scratch_size += M*N; /* R panel is optional */
+    scratch_size *= sizeof(mag_E8M23); /* To bytes */
+
+    static __thread mag_MMScratchBuf sb; /* TODO: this is not freed at the moment */
+    mag_E8M23* scratch = mag_mm_scratch_acquire(&sb, scratch_size);
+    mag_E8M23* xbuf = x_row ? NULL : scratch;
+    mag_E8M23* ybuf = scratch + (x_row ? 0 : M*K);
+    mag_E8M23* rbuf = r_row ? NULL : ybuf + K*N;
+
     for (int64_t b=0; b < batch; ++b) {
         int64_t xb = bx_batch == 1 ? 0 : b;
         int64_t yb = by_batch == 1 ? 0 : b;
@@ -981,14 +1012,11 @@ static void MAG_HOTPROC mag_blas_matmul_e8m23(const mag_CPUKernelPayload* _Nonnu
             const mag_E8M23* restrict a_row = A + i*K;
             for (int64_t n=0; n < N; ++n) {
                 const mag_E8M23* restrict b_col = B + n*K; /* a_row and b_col are both contiguous now */
-                C[i*N + n] = mag_vdot_e8m23(K, b_col, a_row); /* SIMD dotprod */
+                C[i*N + n] = mag_vdot_e8m23(K, b_col, a_row); /* SIMD dotprod. TODO: Widen the microkernel (remove register blocking) */
             }
         }
         if (!r_row) mag_mm_scatter_back_r_e8m23(rbuf, pr, r, b, M, N); /* Scatter back R if needed */
     }
-    if (xbuf) (*mag_alloc)(xbuf, 0);
-    if (ybuf) (*mag_alloc)(ybuf, 0);
-    if (mag_alloc) (*mag_alloc)(rbuf, 0);
 }
 
 static void MAG_HOTPROC mag_blas_matmul_e5m10(const mag_CPUKernelPayload* _Nonnull payload) {
