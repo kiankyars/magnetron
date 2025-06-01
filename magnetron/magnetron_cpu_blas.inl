@@ -935,12 +935,6 @@ static MAG_AINLINE mag_E8M23* _Nonnull mag_mm_pack_y_e8m23(mag_E8M23* _Nonnull y
     return ybuf;
 }
 
-static MAG_AINLINE void mag_mm_scatter_back_r_e8m23(const mag_E8M23* _Nonnull rbuf, mag_E8M23* _Nonnull pr, const mag_Tensor* _Nonnull r, int64_t b, int64_t M, int64_t N) {
-    for (int64_t i=0; i < M; ++i)
-        for (int64_t n=0; n < N; ++n)
-            pr[mag_offset_rmn(r, b, i, n)] = rbuf[i*N + n];
-}
-
 typedef struct mag_MMScratchBuf {
     void* _Nonnull p;
     size_t cap;
@@ -984,18 +978,15 @@ static void MAG_HOTPROC mag_blas_matmul_e8m23(const mag_CPUKernelPayload* _Nonnu
     int64_t bx_batch = (x->rank == 3) ? x->shape[0] : 1;
     int64_t by_batch = (y->rank == 3) ? y->shape[0] : 1;
     bool x_row = mag_tensor_is_contiguous(x) && x->strides[x->rank-1] == 1;
-    bool r_row = mag_tensor_is_contiguous(r) && (r->rank == 1 || r->strides[r->rank-1] == 1);
 
     size_t scratch_size = K*N; /* Scratch buffer size. Y panel is mandatory */
     if (!x_row) scratch_size += M*K;
-    if (!r_row) scratch_size += M*N; /* R panel is optional */
     scratch_size *= sizeof(mag_E8M23); /* To bytes */
 
     static __thread mag_MMScratchBuf sb; /* TODO: this is not freed at the moment */
     mag_E8M23* scratch = mag_mm_scratch_acquire(&sb, scratch_size);
     mag_E8M23* xbuf = x_row ? NULL : scratch;
     mag_E8M23* ybuf = scratch + (x_row ? 0 : M*K);
-    mag_E8M23* rbuf = r_row ? NULL : ybuf + K*N;
 
     for (int64_t b=0; b < batch; ++b) {
         int64_t xb = bx_batch == 1 ? 0 : b;
@@ -1006,7 +997,7 @@ static void MAG_HOTPROC mag_blas_matmul_e8m23(const mag_CPUKernelPayload* _Nonnu
         const mag_E8M23* restrict A = px;
         if (!x_row) A = mag_mm_pack_x_e8m23(xbuf, M, N, K, xb, x, px);              /* Pack and broadcast X if needed */
         const mag_E8M23* restrict B = mag_mm_pack_y_e8m23(ybuf, K, N, yb, y, py);   /* Y is always packed to provide contiguous access for the microkernel. ybuf[n*K + k] holds element (k, n) – contiguous per column */
-        mag_E8M23* restrict C = r_row ? pr : rbuf;
+        mag_E8M23* restrict C = pr;
         /* Packed SGEMM */
         for (int64_t i=0; i < M; ++i) {
             const mag_E8M23* restrict a_row = A + i*K;
@@ -1015,7 +1006,6 @@ static void MAG_HOTPROC mag_blas_matmul_e8m23(const mag_CPUKernelPayload* _Nonnu
                 C[i*N + n] = mag_vdot_e8m23(K, b_col, a_row); /* SIMD dotprod. TODO: Widen the microkernel (remove register blocking) */
             }
         }
-        if (!r_row) mag_mm_scatter_back_r_e8m23(rbuf, pr, r, b, M, N); /* Scatter back R if needed */
     }
 }
 
