@@ -26,14 +26,10 @@ extern "C" {
 #define MAG_MAX_OP_PARAMS 8                 /* Maximum number of parameters for an operation */
 
 #ifndef MAG_EXPORT
-#ifdef MAG_SHARED
 #ifdef _MSC_VER
 #define MAG_EXPORT __declspec(dllexport)
 #else
 #define MAG_EXPORT __attribute__((visibility("default")))
-#endif
-#else
-#define MAG_EXPORT
 #endif
 #endif
 #ifndef __clang__

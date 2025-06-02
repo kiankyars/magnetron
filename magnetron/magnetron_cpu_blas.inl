@@ -910,7 +910,7 @@ static MAG_AINLINE mag_E8M23* _Nonnull mag_mm_pack_x_e8m23(mag_E8M23* _Nonnull x
     for (int64_t i=0; i < M; ++i) {
         for (int64_t k=0; k < K; ++k) {
             size_t j = mag_offset_rmn(x, xb, i, k);
-            mag_bnd_chk(px+j, bx, mag_tensor_get_data_size(x));
+            mag_bnd_chk(px+j, px, mag_tensor_get_data_size(x));
             mag_bnd_chk(xbuf + i*K + k, xbuf, M*K*sizeof(*xbuf));
             xbuf[i*K + k] = px[j];
         }
@@ -945,7 +945,7 @@ typedef struct mag_MMScratchBuf {
 static void* _Nonnull mag_mm_scratch_acquire(mag_MMScratchBuf* _Nonnull sb, size_t size) {
     if (size <= sb->cap) return sb->p; /* We have enough space */
     void* p = mag_alloc_aligned(size, MAG_MM_SCRATCH_BUG_ALIGN);
-    mag_free_aligned(sb->p);
+    if (sb->p) mag_free_aligned(sb->p);
     sb->p = p;
     sb->cap = size;
     return p;
@@ -979,9 +979,7 @@ static void MAG_HOTPROC mag_blas_matmul_e8m23(const mag_CPUKernelPayload* _Nonnu
     int64_t by_batch = (y->rank == 3) ? y->shape[0] : 1;
     bool x_row = mag_tensor_is_contiguous(x) && x->strides[x->rank-1] == 1;
 
-    size_t scratch_size = K*N; /* Scratch buffer size. Y panel is mandatory */
-    if (!x_row) scratch_size += M*K;
-    scratch_size *= sizeof(mag_E8M23); /* To bytes */
+    size_t scratch_size = sizeof(mag_E8M23)*(K*N + (x_row ? 0 : M*K)); /* Scratch buffer size. X panel is optional, Y panel is mandatory */
 
     static __thread mag_MMScratchBuf sb; /* TODO: this is not freed at the moment */
     mag_E8M23* scratch = mag_mm_scratch_acquire(&sb, scratch_size);

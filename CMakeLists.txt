@@ -11,7 +11,6 @@ set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}")
 set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}")
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-option(MAGNETRON_BUILD_SHARED "Build shared library" ON)                        # Build shared library
 option(MAGNETRON_BUILD_TESTS "Build tests" ON)                                  # Build tests
 option(MAGNETRON_BUILD_BENCHMARKS "Build benchmarks" ON)                        # Build benchmarks
 option(MAGNETRON_BUILD_FUZZERS "Build fuzzers" OFF)                             # (Experimental) Build fuzzers
@@ -59,7 +58,4 @@ endif()
 
 message(STATUS "C Compiler: ${CMAKE_C_COMPILER}")
 message(STATUS "C++ Compiler: ${CMAKE_CXX_COMPILER}")
-get_target_property(MAIN_CFLAGS magnetron COMPILE_OPTIONS)
-message(STATUS "Compilation flags: ${MAIN_CFLAGS}")
-
 message(STATUS "Configuring magnetron project for ${CMAKE_SYSTEM_PROCESSOR}... done")

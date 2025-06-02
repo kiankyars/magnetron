@@ -69,53 +69,58 @@ set(MAG_GCC_RELEASE_COMPILE_FLAGS
 set(MAG_GCC_LINK_OPTIONS "")
 set(MAG_GCC_RELEASE_LINK_OPTIONS -flto=auto)
 
-if (${IS_ARM64})
-    if (NOT WIN32)
-        add_compile_options(-moutline-atomics)
-    endif()
-    set(MAG_CLANG_COMPILE_FLAGS ${MAG_CLANG_COMPILE_FLAGS} -march=armv8-a -moutline-atomics) # See beginning for file for info of -moutline-atomics
-    set(MAG_GCC_COMPILE_FLAGS ${MAG_CLANG_COMPILE_FLAGS} -march=armv8-a -moutline-atomics)
-elseif (${IS_AMD64})
-    set(MAG_CLANG_COMPILE_FLAGS ${MAG_CLANG_COMPILE_FLAGS} -msse -msse2)
-    set(MAG_GCC_COMPILE_FLAGS ${MAG_CLANG_COMPILE_FLAGS} -msse -msse2)
-endif()
-
-if (WIN32) # Windows (MSVC) specific config
-    target_compile_options(magnetron PRIVATE ${MAG_MSVC_COMPILE_FLAGS})
-    target_link_options(magnetron PRIVATE ${MAG_MSVC_LINK_OPTIONS})
-    if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")     # Enable optimizations for release builds
-        message(STATUS "! Generating optimized MAGNETRON release build")
-        target_compile_options(magnetron PRIVATE ${MAG_MSVC_RELEASE_COMPILE_FLAGS})
-        target_link_options(magnetron PRIVATE ${MAG_MSVC_RELEASE_LINK_OPTIONS})
-    endif()
-else() # GCC/Clang specific config
-    target_link_libraries(magnetron m) # link math library
-    if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
-        target_compile_options(magnetron PRIVATE ${MAG_GCC_COMPILE_FLAGS})
-        target_link_options(magnetron PRIVATE ${MAG_GCC_LINK_OPTIONS})
-    else()
-        target_compile_options(magnetron PRIVATE ${MAG_CLANG_COMPILE_FLAGS})
-        target_link_options(magnetron PRIVATE ${MAG_CLANG_LINK_OPTIONS})
+function(configure_mag_lib target_name)
+   if(${IS_ARM64})
+        if (NOT WIN32)
+            add_compile_options(-moutline-atomics)
+        endif()
+        set(MAG_CLANG_COMPILE_FLAGS ${MAG_CLANG_COMPILE_FLAGS} -march=armv8-a -moutline-atomics) # See beginning for file for info of -moutline-atomics
+        set(MAG_GCC_COMPILE_FLAGS ${MAG_CLANG_COMPILE_FLAGS} -march=armv8-a -moutline-atomics)
+    elseif (${IS_AMD64})
+        set(MAG_CLANG_COMPILE_FLAGS ${MAG_CLANG_COMPILE_FLAGS} -msse -msse2)
+        set(MAG_GCC_COMPILE_FLAGS ${MAG_CLANG_COMPILE_FLAGS} -msse -msse2)
     endif()
 
-    if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")     # Enable optimizations only for release builds
-        message(STATUS "! Generating optimized MAGNETRON release build")
+    if(WIN32) # Windows (MSVC) specific config
+        target_compile_options(${target_name} PRIVATE ${MAG_MSVC_COMPILE_FLAGS})
+        target_link_options(${target_name} PRIVATE ${MAG_MSVC_LINK_OPTIONS})
+        if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")     # Enable optimizations for release builds
+            message(STATUS "! Generating optimized MAGNETRON release build")
+            target_compile_options(${target_name} PRIVATE ${MAG_MSVC_RELEASE_COMPILE_FLAGS})
+            target_link_options(${target_name} PRIVATE ${MAG_MSVC_RELEASE_LINK_OPTIONS})
+        endif()
+    else() # GCC/Clang specific config
+        target_link_libraries(${target_name} m) # link math library
         if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
-            target_compile_options(magnetron PRIVATE ${MAG_GCC_RELEASE_COMPILE_FLAGS})
-            target_link_options(magnetron PRIVATE ${MAG_GCC_RELEASE_LINK_OPTIONS})
+            target_compile_options(${target_name} PRIVATE ${MAG_GCC_COMPILE_FLAGS})
+            target_link_options(${target_name} PRIVATE ${MAG_GCC_LINK_OPTIONS})
         else()
-            target_compile_options(magnetron PRIVATE ${MAG_CLANG_RELEASE_COMPILE_FLAGS})
-            target_link_options(magnetron PRIVATE ${MAG_CLANG_RELEASE_LINK_OPTIONS})
+            target_compile_options(${target_name} PRIVATE ${MAG_CLANG_COMPILE_FLAGS})
+            target_link_options(${target_name} PRIVATE ${MAG_CLANG_LINK_OPTIONS})
+        endif()
+
+        if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")     # Enable optimizations only for release builds
+            message(STATUS "Enabling release build optimizations for ${target_name}")
+            if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+                target_compile_options(${target_name} PRIVATE ${MAG_GCC_RELEASE_COMPILE_FLAGS})
+                target_link_options(${target_name} PRIVATE ${MAG_GCC_RELEASE_LINK_OPTIONS})
+            else()
+                target_compile_options(${target_name} PRIVATE ${MAG_CLANG_RELEASE_COMPILE_FLAGS})
+                target_link_options(${target_name} PRIVATE ${MAG_CLANG_RELEASE_LINK_OPTIONS})
+            endif()
+        endif()
+
+        if (${MAGNETRON_CPU_APPROX_MATH})
+            target_compile_definitions(${target_name} PRIVATE MAG_APPROXMATH)
+        endif()
+        if (${MAGNETRON_DEBUG})
+            target_compile_definitions(${target_name} PRIVATE MAG_DEBUG)
         endif()
     endif()
 
-    if (${MAGNETRON_BUILD_SHARED})
-        target_compile_definitions(magnetron PRIVATE MAG_SHARED)
-    endif()
-    if (${MAGNETRON_CPU_APPROX_MATH})
-        target_compile_definitions(magnetron PRIVATE MAG_APPROXMATH)
-    endif()
-    if (${MAGNETRON_DEBUG})
-        target_compile_definitions(magnetron PRIVATE MAG_DEBUG)
-    endif()
-endif()
+    get_target_property(MAIN_CFLAGS ${target_name} COMPILE_OPTIONS)
+    message(STATUS "${target_name} target flags: ${MAIN_CFLAGS}")
+endfunction()
+
+configure_mag_lib(magnetron)
+configure_mag_lib(magnetron-static)

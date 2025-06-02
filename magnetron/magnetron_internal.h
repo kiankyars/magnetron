@@ -362,8 +362,8 @@ static uint64_t MAG_AINLINE mag_bswap64(uint64_t x) {
 
 #define MAG_FMT_DIM_BUF_SIZE ((21+4)*MAG_MAX_DIMS)
 
-extern MAG_NORET MAG_COLDPROC MAG_EXPORT void mag_panic(const char* _Nonnull msg, ...); /* Print error message and abort. */
-extern MAG_EXPORT bool mag_log_enabled; /* Enable/disable logging to stdout/stderr. */
+extern MAG_NORET MAG_COLDPROC void mag_panic(const char* _Nonnull msg, ...); /* Print error message and abort. */
+extern bool mag_log_enabled; /* Enable/disable logging to stdout/stderr. */
 
 extern void MAG_COLDPROC mag_print_separator(FILE* _Nonnull f); /* Print a separator line. */
 extern void mag_fmt_shape(char (*_Nonnull buf)[MAG_FMT_DIM_BUF_SIZE], const int64_t (*_Nonnull dims)[MAG_MAX_DIMS], int64_t rank);
@@ -378,14 +378,14 @@ extern void mag_fmt_shape(char (*_Nonnull buf)[MAG_FMT_DIM_BUF_SIZE], const int6
 ** (*mag_alloc)(ptr, size) <=> realloc(ptr, size)       <- Passing non-NULL pointer as reallocation base and size != 0 => reallocation.
 ** (*mag_alloc)(ptr, 0) <=> free(ptr)                   <- Passing NULL as reallocation base and size == 0 => free.
 */
-extern MAG_EXPORT void* _Nonnull (*_Nonnull mag_alloc)(void* _Nullable blk, size_t size);
+extern void* _Nonnull (*_Nonnull mag_alloc)(void* _Nullable blk, size_t size);
 
-extern MAG_EXPORT void* _Nonnull mag_alloc_aligned(size_t size, size_t align); /* Aligned allocator function. */
-extern MAG_EXPORT void mag_free_aligned(void* _Nonnull blk); /* Free aligned memory. */
+extern void* _Nonnull mag_alloc_aligned(size_t size, size_t align); /* Aligned allocator function. */
+extern void mag_free_aligned(void* _Nonnull blk); /* Free aligned memory. */
 
 /* Humanize memory size. Format and convert a memory size to the appropriate unit. For example. 1024 => 1 KiB */
-extern MAG_EXPORT void mag_humanize_memory_size(size_t n, mag_E11M52* _Nonnull out, const char* _Nonnull* _Nonnull unit);
-extern MAG_EXPORT uintptr_t mag_thread_id(void); /* Get current native thread ID. */
+extern void mag_humanize_memory_size(size_t n, mag_E11M52* _Nonnull out, const char* _Nonnull* _Nonnull unit);
+extern uintptr_t mag_thread_id(void); /* Get current native thread ID. */
 
 #define mag_swap(T, a, b) do { T tmp = (a); (a) = (b); (b) = tmp; } while (0)
 #define mag_xmax(x, y) (((x) > (y)) ? (x) : (y))
@@ -553,9 +553,9 @@ typedef pthread_cond_t mag_CondVar;
 
 #endif
 
-extern MAG_EXPORT void mag_thread_set_prio(mag_ThreadPrio prio); /* Set thread scheduling priority of current thread. */
-extern MAG_EXPORT void mag_thread_set_name(const char* _Nonnull name); /* Set thread name. */
-extern MAG_EXPORT void mag_thread_yield(void); /* Yield current thread. */
+extern void mag_thread_set_prio(mag_ThreadPrio prio); /* Set thread scheduling priority of current thread. */
+extern void mag_thread_set_name(const char* _Nonnull name); /* Set thread name. */
+extern void mag_thread_yield(void); /* Yield current thread. */
 
 /* Dynamic zero-terminated string buffer. */
 typedef struct mag_StrStream {
@@ -806,7 +806,7 @@ typedef struct mag_OPMetadata {
     } cpu; /* CPU specific metadata. */
 } mag_OPMetadata;
 
-extern MAG_EXPORT const mag_OPMetadata* _Nonnull mag_op_meta_of(mag_Operator opc); /* Get operation metadata for a specific opcode. */
+extern const mag_OPMetadata* _Nonnull mag_op_meta_of(mag_Operator opc); /* Get operation metadata for a specific opcode. */
 
 /* Header for all objects that are reference counted. */
 typedef struct mag_RCControlBlock {
@@ -859,11 +859,11 @@ typedef struct mag_Pool {
     uint64_t num_allocs;                 /* Number of total allocations */
 } mag_Pool;
 
-extern MAG_EXPORT void mag_fixed_intrusive_pool_init(mag_Pool* _Nonnull pool, size_t block_size, size_t block_align, size_t blocks_per_chunk);
-extern MAG_EXPORT void* _Nonnull mag_fixed_intrusive_pool_malloc(mag_Pool* _Nonnull pool);
-extern MAG_EXPORT void mag_fixed_intrusive_pool_free(mag_Pool* _Nonnull pool, void* _Nonnull blk);
-extern MAG_EXPORT void mag_fixed_intrusive_pool_destroy(mag_Pool* _Nonnull pool);
-extern MAG_EXPORT void mag_fixed_intrusive_pool_print_info(mag_Pool* _Nonnull pool, const char* _Nonnull name);
+extern void mag_fixed_intrusive_pool_init(mag_Pool* _Nonnull pool, size_t block_size, size_t block_align, size_t blocks_per_chunk);
+extern void* _Nonnull mag_fixed_intrusive_pool_malloc(mag_Pool* _Nonnull pool);
+extern void mag_fixed_intrusive_pool_free(mag_Pool* _Nonnull pool, void* _Nonnull blk);
+extern void mag_fixed_intrusive_pool_destroy(mag_Pool* _Nonnull pool);
+extern void mag_fixed_intrusive_pool_print_info(mag_Pool* _Nonnull pool, const char* _Nonnull name);
 
 /* Device interface to any compute backend device (CPU, GPU, TPU etc..) */
 typedef struct mag_IComputeDevice mag_IComputeDevice;
@@ -1142,8 +1142,8 @@ static inline void mag_hash_combine(uint32_t* _Nonnull seed, uint32_t value) {
     *seed ^= value + 0x9e3779b9 + (*seed<<6) + (*seed>>2);
 }
 
-extern MAG_EXPORT uint64_t mag_hash(const void* _Nonnull key, size_t len, uint32_t seed); /* Compute murmur3_64 hash */
-extern MAG_EXPORT uint32_t mag_crc32c(const void* _Nonnull buffer, size_t size); /* Compute CRC32 checksum with CRC32c polynomial. */
+extern uint64_t mag_hash(const void* _Nonnull key, size_t len, uint32_t seed); /* Compute murmur3_64 hash */
+extern uint32_t mag_crc32c(const void* _Nonnull buffer, size_t size); /* Compute CRC32 checksum with CRC32c polynomial. */
 
 #define MAG_DEF_MAP_GROW_FACTOR 0.6 /* 60% - Default grow factor. */
 #define MAG_DEF_MAP_SHRINK_FACTOR 0.1 /* 10% - Default shrink factor. */
@@ -1156,7 +1156,7 @@ extern MAG_EXPORT uint32_t mag_crc32c(const void* _Nonnull buffer, size_t size);
 typedef struct mag_HashMap mag_HashMap;
 
 /* Create a new hashmap. */
-extern MAG_EXPORT mag_HashMap* _Nonnull mag_hashmap_create(
+extern mag_HashMap* _Nonnull mag_hashmap_create(
     size_t elsize,
     size_t cap,
     uint32_t seed,
@@ -1169,21 +1169,21 @@ extern MAG_EXPORT mag_HashMap* _Nonnull mag_hashmap_create(
     double load_fac
 );
 
-extern MAG_EXPORT void mag_hashmap_destroy(mag_HashMap* _Nonnull map);
-extern MAG_EXPORT void mag_hashmap_clear(mag_HashMap* _Nonnull map, bool update_cap);
-extern MAG_EXPORT size_t mag_hashmap_count(mag_HashMap* _Nonnull map);
-extern MAG_EXPORT bool mag_hashmap_is_oom(mag_HashMap* _Nonnull map);
-extern MAG_EXPORT const void* _Nullable mag_hashmap_lookup(mag_HashMap* _Nonnull map, const void* _Nonnull item);
-extern MAG_EXPORT const void* _Nullable mag_hashmap_insert(mag_HashMap* _Nonnull map, const void* _Nonnull item);
-extern MAG_EXPORT const void* _Nullable mag_hashmap_delete(mag_HashMap* _Nonnull map, const void* _Nonnull item);
-extern MAG_EXPORT const void* _Nullable mag_hashmap_probe(mag_HashMap* _Nonnull map, uint64_t position);
-extern MAG_EXPORT bool mag_hashmap_scan(mag_HashMap* _Nonnull map, bool (*_Nonnull iter)(const void* _Nonnull item, void* _Nullable ud), void* _Nullable ud);
-extern MAG_EXPORT bool mag_hashmap_iter(mag_HashMap* _Nonnull map, size_t* _Nonnull i, void* _Nonnull* _Nonnull item);
-extern MAG_EXPORT const void* _Nullable mag_hashmap_get_with_hash(mag_HashMap* _Nonnull map, const void* _Nonnull key, uint64_t hash);
-extern MAG_EXPORT const void* _Nullable mag_hashmap_delete_with_hash(mag_HashMap* _Nonnull map, const void* _Nonnull key, uint64_t hash);
-extern MAG_EXPORT const void* _Nullable mag_hashmap_set_with_hash(mag_HashMap* _Nonnull map, const void* _Nonnull item, uint64_t hash);
-extern MAG_EXPORT void mag_hashmap_set_grow_by_power(mag_HashMap* _Nonnull map, size_t pow);
-extern MAG_EXPORT void mag_hashmap_set_load_factor(mag_HashMap* _Nonnull map, double load_factor);
+extern void mag_hashmap_destroy(mag_HashMap* _Nonnull map);
+extern void mag_hashmap_clear(mag_HashMap* _Nonnull map, bool update_cap);
+extern size_t mag_hashmap_count(mag_HashMap* _Nonnull map);
+extern bool mag_hashmap_is_oom(mag_HashMap* _Nonnull map);
+extern const void* _Nullable mag_hashmap_lookup(mag_HashMap* _Nonnull map, const void* _Nonnull item);
+extern const void* _Nullable mag_hashmap_insert(mag_HashMap* _Nonnull map, const void* _Nonnull item);
+extern const void* _Nullable mag_hashmap_delete(mag_HashMap* _Nonnull map, const void* _Nonnull item);
+extern const void* _Nullable mag_hashmap_probe(mag_HashMap* _Nonnull map, uint64_t position);
+extern bool mag_hashmap_scan(mag_HashMap* _Nonnull map, bool (*_Nonnull iter)(const void* _Nonnull item, void* _Nullable ud), void* _Nullable ud);
+extern bool mag_hashmap_iter(mag_HashMap* _Nonnull map, size_t* _Nonnull i, void* _Nonnull* _Nonnull item);
+extern const void* _Nullable mag_hashmap_get_with_hash(mag_HashMap* _Nonnull map, const void* _Nonnull key, uint64_t hash);
+extern const void* _Nullable mag_hashmap_delete_with_hash(mag_HashMap* _Nonnull map, const void* _Nonnull key, uint64_t hash);
+extern const void* _Nullable mag_hashmap_set_with_hash(mag_HashMap* _Nonnull map, const void* _Nonnull item, uint64_t hash);
+extern void mag_hashmap_set_grow_by_power(mag_HashMap* _Nonnull map, size_t pow);
+extern void mag_hashmap_set_load_factor(mag_HashMap* _Nonnull map, double load_factor);
 
 #ifdef __cplusplus
 }

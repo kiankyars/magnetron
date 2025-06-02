@@ -14,11 +14,10 @@ set(MAGNETRON_SOURCES
 
 include(cmake/blas_tune.cmake)
 
-if (${MAGNETRON_BUILD_SHARED})
-    add_library(magnetron SHARED ${MAGNETRON_SOURCES})
-else()
-    add_library(magnetron STATIC ${MAGNETRON_SOURCES})
-endif()
+add_library(magnetron SHARED ${MAGNETRON_SOURCES})
+add_library(magnetron-static STATIC ${MAGNETRON_SOURCES})
 
 target_include_directories(magnetron PUBLIC include)
 target_include_directories(magnetron PRIVATE extern)
+target_include_directories(magnetron-static PUBLIC include)
+target_include_directories(magnetron-static PRIVATE extern)
