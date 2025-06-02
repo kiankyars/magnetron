@@ -2,7 +2,7 @@
 
 from benchmarks.bench import *
 
-DIM_LIM: int = 512
+DIM_LIM: int = 1024
 STEP: int = 32
 
 bench_square_bin_ops(dim_lim=DIM_LIM, step=STEP)
