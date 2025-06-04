@@ -976,6 +976,31 @@ mag_Tensor* mag_repeat_back(mag_Tensor* x, mag_Tensor* y) {
     return mag_tensor_operator(x->ctx, MAG_OP_REPEAT_BACK, false, (mag_Tensor*[]){x, y}, 2, NULL, 0, MAG_STAGE_EVAL);
 }
 
+mag_Tensor* mag_and(mag_Tensor* x, mag_Tensor* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_AND, false, (mag_Tensor*[]){x, y}, 2, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_Tensor* mag_and_(mag_Tensor* x, mag_Tensor* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_AND, true, (mag_Tensor*[]){x, y}, 2, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_Tensor* mag_or(mag_Tensor* x, mag_Tensor* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_OR, false, (mag_Tensor*[]){x, y}, 2, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_Tensor* mag_or_(mag_Tensor* x, mag_Tensor* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_OR, true, (mag_Tensor*[]){x, y}, 2, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_Tensor* mag_xor(mag_Tensor* x, mag_Tensor* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_XOR, false, (mag_Tensor*[]){x, y}, 2, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_Tensor* mag_xor_(mag_Tensor* x, mag_Tensor* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_XOR, true, (mag_Tensor*[]){x, y}, 2, NULL, 0, MAG_STAGE_EVAL);
+}
+
+
 void mag_tensor_fill_from_floats(mag_Tensor* t, const mag_E8M23* data, size_t len) {
     mag_assert(data && len, "invalid data pointer or length");
     mag_IStorageBuffer* sto = t->storage;
@@ -1927,7 +1952,76 @@ const mag_OPMetadata* mag_op_meta_of(mag_Operator opc) {
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_repeat_back,
             .validator = mag_validate_op_repeat_rev
-        }
+        },
+        [MAG_OP_AND] = {
+            .mnemonic = "and",
+            .desc = "𝑥 ∧ 𝑦",
+            .input_count = 2,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
+            .backward = NULL,
+            .r_alloc = &mag_result_constructor_routine_isomorph,
+            .validator = &mag_validate_op_binary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
+        },
+        [MAG_OP_OR] = {
+            .mnemonic = "or",
+            .desc = "𝑥 ∨ 𝑦",
+            .input_count = 2,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
+            .backward = NULL,
+            .r_alloc = &mag_result_constructor_routine_isomorph,
+            .validator = &mag_validate_op_binary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
+        },
+        [MAG_OP_XOR] = {
+            .mnemonic = "xor",
+            .desc = "𝑥 ⊕ 𝑦",
+            .input_count = 2,
+            .op_param_layout = {
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+                {.type=MAG_OPP_NONE, .is_required=false},
+            },
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
+            .backward = NULL,
+            .r_alloc = &mag_result_constructor_routine_isomorph,
+            .validator = &mag_validate_op_binary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
+        },
     };
     return infos+opc;
 }

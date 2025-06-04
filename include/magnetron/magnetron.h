@@ -161,6 +161,7 @@ typedef struct mag_Tensor mag_Tensor;
 typedef enum mag_DType {
     MAG_DTYPE_E8M23,        /* IEEE-754 32-bit floating point number */
     MAG_DTYPE_E5M10,        /* IEEE-754 16-bit floating point number */
+    MAG_DTYPE_BOOL,         /* 1-byte boolean */
 
     MAG_DTYPE__NUM
 } mag_DType;
@@ -267,12 +268,18 @@ extern MAG_EXPORT mag_Tensor* _Nonnull mag_div(mag_Tensor* _Nonnull x, mag_Tenso
 extern MAG_EXPORT mag_Tensor* _Nonnull mag_div_(mag_Tensor* _Nonnull x, mag_Tensor* _Nonnull y);
 extern MAG_EXPORT mag_Tensor* _Nonnull mag_matmul(mag_Tensor* _Nonnull x, mag_Tensor* _Nonnull y);
 extern MAG_EXPORT mag_Tensor* _Nonnull mag_repeat_back(mag_Tensor* _Nonnull x, mag_Tensor* _Nonnull y);
+extern MAG_EXPORT mag_Tensor* _Nonnull mag_and(mag_Tensor* _Nonnull x, mag_Tensor* _Nonnull y);
+extern MAG_EXPORT mag_Tensor* _Nonnull mag_and_(mag_Tensor* _Nonnull x, mag_Tensor* _Nonnull y);
+extern MAG_EXPORT mag_Tensor* _Nonnull mag_or(mag_Tensor* _Nonnull x, mag_Tensor* _Nonnull y);
+extern MAG_EXPORT mag_Tensor* _Nonnull mag_or_(mag_Tensor* _Nonnull x, mag_Tensor* _Nonnull y);
+extern MAG_EXPORT mag_Tensor* _Nonnull mag_xor(mag_Tensor* _Nonnull x, mag_Tensor* _Nonnull y);
+extern MAG_EXPORT mag_Tensor* _Nonnull mag_xor_(mag_Tensor* _Nonnull x, mag_Tensor* _Nonnull y);
 
 /* ============ Tensor Init Operators ============ */
 
 extern MAG_EXPORT void mag_tensor_fill_from_floats(mag_Tensor* _Nonnull t, const float* _Nonnull data, size_t len);       /* Copy floats into tensor buffer. If the tensors datatype is not float, the values are converted to the tensors dtype. */
 extern MAG_EXPORT void mag_tensor_fill_from_raw_bytes(mag_Tensor* _Nonnull t, const void* _Nonnull data, size_t len);     /* Copy raw bytes into tensor buffer */
-extern MAG_EXPORT void mag_tensor_fill(mag_Tensor* _Nonnull t, float x);                                                  /* Set all tensor elements to a specific value */
+extern MAG_EXPORT void mag_tensor_fill(mag_Tensor* _Nonnull t, float x);                                                  /* Set all tensor elements to a specific value. For boolean tensors x == 0 ? False else True */
 extern MAG_EXPORT void mag_tensor_fill_random_uniform(mag_Tensor* _Nonnull t, float min, float max);                      /* Fill tensor with random values from uniform distribution within [min, max] */
 extern MAG_EXPORT void mag_tensor_fill_random_normal(mag_Tensor* _Nonnull t, float mean, float stddev);                   /* Fill tensor with random values from the normal distribution. */
 
@@ -301,6 +308,8 @@ extern MAG_EXPORT int64_t mag_tensor_get_channels(const mag_Tensor* _Nonnull t);
 extern MAG_EXPORT bool mag_tensor_is_view(const mag_Tensor* _Nonnull t);                                                /* Check if the tensor is a view of another tensor */
 extern MAG_EXPORT mag_Tensor* _Nullable mag_tensor_get_view_base(const mag_Tensor* _Nonnull t);
 extern MAG_EXPORT size_t mag_tensor_get_view_offset(const mag_Tensor* _Nonnull t);
+extern MAG_EXPORT bool mag_tensor_is_floating_point_typed(const mag_Tensor* _Nonnull t);
+extern MAG_EXPORT bool mag_tensor_is_integral_typed(const mag_Tensor* _Nonnull t);
 
 /* ============ Tensor Shape Utils ============ */
 

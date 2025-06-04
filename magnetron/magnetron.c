@@ -973,6 +973,11 @@ const mag_DTypeMetadata* mag_dtype_meta_of(mag_DType type) {
             .size=sizeof(mag_E5M10),
             .align=__alignof__(mag_E5M10),
         },
+        [MAG_DTYPE_BOOL] = {
+            .name="bool",
+            .size=sizeof(uint8_t),
+            .align=__alignof__(uint8_t),
+        },
     };
     return &infos[type];
 }
@@ -1587,9 +1592,24 @@ void mag_tensor_img_draw_text(mag_Tensor* t, int32_t x, int32_t y, int32_t size,
     }
 }
 
+static void mag_fmt_single_elem(mag_StrStream* ss, const void* buf, size_t i, mag_DType dtype) {
+    switch (dtype) {
+        case MAG_DTYPE_E8M23:
+        case MAG_DTYPE_E5M10:
+            mag_strstream_append(ss, "%g", (mag_E11M52)((const mag_E8M23*)buf)[i]);
+        return;
+        case MAG_DTYPE_BOOL:
+            mag_strstream_append(ss, "%s", ((const uint8_t*)buf)[i] ? "True" : "False");
+        return;
+        default:
+            mag_panic("DType formatting not implemented: %d", dtype);
+    }
+}
+
 static void mag_tensor_fmt_recursive(
     mag_StrStream* ss,
-    const mag_E8M23* buf,
+    const void* buf,
+    mag_DType dtype,
     const int64_t* shape,
     const int64_t* strides,
     int64_t rank,
@@ -1597,12 +1617,12 @@ static void mag_tensor_fmt_recursive(
     int64_t moff
 ) {
     if (depth == rank) /* scalar leaf */ {
-        mag_strstream_append(ss, "%g", (mag_E11M52)buf[moff]);
+        mag_fmt_single_elem(ss, buf, moff, dtype);
         return;
     }
     mag_strstream_putc(ss, '[');
     for (int64_t i=0; i < shape[depth]; ++i) {
-        mag_tensor_fmt_recursive(ss, buf, shape, strides, rank, depth+1, moff + i*strides[depth]); /* Recurse down */
+        mag_tensor_fmt_recursive(ss, buf, dtype, shape, strides, rank, depth+1, moff + i*strides[depth]); /* Recurse down */
         if (i != shape[depth]-1) { /* separator */
             mag_strstream_putc(ss, ',');
             if (rank-depth > 1) { /* newline + indent for outer dims */
@@ -1619,11 +1639,17 @@ static void mag_tensor_fmt_recursive(
 
 char* mag_tensor_to_string(mag_Tensor* t, bool with_header, size_t from_start_count, size_t from_end_count) {
     if (!from_end_count) from_end_count = UINT64_MAX;
-    mag_E8M23* buf = mag_tensor_get_data_as_floats(t); /* Offload data to float CPU buffer */
+    void* buf = NULL;
+    if (mag_tensor_is_floating_point_typed(t)) /* For all float types we want a (maybe converted) fp32 buffer for easy formatting. */
+        buf = mag_tensor_get_data_as_floats(t);
+    else /* Integral types can be formated easily */
+        buf = mag_tensor_get_raw_data_as_bytes(t);
     mag_StrStream ss;
     mag_strstream_init(&ss);
-    mag_tensor_fmt_recursive(&ss, buf, t->shape, t->strides, t->rank, 0, 0); /* Recursive format */
-    mag_tensor_get_data_as_floats_free(buf);
+    mag_tensor_fmt_recursive(&ss, buf, t->dtype, t->shape, t->strides, t->rank, 0, 0); /* Recursive format */
+    /* Free allocated buffer */
+    if (mag_tensor_is_floating_point_typed(t)) mag_tensor_get_data_as_floats_free(buf);
+    else mag_tensor_get_raw_data_as_bytes_free(buf);
     return ss.buf; /* Return the string, must be freed with mag_tensor_to_string_free_data. */
 }
 
@@ -1640,6 +1666,10 @@ int64_t mag_tensor_get_channels(const mag_Tensor* t) { return t->shape[0]; }
 bool mag_tensor_is_view(const mag_Tensor* t) { return t->flags & MAG_TFLAG_IS_VIEW; }
 mag_Tensor* mag_tensor_get_view_base(const mag_Tensor* t) { return t->view_uplink; }
 size_t mag_tensor_get_view_offset(const mag_Tensor* t) { return t->view_offs; }
+bool mag_tensor_is_floating_point_typed(const mag_Tensor* t) {
+    return t->dtype == MAG_DTYPE_E8M23 || t->dtype == MAG_DTYPE_E5M10;
+}
+bool mag_tensor_is_integral_typed(const mag_Tensor* t) { return !mag_tensor_is_floating_point_typed(t); }
 
 #ifdef __APPLE__
     static bool mag_sysctl_mib01(uint8_t (*out)[256], size_t* o_len, int mib0, int mib1) { /* Get sysctl data */

@@ -748,10 +748,13 @@ typedef enum mag_Operator {
     MAG_OP_POWS,
     MAG_OP_MATMUL,
     MAG_OP_REPEAT_BACK,
+    MAG_OP_AND,
+    MAG_OP_OR,
+    MAG_OP_XOR,
     MAG_OP__NUM
 } mag_Operator;
 mag_static_assert(MAG_OP_NOP == 0);
-mag_static_assert(MAG_OP_REPEAT_BACK+1 == MAG_OP__NUM);
+mag_static_assert(MAG_OP_XOR+1 == MAG_OP__NUM);
 mag_static_assert(MAG_OP__NUM <= 0xff);
 
 /* Initialization opcodes. */

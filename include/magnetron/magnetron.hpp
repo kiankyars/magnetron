@@ -206,7 +206,8 @@ namespace magnetron {
         e8m23 = MAG_DTYPE_E8M23,
         f32 = e8m23,
         e5m10 = MAG_DTYPE_E5M10,
-        f16 = e5m10
+        f16 = e5m10,
+        boolean = MAG_DTYPE_BOOL,
     };
 
     [[nodiscard]] inline auto dtype_size(dtype t) noexcept -> std::size_t {
@@ -349,6 +350,12 @@ namespace magnetron {
             tensor sca {mag_tensor_scalar(mag_tensor_get_ctx(m_tensor), mag_tensor_get_dtype(m_tensor), other)};
             return div(sca);
         }
+        [[nodiscard]] auto land(tensor other) const noexcept -> tensor {return tensor{mag_and(m_tensor, &*other)}; }
+        [[nodiscard]] auto land_(tensor other) const noexcept -> tensor { return tensor{mag_and_(m_tensor, &*other)}; }
+        [[nodiscard]] auto lor(tensor other) const noexcept -> tensor {return tensor{mag_or(m_tensor, &*other)}; }
+        [[nodiscard]] auto lor_(tensor other) const noexcept -> tensor { return tensor{mag_or_(m_tensor, &*other)}; }
+        [[nodiscard]] auto lxor(tensor other) const noexcept -> tensor {return tensor{mag_xor(m_tensor, &*other)}; }
+        [[nodiscard]] auto lxor_(tensor other) const noexcept -> tensor { return tensor{mag_xor_(m_tensor, &*other)}; }
 
         [[nodiscard]] auto operator + (tensor other) const noexcept -> tensor { return add(other); }
         [[nodiscard]] auto operator + (float other) const noexcept -> tensor { return add(other); }
@@ -362,7 +369,16 @@ namespace magnetron {
         [[nodiscard]] auto operator / (tensor other) const noexcept -> tensor { return div(other); }
         [[nodiscard]] auto operator / (float other) const noexcept -> tensor { return div(other); }
         auto operator /= (tensor other) const noexcept -> tensor { return div_(other); }
-        [[nodiscard]] auto operator & (tensor other) const noexcept -> tensor { return matmul(other); } // we use the & operator for matmul in C++, as @ is not allowed
+
+        [[nodiscard]] auto operator % (tensor other) const noexcept -> tensor { return matmul(other); } // we use the % operator for matmul in C++, as @ is not allowed
+
+        [[nodiscard]] auto operator & (tensor other) const noexcept -> tensor { return land(other); }
+        auto operator &= (tensor other) const noexcept -> tensor { return land_(other); }
+        [[nodiscard]] auto operator | (tensor other) const noexcept -> tensor { return lor(other); }
+        auto operator |= (tensor other) const noexcept -> tensor { return lor_(other); }
+        [[nodiscard]] auto operator ^ (tensor other) const noexcept -> tensor { return lxor(other); }
+        auto operator ^= (tensor other) const noexcept -> tensor { return lxor_(other); }
+
 
         auto fill_from(const void* buf, std::size_t nb) -> void {
             mag_tensor_fill_from_raw_bytes(m_tensor, buf, nb);
@@ -370,6 +386,19 @@ namespace magnetron {
 
         auto fill_from(std::span<const float> data) -> void {
             mag_tensor_fill_from_floats(m_tensor, data.data(), data.size());
+        }
+
+        auto fill_from(std::span<const bool> data) -> void {
+            static_assert(sizeof(bool) == sizeof(std::uint8_t));
+            mag_tensor_fill_from_raw_bytes(m_tensor, data.data(), data.size());
+        }
+
+        auto fill_from(const std::vector<bool>& data) -> void {
+            static_assert(sizeof(bool) == sizeof(std::uint8_t));
+            std::vector<std::uint8_t> unpacked {};
+            unpacked.resize(data.size());
+            std::ranges::copy(data, unpacked.begin());
+            mag_tensor_fill_from_raw_bytes(m_tensor, unpacked.data(), unpacked.size());
         }
 
         auto fill(float val) -> void {
@@ -404,12 +433,22 @@ namespace magnetron {
         [[nodiscard]] auto dtype() const noexcept -> dtype { return static_cast<enum dtype>(mag_tensor_get_dtype(m_tensor)); }
         [[nodiscard]] auto data_ptr() const noexcept -> void* { return mag_tensor_get_data_ptr(m_tensor); }
         [[nodiscard]] auto storage_base_ptr() const noexcept -> void* { return mag_tensor_get_storage_base_ptr(m_tensor); }
-        [[nodiscard]] auto to_vector() const -> std::vector<float> {
+        [[nodiscard]] auto to_float_vector() const -> std::vector<float> {
             auto* data {mag_tensor_get_data_as_floats(m_tensor)};
             std::vector<float> result {};
             result.resize(numel());
             std::copy_n(data, numel(), result.begin());
             mag_tensor_get_data_as_floats_free(data);
+            return result;
+        }
+        [[nodiscard]] auto to_bool_vector() const -> std::vector<bool> {
+            if (dtype() != dtype::boolean)
+                throw std::runtime_error {"requires boolean dtype"};
+            auto* data {static_cast<std::uint8_t*>(mag_tensor_get_raw_data_as_bytes(m_tensor))};
+            std::vector<bool> result {};
+            result.resize(numel());
+            std::copy_n(data, numel(), result.begin());
+            mag_tensor_get_raw_data_as_bytes_free(data);
             return result;
         }
         [[nodiscard]] auto data_size() const noexcept -> std::int64_t { return mag_tensor_get_data_size(m_tensor); }
