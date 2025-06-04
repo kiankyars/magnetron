@@ -162,8 +162,8 @@ static void MAG_HOTPROC mag_vector_cast_mag_e5m10_cvt_e8m23(int64_t n, const mag
     }
 }
 
-/* Generate N uniform canonical floats in [0, 1) using active algorithm and rescale to [min, max]. */
-static void MAG_AINLINE mag_prng_gen_uniform_vec_e8m23(mag_PRNGState* _Nonnull prng, mag_E8M23* _Nonnull o, int64_t n, mag_E8M23 min, mag_E8M23 max) {
+/* Generate N uniform canonical floats ∈ [0, 1) and rescale to [min, max]. */
+static void MAG_AINLINE mag_vrand_uniform_e8m23(mag_PRNGState* _Nonnull prng, mag_E8M23* _Nonnull o, int64_t n, mag_E8M23 min, mag_E8M23 max) {
     mag_E8M23 rescale_uniform = max - min;
     switch (prng->algo) {
         case MAG_PRNG_MERSENNE_TWISTER: { /* Use Mersenne Twister. */
@@ -211,8 +211,8 @@ static void MAG_AINLINE mag_prng_gen_uniform_vec_e8m23(mag_PRNGState* _Nonnull p
     }
 }
 
-/* Generate N uniform canonical floats in [0, 1) using active algorithm and rescale to [min, max]. */
-static void MAG_AINLINE mag_prng_gen_uniform_vec_e5m10(mag_PRNGState* _Nonnull prng, mag_E5M10* _Nonnull o, int64_t n, mag_E8M23 min, mag_E8M23 max) {
+/* Generate N uniform canonical floats ∈ [0, 1) and rescale to [min, max]. */
+static void MAG_AINLINE mag_vrand_uniform_e5m10(mag_PRNGState* _Nonnull prng, mag_E5M10* _Nonnull o, int64_t n, mag_E8M23 min, mag_E8M23 max) {
     mag_E8M23 rescale_uniform = max - min;
     switch (prng->algo) {
         case MAG_PRNG_MERSENNE_TWISTER: { /* Use Mersenne Twister. */
@@ -261,8 +261,8 @@ static void MAG_AINLINE mag_prng_gen_uniform_vec_e5m10(mag_PRNGState* _Nonnull p
 }
 
 /* Generate N normal (Gauss) distributed floats. */
-static void MAG_HOTPROC mag_prng_gen_normal_vec_e8m23(mag_PRNGState* _Nonnull prng, mag_E8M23* _Nonnull o, int64_t n, mag_E8M23 mean, mag_E8M23 std) {
-    mag_prng_gen_uniform_vec_e8m23(prng, o, n, 0.0f, 1.0f); /* Generate uniform random numbers. */
+static void MAG_HOTPROC mag_vrand_normal_e8m23(mag_PRNGState* _Nonnull prng, mag_E8M23* _Nonnull o, int64_t n, mag_E8M23 mean, mag_E8M23 std) {
+    mag_vrand_uniform_e8m23(prng, o, n, 0.0f, 1.0f); /* Generate uniform random numbers. */
     for (int64_t i=0; i < n-1; i += 2) { /* Map uniform to normal dist with Box-Muller transform. TODO: Write SIMD sqrt and vectorize this. */
         mag_E8M23* u1 = o+i;
         mag_E8M23* u2 = o+i+1;
@@ -274,14 +274,14 @@ static void MAG_HOTPROC mag_prng_gen_normal_vec_e8m23(mag_PRNGState* _Nonnull pr
     }
     if (n & 1) {  /* Handle odd numel */
         mag_E8M23 u[2];
-        mag_prng_gen_uniform_vec_e8m23(prng, u, sizeof(u)/sizeof(*u), 0.0f, 1.0f);
+        mag_vrand_uniform_e8m23(prng, u, sizeof(u)/sizeof(*u), 0.0f, 1.0f);
         o[n-1] = std*sqrtf(-2.0f*logf(u[0]))*cosf(MAG_TAU*u[1]) + mean;
     }
 }
 
 /* Generate N normal (Gauss) distributed floats. */
-static void MAG_HOTPROC mag_prng_gen_normal_vec_e5m10(mag_PRNGState* _Nonnull prng, mag_E5M10* _Nonnull o, int64_t n, mag_E8M23 mean, mag_E8M23 std) {
-    mag_prng_gen_uniform_vec_e5m10(prng, o, n, 0.0f, 1.0f); /* Generate uniform random numbers. */
+static void MAG_HOTPROC mag_vrand_normal_e5m10(mag_PRNGState* _Nonnull prng, mag_E5M10* _Nonnull o, int64_t n, mag_E8M23 mean, mag_E8M23 std) {
+    mag_vrand_uniform_e5m10(prng, o, n, 0.0f, 1.0f); /* Generate uniform random numbers. */
     for (int64_t i=0; i < n; i += 2) { /* Map uniform to normal dist with Box-Muller transform. TODO: Write SIMD sqrt and vectorize this. */
         mag_E8M23 u1 = mag_e5m10_cvt_e8m23(o[i]);
         mag_E8M23 u2 = mag_e5m10_cvt_e8m23(o[i+1]);
@@ -293,8 +293,57 @@ static void MAG_HOTPROC mag_prng_gen_normal_vec_e5m10(mag_PRNGState* _Nonnull pr
     }
     if (n & 1) {  /* Handle odd numel */
         mag_E8M23 u[2];
-        mag_prng_gen_uniform_vec_e8m23(prng, u, sizeof(u)/sizeof(*u), 0.0f, 1.0f);
+        mag_vrand_uniform_e8m23(prng, u, sizeof(u)/sizeof(*u), 0.0f, 1.0f);
         o[n-1] = mag_e8m23_cvt_e5m10(std*sqrtf(-2.0f*logf(u[0]))*cosf(MAG_TAU*u[1]) + mean);
+    }
+}
+
+/* Generate N uniform canonical floats in [0, 1) using active algorithm and rescale to [min, max]. */
+static void MAG_AINLINE mag_vrand_bernoulli_bool(mag_PRNGState* _Nonnull prng, uint8_t* _Nonnull o, int64_t n, mag_E8M23 p) {
+    uint32_t thresh = (uint32_t)(p * 4294967296.f); /* 2^32 */
+    switch (prng->algo) {
+        case MAG_PRNG_MERSENNE_TWISTER: { /* Use Mersenne Twister. */
+            uint32_t* rem = &prng->mersenne.remaining;
+            uint32_t* next = &prng->mersenne.next;
+            uint32_t* state = prng->mersenne.state;
+            for (int64_t ii=0; ii < n; ++ii) {
+                if (--*rem <= 0) {
+                    *rem = 624;
+                    *next = 0;
+                    uint32_t y, i;
+                    for (i = 0; i < 624-397; ++i) {
+                        y = (state[i] & 0x80000000u) | (state[i+1] & 0x7fffffffu);
+                        state[i] = state[i+397] ^ (y>>1) ^ ((y&1) ? 0 : 0x9908b0dfu);
+                    }
+                    for (; i < 624-1; ++i) {
+                        y = (state[i] & 0x80000000u) | (state[i+1] & 0x7fffffffu);
+                        state[i] = state[i + (397-624)] ^ (y>>1) ^ ((y&1) ? 0 : 0x9908b0dfu);
+                    }
+                    y = (state[624-1] & 0x80000000u) | (*state & 0x7fffffffu);
+                    state[624-1] = state[397-1] ^ (y>>1) ^ ((y&1) ? 0 : 0x9908b0dfu);
+                }
+                uint32_t y = state[(*next)++];
+                y ^= y >> 11;
+                y ^= (y << 7) & 0x9d2c5680;
+                y ^= (y << 15) & 0xefc60000;
+                y ^= y >> 18;
+                o[ii] = !!(y < thresh);
+            }
+        } break;
+        case MAG_PRNG_PCG: { /* Use Permuted Congruential Generator. */
+            uint64_t* state = &prng->pcg.state;
+            uint64_t* inc = &prng->pcg.inc;
+            for (int64_t ii=0; ii < n; ++ii) {
+                uint64_t prev = *state;
+                *state = prev*6364136223846793005ull + *inc;
+                uint32_t mixed = ((prev>>18u) ^ prev) >> 27u;
+                uint32_t rot = prev >> 59u;
+                uint32_t y = (mixed>>rot) | (mixed << ((-rot)&31));
+                o[ii] = !!(y < thresh);
+            }
+        } break;
+        default:
+            mag_panic("invalid PRNG algorithm: %d", prng->algo);
     }
 }
 
@@ -1113,7 +1162,7 @@ static void mag_blas_init_rand_uniform_e8m23(const mag_CPUKernelPayload* _Nonnul
     mag_E8M23 max = mag_op_param_unpack_e8m23_or_panic(r->init_op_params[1]);
     mag_E8M23* b_r = mag_e8m23p_mut(r);
     int64_t numel = r->numel;
-    mag_prng_gen_uniform_vec_e8m23(payload->local_prng, b_r, numel, min, max);
+    mag_vrand_uniform_e8m23(payload->local_prng, b_r, numel, min, max);
 }
 
 static void mag_blas_init_rand_uniform_e5m10(const mag_CPUKernelPayload* _Nonnull payload) {
@@ -1122,7 +1171,7 @@ static void mag_blas_init_rand_uniform_e5m10(const mag_CPUKernelPayload* _Nonnul
     mag_E8M23 max = mag_op_param_unpack_e8m23_or_panic(r->init_op_params[1]);
     mag_E5M10* b_r = mag_e5m10p_mut(r);
     int64_t numel = r->numel;
-    mag_prng_gen_uniform_vec_e5m10(payload->local_prng, b_r, numel, min, max);
+    mag_vrand_uniform_e5m10(payload->local_prng, b_r, numel, min, max);
 }
 
 static void mag_blas_init_rand_normal_e8m23(const mag_CPUKernelPayload* _Nonnull payload) {
@@ -1131,7 +1180,7 @@ static void mag_blas_init_rand_normal_e8m23(const mag_CPUKernelPayload* _Nonnull
     mag_E8M23 stddev = mag_op_param_unpack_e8m23_or_panic(r->init_op_params[1]);
     mag_E8M23* b_r = mag_e8m23p_mut(r);
     int64_t numel = r->numel;
-    mag_prng_gen_normal_vec_e8m23(payload->local_prng, b_r, numel, mean, stddev);
+    mag_vrand_normal_e8m23(payload->local_prng, b_r, numel, mean, stddev);
 }
 
 static void mag_blas_init_rand_normal_e5m10(const mag_CPUKernelPayload* _Nonnull payload) {
@@ -1140,7 +1189,15 @@ static void mag_blas_init_rand_normal_e5m10(const mag_CPUKernelPayload* _Nonnull
     mag_E8M23 stddev = mag_op_param_unpack_e8m23_or_panic(r->init_op_params[1]);
     mag_E5M10* b_r = mag_e5m10p_mut(r);
     int64_t numel = r->numel;
-    mag_prng_gen_normal_vec_e5m10(payload->local_prng, b_r, numel, mean, stddev);
+    mag_vrand_normal_e5m10(payload->local_prng, b_r, numel, mean, stddev);
+}
+
+static void mag_blas_init_rand_bernoulli_bool(const mag_CPUKernelPayload* _Nonnull payload) {
+    mag_Tensor* r = payload->node;
+    mag_E8M23 p = mag_op_param_unpack_e8m23_or_panic(r->init_op_params[0]);
+    uint8_t* b_r = mag_boolp_mut(r);
+    int64_t numel = r->numel;
+    mag_vrand_bernoulli_bool(payload->local_prng, b_r, numel, p);
 }
 
 #define mag_cpu_blas_impl_unary(T, DT, FUNC) \
@@ -2930,6 +2987,9 @@ static void (*_Nonnull const mag_blas_lut_init_kernels[MAG_IOP__NUM][MAG_DTYPE__
     [MAG_IOP_RAND_NORMAL] = {
         [MAG_DTYPE_E8M23] = &mag_blas_init_rand_normal_e8m23,
         [MAG_DTYPE_E5M10] = &mag_blas_init_rand_normal_e5m10,
+    },
+    [MAG_IOP_RAND_BERNOULLI] = {
+        [MAG_DTYPE_BOOL] = &mag_blas_init_rand_bernoulli_bool,
     },
 };
 

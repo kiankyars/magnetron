@@ -413,6 +413,10 @@ namespace magnetron {
             mag_tensor_fill_random_normal(m_tensor, mean, stddev);
         }
 
+        auto fill_rand_bernoulli(float p = 0.5f) -> void {
+            mag_tensor_fill_random_bernoulli(m_tensor, p);
+        }
+
         [[nodiscard]] auto refcount() const noexcept -> std::uint64_t { return mag_tensor_get_refcount(m_tensor); }
         [[nodiscard]] auto memory_usage() const noexcept -> std::size_t { return mag_tensor_get_memory_usage(m_tensor); }
         auto set_name(const std::string& name) -> void { mag_tensor_set_name(m_tensor, name.c_str()); }

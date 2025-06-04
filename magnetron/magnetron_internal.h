@@ -763,6 +763,7 @@ typedef enum mag_InitOperator {
     MAG_IOP_BROADCAST,
     MAG_IOP_RAND_UNIFORM,
     MAG_IOP_RAND_NORMAL,
+    MAG_IOP_RAND_BERNOULLI,
     MAG_IOP__NUM
 } mag_InitOperator;
 

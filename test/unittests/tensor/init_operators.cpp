@@ -170,3 +170,22 @@ TEST(cpu_tensor_init_ops, fill_random_normal_e5m10) {
     });
 }
 #endif
+
+#if 0
+TEST(cpu_tensor_init_ops, fill_random_bool) {
+    context ctx {compute_device::cpu};
+    for_all_shape_perms(lim, 1, [&](std::span<const std::int64_t> shape) {
+        std::uniform_real_distribution<e8m23_t> dist {0.01f, 0.99f};
+        e8m23_t p {dist(gen)};
+        tensor t {ctx, dtype::boolean, shape};
+        t.fill_rand_bernoulli(p);
+        std::vector<bool> data {t.to_bool_vector()};
+        int64_t samples {};
+        for (bool k : data)
+            samples += k ? 1 : 0;
+        double phat {static_cast<double>(samples) / data.size()};
+        double z  {(phat - p) / std::sqrt(p*(1.0 - p) / static_cast<double>(data.size()))};
+        EXPECT_LT(std::fabs(z), 3.49) << "phat=" << phat << "  z=" << z;
+    });
+}
+#endif
