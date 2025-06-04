@@ -274,6 +274,7 @@ namespace magnetron {
 
         [[nodiscard]] auto clone() const noexcept -> tensor { return tensor{mag_clone(m_tensor)}; }
         [[nodiscard]] auto view() const noexcept -> tensor { return tensor{mag_view(m_tensor)}; }
+        [[nodiscard]] auto view_slice(std::int64_t dim, std::int64_t start, std::int64_t len, std::int64_t step) -> tensor { return tensor {mag_view_slice(m_tensor, dim, start, len, step)}; }
         [[nodiscard]] auto T() const noexcept -> tensor { return tensor{mag_transpose(m_tensor)}; }
         [[nodiscard]] auto transpose() const noexcept -> tensor { return tensor{mag_transpose(m_tensor)}; }
         [[nodiscard]] auto permute(const std::array<std::int64_t, k_max_dims>& axes) const noexcept -> tensor { return tensor{mag_permute(m_tensor, axes.data(), axes.size())}; }
@@ -402,6 +403,7 @@ namespace magnetron {
         }
         [[nodiscard]] auto dtype() const noexcept -> dtype { return static_cast<enum dtype>(mag_tensor_get_dtype(m_tensor)); }
         [[nodiscard]] auto data_ptr() const noexcept -> void* { return mag_tensor_get_data_ptr(m_tensor); }
+        [[nodiscard]] auto storage_base_ptr() const noexcept -> void* { return mag_tensor_get_storage_base_ptr(m_tensor); }
         [[nodiscard]] auto to_vector() const -> std::vector<float> {
             auto* data {mag_tensor_get_data_as_floats(m_tensor)};
             std::vector<float> result {};
@@ -417,6 +419,9 @@ namespace magnetron {
         [[nodiscard]] auto is_transposed() const noexcept -> bool { return mag_tensor_is_transposed(m_tensor); }
         [[nodiscard]] auto is_permuted() const noexcept -> bool { return mag_tensor_is_permuted(m_tensor); }
         [[nodiscard]] auto is_contiguous() const noexcept -> bool { return mag_tensor_is_contiguous(m_tensor); }
+        [[nodiscard]] auto is_view() const noexcept -> bool { return mag_tensor_is_view(m_tensor); }
+        [[nodiscard]] auto view_base() const noexcept -> tensor { return tensor {mag_tensor_get_view_base(m_tensor)}; }
+        [[nodiscard]] auto view_offset() const noexcept -> std::size_t { return mag_tensor_get_view_offset(m_tensor); }
 
         [[nodiscard]] auto grad() const noexcept -> std::optional<tensor> {
             auto* grad {mag_tensor_get_grad(m_tensor)};

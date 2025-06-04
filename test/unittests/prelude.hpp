@@ -77,7 +77,7 @@ namespace magnetron::test {
     }
 
     inline thread_local std::random_device rd {};
-    inline thread_local std::mt19937 gen {rd()};
+    inline thread_local std::mt19937_64 gen {rd()};
 
     template <typename F> requires std::is_invocable_v<F, std::span<const std::int64_t>>
     auto for_all_shape_perms(std::int64_t lim, std::int64_t fac, F&& f) -> void {
@@ -136,26 +136,52 @@ namespace magnetron::test {
         });
     }
 
-    template <bool BROADCAST, bool INPLACE, typename A, typename B>
+    [[nodiscard]] inline auto make_random_view(tensor base) -> tensor {
+        std::mt19937_64& rng {gen};
+        if (base.rank() == 0) return base.view();
+        bool all_one = true;
+        for (auto s : base.shape())
+            if (s > 1) { all_one = false; break; }
+        if (all_one) return base.view();
+        std::vector<std::int64_t> slicable;
+        for (std::int64_t d {}; d < base.rank(); ++d)
+            if (base.shape()[d] > 1) slicable.push_back(d);
+        std::uniform_int_distribution<size_t> dim_dis(0, slicable.size() - 1);
+        std::int64_t dim {slicable[dim_dis(rng)]};
+        std::int64_t size {base.shape()[dim]};
+        std::uniform_int_distribution<std::int64_t> step_dis {2, std::min<std::int64_t>(4, size)};
+        std::int64_t step {step_dis(rng)};
+        std::int64_t max_start {size - step};
+        std::uniform_int_distribution<std::int64_t> start_dis {0, max_start};
+        std::int64_t start {start_dis(rng)};
+        std::int64_t max_len {(size - start + step - 1)/step};
+        std::uniform_int_distribution<std::int64_t> len_dis {1, max_len};
+        std::int64_t len {len_dis(rng)};
+        return base.view_slice(dim, start, len, step);
+    }
+
+    template <bool BROADCAST, bool INPLACE, bool SUBVIEW, typename A, typename B>
         requires std::is_invocable_r_v<tensor, A, tensor> && std::is_invocable_v<B, e8m23_t>
     auto test_unary_operator(std::int64_t lim, e8m23_t eps, dtype ty, A&& a, B&& b, e8m23_t min = 0.0, e8m23_t max = 2.0) -> void {
         auto ctx = context{compute_device::cpu};
         for_all_shape_perms(lim, BROADCAST ? 2 : 1, [&](std::span<const std::int64_t> shape) {
-            tensor t_a {ctx, ty, shape};
-            t_a.fill_rand_uniform(min, max);
-            std::vector<e8m23_t> d_a {t_a.to_vector()};
-            tensor t_r {std::invoke(a, t_a)};
-            if constexpr (INPLACE) {
+            tensor base{ctx, ty, shape};
+            base.fill_rand_uniform(min, max);
+            tensor t_a = SUBVIEW ?  make_random_view(base) : base;
+            if constexpr (SUBVIEW)
+                ASSERT_TRUE(t_a.is_view());
+            std::vector<e8m23_t> d_a{t_a.to_vector()};
+            tensor t_r = std::invoke(a, t_a);
+            if constexpr (INPLACE)
                 ASSERT_EQ(t_a.data_ptr(), t_r.data_ptr());
-            } else {
+            else
                 ASSERT_NE(t_a.data_ptr(), t_r.data_ptr());
-            }
-            std::vector<e8m23_t> d_r {t_r.to_vector()};
+            if constexpr (INPLACE)
+                ASSERT_EQ(t_a.storage_base_ptr(), t_r.storage_base_ptr());
+            std::vector<e8m23_t> d_r{t_r.to_vector()};
             ASSERT_EQ(d_a.size(), d_r.size());
-            ASSERT_EQ(t_a.dtype(), t_r.dtype());
-            for (std::int64_t i = 0; i < d_r.size(); ++i) {
+            for (std::size_t i = 0; i < d_r.size(); ++i)
                 ASSERT_NEAR(std::invoke(b, d_a[i]), d_r[i], eps);
-            }
         });
     }
 

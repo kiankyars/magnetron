@@ -1059,7 +1059,7 @@ struct mag_Context {
 /* Tensor specific flags. */
 typedef enum mag_TensorFlags {
     MAG_TFLAG_NONE = 0,
-    MAG_TFLAG_VIEW = 1<<0,              /* Tensor is a view. */
+    MAG_TFLAG_IS_VIEW = 1<<0,           /* Tensor is a view. */
     MAG_TFLAG_IS_GRAD = 1<<1,           /* Tensor is a gradient. */
     MAG_TFLAG_REQUIRES_GRAD = 1<<2,     /* Tensor requires gradient. */
 

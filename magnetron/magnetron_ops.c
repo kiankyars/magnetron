@@ -580,12 +580,30 @@ mag_Tensor* mag_view(mag_Tensor* x) {
     return mag_tensor_operator(x->ctx, MAG_OP_VIEW, false, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
+mag_Tensor* mag_view_slice(mag_Tensor* x, int64_t dim, int64_t start, int64_t len, int64_t step) {
+    mag_assert(step > 0, "negative step not supported");
+    mag_assert(dim  >= 0 && dim < x->rank, "dim out of range");
+    int64_t sz = x->shape[dim];
+    if (start < 0) start += sz;
+    mag_assert(start >= 0 && start < sz, "start out of bounds");
+    if (len < 0) len = sz - start;
+    mag_assert(len > 0, "len must be > 0");
+    mag_assert(start + (len-1)*step < sz, "slice exceeds tensor bounds");
+    int64_t shape[MAG_MAX_DIMS];
+    int64_t strides[MAG_MAX_DIMS];
+    memcpy(shape, x->shape, sizeof(shape));
+    memcpy(strides, x->strides, sizeof(strides));
+    shape[dim] = len;
+    strides[dim] *= step;
+    size_t byte_offs = start*x->strides[dim]*mag_dtype_meta_of(x->dtype)->size;
+    return mag_tensor_init_internal(x->ctx, x->dtype, x->rank, shape, x, byte_offs);
+}
+
 mag_Tensor* mag_transpose(mag_Tensor* x) {
     return mag_tensor_operator(x->ctx, MAG_OP_TRANSPOSE, false, &x, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
 mag_Tensor* mag_permute(mag_Tensor* x, const int64_t* dims, uint32_t num_dims) {
-    mag_assert(dims != NULL, "invalid permutation dimensions");
     mag_assert(num_dims <= MAG_MAX_DIMS, "invalid permutation dimensions count, max %d but is %u", MAG_MAX_DIMS, num_dims);
     mag_OPParamLayout layout;
     mag_op_param_layout_init(&layout);

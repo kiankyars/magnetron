@@ -453,6 +453,10 @@ class Tensor:
     def data_ptr(self) -> int:
         return int(_ffi.cast('uintptr_t', _C.mag_tensor_get_data_ptr(self._ptr)))
 
+    @property
+    def storage_base_ptr(self) -> int:
+        return int(_ffi.cast('uintptr_t', _C.mag_tensor_get_storage_base_ptr(self._ptr)))
+
     def item(self) -> float:
         return self.tolist()[0]
 
@@ -486,6 +490,23 @@ class Tensor:
 
     def can_broadcast(self, other: 'Tensor') -> bool:
         return _C.mag_tensor_can_broadcast(self._ptr, other._ptr)
+
+    @property
+    def is_view(self) -> bool:
+        return _C.mag_tensor_is_view(self._ptr)
+
+    @property
+    def view_base(self) -> 'Tensor' | None:
+        if not self.is_view:
+            return None
+        ptr: _ffi.CData = _C.mag_tensor_get_view_base(self._ptr)
+        if ptr is None or ptr == _ffi.NULL:
+            return None
+        return Tensor(ptr)
+
+    @property
+    def view_offset(self) -> int:
+        return _C.mag_tensor_get_view_offset(self._ptr)
 
     @property
     def width(self) -> int:

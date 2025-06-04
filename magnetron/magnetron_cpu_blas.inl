@@ -129,10 +129,10 @@ static MAG_AINLINE mag_E8M23 mag_e5m10_cvt_e8m23(mag_E5M10 x) {
     #endif
 }
 
-#define mag_e8m23p(t) ((const mag_E8M23*)(t)->storage->base)
-#define mag_e8m23p_mut(t) ((mag_E8M23*)(t)->storage->base)
-#define mag_e5m10p(t) ((const mag_E5M10*)(t)->storage->base)
-#define mag_e5m10p_mut(t) ((mag_E5M10*)(t)->storage->base)
+#define mag_e8m23p(t) ((const mag_E8M23*)mag_tensor_get_data_ptr(t))
+#define mag_e8m23p_mut(t) ((mag_E8M23*)mag_tensor_get_data_ptr(t))
+#define mag_e5m10p(t) ((const mag_E5M10*)mag_tensor_get_data_ptr(t))
+#define mag_e5m10p_mut(t) ((mag_E5M10*)mag_tensor_get_data_ptr(t))
 
 static void MAG_HOTPROC mag_vector_cast_mag_e8m23_cvt_e5m10(int64_t n, const mag_E8M23* _Nonnull __restrict src, mag_E5M10* _Nonnull __restrict dst) {
     int64_t i=0;
@@ -1011,11 +1011,11 @@ static mag_E8M23 MAG_HOTPROC mag_vmax_e5m10(int64_t numel, const mag_E5M10* _Non
 
 static void mag_blas_nop(const mag_CPUKernelPayload* _Nonnull payload) { (void)payload; }
 
-static inline int64_t mag_offset_from_flat(const mag_Tensor* _Nonnull t, int64_t idx) {
+static inline int64_t mag_offset_from_flat(const mag_Tensor* _Nonnull t, int64_t i) {
     int64_t off = 0;
     for (int64_t d=t->rank-1; d >= 0; --d) {
-        int64_t coord = idx % t->shape[d];
-        idx /= t->shape[d];
+        int64_t coord = i % t->shape[d];
+        i /= t->shape[d];
         off += coord * t->strides[d];
     }
     return off;
@@ -1134,9 +1134,9 @@ static void mag_blas_init_rand_normal_e5m10(const mag_CPUKernelPayload* _Nonnull
         int64_t start = ti * chunk; \
         int64_t end = mag_xmin(start + chunk, total); \
         int64_t ra = r->rank; \
-        for (int64_t idx=start; idx < end; ++idx) { \
-            int64_t roff = mag_offset_from_flat(r, idx); \
-            int64_t tmp = idx; \
+        for (int64_t i=start; i < end; ++i) { \
+            int64_t roff = mag_offset_from_flat(r, i); \
+            int64_t tmp = i; \
             int64_t xoff = 0; \
             for (int64_t d=ra-1; d >= 0; --d) { \
                 int64_t coord = tmp % r->shape[d]; \
@@ -1285,7 +1285,7 @@ static void MAG_HOTPROC mag_blas_add_e8m23(const mag_CPUKernelPayload* _Nonnull 
     if (mag_likely(yc)) {  /* Fast path if Y is contiguous */
         const mag_E8M23* py = by + ra;
         mag_E8M23* pr = br + ra;
-        for (int64_t i = ra; i < rb; ++i) {
+        for (int64_t i=ra; i < rb; ++i) {
             int64_t tmp = i;
             int64_t xi = 0;
             for (int64_t d = r->rank-1; d >= 0; --d) {
@@ -1303,8 +1303,8 @@ static void MAG_HOTPROC mag_blas_add_e8m23(const mag_CPUKernelPayload* _Nonnull 
         }
         return;
     }
-    for (int64_t idx = ra; idx < rb; ++idx) { /* General case */
-        int64_t tmp  = idx;
+    for (int64_t i=ra; i < rb; ++i) { /* General case */
+        int64_t tmp  = i;
         int64_t ri = 0;
         int64_t xi = 0;
         int64_t yi = 0;
@@ -1379,7 +1379,7 @@ static void MAG_HOTPROC mag_blas_sub_e8m23(const mag_CPUKernelPayload* _Nonnull 
     if (mag_likely(yc)) {  /* Fast path if Y is contiguous */
         const mag_E8M23* py = by + ra;
         mag_E8M23* pr = br + ra;
-        for (int64_t i = ra; i < rb; ++i) {
+        for (int64_t i=ra; i < rb; ++i) {
             int64_t tmp = i;
             int64_t xi = 0;
             for (int64_t d = r->rank-1; d >= 0; --d) {
@@ -1397,8 +1397,8 @@ static void MAG_HOTPROC mag_blas_sub_e8m23(const mag_CPUKernelPayload* _Nonnull 
         }
         return;
     }
-    for (int64_t idx = ra; idx < rb; ++idx) { /* General case */
-        int64_t tmp  = idx;
+    for (int64_t i=ra; i < rb; ++i) { /* General case */
+        int64_t tmp  = i;
         int64_t ri = 0;
         int64_t xi = 0;
         int64_t yi = 0;
@@ -1473,7 +1473,7 @@ static void MAG_HOTPROC mag_blas_mul_e8m23(const mag_CPUKernelPayload* _Nonnull 
     if (mag_likely(yc)) {  /* Fast path if Y is contiguous */
         const mag_E8M23* py = by + ra;
         mag_E8M23* pr = br + ra;
-        for (int64_t i = ra; i < rb; ++i) {
+        for (int64_t i=ra; i < rb; ++i) {
             int64_t tmp = i;
             int64_t xi = 0;
             for (int64_t d = r->rank-1; d >= 0; --d) {
@@ -1491,8 +1491,8 @@ static void MAG_HOTPROC mag_blas_mul_e8m23(const mag_CPUKernelPayload* _Nonnull 
         }
         return;
     }
-    for (int64_t idx = ra; idx < rb; ++idx) { /* General case */
-        int64_t tmp  = idx;
+    for (int64_t i=ra; i < rb; ++i) { /* General case */
+        int64_t tmp  = i;
         int64_t ri = 0;
         int64_t xi = 0;
         int64_t yi = 0;
@@ -1567,7 +1567,7 @@ static void MAG_HOTPROC mag_blas_div_e8m23(const mag_CPUKernelPayload* _Nonnull 
     if (mag_likely(yc)) {  /* Fast path if Y is contiguous */
         const mag_E8M23* py = by + ra;
         mag_E8M23* pr = br + ra;
-        for (int64_t i = ra; i < rb; ++i) {
+        for (int64_t i=ra; i < rb; ++i) {
             int64_t tmp = i;
             int64_t xi = 0;
             for (int64_t d = r->rank-1; d >= 0; --d) {
@@ -1585,8 +1585,8 @@ static void MAG_HOTPROC mag_blas_div_e8m23(const mag_CPUKernelPayload* _Nonnull 
         }
         return;
     }
-    for (int64_t idx = ra; idx < rb; ++idx) { /* General case */
-        int64_t tmp  = idx;
+    for (int64_t i=ra; i < rb; ++i) { /* General case */
+        int64_t tmp  = i;
         int64_t ri = 0;
         int64_t xi = 0;
         int64_t yi = 0;
@@ -1784,7 +1784,7 @@ static void MAG_HOTPROC mag_blas_add_e5m10(const mag_CPUKernelPayload* _Nonnull 
     if (mag_likely(yc)) {  /* Fast path if Y is contiguous */
         const mag_E5M10* py = by + ra;
         mag_E5M10* pr = br + ra;
-        for (int64_t i = ra; i < rb; ++i) {
+        for (int64_t i=ra; i < rb; ++i) {
             int64_t tmp = i;
             int64_t xi = 0;
             for (int64_t d = r->rank-1; d >= 0; --d) {
@@ -1802,8 +1802,8 @@ static void MAG_HOTPROC mag_blas_add_e5m10(const mag_CPUKernelPayload* _Nonnull 
         }
         return;
     }
-    for (int64_t idx = ra; idx < rb; ++idx) { /* General case */
-        int64_t tmp  = idx;
+    for (int64_t i=ra; i < rb; ++i) { /* General case */
+        int64_t tmp  = i;
         int64_t ri = 0;
         int64_t xi = 0;
         int64_t yi = 0;
@@ -1878,7 +1878,7 @@ static void MAG_HOTPROC mag_blas_sub_e5m10(const mag_CPUKernelPayload* _Nonnull 
     if (mag_likely(yc)) {  /* Fast path if Y is contiguous */
         const mag_E5M10* py = by + ra;
         mag_E5M10* pr = br + ra;
-        for (int64_t i = ra; i < rb; ++i) {
+        for (int64_t i=ra; i < rb; ++i) {
             int64_t tmp = i;
             int64_t xi = 0;
             for (int64_t d = r->rank-1; d >= 0; --d) {
@@ -1896,8 +1896,8 @@ static void MAG_HOTPROC mag_blas_sub_e5m10(const mag_CPUKernelPayload* _Nonnull 
         }
         return;
     }
-    for (int64_t idx = ra; idx < rb; ++idx) { /* General case */
-        int64_t tmp  = idx;
+    for (int64_t i=ra; i < rb; ++i) { /* General case */
+        int64_t tmp  = i;
         int64_t ri = 0;
         int64_t xi = 0;
         int64_t yi = 0;
@@ -1972,7 +1972,7 @@ static void MAG_HOTPROC mag_blas_mul_e5m10(const mag_CPUKernelPayload* _Nonnull 
     if (mag_likely(yc)) {  /* Fast path if Y is contiguous */
         const mag_E5M10* py = by + ra;
         mag_E5M10* pr = br + ra;
-        for (int64_t i = ra; i < rb; ++i) {
+        for (int64_t i=ra; i < rb; ++i) {
             int64_t tmp = i;
             int64_t xi = 0;
             for (int64_t d = r->rank-1; d >= 0; --d) {
@@ -1990,8 +1990,8 @@ static void MAG_HOTPROC mag_blas_mul_e5m10(const mag_CPUKernelPayload* _Nonnull 
         }
         return;
     }
-    for (int64_t idx = ra; idx < rb; ++idx) { /* General case */
-        int64_t tmp  = idx;
+    for (int64_t i=ra; i < rb; ++i) { /* General case */
+        int64_t tmp  = i;
         int64_t ri = 0;
         int64_t xi = 0;
         int64_t yi = 0;
@@ -2066,7 +2066,7 @@ static void MAG_HOTPROC mag_blas_div_e5m10(const mag_CPUKernelPayload* _Nonnull 
     if (mag_likely(yc)) {  /* Fast path if Y is contiguous */
         const mag_E5M10* py = by + ra;
         mag_E5M10* pr = br + ra;
-        for (int64_t i = ra; i < rb; ++i) {
+        for (int64_t i=ra; i < rb; ++i) {
             int64_t tmp = i;
             int64_t xi = 0;
             for (int64_t d = r->rank-1; d >= 0; --d) {
@@ -2084,8 +2084,8 @@ static void MAG_HOTPROC mag_blas_div_e5m10(const mag_CPUKernelPayload* _Nonnull 
         }
         return;
     }
-    for (int64_t idx = ra; idx < rb; ++idx) { /* General case */
-        int64_t tmp  = idx;
+    for (int64_t i=ra; i < rb; ++i) { /* General case */
+        int64_t tmp  = i;
         int64_t ri = 0;
         int64_t xi = 0;
         int64_t yi = 0;

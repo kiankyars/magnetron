@@ -194,6 +194,7 @@ extern MAG_EXPORT mag_Tensor* _Nonnull mag_tensor_full_like(mag_Tensor* _Nonnull
 
 extern MAG_EXPORT mag_Tensor* _Nonnull mag_clone(mag_Tensor* _Nonnull x);
 extern MAG_EXPORT mag_Tensor* _Nonnull mag_view(mag_Tensor* _Nonnull x);
+extern MAG_EXPORT mag_Tensor* _Nonnull mag_view_slice(mag_Tensor* _Nonnull x, int64_t dim, int64_t start, int64_t len, int64_t step);
 extern MAG_EXPORT mag_Tensor* _Nonnull mag_transpose(mag_Tensor* _Nonnull x);
 extern MAG_EXPORT mag_Tensor* _Nonnull mag_permute(mag_Tensor* _Nonnull x, const int64_t* _Nonnull dims, uint32_t num_dims);
 
@@ -286,25 +287,29 @@ extern MAG_EXPORT const char* _Nonnull mag_tensor_get_name(const mag_Tensor* _No
 extern MAG_EXPORT int64_t mag_tensor_get_rank(const mag_Tensor* _Nonnull t);                                              /* Get the rank (number of dimensions) of the tensor */
 extern MAG_EXPORT const int64_t* _Nonnull mag_tensor_get_shape(const mag_Tensor* _Nonnull t);                             /* Get the dimensions of the tensor */
 extern MAG_EXPORT const int64_t* _Nonnull mag_tensor_get_strides(const mag_Tensor* _Nonnull t);                           /* Get the strides of the tensor */
-extern MAG_EXPORT mag_DType mag_tensor_get_dtype(const mag_Tensor* _Nonnull t);                                         /* Get the data type of the tensor */
-extern MAG_EXPORT void* _Nonnull mag_tensor_get_data_ptr(const mag_Tensor* _Nonnull t);                                   /* Get the tensor raw buffer pointer. Might pointer to GPU or any other device memory. */
+extern MAG_EXPORT mag_DType mag_tensor_get_dtype(const mag_Tensor* _Nonnull t);                                           /* Get the data type of the tensor */
+extern MAG_EXPORT void* _Nonnull mag_tensor_get_data_ptr(const mag_Tensor* _Nonnull t);                                   /* Get pointer to first element. Might point to GPU or any other device memory. */
+extern MAG_EXPORT void* _Nonnull mag_tensor_get_storage_base_ptr(const mag_Tensor* _Nonnull t);                           /* Get pointer to storage memory block base. Might point to GPU or any other device memory. */
 extern MAG_EXPORT int64_t mag_tensor_get_data_size(const mag_Tensor* _Nonnull );                                          /* Get the size of the tensor buffer in bytes. */
 extern MAG_EXPORT int64_t mag_tensor_get_numel(const mag_Tensor* _Nonnull t);                                             /* Get the total amount of elements in the tensor. */
-extern MAG_EXPORT mag_Context* _Nonnull mag_tensor_get_ctx(const mag_Tensor* _Nonnull t);                                   /* Get the context of the tensor */
+extern MAG_EXPORT mag_Context* _Nonnull mag_tensor_get_ctx(const mag_Tensor* _Nonnull t);                                 /* Get the context of the tensor */
 extern MAG_EXPORT void* _Nullable mag_tensor_get_user_data(const mag_Tensor* _Nonnull t);                                 /* Get the user data of the tensor */
 extern MAG_EXPORT void mag_tensor_set_user_data(mag_Tensor* _Nonnull t, void* _Nullable ud);
 extern MAG_EXPORT int64_t mag_tensor_get_width(const mag_Tensor* _Nonnull t);
 extern MAG_EXPORT int64_t mag_tensor_get_height(const mag_Tensor* _Nonnull t);
 extern MAG_EXPORT int64_t mag_tensor_get_channels(const mag_Tensor* _Nonnull t);
+extern MAG_EXPORT bool mag_tensor_is_view(const mag_Tensor* _Nonnull t);                                                /* Check if the tensor is a view of another tensor */
+extern MAG_EXPORT mag_Tensor* _Nullable mag_tensor_get_view_base(const mag_Tensor* _Nonnull t);
+extern MAG_EXPORT size_t mag_tensor_get_view_offset(const mag_Tensor* _Nonnull t);
 
 /* ============ Tensor Shape Utils ============ */
 
-extern MAG_EXPORT bool mag_tensor_is_shape_eq(const mag_Tensor* _Nonnull x, const mag_Tensor* _Nonnull y);          /* Checks if a and b have the same shape. */
-extern MAG_EXPORT bool mag_tensor_are_strides_eq(const mag_Tensor* _Nonnull x, const mag_Tensor* _Nonnull y);       /* Checks if a and b have the same strides. */
-extern MAG_EXPORT bool mag_tensor_can_broadcast(const mag_Tensor* _Nonnull small, const mag_Tensor* _Nonnull big);  /* Checks if b can be broadcasted into a. */
-extern MAG_EXPORT bool mag_tensor_is_transposed(const mag_Tensor* _Nonnull t);                                        /* Check if the tensor is transposed */
-extern MAG_EXPORT bool mag_tensor_is_permuted(const mag_Tensor* _Nonnull t);                                          /* Check if the tensor is permuted */
-extern MAG_EXPORT bool mag_tensor_is_contiguous(const mag_Tensor* _Nonnull t);                                        /* Check if the tensor memory is contiguous */
+extern MAG_EXPORT bool mag_tensor_is_shape_eq(const mag_Tensor* _Nonnull x, const mag_Tensor* _Nonnull y);              /* Checks if a and b have the same shape. */
+extern MAG_EXPORT bool mag_tensor_are_strides_eq(const mag_Tensor* _Nonnull x, const mag_Tensor* _Nonnull y);           /* Checks if a and b have the same strides. */
+extern MAG_EXPORT bool mag_tensor_can_broadcast(const mag_Tensor* _Nonnull small, const mag_Tensor* _Nonnull big);      /* Checks if b can be broadcasted into a. */
+extern MAG_EXPORT bool mag_tensor_is_transposed(const mag_Tensor* _Nonnull t);                                          /* Check if the tensor is transposed */
+extern MAG_EXPORT bool mag_tensor_is_permuted(const mag_Tensor* _Nonnull t);                                            /* Check if the tensor is permuted */
+extern MAG_EXPORT bool mag_tensor_is_contiguous(const mag_Tensor* _Nonnull t);                                          /* Check if the tensor memory is contiguous */
 
 /* ============ Gradient & Backprop API ============ */
 
