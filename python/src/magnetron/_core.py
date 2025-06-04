@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from enum import Enum, unique
 from functools import lru_cache
 from os import getenv
+from typing import Optional
+
 from magnetron._bootstrap import load_native_module
 
 faulthandler.enable()
@@ -496,7 +498,7 @@ class Tensor:
         return _C.mag_tensor_is_view(self._ptr)
 
     @property
-    def view_base(self) -> 'Tensor' | None:
+    def view_base(self) -> Optional['Tensor']:
         if not self.is_view:
             return None
         ptr: _ffi.CData = _C.mag_tensor_get_view_base(self._ptr)
@@ -533,7 +535,7 @@ class Tensor:
         _C.mag_tensor_set_requires_grad(self._ptr, require)
 
     @property
-    def grad(self) -> 'Tensor':
+    def grad(self) -> Optional['Tensor']:
         if not self.requires_grad:
             return None
         ptr: _ffi.CData = _C.mag_tensor_get_grad(self._ptr)
