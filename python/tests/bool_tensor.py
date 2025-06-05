@@ -1,7 +1,7 @@
 from magnetron import *
 
-a = Tensor.from_data([True, False, True, True])
-b = Tensor.from_data([False, False, True, False])
+a = Tensor.bernoulli((4,))
+b = Tensor.bernoulli((4,))
 print(a & b)
 print(a | b)
 print(a ^ b)
