@@ -1159,9 +1159,7 @@ void mag_tensor_set_arg(mag_Tensor* t, size_t slot, mag_Tensor* arg) {
 }
 
 uint64_t mag_tensor_get_refcount(const mag_Tensor* t) { return t->rc_control.rc; }
-
 uint64_t mag_tensor_get_storage_refcount(const mag_Tensor* t) { return t->storage->rc_control.rc; }
-
 size_t mag_tensor_get_memory_usage(const mag_Tensor* t) {
     return sizeof(*t) + mag_tensor_get_data_size(t);
 }

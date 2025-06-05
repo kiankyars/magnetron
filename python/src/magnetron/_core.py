@@ -37,7 +37,17 @@ class PRNGAlgorithm(Enum):
     PCG = _C.MAG_PRNG_PCG
 
 
-DataType = namedtuple('DataType', ['enum_value', 'size', 'name'])
+@dataclass(frozen=True)
+class DataType:
+    enum_value: int
+    size: int
+    name: str
+
+    def __str__(self) -> str:
+        return self.name
+
+    def __repr__(self) -> str:
+        return self.name
 
 e8m23: DataType = DataType(_C.MAG_DTYPE_E8M23, 4, 'e8m23')
 e5m10: DataType = DataType(_C.MAG_DTYPE_E5M10, 2, 'e5m10')
@@ -207,7 +217,7 @@ def _deduce_tensor_dtype(obj: any) -> tuple[DataType, str, _ffi.CData]:
 def _validate_dtype_compat(dtypes: set[DataType], *kwargs):
     for (i, tensor) in enumerate(kwargs):
         if tensor.dtype not in dtypes:
-            raise TypeError(f'Unsupported data type of argument {i+1} for operator: {tensor.dtype.name}')
+            raise TypeError(f'Unsupported data type of argument {i+1} for operator: {tensor.dtype}')
 
 def _get_reduction_axes(dim: int | tuple[int] | None) -> tuple[_ffi.CData, int]:
     if dim is None:
@@ -881,6 +891,15 @@ class Tensor:
         _validate_dtype_compat(_BOOLEAN_DTYPES, self, other)
         return Tensor(_C.mag_xor_(self._ptr, other._ptr))
 
+    def logical_not(self):
+        _validate_dtype_compat(_BOOLEAN_DTYPES, self)
+        return Tensor(_C.mag_not(self._ptr))
+
+    def logical_not_(self):
+        _validate_dtype_compat(_BOOLEAN_DTYPES, self)
+        self._validate_inplace_op()
+        return Tensor(_C.mag_not_(self._ptr))
+
     def __add__(self, other: object | int | float) -> 'Tensor':
         if not isinstance(other, Tensor):
             other = Tensor.full(self.shape, fill_value=float(other))
@@ -985,6 +1004,10 @@ class Tensor:
     def __ixor__(self, other: 'Tensor') -> 'Tensor':
         _validate_dtype_compat(_BOOLEAN_DTYPES, self, other)
         return Tensor(_C.mag_xor_(self._ptr, other._ptr))
+
+    def __invert__(self) -> 'Tensor':
+        _validate_dtype_compat(_BOOLEAN_DTYPES, self)
+        return Tensor(_C.mag_not(self._ptr))
 
     def __eq__(self, other: 'Tensor') -> bool:
         _validate_dtype_compat(_BOOLEAN_DTYPES, self, other)

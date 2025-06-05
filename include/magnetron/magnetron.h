@@ -274,6 +274,8 @@ extern MAG_EXPORT mag_Tensor* _Nonnull mag_or(mag_Tensor* _Nonnull x, mag_Tensor
 extern MAG_EXPORT mag_Tensor* _Nonnull mag_or_(mag_Tensor* _Nonnull x, mag_Tensor* _Nonnull y);
 extern MAG_EXPORT mag_Tensor* _Nonnull mag_xor(mag_Tensor* _Nonnull x, mag_Tensor* _Nonnull y);
 extern MAG_EXPORT mag_Tensor* _Nonnull mag_xor_(mag_Tensor* _Nonnull x, mag_Tensor* _Nonnull y);
+extern MAG_EXPORT mag_Tensor* _Nonnull mag_not(mag_Tensor* _Nonnull x);
+extern MAG_EXPORT mag_Tensor* _Nonnull mag_not_(mag_Tensor* _Nonnull x);
 
 /* ============ Tensor Init Operators ============ */
 
