@@ -106,6 +106,7 @@ MAG_NORET MAG_COLDPROC MAG_EXPORT void mag_panic(const char* msg, ...) { /* Pani
             fclose(f), f = NULL;
         }
     #endif
+    fflush(stdout);
     mag_panic_dump(stderr, true, msg, args);
     va_end(args);
     #ifdef NDEBUG

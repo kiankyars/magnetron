@@ -61,13 +61,15 @@ class DataType:
 
 e8m23: DataType = DataType(_C.MAG_DTYPE_E8M23, 4, 'e8m23', True)
 e5m10: DataType = DataType(_C.MAG_DTYPE_E5M10, 2, 'e5m10', True)
+boolean: DataType = DataType(_C.MAG_DTYPE_BOOL, 1, 'bool', False)
 
 f32: DataType = e8m23
 f16: DataType = e5m10
 
-_dtype_enum_map: dict[int, DataType] = {
+_DTYPE_ENUM_MAP: dict[int, DataType] = {
     e8m23.enum_value: e8m23,
     e5m10.enum_value: e5m10,
+    boolean.enum_value: boolean,
 }
 
 
@@ -206,6 +208,13 @@ def _flatten_nested_lists(nested: object) -> tuple[tuple[int, ...], list[float]]
             assert s == first_shape, 'All sub-lists must have the same shape'
         return (len(nested),) + first_shape, flattened
 
+def _deduce_tensor_dtype(obj: any) -> tuple[DataType, str, _ffi.CData]:
+    if isinstance(obj, bool):
+        return boolean, 'uint8_t', _C.mag_tensor_fill_from_raw_bytes
+    elif isinstance(obj, float) or isinstance(obj, int):
+        return f32, 'float', _C.mag_tensor_fill_from_floats
+    else:
+        raise TypeError(f'Invalid data type: {type(obj)}')
 
 class Tensor:
     """A 1-6 dimensional tensor with support for automatic differentiation."""
@@ -316,13 +325,16 @@ class Tensor:
     @classmethod
     def from_data(
         cls,
-        data: list[float, ...],
+        data: list[float, ...] | list[bool, ...],
         *,
-        dtype: DataType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> 'Tensor':
+        if not data:
+            return cls.empty(shape=(0,), dtype=e8m23)
+
         shape, flattened_data = _flatten_nested_lists(data)
+        dtype, native_name, alloc_fn = _deduce_tensor_dtype(flattened_data[0])
         tensor = cls(
             native_object=None,
             ctx=Context.primary(),
@@ -331,11 +343,8 @@ class Tensor:
             requires_grad=requires_grad,
             name=name,
         )
-        _C.mag_tensor_fill_from_floats(
-            tensor._ptr,
-            _ffi.new(f'float[{len(flattened_data)}]', flattened_data),
-            len(flattened_data),
-        )
+        staging_buffer: _ffi.CData = _ffi.new(f'{native_name}[{len(flattened_data)}]', flattened_data)
+        alloc_fn(tensor._ptr, staging_buffer, len(flattened_data))
         return tensor
 
     @classmethod
@@ -448,8 +457,8 @@ class Tensor:
     @property
     def dtype(self) -> DataType:
         dtype_value: int = _C.mag_tensor_get_dtype(self._ptr)
-        assert dtype_value in _dtype_enum_map, f'Unsupported tensor dtype: {dtype_value}'
-        return _dtype_enum_map[dtype_value]
+        assert dtype_value in _DTYPE_ENUM_MAP, f'Unsupported tensor dtype: {dtype_value}'
+        return _DTYPE_ENUM_MAP[dtype_value]
 
     @property
     def data_ptr(self) -> int:
@@ -772,6 +781,24 @@ class Tensor:
         self._validate_inplace_op()
         return Tensor(_C.mag_gelu_(self._ptr))
 
+    def logical_and(self, other: 'Tensor'):
+        return Tensor(_C.mag_and(self._ptr, other._ptr))
+
+    def logical_and_(self, other: 'Tensor'):
+        return Tensor(_C.mag_and_(self._ptr, other._ptr))
+
+    def logical_or(self, other: 'Tensor'):
+        return Tensor(_C.mag_and(self._ptr, other._ptr))
+
+    def logical_or_(self, other: 'Tensor'):
+        return Tensor(_C.mag_or_(self._ptr, other._ptr))
+
+    def logical_xor(self, other: 'Tensor'):
+        return Tensor(_C.mag_and(self._ptr, other._ptr))
+
+    def logical_xor_(self, other: 'Tensor'):
+        return Tensor(_C.mag_xor_(self._ptr, other._ptr))
+
     def __add__(self, other: object | int | float) -> 'Tensor':
         if not isinstance(other, Tensor):
             other = Tensor.full(self.shape, fill_value=float(other))
@@ -839,12 +866,23 @@ class Tensor:
         self._validate_inplace_op()
         return Tensor(_C.mag_matmul_(self._ptr, other._ptr))
 
-    def __pow__(self, exponent: int | float) -> 'Tensor':
-        return Tensor(_C.mag_pows(self._ptr, float(exponent)))
+    def __and__(self, other: 'Tensor') -> 'Tensor':
+        return Tensor(_C.mag_and(self._ptr, other._ptr))
 
-    def __ipow__(self, exponent: int | float) -> 'Tensor':
-        self._validate_inplace_op()
-        return Tensor(_C.mag_pows_(self._ptr, float(exponent)))
+    def __iand__(self, other: 'Tensor') -> 'Tensor':
+        return Tensor(_C.mag_and_(self._ptr, other._ptr))
+
+    def __or__(self, other: 'Tensor') -> 'Tensor':
+        return Tensor(_C.mag_or(self._ptr, other._ptr))
+
+    def __ior__(self, other: 'Tensor') -> 'Tensor':
+        return Tensor(_C.mag_or_(self._ptr, other._ptr))
+
+    def __xor__(self, other: 'Tensor') -> 'Tensor':
+        return Tensor(_C.mag_xor(self._ptr, other._ptr))
+
+    def __ixor__(self, other: 'Tensor') -> 'Tensor':
+        return Tensor(_C.mag_xor_(self._ptr, other._ptr))
 
     def __eq__(self, other: 'Tensor') -> bool:
         return _C.mag_tensor_eq(self._ptr, other._ptr)
