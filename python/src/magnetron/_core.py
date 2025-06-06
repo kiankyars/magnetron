@@ -213,7 +213,7 @@ def _deduce_tensor_dtype(obj: any) -> tuple[DataType, str, _ffi.CData]:
     if isinstance(obj, bool):
         return boolean, 'uint8_t', _C.mag_tensor_fill_from_raw_bytes
     elif isinstance(obj, float) or isinstance(obj, int):
-        return f32, 'float', _C.mag_tensor_fill_from_floats
+        return float32, 'float', _C.mag_tensor_fill_from_floats
     else:
         raise TypeError(f'Invalid data type: {type(obj)}')
 
@@ -586,8 +586,8 @@ class Tensor:
 
     @requires_grad.setter
     def requires_grad(self, require: bool) -> None:
-        if require and self.is_floating_point:
-            raise RuntimeError('Tensors requiring gradients must be of floating point type')
+        if require and not self.is_floating_point:
+            raise RuntimeError(f'Tensors requiring gradients must be of a floating point type, but is: {self.dtype}')
         _C.mag_tensor_set_requires_grad(self._ptr, require)
 
     @property

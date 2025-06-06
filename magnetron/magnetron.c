@@ -1606,7 +1606,7 @@ static void mag_fmt_single_elem(mag_StrStream* ss, const void* buf, size_t i, ma
             mag_strstream_append(ss, "%s", ((const uint8_t*)buf)[i] ? "True" : "False");
         return;
         case MAG_DTYPE_I32:
-        mag_strstream_append(ss, "%" PRIi32, ((const int32_t*)buf)[i]);
+            mag_strstream_append(ss, "%" PRIi32, ((const int32_t*)buf)[i]);
         return;
         default:
             mag_panic("DType formatting not implemented: %d", dtype);
