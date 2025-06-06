@@ -96,7 +96,7 @@ static void MAG_COLDPROC mag_panic_dump(FILE* f, bool cc, const char* msg, va_li
     fflush(f);
 }
 
-MAG_NORET MAG_COLDPROC MAG_EXPORT void mag_panic(const char* msg, ...) { /* Panic and exit the program. If available print backtrace. */
+MAG_NORET MAG_COLDPROC void mag_panic(const char* msg, ...) { /* Panic and exit the program. If available print backtrace. */
     va_list args;
     va_start(args, msg);
     #if 0
