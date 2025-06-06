@@ -1057,7 +1057,7 @@ void mag_tensor_fill(mag_Tensor* t, mag_E8M23 x) {
     t->init_op = MAG_IOP_BROADCAST;
     mag_OPParamLayout layout;
     mag_op_param_layout_init(&layout);
-    mag_op_param_layout_insert(&layout, mag_op_param_wrap_e8m23(x));
+    mag_op_param_layout_insert(&layout, mag_tensor_is_integral_typed(t) ? mag_op_param_wrap_i64(x) : mag_op_param_wrap_e8m23(x)); /* TODO: data is lost here from x as fp32 */
     mag_op_param_layout_transfer(&layout, &t->init_op_params);
     mag_op_exec(t, t->ctx->device, MAG_STAGE_INIT);
 }
@@ -1818,10 +1818,12 @@ const mag_OPMetadata* mag_op_meta_of(mag_Operator opc) {
                 [0] = {
                     {.type=MAG_DTYPE_E8M23, .is_used=true},
                     {.type=MAG_DTYPE_E5M10, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 },
                 [1] = {
                     {.type=MAG_DTYPE_E8M23, .is_used=true},
                     {.type=MAG_DTYPE_E5M10, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 }
             },
             .op_param_layout = {},
@@ -1842,10 +1844,12 @@ const mag_OPMetadata* mag_op_meta_of(mag_Operator opc) {
                 [0] = {
                     {.type=MAG_DTYPE_E8M23, .is_used=true},
                     {.type=MAG_DTYPE_E5M10, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 },
                 [1] = {
                     {.type=MAG_DTYPE_E8M23, .is_used=true},
                     {.type=MAG_DTYPE_E5M10, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 }
             },
             .op_param_layout = {},
@@ -1866,10 +1870,12 @@ const mag_OPMetadata* mag_op_meta_of(mag_Operator opc) {
                 [0] = {
                     {.type=MAG_DTYPE_E8M23, .is_used=true},
                     {.type=MAG_DTYPE_E5M10, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 },
                 [1] = {
                     {.type=MAG_DTYPE_E8M23, .is_used=true},
                     {.type=MAG_DTYPE_E5M10, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 }
             },
             .op_param_layout = {},
@@ -1889,11 +1895,13 @@ const mag_OPMetadata* mag_op_meta_of(mag_Operator opc) {
             .input_dtypes = {
                 [0] = {
                     {.type=MAG_DTYPE_E8M23, .is_used=true},
-                     {.type=MAG_DTYPE_E5M10, .is_used=true},
+                    {.type=MAG_DTYPE_E5M10, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 },
                 [1] = {
                     {.type=MAG_DTYPE_E8M23, .is_used=true},
                     {.type=MAG_DTYPE_E5M10, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 }
             },
             .op_param_layout = {},
@@ -1955,9 +1963,11 @@ const mag_OPMetadata* mag_op_meta_of(mag_Operator opc) {
             .input_dtypes = {
                 [0] = {
                     {.type=MAG_DTYPE_BOOL, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 },
                 [1] = {
                     {.type=MAG_DTYPE_BOOL, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 }
             },
             .op_param_layout = {},
@@ -1977,9 +1987,11 @@ const mag_OPMetadata* mag_op_meta_of(mag_Operator opc) {
             .input_dtypes = {
                 [0] = {
                     {.type=MAG_DTYPE_BOOL, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 },
                 [1] = {
                     {.type=MAG_DTYPE_BOOL, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 }
             },
             .op_param_layout = {},
@@ -1999,9 +2011,11 @@ const mag_OPMetadata* mag_op_meta_of(mag_Operator opc) {
             .input_dtypes = {
                 [0] = {
                     {.type=MAG_DTYPE_BOOL, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 },
                 [1] = {
                     {.type=MAG_DTYPE_BOOL, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 }
             },
             .op_param_layout = {},
@@ -2021,6 +2035,7 @@ const mag_OPMetadata* mag_op_meta_of(mag_Operator opc) {
             .input_dtypes = {
                 [0] = {
                     {.type=MAG_DTYPE_BOOL, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 }
             },
             .op_param_layout = {},

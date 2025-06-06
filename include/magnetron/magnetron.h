@@ -159,9 +159,10 @@ typedef struct mag_Tensor mag_Tensor;
  * @brief Data types for tensors.
  */
 typedef enum mag_DType {
-    MAG_DTYPE_E8M23,        /* IEEE-754 32-bit floating point number */
-    MAG_DTYPE_E5M10,        /* IEEE-754 16-bit floating point number */
+    MAG_DTYPE_E8M23,        /* IEEE-754 32-bit floating point number. Commonly known as float32, f32. */
+    MAG_DTYPE_E5M10,        /* IEEE-754 16-bit floating point number. Commonly known as float16, f16, half. */
     MAG_DTYPE_BOOL,         /* 1-byte boolean */
+    MAG_DTYPE_I32,          /* 32-bit signed integer */
 
     MAG_DTYPE__NUM
 } mag_DType;

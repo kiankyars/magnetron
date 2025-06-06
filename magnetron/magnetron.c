@@ -979,6 +979,11 @@ const mag_DTypeMetadata* mag_dtype_meta_of(mag_DType type) {
             .size=sizeof(uint8_t),
             .align=__alignof__(uint8_t),
         },
+        [MAG_DTYPE_I32] = {
+            .name="i32",
+            .size=sizeof(int32_t),
+            .align=__alignof__(int32_t),
+        },
     };
     return &infos[type];
 }
@@ -1599,6 +1604,9 @@ static void mag_fmt_single_elem(mag_StrStream* ss, const void* buf, size_t i, ma
         return;
         case MAG_DTYPE_BOOL:
             mag_strstream_append(ss, "%s", ((const uint8_t*)buf)[i] ? "True" : "False");
+        return;
+        case MAG_DTYPE_I32:
+        mag_strstream_append(ss, "%" PRIi32, ((const int32_t*)buf)[i]);
         return;
         default:
             mag_panic("DType formatting not implemented: %d", dtype);

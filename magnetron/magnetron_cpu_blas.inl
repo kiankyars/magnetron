@@ -1430,9 +1430,13 @@ static MAG_AINLINE int64_t mag_offset_from_flat(const mag_Tensor* _Nonnull t, in
 
 static MAG_HOTPROC void mag_blas_clone_e8m23(const mag_CPUKernelPayload* _Nonnull payload) {
     mag_Tensor*  r  = payload->node;
-    const mag_Tensor* x  = r->op_inputs[0];
+    const mag_Tensor* x = r->op_inputs[0];
     mag_E8M23* br = mag_e8m23p_mut(r);
     const mag_E8M23* bx = mag_e8m23p(x);
+    if (mag_likely(mag_tensor_is_contiguous(x))) { /* Fast path for contiguous X */
+        memcpy(br, bx, mag_tensor_get_data_size(r));
+        return;
+    }
     for (int64_t i=0; i < r->numel; ++i) {
         int64_t off_src = mag_offset_from_flat(x, i);
         br[i] = bx[off_src];
@@ -1441,9 +1445,13 @@ static MAG_HOTPROC void mag_blas_clone_e8m23(const mag_CPUKernelPayload* _Nonnul
 
 static MAG_HOTPROC void mag_blas_clone_e5m10(const mag_CPUKernelPayload* _Nonnull payload) {
     mag_Tensor* r = payload->node;
-    const mag_Tensor* x  = r->op_inputs[0];
+    const mag_Tensor* x = r->op_inputs[0];
     mag_E5M10* br = mag_e5m10p_mut(r);
     const mag_E5M10* bx = mag_e5m10p(x);
+    if (mag_likely(mag_tensor_is_contiguous(x))) { /* Fast path for contiguous X */
+        memcpy(br, bx, mag_tensor_get_data_size(r));
+        return;
+    }
     for (int64_t i=0; i < r->numel; ++i) {
         int64_t off_src = mag_offset_from_flat(x, i);
         br[i] = bx[off_src];
@@ -1452,9 +1460,28 @@ static MAG_HOTPROC void mag_blas_clone_e5m10(const mag_CPUKernelPayload* _Nonnul
 
 static MAG_HOTPROC void mag_blas_clone_bool(const mag_CPUKernelPayload* _Nonnull payload) {
     mag_Tensor* r = payload->node;
-    const mag_Tensor* x  = r->op_inputs[0];
+    const mag_Tensor* x = r->op_inputs[0];
     uint8_t* br = mag_boolp_mut(r);
     const uint8_t* bx = mag_boolp(x);
+    if (mag_likely(mag_tensor_is_contiguous(x))) { /* Fast path for contiguous X */
+        memcpy(br, bx, mag_tensor_get_data_size(r));
+        return;
+    }
+    for (int64_t i=0; i < r->numel; ++i) {
+        int64_t off_src = mag_offset_from_flat(x, i);
+        br[i] = bx[off_src];
+    }
+}
+
+static MAG_HOTPROC void mag_blas_clone_i32(const mag_CPUKernelPayload* _Nonnull payload) {
+    mag_Tensor* r = payload->node;
+    const mag_Tensor* x = r->op_inputs[0];
+    int32_t* br = mag_i32p_mut(r);
+    const int32_t* bx = mag_i32p(x);
+    if (mag_likely(mag_tensor_is_contiguous(x))) { /* Fast path for contiguous X */
+        memcpy(br, bx, mag_tensor_get_data_size(r));
+        return;
+    }
     for (int64_t i=0; i < r->numel; ++i) {
         int64_t off_src = mag_offset_from_flat(x, i);
         br[i] = bx[off_src];
@@ -1485,8 +1512,17 @@ static MAG_HOTPROC void mag_blas_init_broadcast_e5m10(const mag_CPUKernelPayload
 
 static MAG_HOTPROC void mag_blas_init_broadcast_bool(const mag_CPUKernelPayload* _Nonnull payload) {
     mag_Tensor* r = payload->node;
-    bool xi = mag_op_param_unpack_e8m23_or_panic(r->init_op_params[0]) > 0.F;
+    bool xi = mag_op_param_unpack_i64_or_panic(r->init_op_params[0]) != 0;
     uint8_t* b_r = mag_boolp_mut(r);
+    int64_t numel = r->numel;
+    for (int64_t i=0; i < numel; ++i)
+        b_r[i] = xi;
+}
+
+static MAG_HOTPROC void mag_blas_init_broadcast_i32(const mag_CPUKernelPayload* _Nonnull payload) {
+    mag_Tensor* r = payload->node;
+    int32_t xi = (int32_t)mag_op_param_unpack_i64_or_panic(r->init_op_params[0]);
+    int32_t* b_r = mag_i32p_mut(r);
     int64_t numel = r->numel;
     for (int64_t i=0; i < numel; ++i)
         b_r[i] = xi;
@@ -5901,11 +5937,13 @@ static void (*_Nonnull const mag_blas_lut_init_kernels[MAG_IOP__NUM][MAG_DTYPE__
         [MAG_DTYPE_E8M23] = &mag_blas_nop,
         [MAG_DTYPE_E5M10] = &mag_blas_nop,
         [MAG_DTYPE_BOOL] = &mag_blas_nop,
+        [MAG_DTYPE_I32] = &mag_blas_nop,
     },
     [MAG_IOP_BROADCAST] = {
         [MAG_DTYPE_E8M23] = &mag_blas_init_broadcast_e8m23,
         [MAG_DTYPE_E5M10] = &mag_blas_init_broadcast_e5m10,
         [MAG_DTYPE_BOOL] = &mag_blas_init_broadcast_bool,
+        [MAG_DTYPE_I32] = &mag_blas_init_broadcast_i32,
     },
     [MAG_IOP_RAND_UNIFORM] = {
         [MAG_DTYPE_E8M23] = &mag_blas_init_rand_uniform_e8m23,
@@ -6067,18 +6105,22 @@ static void (*_Nonnull const mag_blas_lut_eval_kernels[MAG_OP__NUM][MAG_DTYPE__N
     [MAG_OP_ADD] = {
         [MAG_DTYPE_E8M23] = &mag_blas_add_e8m23,
         [MAG_DTYPE_E5M10] = &mag_blas_add_e5m10,
+        [MAG_DTYPE_I32] = &mag_blas_add_i32,
     },
     [MAG_OP_SUB] = {
         [MAG_DTYPE_E8M23] = &mag_blas_sub_e8m23,
         [MAG_DTYPE_E5M10] = &mag_blas_sub_e5m10,
+        [MAG_DTYPE_I32] = &mag_blas_sub_i32,
     },
     [MAG_OP_MUL] = {
         [MAG_DTYPE_E8M23] = &mag_blas_mul_e8m23,
         [MAG_DTYPE_E5M10] = &mag_blas_mul_e5m10,
+        [MAG_DTYPE_I32] = &mag_blas_mul_i32,
     },
     [MAG_OP_DIV] = {
         [MAG_DTYPE_E8M23] = &mag_blas_div_e8m23,
         [MAG_DTYPE_E5M10] = &mag_blas_div_e5m10,
+        [MAG_DTYPE_I32] = &mag_blas_div_i32,
     },
     [MAG_OP_ADDS] = {
         [MAG_DTYPE_E8M23] = &mag_blas_adds_e8m23,
@@ -6110,15 +6152,19 @@ static void (*_Nonnull const mag_blas_lut_eval_kernels[MAG_OP__NUM][MAG_DTYPE__N
     },
     [MAG_OP_AND] = {
         [MAG_DTYPE_BOOL] = &mag_blas_and_bool,
+        [MAG_DTYPE_I32] = &mag_blas_and_i32,
     },
     [MAG_OP_OR] = {
         [MAG_DTYPE_BOOL] = &mag_blas_or_bool,
+        [MAG_DTYPE_I32] = &mag_blas_or_i32,
     },
     [MAG_OP_XOR] = {
         [MAG_DTYPE_BOOL] = &mag_blas_xor_bool,
+        [MAG_DTYPE_I32] = &mag_blas_xor_i32,
     },
     [MAG_OP_NOT] = {
         [MAG_DTYPE_BOOL] = &mag_blas_not_bool,
+        [MAG_DTYPE_I32] = &mag_blas_not_i32,
     },
 };
 
