@@ -117,21 +117,50 @@ namespace magnetron::test {
             tensor t_a {ctx, ty, shape};
             t_a.fill_rand_uniform(min, max);
             tensor t_b {t_a.clone()};
-            std::vector<e8m23_t> d_a {t_a.to_vector()};
-            std::vector<e8m23_t> d_b {t_b.to_vector()};
+            std::vector<e8m23_t> d_a {t_a.to_float_vector()};
+            std::vector<e8m23_t> d_b {t_b.to_float_vector()};
             tensor t_r {std::invoke(a, t_a, t_b)};
             if constexpr (INPLACE) {
                 ASSERT_EQ(t_a.data_ptr(), t_r.data_ptr());
             } else {
                 ASSERT_NE(t_a.data_ptr(), t_r.data_ptr());
             }
-            std::vector<e8m23_t> d_r {t_r.to_vector()};
+            std::vector<e8m23_t> d_r {t_r.to_float_vector()};
             ASSERT_EQ(d_a.size(), d_b.size());
             ASSERT_EQ(d_a.size(), d_r.size());
             ASSERT_EQ(t_a.dtype(), t_b.dtype());
             ASSERT_EQ(t_a.dtype(), t_r.dtype());
             for (std::int64_t i = 0; i < d_r.size(); ++i) {
                 ASSERT_NEAR(std::invoke(b, d_a[i], d_b[i]), d_r[i], eps);
+            }
+        });
+    }
+
+    template <bool BROADCAST, bool INPLACE, typename A, typename B>
+     requires std::is_invocable_r_v<tensor, A, tensor, tensor> && std::is_invocable_v<B, bool, bool>
+    auto test_binary_boolean_operator(std::int64_t lim, A&& a, B&& b) -> decltype(auto) {
+        auto ctx = context{compute_device::cpu};
+        ctx.stop_grad_recorder();
+        for_all_shape_perms(lim, BROADCAST ? 2 : 1, [&](std::span<const std::int64_t> shape) {
+            tensor t_a {ctx, dtype::boolean, shape};
+            t_a.fill(1.0f);
+            tensor t_b {t_a.clone()};
+            t_b.fill(0.0f);
+            std::vector<bool> d_a {t_a.to_bool_vector()};
+            std::vector<bool> d_b {t_b.to_bool_vector()};
+            tensor t_r {std::invoke(a, t_a, t_b)};
+            if constexpr (INPLACE) {
+                ASSERT_EQ(t_a.data_ptr(), t_r.data_ptr());
+            } else {
+                ASSERT_NE(t_a.data_ptr(), t_r.data_ptr());
+            }
+            std::vector<bool> d_r {t_r.to_bool_vector()};
+            ASSERT_EQ(d_a.size(), d_b.size());
+            ASSERT_EQ(d_a.size(), d_r.size());
+            ASSERT_EQ(t_a.dtype(), t_b.dtype());
+            ASSERT_EQ(t_a.dtype(), t_r.dtype());
+            for (std::int64_t i = 0; i < d_r.size(); ++i) {
+                ASSERT_EQ(std::invoke(b, d_a[i], d_b[i]), d_r[i]);
             }
         });
     }
@@ -170,7 +199,7 @@ namespace magnetron::test {
             tensor t_a = SUBVIEW ?  make_random_view(base) : base;
             if constexpr (SUBVIEW)
                 ASSERT_TRUE(t_a.is_view());
-            std::vector<e8m23_t> d_a{t_a.to_vector()};
+            std::vector<e8m23_t> d_a{t_a.to_float_vector()};
             tensor t_r = std::invoke(a, t_a);
             if constexpr (INPLACE)
                 ASSERT_EQ(t_a.data_ptr(), t_r.data_ptr());
@@ -178,7 +207,7 @@ namespace magnetron::test {
                 ASSERT_NE(t_a.data_ptr(), t_r.data_ptr());
             if constexpr (INPLACE)
                 ASSERT_EQ(t_a.storage_base_ptr(), t_r.storage_base_ptr());
-            std::vector<e8m23_t> d_r{t_r.to_vector()};
+            std::vector<e8m23_t> d_r{t_r.to_float_vector()};
             ASSERT_EQ(d_a.size(), d_r.size());
             for (std::size_t i = 0; i < d_r.size(); ++i)
                 ASSERT_NEAR(std::invoke(b, d_a[i]), d_r[i], eps);
@@ -333,7 +362,7 @@ namespace magnetron::test {
             }
 
             [[nodiscard]] auto operator()(tensor x) const -> tensor {
-                tensor y {x & weight->T()};
+                tensor y {x % weight->T()};
                 if (bias)
                     y = y + *bias;
                 return y;

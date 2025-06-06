@@ -748,10 +748,15 @@ typedef enum mag_Operator {
     MAG_OP_POWS,
     MAG_OP_MATMUL,
     MAG_OP_REPEAT_BACK,
+    MAG_OP_AND,
+    MAG_OP_OR,
+    MAG_OP_XOR,
+    MAG_OP_NOT,
+
     MAG_OP__NUM
 } mag_Operator;
 mag_static_assert(MAG_OP_NOP == 0);
-mag_static_assert(MAG_OP_REPEAT_BACK+1 == MAG_OP__NUM);
+mag_static_assert(MAG_OP_NOT+1 == MAG_OP__NUM);
 mag_static_assert(MAG_OP__NUM <= 0xff);
 
 /* Initialization opcodes. */
@@ -760,6 +765,7 @@ typedef enum mag_InitOperator {
     MAG_IOP_BROADCAST,
     MAG_IOP_RAND_UNIFORM,
     MAG_IOP_RAND_NORMAL,
+    MAG_IOP_RAND_BERNOULLI,
     MAG_IOP__NUM
 } mag_InitOperator;
 
@@ -770,29 +776,38 @@ typedef enum mag_OPFlags {
 } mag_OPFlags;
 
 typedef struct mag_OPParamSlot {
-    mag_OPParamType type;           /* Type of the parameter. */
-    bool is_required;               /* Is the parameter required? */
+    mag_OPParamType type;
+    bool is_required;
 } mag_OPParamSlot;
+
+typedef struct mag_DTypeSlot {
+    mag_DType type;
+    bool is_used;
+} mag_DTypeSlot;
 
 /* Stores operator metadata such as operation type, number of inputs and parameters, and the types of the parameters. */
 typedef struct mag_OPMetadata {
-    const char* const _Nonnull mnemonic;                    /* Operation mnemonic */
-    const char* const _Nonnull desc;                        /* Operation mnemonic */
-    const uint8_t input_count;                               /* Number of inputs */
-    const mag_OPParamSlot op_param_layout[MAG_MAX_OP_PARAMS];    /* Parameter types */
-    const mag_OPFlags flags;                             /* Operation flags */
+    const char* const _Nonnull mnemonic;                                    /* Operation mnemonic */
+    const char* const _Nonnull desc;                                        /* Operation mnemonic */
+    const uint8_t input_count;                                              /* Number of inputs */
+    const mag_DTypeSlot input_dtypes[MAG_MAX_OP_INPUTS][MAG_DTYPE__NUM];    /* Input data types */
+    const mag_OPParamSlot op_param_layout[MAG_MAX_OP_PARAMS];               /* Parameter types */
+    const mag_OPFlags flags;                                                /* Operation flags */
 
-    void (*_Nullable const backward)(                       /* Backward pass function or NULL. */
+    /* Backward pass function or NULL if op is not differentiable */
+    void (*_Nullable const backward)(
         mag_Tensor* _Nonnull,
         mag_Tensor* _Nonnull* _Nonnull
     );
 
-    mag_Tensor* _Nonnull (*_Nullable const r_alloc)(      /* Result allocator function or NULL. */
+    /* Result allocator function or NULL. */
+    mag_Tensor* _Nonnull (*_Nullable const r_alloc)(
         mag_Tensor* _Nonnull* _Nonnull,
         const mag_OPParam* _Nullable
     );
 
-    bool (*_Nullable const validator)(                      /* Validator function or NULL. */
+    /* Validator function or NULL. */
+    bool (*_Nullable const validator)(
         mag_StrStream* _Nullable* _Nonnull,
         bool,
         mag_Tensor* _Nonnull,

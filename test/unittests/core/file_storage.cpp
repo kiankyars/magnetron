@@ -92,8 +92,8 @@ TEST(file_storage, deserialize) {
         ASSERT_EQ(b.data_size(), 4*4*sizeof(float));
         ASSERT_EQ(a.numel(), 2*2);
         ASSERT_EQ(b.numel(), 4*4);
-        std::vector<mag_E8M23> dat_a {a.to_vector()};
-        std::vector<mag_E8M23> dat_b {b.to_vector()};
+        std::vector<mag_E8M23> dat_a {a.to_float_vector()};
+        std::vector<mag_E8M23> dat_b {b.to_float_vector()};
         for (std::size_t i {}; i < a.numel(); ++i) {
             ASSERT_FLOAT_EQ(dat_a[i], fill_a[i]);
         }
@@ -158,7 +158,7 @@ TEST(file_storage, stress_roundtrip) {
                 auto opt = reader.get(std::to_string(i));
                 ASSERT_TRUE(opt.has_value()) << "Missing tensor " << i;
                 tensor t = *opt;
-                auto loaded = t.to_vector();
+                auto loaded = t.to_float_vector();
                 auto &orig = reference[i];
                 ASSERT_EQ(loaded.size(), orig.size())
                     << "Size mismatch at tensor " << i;
