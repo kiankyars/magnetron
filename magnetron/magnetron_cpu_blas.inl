@@ -615,7 +615,7 @@ static __m256 mag_simd_tanh(__m256 x) {
 
 #elif defined(__SSE2__)
 
-static __m128 mag_simd_expf(const __m128 x) {
+static __m128 mag_simd_expf(__m128 x) {
     __m128 r = _mm_set1_ps(0x1.8p23f);
     __m128 z = _mm_add_ps(_mm_mul_ps(x, _mm_set1_ps(0x1.715476p+0f)), r);
     __m128 n = _mm_sub_ps(z, r);
@@ -654,7 +654,7 @@ static __m128 mag_simd_tanh(__m128 x) {
     return _mm_add_ps(neg_one, _mm_mul_ps(two, inv));
 }
 
-static void mag_simd_sincos(__m128 x, __m128 *osin, __m128 *ocos) {
+static void mag_simd_sincos(__m128 x, __m128* _Nonnull osin, __m128* _Nonnull ocos) {
     __m128 sign_mask_sin_ps = _mm_cmplt_ps(x, _mm_set1_ps(0.0f));
     __m128i sign_mask_sin = _mm_castps_si128(sign_mask_sin_ps);
     x = _mm_and_ps(x, _mm_castsi128_ps(_mm_set1_epi32(0x7fffffff)));
