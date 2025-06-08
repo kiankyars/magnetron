@@ -6,11 +6,11 @@ import magnetron as mag
 import numpy as np
 
 DTYPE_TO_NUMPY: dict[mag.DataType, np.dtype] = {
-    mag.f16: np.float16,
-    mag.f32: np.float32,
+    mag.float16: np.float16,
+    mag.float32: np.float32,
 }
 
-DTYPE_EPS: dict[mag.DataType, float] = {mag.f16: 1e-3, mag.f32: 1e-6}
+DTYPE_EPS: dict[mag.DataType, float] = {mag.float16: 1e-3, mag.float32: 1e-6}
 
 
 def tonumpy(t: mag.Tensor, dtype: mag.DataType) -> np.array:
@@ -86,109 +86,109 @@ def scalar_op(dtype: mag.DataType, f: callable, rhs: bool = True, lim: int = 4) 
     square_shape_permutations(compute, lim)
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_unary_op_abs(dtype: mag.DataType) -> None:
     unary_op(dtype, lambda x: x.abs(), lambda x: np.abs(x))
     with mag.no_grad():
         unary_op(dtype, lambda x: x.abs_(), lambda x: np.abs(x))
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_unary_op_neg(dtype: mag.DataType) -> None:
     unary_op(dtype, lambda x: -x, lambda x: -x)
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_unary_op_log(dtype: mag.DataType) -> None:
     unary_op(dtype, lambda x: x.log(), lambda x: np.log(x))
     with mag.no_grad():
         unary_op(dtype, lambda x: x.log_(), lambda x: np.log(x))
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_unary_op_sqr(dtype: mag.DataType) -> None:
     unary_op(dtype, lambda x: x.sqr(), lambda x: x * x)
     with mag.no_grad():
         unary_op(dtype, lambda x: x.sqr_(), lambda x: x * x)
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_unary_op_sqrt(dtype: mag.DataType) -> None:
     unary_op(dtype, lambda x: x.sqrt(), lambda x: np.sqrt(x))
     with mag.no_grad():
         unary_op(dtype, lambda x: x.sqrt_(), lambda x: np.sqrt(x))
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_unary_op_sin(dtype: mag.DataType) -> None:
     unary_op(dtype, lambda x: x.sin(), lambda x: np.sin(x))
     with mag.no_grad():
         unary_op(dtype, lambda x: x.sin_(), lambda x: np.sin(x))
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_unary_op_cos(dtype: mag.DataType) -> None:
     unary_op(dtype, lambda x: x.cos(), lambda x: np.cos(x))
     with mag.no_grad():
         unary_op(dtype, lambda x: x.cos_(), lambda x: np.cos(x))
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_unary_op_step(dtype: mag.DataType) -> None:
     unary_op(dtype, lambda x: x.step(), lambda x: np.heaviside(x, 0))
     with mag.no_grad():
         unary_op(dtype, lambda x: x.step_(), lambda x: np.heaviside(x, 0))
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_unary_op_exp(dtype: mag.DataType) -> None:
     unary_op(dtype, lambda x: x.exp(), lambda x: np.exp(x))
     with mag.no_grad():
         unary_op(dtype, lambda x: x.exp_(), lambda x: np.exp(x))
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_binary_op_add(dtype: mag.DataType) -> None:
     binary_op_square(dtype, lambda x, y: x + y)
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_binary_op_sub(dtype: mag.DataType) -> None:
     binary_op_square(dtype, lambda x, y: x + y)
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_binary_op_mul(dtype: mag.DataType) -> None:
     binary_op_square(dtype, lambda x, y: x * y)
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_binary_op_div(dtype: mag.DataType) -> None:
     binary_op_square(dtype, lambda x, y: x / y)
 
 
 """ TODO
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_scalar_op_add(dtype: mag.DataType) -> None:
     scalar_op(dtype, lambda x, xi: x + xi)
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_scalar_op_sub(dtype: mag.DataType) -> None:
     scalar_op(dtype, lambda x, xi: x + xi)
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_scalar_op_mul(dtype: mag.DataType) -> None:
     scalar_op(dtype, lambda x, xi: x * xi)
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_scalar_op_div(dtype: mag.DataType) -> None:
     scalar_op(dtype, lambda x, xi: x / xi)
 
 
-@pytest.mark.parametrize('dtype', [mag.f16, mag.f32])
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
 def test_scalar_op_pow(dtype: mag.DataType) -> None:
     scalar_op(dtype, lambda x, xi: x**xi, rhs=False)
 """

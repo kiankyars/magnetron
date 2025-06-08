@@ -647,11 +647,12 @@ class Tensor:
         if len(axes) != MAX_DIMS:
             axes = axes + tuple(range(self.rank, MAX_DIMS))
         assert len(axes) == MAX_DIMS
+        axes = _ffi.new('int64_t[]', axes)
         for i in range(MAX_DIMS):
             assert 0 <= axes[i] < MAX_DIMS
             for j in range(i + 1, MAX_DIMS):
                 assert axes[i] != axes[j], f'Duplicate axis: {axes[i]}'
-        return Tensor(_C.mag_permute(self._ptr, *axes))
+        return Tensor(_C.mag_permute(self._ptr, axes, MAX_DIMS))
 
     def fill_(self, value: float | int | bool) -> None:
         self._validate_inplace_op()
