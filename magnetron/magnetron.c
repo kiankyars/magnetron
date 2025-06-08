@@ -1206,6 +1206,7 @@ void mag_tensor_get_raw_data_as_bytes_free(void* ret_val) {
 }
 
 mag_E8M23* mag_tensor_get_data_as_floats(mag_Tensor* t) {
+    mag_assert(mag_tensor_is_floating_point_typed(t), "Tensor must be a floating point tensor, but has dtype: %s", mag_dtype_meta_of(t->dtype)->name);
     size_t size = t->numel*sizeof(mag_E8M23);
     mag_assert2(size);
     mag_E8M23* dst = (*mag_alloc)(NULL, size); /* TODO: Use dynamic scratch buffer */

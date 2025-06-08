@@ -19,6 +19,7 @@
 using namespace testing;
 
 namespace magnetron::test {
+    using e11m52_t = double;
     using e8m23_t = float;
     using e5m10_t = half_float::half;
 
@@ -110,7 +111,7 @@ namespace magnetron::test {
 
     template <bool BROADCAST, bool INPLACE, typename A, typename B>
         requires std::is_invocable_r_v<tensor, A, tensor, tensor> && std::is_invocable_v<B, e8m23_t, e8m23_t>
-    auto test_binary_operator(std::int64_t lim, e8m23_t eps, dtype ty, A&& a, B&& b, e8m23_t min = -10.0, e8m23_t max = 10.0) -> decltype(auto) {
+    auto test_binary_float_operator(std::int64_t lim, e8m23_t eps, dtype ty, A&& a, B&& b, e8m23_t min = -10.0, e8m23_t max = 10.0) -> decltype(auto) {
         auto ctx = context{compute_device::cpu};
         ctx.stop_grad_recorder();
         for_all_shape_perms(lim, BROADCAST ? 2 : 1, [&](std::span<const std::int64_t> shape) {
@@ -131,7 +132,36 @@ namespace magnetron::test {
             ASSERT_EQ(t_a.dtype(), t_b.dtype());
             ASSERT_EQ(t_a.dtype(), t_r.dtype());
             for (std::int64_t i = 0; i < d_r.size(); ++i) {
-                ASSERT_NEAR(std::invoke(b, d_a[i], d_b[i]), d_r[i], eps);
+                ASSERT_NEAR(std::invoke(b, d_a[i], d_b[i]), d_r[i], eps) << d_a[i] << " op " << d_b[i] << " = " << d_r[i];
+            }
+        });
+    }
+
+  template <bool BROADCAST, bool INPLACE, typename A, typename B>
+        requires std::is_invocable_r_v<tensor, A, tensor, tensor> && std::is_invocable_v<B, std::int32_t, std::int32_t>
+    auto test_binary_int_operator(std::int64_t lim, dtype ty, A&& a, B&& b) -> decltype(auto) {
+        auto ctx = context{compute_device::cpu};
+        ctx.stop_grad_recorder();
+        for_all_shape_perms(lim, BROADCAST ? 2 : 1, [&](std::span<const std::int64_t> shape) {
+            tensor t_a {ctx, ty, shape};
+            std::uniform_int_distribution<std::int32_t> fill_val {std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max()};
+            t_a.fill(static_cast<e11m52_t>(fill_val(gen)));
+            tensor t_b {t_a.clone()};
+            std::vector<std::int32_t> d_a {t_a.to_int_vector()};
+            std::vector<std::int32_t> d_b {t_b.to_int_vector()};
+            tensor t_r {std::invoke(a, t_a, t_b)};
+            if constexpr (INPLACE) {
+                ASSERT_EQ(t_a.data_ptr(), t_r.data_ptr());
+            } else {
+                ASSERT_NE(t_a.data_ptr(), t_r.data_ptr());
+            }
+            std::vector<std::int32_t> d_r {t_r.to_int_vector()};
+            ASSERT_EQ(d_a.size(), d_b.size());
+            ASSERT_EQ(d_a.size(), d_r.size());
+            ASSERT_EQ(t_a.dtype(), t_b.dtype());
+            ASSERT_EQ(t_a.dtype(), t_r.dtype());
+            for (std::int64_t i = 0; i < d_r.size(); ++i) {
+                ASSERT_EQ(std::invoke(b, d_a[i], d_b[i]), d_r[i]) << d_a[i] << " op " << d_b[i] << " = " << d_r[i];
             }
         });
     }
@@ -160,7 +190,7 @@ namespace magnetron::test {
             ASSERT_EQ(t_a.dtype(), t_b.dtype());
             ASSERT_EQ(t_a.dtype(), t_r.dtype());
             for (std::int64_t i = 0; i < d_r.size(); ++i) {
-                ASSERT_EQ(std::invoke(b, d_a[i], d_b[i]), d_r[i]);
+                ASSERT_EQ(std::invoke(b, d_a[i], d_b[i]), d_r[i]) << d_a[i] << " op " << d_b[i] << " = " << d_r[i];
             }
         });
     }

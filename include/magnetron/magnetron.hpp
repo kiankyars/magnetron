@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <array>
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -204,10 +205,9 @@ namespace magnetron {
 
     enum class dtype : std::underlying_type_t<mag_DType> {
         e8m23 = MAG_DTYPE_E8M23,
-        f32 = e8m23,
         e5m10 = MAG_DTYPE_E5M10,
-        f16 = e5m10,
         boolean = MAG_DTYPE_BOOL,
+        i32 = MAG_DTYPE_I32,
     };
 
     [[nodiscard]] inline auto dtype_size(dtype t) noexcept -> std::size_t {
@@ -230,7 +230,11 @@ namespace magnetron {
         template <typename... S> requires std::is_integral_v<std::common_type_t<S...>>
         tensor(context& ctx, dtype type, S&&... shape) : tensor{ctx, type, std::array{static_cast<std::int64_t>(shape)...}} {}
 
-        tensor(context& ctx, std::span<const std::int64_t> shape, std::span<const float> data) : tensor{ctx, dtype::f32, shape} {
+        tensor(context& ctx, std::span<const std::int64_t> shape, std::span<const float> data) : tensor{ctx, dtype::e8m23, shape} {
+            fill_from(data);
+        }
+
+        tensor(context& ctx, std::span<const std::int64_t> shape, std::span<const std::int32_t> data) : tensor{ctx, dtype::i32, shape} {
             fill_from(data);
         }
 
@@ -390,7 +394,7 @@ namespace magnetron {
 
         auto fill_from(std::span<const bool> data) -> void {
             static_assert(sizeof(bool) == sizeof(std::uint8_t));
-            mag_tensor_fill_from_raw_bytes(m_tensor, data.data(), data.size());
+            mag_tensor_fill_from_raw_bytes(m_tensor, data.data(), data.size_bytes());
         }
 
         auto fill_from(const std::vector<bool>& data) -> void {
@@ -399,6 +403,10 @@ namespace magnetron {
             unpacked.resize(data.size());
             std::ranges::copy(data, unpacked.begin());
             mag_tensor_fill_from_raw_bytes(m_tensor, unpacked.data(), unpacked.size());
+        }
+
+        auto fill_from(std::span<const std::int32_t> data) -> void {
+            mag_tensor_fill_from_raw_bytes(m_tensor, data.data(), data.size_bytes());
         }
 
         auto fill(float val) -> void {
@@ -438,6 +446,8 @@ namespace magnetron {
         [[nodiscard]] auto data_ptr() const noexcept -> void* { return mag_tensor_get_data_ptr(m_tensor); }
         [[nodiscard]] auto storage_base_ptr() const noexcept -> void* { return mag_tensor_get_storage_base_ptr(m_tensor); }
         [[nodiscard]] auto to_float_vector() const -> std::vector<float> {
+            if (!is_floating_point_typed())
+                throw std::runtime_error {"requires floating point dtype"};
             auto* data {mag_tensor_get_data_as_floats(m_tensor)};
             std::vector<float> result {};
             result.resize(numel());
@@ -451,7 +461,18 @@ namespace magnetron {
             auto* data {static_cast<std::uint8_t*>(mag_tensor_get_raw_data_as_bytes(m_tensor))};
             std::vector<bool> result {};
             result.resize(numel());
-            std::copy_n(data, numel(), result.begin());
+            for (std::size_t i = 0; i < result.size(); ++i)
+                result[i] = static_cast<bool>(data[i]);
+            mag_tensor_get_raw_data_as_bytes_free(data);
+            return result;
+        }
+        [[nodiscard]] auto to_int_vector() const -> std::vector<std::int32_t> {
+            if (dtype() != dtype::i32)
+                throw std::runtime_error {"requires int32 dtype"};
+            auto* data {static_cast<std::int32_t*>(mag_tensor_get_raw_data_as_bytes(m_tensor))};
+            std::vector<std::int32_t> result {};
+            result.resize(numel());
+            std::memcpy(result.data(), data, data_size());
             mag_tensor_get_raw_data_as_bytes_free(data);
             return result;
         }
@@ -465,6 +486,8 @@ namespace magnetron {
         [[nodiscard]] auto is_view() const noexcept -> bool { return mag_tensor_is_view(m_tensor); }
         [[nodiscard]] auto view_base() const noexcept -> tensor { return tensor {mag_tensor_get_view_base(m_tensor)}; }
         [[nodiscard]] auto view_offset() const noexcept -> std::size_t { return mag_tensor_get_view_offset(m_tensor); }
+        [[nodiscard]] auto is_floating_point_typed() const noexcept -> bool { return mag_tensor_is_floating_point_typed(m_tensor); }
+        [[nodiscard]] auto is_integral_point_typed() const noexcept -> bool { return mag_tensor_is_integral_typed(m_tensor); }
 
         [[nodiscard]] auto grad() const noexcept -> std::optional<tensor> {
             auto* grad {mag_tensor_get_grad(m_tensor)};

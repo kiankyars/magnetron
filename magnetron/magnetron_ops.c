@@ -1053,11 +1053,11 @@ void mag_tensor_fill_from_raw_bytes(mag_Tensor* t, const void* data, size_t len)
     (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_COPY, 0, (void*)data, len);
 }
 
-void mag_tensor_fill(mag_Tensor* t, mag_E8M23 x) {
+void mag_tensor_fill(mag_Tensor* t, mag_E11M52 x) {
     t->init_op = MAG_IOP_BROADCAST;
     mag_OPParamLayout layout;
     mag_op_param_layout_init(&layout);
-    mag_op_param_layout_insert(&layout, mag_tensor_is_integral_typed(t) ? mag_op_param_wrap_i64(x) : mag_op_param_wrap_e8m23(x)); /* TODO: data is lost here from x as fp32 */
+    mag_op_param_layout_insert(&layout, mag_tensor_is_integral_typed(t) ? mag_op_param_wrap_i64((int64_t)x) : mag_op_param_wrap_e8m23((mag_E8M23)x));
     mag_op_param_layout_transfer(&layout, &t->init_op_params);
     mag_op_exec(t, t->ctx->device, MAG_STAGE_INIT);
 }
@@ -1122,6 +1122,7 @@ const mag_OPMetadata* mag_op_meta_of(mag_Operator opc) {
                     {.type=MAG_DTYPE_E8M23, .is_used=true},
                     {.type=MAG_DTYPE_E5M10, .is_used=true},
                     {.type=MAG_DTYPE_BOOL, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 }
             },
             .op_param_layout = {},
@@ -1139,6 +1140,7 @@ const mag_OPMetadata* mag_op_meta_of(mag_Operator opc) {
                     {.type=MAG_DTYPE_E8M23, .is_used=true},
                     {.type=MAG_DTYPE_E5M10, .is_used=true},
                     {.type=MAG_DTYPE_BOOL, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 }
             },
             .op_param_layout = {},
@@ -1156,6 +1158,7 @@ const mag_OPMetadata* mag_op_meta_of(mag_Operator opc) {
                     {.type=MAG_DTYPE_E8M23, .is_used=true},
                     {.type=MAG_DTYPE_E5M10, .is_used=true},
                     {.type=MAG_DTYPE_BOOL, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 }
             },
             .op_param_layout = {},
@@ -1173,6 +1176,7 @@ const mag_OPMetadata* mag_op_meta_of(mag_Operator opc) {
                     {.type=MAG_DTYPE_E8M23, .is_used=true},
                     {.type=MAG_DTYPE_E5M10, .is_used=true},
                     {.type=MAG_DTYPE_BOOL, .is_used=true},
+                    {.type=MAG_DTYPE_I32, .is_used=true},
                 }
             },
             .op_param_layout = {

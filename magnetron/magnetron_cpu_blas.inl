@@ -5963,24 +5963,31 @@ static void (*_Nonnull const mag_blas_lut_eval_kernels[MAG_OP__NUM][MAG_DTYPE__N
         [MAG_DTYPE_E8M23] = &mag_blas_nop,
         [MAG_DTYPE_E5M10] = &mag_blas_nop,
         [MAG_DTYPE_BOOL] = &mag_blas_nop,
+        [MAG_DTYPE_I32] = &mag_blas_nop,
     },
     [MAG_OP_CLONE] = {
         [MAG_DTYPE_E8M23] = &mag_blas_clone_e8m23,
         [MAG_DTYPE_E5M10] = &mag_blas_clone_e5m10,
         [MAG_DTYPE_BOOL] = &mag_blas_clone_bool,
+        [MAG_DTYPE_I32] = &mag_blas_clone_i32,
     },
     [MAG_OP_VIEW] = {
         [MAG_DTYPE_E8M23] = &mag_blas_nop,
         [MAG_DTYPE_E5M10] = &mag_blas_nop,
         [MAG_DTYPE_BOOL] = &mag_blas_nop,
+        [MAG_DTYPE_I32] = &mag_blas_nop,
     },
     [MAG_OP_TRANSPOSE] = {
         [MAG_DTYPE_E8M23] = &mag_blas_nop,
         [MAG_DTYPE_E5M10] = &mag_blas_nop,
+        [MAG_DTYPE_BOOL] = &mag_blas_nop,
+        [MAG_DTYPE_I32] = &mag_blas_nop,
     },
     [MAG_OP_PERMUTE] = {
         [MAG_DTYPE_E8M23] = &mag_blas_nop,
         [MAG_DTYPE_E5M10] = &mag_blas_nop,
+        [MAG_DTYPE_BOOL] = &mag_blas_nop,
+        [MAG_DTYPE_I32] = &mag_blas_nop,
     },
     [MAG_OP_MEAN] = {
         [MAG_DTYPE_E8M23] = &mag_blas_mean_e8m23,

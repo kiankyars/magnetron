@@ -282,7 +282,7 @@ extern MAG_EXPORT mag_Tensor* _Nonnull mag_not_(mag_Tensor* _Nonnull x);
 
 extern MAG_EXPORT void mag_tensor_fill_from_floats(mag_Tensor* _Nonnull t, const float* _Nonnull data, size_t len);     /* Copy floats into tensor buffer. If the tensors datatype is not float, the values are converted to the tensors dtype. */
 extern MAG_EXPORT void mag_tensor_fill_from_raw_bytes(mag_Tensor* _Nonnull t, const void* _Nonnull data, size_t len);   /* Copy raw bytes into tensor buffer */
-extern MAG_EXPORT void mag_tensor_fill(mag_Tensor* _Nonnull t, float x);                                                /* Set all tensor elements to a specific value. For boolean tensors x == 0 ? False else True */
+extern MAG_EXPORT void mag_tensor_fill(mag_Tensor* _Nonnull t, double x);                                               /* Set all tensor elements to a specific value. For boolean tensors x == 0 ? False else True. For int32 tensors all values of an int32 can be stored as double. */
 extern MAG_EXPORT void mag_tensor_fill_random_uniform(mag_Tensor* _Nonnull t, float min, float max);                    /* Fill tensor with random values from uniform distribution within [min, max] */
 extern MAG_EXPORT void mag_tensor_fill_random_normal(mag_Tensor* _Nonnull t, float mean, float stddev);                 /* Fill tensor with random values from the normal distribution. */
 extern MAG_EXPORT void mag_tensor_fill_random_bernoulli(mag_Tensor* _Nonnull t, float p);                               /* Fill bool tensor with random values from the bernoulli distribution. */
