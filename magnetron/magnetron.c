@@ -729,10 +729,10 @@ void mag_thread_set_prio(mag_ThreadPrio prio) {
 #ifdef _WIN32
     DWORD policy = THREAD_PRIORITY_NORMAL;
     switch (prio) {
-        case MAG_THREAD_SCHED_PRIO_NORMAL: policy = THREAD_PRIORITY_NORMAL; break;
-        case MAG_THREAD_SCHED_PRIO_MEDIUM: policy = THREAD_PRIORITY_ABOVE_NORMAL; break;
-        case MAG_THREAD_SCHED_PRIO_HIGH: policy = THREAD_PRIORITY_HIGHEST; break;
-        case MAG_THREAD_SCHED_PRIO_REALTIME: policy = THREAD_PRIORITY_TIME_CRITICAL; break;
+        case MAG_THREAD_PRIO_NORMAL: policy = THREAD_PRIORITY_NORMAL; break;
+        case MAG_THREAD_PRIO_MEDIUM: policy = THREAD_PRIORITY_ABOVE_NORMAL; break;
+        case MAG_THREAD_PRIO_HIGH: policy = THREAD_PRIORITY_HIGHEST; break;
+        case MAG_THREAD_PRIO_REALTIME: policy = THREAD_PRIORITY_TIME_CRITICAL; break;
     }
     if (mag_unlikely(!SetThreadPriority(GetCurrentThread(), policy))) {
         mag_log_warn("Failed to set thread scheduling priority: %d", prio);
@@ -967,22 +967,22 @@ const mag_DTypeMetadata* mag_dtype_meta_of(mag_DType type) {
         [MAG_DTYPE_E8M23] = {
             .name="e8m23",
             .size=sizeof(mag_E8M23),
-            .align=__alignof__(mag_E8M23),
+            .align=__alignof(mag_E8M23),
         },
         [MAG_DTYPE_E5M10] = {
             .name="e5m10",
             .size=sizeof(mag_E5M10),
-            .align=__alignof__(mag_E5M10),
+            .align=__alignof(mag_E5M10),
         },
         [MAG_DTYPE_BOOL] = {
             .name="bool",
             .size=sizeof(uint8_t),
-            .align=__alignof__(uint8_t),
+            .align=__alignof(uint8_t),
         },
         [MAG_DTYPE_I32] = {
             .name="i32",
             .size=sizeof(int32_t),
-            .align=__alignof__(int32_t),
+            .align=__alignof(int32_t),
         },
     };
     return &infos[type];

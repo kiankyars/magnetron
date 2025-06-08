@@ -61,11 +61,14 @@
 #define mag_i32p(t) ((const int32_t*)mag_tensor_get_data_ptr(t))
 #define mag_i32p_mut(t) ((int32_t*)mag_tensor_get_data_ptr(t))
 
-#define MAG_TAU (2.0f*3.14159265358979323846264338327950288f) /* τ = 2π */
+#define MAG_TAU (2.0f*3.14159265358979323846264338327950288f) /* τ=2π */
 
-#if defined(_MSC_VER) && defined(__AVX2__) /*MSVC does not define FMA and F16C with AVX 2*/
+#if defined(_MSC_VER)
+typedef uint16_t __fp16; /* MSVC does not support __fp16. */
+#ifdef __AVX2__ /*MSVC does not define FMA and F16C with AVX 2*/
 #define __FMA__ 1
 #define __F16C__ 1
+#endif
 #endif
 
 static MAG_AINLINE mag_E5M10 mag_e8m23_cvt_e5m10(mag_E8M23 x) {
@@ -4421,7 +4424,7 @@ static void MAG_HOTPROC mag_blas_matmul_e8m23(const mag_CPUKernelPayload* _Nonnu
 
     size_t scratch_size = sizeof(mag_E8M23)*(K*N + (x_row ? 0 : M*K)); /* Scratch buffer size. X panel is optional, Y panel is mandatory */
 
-    static __thread mag_MMScratchBuf sb; /* TODO: this is not freed at the moment */
+    static MAG_THREAD_LOCAL mag_MMScratchBuf sb; /* TODO: this is not freed at the moment */
     mag_E8M23* scratch = mag_mm_scratch_acquire(&sb, scratch_size);
     mag_E8M23* xbuf = x_row ? NULL : scratch;
     mag_E8M23* ybuf = scratch + (x_row ? 0 : M*K);

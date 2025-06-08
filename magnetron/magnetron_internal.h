@@ -88,6 +88,7 @@ typedef enum mag_ExecStage {
 #define MAG_PACKED __attribute__((packed))
 #define MAG_FALLTHROUGH __attribute__((fallthrough))
 #define MAG_UNUSED __attribute__((unused))
+#define MAG_THREAD_LOCAL __thread
 #define mag_likely(x) __builtin_expect(!!(x), 1)
 #define mag_unlikely(x) __builtin_expect(!!(x), 0)
 #define mag_ffs(x) ((uint32_t)__builtin_ctz(x))
@@ -132,6 +133,7 @@ unsigned char _BitScanReverse64(unsigned long*, unsigned __int64);
 #define MAG_PACKED __declspec(align(1))
 #define MAG_FALLTHROUGH
 #define MAG_UNUSED
+#define MAG_THREAD_LOCAL __declspec(thread)
 #define mag_likely(x) (x)
 #define mag_unlikely(x) (x)
 static MAG_AINLINE uint32_t mag_ffs(uint32_t x) { unsigned long r; _BitScanForward(&r, x); return (uint32_t)r; }
@@ -499,30 +501,30 @@ static inline uint32_t mag_ivrem32(uint32_t x, uint32_t y, mag_DivisionContext c
 
 #ifdef _WIN32 /* WIN32 specific threading and synchronization. */
 
-typedef DWORD mag_thread_ret_t;
+typedef DWORD mag_ThreadRet;
 #define MAG_THREAD_RET_NONE 0
 
-typedef HANDLE mag_thread_t;
+typedef HANDLE mag_Thread;
 
-static void mag_thread_create(mag_thread_t* out, mag_thread_ret_t (*f)(void*), void* arg) { /* WIN32 -> pthread style wrapper. */
+static void mag_thread_create(mag_Thread* out, mag_ThreadRet (*f)(void*), void* arg) { /* WIN32 -> pthread style wrapper. */
     HANDLE handle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)f, arg, 0, NULL);
     mag_assert2(handle != 0);
     *out = handle;
 }
 
-static void mag_thread_join(mag_thread_t th) { /* WIN32 -> pthread style wrapper. */
+static void mag_thread_join(mag_Thread th) { /* WIN32 -> pthread style wrapper. */
     int ret = (int)WaitForSingleObject(th, INFINITE);
     CloseHandle(th);
     mag_assert2(ret == 0);
 }
 
-typedef SRWLOCK mag_mutex_t;
+typedef SRWLOCK mag_Mutex;
 #define mag_mutex_create(mtx) InitializeSRWLock(mtx)
 #define mag_mutex_destroy(mtx)
 #define mag_mutex_lock(mtx) AcquireSRWLockExclusive(mtx)
 #define mag_mutex_unlock(mtx) ReleaseSRWLockExclusive(mtx)
 
-typedef CONDITION_VARIABLE mag_cond_var_t;
+typedef CONDITION_VARIABLE mag_CondVar;
 #define mag_cv_create(cv) InitializeConditionVariable(cv)
 #define mag_cv_destroy(cv)
 #define mag_cv_wait(cv, mtx) SleepConditionVariableSRW(cv, mtx, INFINITE, 0)
