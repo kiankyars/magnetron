@@ -40,8 +40,8 @@ jobs:
         shell: bash
         run: echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
-      - name: Install Packages
-        if: runner.os != 'windows'
+      - name: Install Linux Packages
+        if: runner.os == 'linux'
         shell: bash
         run: |
           sudo apt-get update
