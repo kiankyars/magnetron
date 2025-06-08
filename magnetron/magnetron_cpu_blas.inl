@@ -1403,12 +1403,12 @@ static void mag_vxor_i32(int64_t numel, int32_t* _Nonnull o, const int32_t* _Non
 
 static void mag_vshl_i32(int64_t numel, int32_t* _Nonnull o, const int32_t* _Nonnull x, const int32_t* _Nonnull y) {
     for (int64_t i=0; i < numel; ++i)
-        o[i] = x[i] << y[i];
+        o[i] = x[i] << (y[i]&31);
 }
 
 static void mag_vshr_i32(int64_t numel, int32_t* _Nonnull o, const int32_t* _Nonnull x, const int32_t* _Nonnull y) {
     for (int64_t i=0; i < numel; ++i)
-        o[i] = x[i] >> y[i];
+        o[i] = x[i] >> (y[i]&31);
 }
 
 static void mag_vnot_i32(int64_t numel, int32_t* _Nonnull o, const int32_t* _Nonnull x) {
@@ -5595,7 +5595,7 @@ static void MAG_HOTPROC mag_blas_shl_i32(const mag_CPUKernelPayload* _Nonnull pa
             mag_bnd_chk(px+i-ra, bx, mag_tensor_get_data_size(x));
             mag_bnd_chk(by+yi, by, mag_tensor_get_data_size(y));
             mag_bnd_chk(pr+i-ra, br, mag_tensor_get_data_size(r));
-            pr[i-ra] = px[i-ra] << by[yi];
+            pr[i-ra] = px[i-ra] << (by[yi]&31);
         }
         return;
     }
@@ -5616,7 +5616,7 @@ static void MAG_HOTPROC mag_blas_shl_i32(const mag_CPUKernelPayload* _Nonnull pa
             mag_bnd_chk(bx+xi, bx, mag_tensor_get_data_size(x));
             mag_bnd_chk(py+i-ra, by, mag_tensor_get_data_size(y));
             mag_bnd_chk(pr+i-ra, br, mag_tensor_get_data_size(r));
-            pr[i-ra] = bx[xi] << py[i-ra];
+            pr[i-ra] = bx[xi] << (py[i-ra]&31);
         }
         return;
     }
@@ -5640,7 +5640,7 @@ static void MAG_HOTPROC mag_blas_shl_i32(const mag_CPUKernelPayload* _Nonnull pa
         mag_bnd_chk(bx+xi, bx, mag_tensor_get_data_size(x));
         mag_bnd_chk(by+yi, by, mag_tensor_get_data_size(y));
         mag_bnd_chk(br+ri, br, mag_tensor_get_data_size(r));
-        br[ri] = bx[xi] << by[yi];
+        br[ri] = bx[xi] << (by[yi]&31);
     }
 }
 
@@ -5689,7 +5689,7 @@ static void MAG_HOTPROC mag_blas_shr_i32(const mag_CPUKernelPayload* _Nonnull pa
             mag_bnd_chk(px+i-ra, bx, mag_tensor_get_data_size(x));
             mag_bnd_chk(by+yi, by, mag_tensor_get_data_size(y));
             mag_bnd_chk(pr+i-ra, br, mag_tensor_get_data_size(r));
-            pr[i-ra] = px[i-ra] >> by[yi];
+            pr[i-ra] = px[i-ra] >> (by[yi]&31);
         }
         return;
     }
@@ -5710,7 +5710,7 @@ static void MAG_HOTPROC mag_blas_shr_i32(const mag_CPUKernelPayload* _Nonnull pa
             mag_bnd_chk(bx+xi, bx, mag_tensor_get_data_size(x));
             mag_bnd_chk(py+i-ra, by, mag_tensor_get_data_size(y));
             mag_bnd_chk(pr+i-ra, br, mag_tensor_get_data_size(r));
-            pr[i-ra] = bx[xi] >> py[i-ra];
+            pr[i-ra] = bx[xi] >> (py[i-ra]&31);
         }
         return;
     }
@@ -5734,7 +5734,7 @@ static void MAG_HOTPROC mag_blas_shr_i32(const mag_CPUKernelPayload* _Nonnull pa
         mag_bnd_chk(bx+xi, bx, mag_tensor_get_data_size(x));
         mag_bnd_chk(by+yi, by, mag_tensor_get_data_size(y));
         mag_bnd_chk(br+ri, br, mag_tensor_get_data_size(r));
-        br[ri] = bx[xi] >> by[yi];
+        br[ri] = bx[xi] >> (by[yi]&31);
     }
 }
 
@@ -6172,6 +6172,12 @@ static void (*_Nonnull const mag_blas_lut_eval_kernels[MAG_OP__NUM][MAG_DTYPE__N
     [MAG_OP_NOT] = {
         [MAG_DTYPE_BOOL] = &mag_blas_not_bool,
         [MAG_DTYPE_I32] = &mag_blas_not_i32,
+    },
+    [MAG_OP_SHL] = {
+        [MAG_DTYPE_I32] = &mag_blas_shl_i32,
+    },
+    [MAG_OP_SHR] = {
+        [MAG_DTYPE_I32] = &mag_blas_shr_i32,
     },
 };
 

@@ -49,6 +49,7 @@ class DataType:
     def __repr__(self) -> str:
         return self.name
 
+
 float32: DataType = DataType(_C.MAG_DTYPE_E8M23, 4, 'float32')
 float16: DataType = DataType(_C.MAG_DTYPE_E5M10, 2, 'float16')
 boolean: DataType = DataType(_C.MAG_DTYPE_BOOL, 1, 'bool')
@@ -61,17 +62,17 @@ _DTYPE_ENUM_MAP: dict[int, DataType] = {
     int32.enum_value: int32,
 }
 
-_FLOATING_POINT_DTYPES: set[DataType] = {
-    float32,
-    float16
-}
+# Includes all floating-point types.
+_FLOATING_POINT_DTYPES: set[DataType] = {float32, float16}
 
-_INTEGRAL_DTYPES: set[DataType] = {
-    boolean,
-    int32
-}
+# Includes all integral types (integers + boolean).
+_INTEGRAL_DTYPES: set[DataType] = {boolean, int32}
 
-_NUMERIC_DTYPES = _FLOATING_POINT_DTYPES | {int32}
+# Include all integer types (integers - boolean).
+_INTEGER_DTYPES: set[DataType] = _INTEGRAL_DTYPES - {boolean}
+
+# Include all numeric dtypes (floating point + integers - boolean)
+_NUMERIC_DTYPES = _FLOATING_POINT_DTYPES | _INTEGER_DTYPES
 
 
 @dataclass
@@ -209,6 +210,7 @@ def _flatten_nested_lists(nested: object) -> tuple[tuple[int, ...], list[float]]
             assert s == first_shape, 'All sub-lists must have the same shape'
         return (len(nested),) + first_shape, flattened
 
+
 def _deduce_tensor_dtype(obj: any) -> tuple[DataType, str, _ffi.CData]:
     if isinstance(obj, bool):
         return boolean, 'uint8_t', _C.mag_tensor_fill_from_raw_bytes
@@ -217,10 +219,12 @@ def _deduce_tensor_dtype(obj: any) -> tuple[DataType, str, _ffi.CData]:
     else:
         raise TypeError(f'Invalid data type: {type(obj)}')
 
-def _validate_dtype_compat(dtypes: set[DataType], *kwargs):
-    for (i, tensor) in enumerate(kwargs):
+
+def _validate_dtype_compat(dtypes: set[DataType], *kwargs: any) -> None:
+    for i, tensor in enumerate(kwargs):
         if tensor.dtype not in dtypes:
-            raise TypeError(f'Unsupported data type of argument {i+1} for operator: {tensor.dtype}')
+            raise TypeError(f'Unsupported data type of argument {i + 1} for operator: {tensor.dtype}')
+
 
 def _get_reduction_axes(dim: int | tuple[int] | None) -> tuple[_ffi.CData, int]:
     if dim is None:
@@ -233,6 +237,7 @@ def _get_reduction_axes(dim: int | tuple[int] | None) -> tuple[_ffi.CData, int]:
         return axes, num
     else:
         raise TypeError('Dimension must be an int or a tuple of ints.')
+
 
 class Tensor:
     """A 1-6 dimensional tensor with support for automatic differentiation."""
@@ -663,7 +668,7 @@ class Tensor:
         _validate_dtype_compat(_FLOATING_POINT_DTYPES, self)
         self._validate_inplace_op()
         _C.mag_tensor_fill_random_normal(self._ptr, mean, std)
-        
+
     def fill_random_bernoulli_(self, p: float) -> None:
         _validate_dtype_compat(_INTEGRAL_DTYPES, self)
         self._validate_inplace_op()
@@ -880,35 +885,35 @@ class Tensor:
         self._validate_inplace_op()
         return Tensor(_C.mag_gelu_(self._ptr))
 
-    def logical_and(self, other: 'Tensor'):
+    def logical_and(self, other: 'Tensor') -> 'Tensor':
         _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)
         return Tensor(_C.mag_and(self._ptr, other._ptr))
 
-    def logical_and_(self, other: 'Tensor'):
+    def logical_and_(self, other: 'Tensor') -> 'Tensor':
         _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)
         return Tensor(_C.mag_and_(self._ptr, other._ptr))
 
-    def logical_or(self, other: 'Tensor'):
+    def logical_or(self, other: 'Tensor') -> 'Tensor':
         _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)
         return Tensor(_C.mag_and(self._ptr, other._ptr))
 
-    def logical_or_(self, other: 'Tensor'):
+    def logical_or_(self, other: 'Tensor') -> 'Tensor':
         _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)
         return Tensor(_C.mag_or_(self._ptr, other._ptr))
 
-    def logical_xor(self, other: 'Tensor'):
+    def logical_xor(self, other: 'Tensor') -> 'Tensor':
         _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)
         return Tensor(_C.mag_and(self._ptr, other._ptr))
 
-    def logical_xor_(self, other: 'Tensor'):
+    def logical_xor_(self, other: 'Tensor') -> 'Tensor':
         _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)
         return Tensor(_C.mag_xor_(self._ptr, other._ptr))
 
-    def logical_not(self):
+    def logical_not(self) -> None:
         _validate_dtype_compat(_INTEGRAL_DTYPES, self)
         return Tensor(_C.mag_not(self._ptr))
 
-    def logical_not_(self):
+    def logical_not_(self) -> None:
         _validate_dtype_compat(_INTEGRAL_DTYPES, self)
         self._validate_inplace_op()
         return Tensor(_C.mag_not_(self._ptr))
@@ -927,61 +932,71 @@ class Tensor:
     def __iadd__(self, other: object | int | float) -> 'Tensor':
         self._validate_inplace_op()
         if not isinstance(other, Tensor):
-            other = Tensor.full(self.shape, fill_value=float(other))
+            val: float | int = float(other) if self.is_floating_point else int(other)
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_NUMERIC_DTYPES, self, other)
-        return Tensor(_C.mag_adds_(self._ptr, float(other)))
+        return Tensor(_C.mag_add_(self._ptr, float(other)))
 
     def __sub__(self, other: object | int | float) -> 'Tensor':
         if not isinstance(other, Tensor):
-            other = Tensor.full(self.shape, fill_value=float(other))
+            val: float | int = float(other) if self.is_floating_point else int(other)
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_NUMERIC_DTYPES, self, other)
         return Tensor(_C.mag_sub(self._ptr, other._ptr))
 
     def __rsub__(self, other: int | float) -> 'Tensor':
-        other = Tensor.full(self.shape, fill_value=float(other))
+        val: float | int = float(other) if self.is_floating_point else int(other)
+        other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_NUMERIC_DTYPES, self, other)
         return other - self
 
     def __isub__(self, other: object | int | float) -> 'Tensor':
         self._validate_inplace_op()
         if not isinstance(other, Tensor):
-            other = Tensor.full(self.shape, fill_value=float(other))
+            val: float | int = float(other) if self.is_floating_point else int(other)
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_NUMERIC_DTYPES, self, other)
         return Tensor(_C.mag_sub_(self._ptr, other._ptr))
 
     def __mul__(self, other: object | int | float) -> 'Tensor':
         if not isinstance(other, Tensor):
-            other = Tensor.full(self.shape, fill_value=float(other))
+            val: float | int = float(other) if self.is_floating_point else int(other)
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_NUMERIC_DTYPES, self, other)
         return Tensor(_C.mag_mul(self._ptr, other._ptr))
 
     def __rmul__(self, other: int | float) -> 'Tensor':
-        other = Tensor.full(self.shape, fill_value=float(other))
+        val: float | int = float(other) if self.is_floating_point else int(other)
+        other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_NUMERIC_DTYPES, self, other)
         return other * self
 
     def __imul__(self, other: object | int | float) -> 'Tensor':
         self._validate_inplace_op()
         if not isinstance(other, Tensor):
-            other = Tensor.full(self.shape, fill_value=float(other))
+            val: float | int = float(other) if self.is_floating_point else int(other)
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_NUMERIC_DTYPES, self, other)
         return Tensor(_C.mag_mul_(self._ptr, other._ptr))
 
     def __truediv__(self, other: object | int | float) -> 'Tensor':
         if not isinstance(other, Tensor):
-            other = Tensor.full(self.shape, fill_value=float(other))
+            val: float | int = float(other) if self.is_floating_point else int(other)
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_NUMERIC_DTYPES, self, other)
         return Tensor(_C.mag_div(self._ptr, other._ptr))
 
     def __rtruediv__(self, other: int | float) -> 'Tensor':
-        other = Tensor.full(self.shape, fill_value=float(other))
+        val: float | int = float(other) if self.is_floating_point else int(other)
+        other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_NUMERIC_DTYPES, self, other)
         return other / self
 
     def __itruediv__(self, other: object | int | float) -> 'Tensor':
         self._validate_inplace_op()
         if not isinstance(other, Tensor):
-            other = Tensor.full(self.shape, fill_value=float(other))
+            val: float | int = float(other) if self.is_floating_point else int(other)
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_NUMERIC_DTYPES, self, other)
         return Tensor(_C.mag_div_(self._ptr, other._ptr))
 
@@ -994,33 +1009,108 @@ class Tensor:
         self._validate_inplace_op()
         return Tensor(_C.mag_matmul_(self._ptr, other._ptr))
 
-    def __and__(self, other: 'Tensor') -> 'Tensor':
+    def __and__(self, other: object | bool | int) -> 'Tensor':
+        if not isinstance(other, Tensor):
+            val: bool | int = bool(other) if self.dtype == boolean else int(other)
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)
         return Tensor(_C.mag_and(self._ptr, other._ptr))
 
-    def __iand__(self, other: 'Tensor') -> 'Tensor':
+    def __rand__(self, other: int | bool) -> 'Tensor':
+        val: bool | int = bool(other) if self.dtype == boolean else int(other)
+        other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
+        _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)
+        return other & self
+
+    def __iand__(self, other: object | int | float) -> 'Tensor':
+        self._validate_inplace_op()
+        if not isinstance(other, Tensor):
+            val: bool | int = bool(other) if self.dtype == boolean else int(other)
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)
         return Tensor(_C.mag_and_(self._ptr, other._ptr))
 
-    def __or__(self, other: 'Tensor') -> 'Tensor':
+    def __or__(self, other: object | bool | int) -> 'Tensor':
+        if not isinstance(other, Tensor):
+            val: bool | int = bool(other) if self.dtype == boolean else int(other)
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)
         return Tensor(_C.mag_or(self._ptr, other._ptr))
 
-    def __ior__(self, other: 'Tensor') -> 'Tensor':
+    def __ror__(self, other: int | bool) -> 'Tensor':
+        val: bool | int = bool(other) if self.dtype == boolean else int(other)
+        other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
+        _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)
+        return other | self
+
+    def __ior__(self, other: object | int | float) -> 'Tensor':
+        self._validate_inplace_op()
+        if not isinstance(other, Tensor):
+            val: bool | int = bool(other) if self.dtype == boolean else int(other)
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)
         return Tensor(_C.mag_or_(self._ptr, other._ptr))
 
-    def __xor__(self, other: 'Tensor') -> 'Tensor':
+    def __xor__(self, other: object | bool | int) -> 'Tensor':
+        if not isinstance(other, Tensor):
+            val: bool | int = bool(other) if self.dtype == boolean else int(other)
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)
         return Tensor(_C.mag_xor(self._ptr, other._ptr))
 
-    def __ixor__(self, other: 'Tensor') -> 'Tensor':
+    def __rxor__(self, other: int | bool) -> 'Tensor':
+        val: bool | int = bool(other) if self.dtype == boolean else int(other)
+        other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
+        _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)
+        return other ^ self
+
+    def __ixor__(self, other: object | int | float) -> 'Tensor':
+        self._validate_inplace_op()
+        if not isinstance(other, Tensor):
+            val: bool | int = bool(other) if self.dtype == boolean else int(other)
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
         _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)
         return Tensor(_C.mag_xor_(self._ptr, other._ptr))
 
     def __invert__(self) -> 'Tensor':
         _validate_dtype_compat(_INTEGRAL_DTYPES, self)
         return Tensor(_C.mag_not(self._ptr))
+
+    def __lshift__(self, other: object | int) -> 'Tensor':
+        if not isinstance(other, Tensor):
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=int(other))
+        _validate_dtype_compat(_INTEGER_DTYPES, self, other)
+        return Tensor(_C.mag_shl(self._ptr, other._ptr))
+
+    def __rlshift__(self, other: int) -> 'Tensor':
+        other = Tensor.full(self.shape, dtype=self.dtype, fill_value=int(other))
+        _validate_dtype_compat(_INTEGER_DTYPES, self, other)
+        return other << self
+
+    def __ilshift__(self, other: object | int) -> 'Tensor':
+        self._validate_inplace_op()
+        if not isinstance(other, Tensor):
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=int(other))
+        _validate_dtype_compat(_INTEGER_DTYPES, self, other)
+        return Tensor(_C.mag_shl_(self._ptr, other._ptr))
+
+    def __rshift__(self, other: object | int) -> 'Tensor':
+        if not isinstance(other, Tensor):
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=int(other))
+        _validate_dtype_compat(_INTEGER_DTYPES, self, other)
+        return Tensor(_C.mag_shr(self._ptr, other._ptr))
+
+    def __rrshift__(self, other: int) -> 'Tensor':
+        other = Tensor.full(self.shape, dtype=self.dtype, fill_value=int(other))
+        _validate_dtype_compat(_INTEGER_DTYPES, self, other)
+        return other >> self
+
+    def __irshift__(self, other: object | int) -> 'Tensor':
+        self._validate_inplace_op()
+        if not isinstance(other, Tensor):
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=int(other))
+        _validate_dtype_compat(_INTEGER_DTYPES, self, other)
+        return Tensor(_C.mag_shr_(self._ptr, other._ptr))
 
     def __eq__(self, other: 'Tensor') -> bool:
         _validate_dtype_compat(_INTEGRAL_DTYPES, self, other)

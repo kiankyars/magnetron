@@ -139,12 +139,12 @@ namespace magnetron::test {
 
   template <bool BROADCAST, bool INPLACE, typename A, typename B>
         requires std::is_invocable_r_v<tensor, A, tensor, tensor> && std::is_invocable_v<B, std::int32_t, std::int32_t>
-    auto test_binary_int_operator(std::int64_t lim, dtype ty, A&& a, B&& b) -> decltype(auto) {
+    auto test_binary_int_operator(std::int64_t lim, dtype ty, std::int32_t min, std::int32_t max, A&& a, B&& b) -> decltype(auto) {
         auto ctx = context{compute_device::cpu};
         ctx.stop_grad_recorder();
         for_all_shape_perms(lim, BROADCAST ? 2 : 1, [&](std::span<const std::int64_t> shape) {
             tensor t_a {ctx, ty, shape};
-            std::uniform_int_distribution<std::int32_t> fill_val {std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max()};
+            std::uniform_int_distribution<std::int32_t> fill_val {min, max};
             t_a.fill(static_cast<e11m52_t>(fill_val(gen)));
             tensor t_b {t_a.clone()};
             std::vector<std::int32_t> d_a {t_a.to_int_vector()};

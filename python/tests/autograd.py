@@ -92,8 +92,8 @@ def test_autograd_inherit_nograd() -> None:
         t2 = x - y
         t3 = t1 * t2
         yy = t3.relu()
-        assert x.requires_grad # Overriding the no_grad context
-        assert y.requires_grad # Overriding the no_grad context
+        assert x.requires_grad  # Overriding the no_grad context
+        assert y.requires_grad  # Overriding the no_grad context
         assert not t1.requires_grad
         assert not t2.requires_grad
         assert not t3.requires_grad

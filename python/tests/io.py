@@ -2,11 +2,13 @@
 
 from magnetron.io import *
 
-def test_open_close_stream():
+
+def test_open_close_stream() -> None:
     with StorageStream() as stream:
         assert len(stream.tensor_keys()) == 0
 
-def test_write_read_tensor():
+
+def test_write_read_tensor() -> None:
     with StorageStream() as stream:
         tensor = Tensor.from_data([1.0, 2.0, 3.0])
         stream['test_tensor'] = tensor
@@ -15,7 +17,8 @@ def test_write_read_tensor():
         read_tensor = stream['test_tensor']
         assert read_tensor.tolist() == [1.0, 2.0, 3.0]
 
-def test_write_read_multiple_tensors():
+
+def test_write_read_multiple_tensors() -> None:
     with StorageStream() as stream:
         tensor1 = Tensor.from_data([1.0, 2.0])
         tensor2 = Tensor.from_data([3.0, 4.0])

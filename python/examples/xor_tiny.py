@@ -2,12 +2,7 @@ import magnetron as mag
 from magnetron import optim, nn
 
 # Create the model, optimizer, and loss function
-model = nn.Sequential(
-    nn.Linear(2, 2),
-    nn.Tanh(),
-    nn.Linear(2, 1),
-    nn.Tanh()
-)
+model = nn.Sequential(nn.Linear(2, 2), nn.Tanh(), nn.Linear(2, 1), nn.Tanh())
 optimizer = optim.SGD(model.parameters(), lr=1e-1)
 criterion = nn.MSELoss()
 

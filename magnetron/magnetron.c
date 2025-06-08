@@ -1269,6 +1269,9 @@ bool mag_tensor_requires_grad(const mag_Tensor* t) {
 }
 
 void mag_tensor_set_requires_grad(mag_Tensor* t, bool requires_grad) {
+    if (requires_grad) {
+        mag_assert(mag_tensor_is_floating_point_typed(t), "Gradient tracking tensors must be floating-point typed, but tensor has dtype: %s", mag_dtype_meta_of(t->dtype)->name);
+    }
     if (requires_grad) t->flags |= MAG_TFLAG_REQUIRES_GRAD;
     else t->flags &= ~MAG_TFLAG_REQUIRES_GRAD;
 }

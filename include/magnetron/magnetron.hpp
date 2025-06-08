@@ -354,12 +354,18 @@ namespace magnetron {
             tensor sca {mag_tensor_scalar(mag_tensor_get_ctx(m_tensor), mag_tensor_get_dtype(m_tensor), other)};
             return div(sca);
         }
-        [[nodiscard]] auto land(tensor other) const noexcept -> tensor {return tensor{mag_and(m_tensor, &*other)}; }
-        [[nodiscard]] auto land_(tensor other) const noexcept -> tensor { return tensor{mag_and_(m_tensor, &*other)}; }
-        [[nodiscard]] auto lor(tensor other) const noexcept -> tensor {return tensor{mag_or(m_tensor, &*other)}; }
-        [[nodiscard]] auto lor_(tensor other) const noexcept -> tensor { return tensor{mag_or_(m_tensor, &*other)}; }
-        [[nodiscard]] auto lxor(tensor other) const noexcept -> tensor {return tensor{mag_xor(m_tensor, &*other)}; }
-        [[nodiscard]] auto lxor_(tensor other) const noexcept -> tensor { return tensor{mag_xor_(m_tensor, &*other)}; }
+        [[nodiscard]] auto band(tensor other) const noexcept -> tensor {return tensor{mag_and(m_tensor, &*other)}; }
+        [[nodiscard]] auto band_(tensor other) const noexcept -> tensor { return tensor{mag_and_(m_tensor, &*other)}; }
+        [[nodiscard]] auto bor(tensor other) const noexcept -> tensor {return tensor{mag_or(m_tensor, &*other)}; }
+        [[nodiscard]] auto bor_(tensor other) const noexcept -> tensor { return tensor{mag_or_(m_tensor, &*other)}; }
+        [[nodiscard]] auto bxor(tensor other) const noexcept -> tensor {return tensor{mag_xor(m_tensor, &*other)}; }
+        [[nodiscard]] auto bxor_(tensor other) const noexcept -> tensor { return tensor{mag_xor_(m_tensor, &*other)}; }
+        [[nodiscard]] auto bnot() const noexcept -> tensor { return tensor{mag_not(m_tensor)}; }
+        [[nodiscard]] auto bnot_() const noexcept -> tensor { return tensor{mag_not_(m_tensor)}; }
+        [[nodiscard]] auto bshl(tensor other) const noexcept -> tensor {return tensor{mag_shl(m_tensor, &*other)}; }
+        [[nodiscard]] auto bshl_(tensor other) const noexcept -> tensor { return tensor{mag_shl_(m_tensor, &*other)}; }
+        [[nodiscard]] auto bshr(tensor other) const noexcept -> tensor {return tensor{mag_shr(m_tensor, &*other)}; }
+        [[nodiscard]] auto bshr_(tensor other) const noexcept -> tensor { return tensor{mag_shr_(m_tensor, &*other)}; }
 
         [[nodiscard]] auto operator + (tensor other) const noexcept -> tensor { return add(other); }
         [[nodiscard]] auto operator + (float other) const noexcept -> tensor { return add(other); }
@@ -376,12 +382,17 @@ namespace magnetron {
 
         [[nodiscard]] auto operator % (tensor other) const noexcept -> tensor { return matmul(other); } // we use the % operator for matmul in C++, as @ is not allowed
 
-        [[nodiscard]] auto operator & (tensor other) const noexcept -> tensor { return land(other); }
-        auto operator &= (tensor other) const noexcept -> tensor { return land_(other); }
-        [[nodiscard]] auto operator | (tensor other) const noexcept -> tensor { return lor(other); }
-        auto operator |= (tensor other) const noexcept -> tensor { return lor_(other); }
-        [[nodiscard]] auto operator ^ (tensor other) const noexcept -> tensor { return lxor(other); }
-        auto operator ^= (tensor other) const noexcept -> tensor { return lxor_(other); }
+        [[nodiscard]] auto operator & (tensor other) const noexcept -> tensor { return band(other); }
+        auto operator &= (tensor other) const noexcept -> tensor { return band_(other); }
+        [[nodiscard]] auto operator | (tensor other) const noexcept -> tensor { return bor(other); }
+        auto operator |= (tensor other) const noexcept -> tensor { return bor_(other); }
+        [[nodiscard]] auto operator ^ (tensor other) const noexcept -> tensor { return bxor(other); }
+        auto operator ^= (tensor other) const noexcept -> tensor { return bxor_(other); }
+        [[nodiscard]] auto operator ~ () const noexcept -> tensor { return bnot(); }
+        [[nodiscard]] auto operator << (tensor other) const noexcept -> tensor { return bshl(other); }
+        auto operator <<= (tensor other) const noexcept -> tensor { return bshl_(other); }
+        [[nodiscard]] auto operator >> (tensor other) const noexcept -> tensor { return bshr(other); }
+        auto operator >>= (tensor other) const noexcept -> tensor { return bshr_(other); }
 
 
         auto fill_from(const void* buf, std::size_t nb) -> void {

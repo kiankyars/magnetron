@@ -1040,6 +1040,21 @@ mag_Tensor* mag_not_(mag_Tensor* x) {
     return mag_tensor_operator(x->ctx, MAG_OP_NOT, true, (mag_Tensor*[]){x}, 1, NULL, 0, MAG_STAGE_EVAL);
 }
 
+mag_Tensor* mag_shl(mag_Tensor* x, mag_Tensor* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SHL, false, (mag_Tensor*[]){x, y}, 2, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_Tensor* mag_shl_(mag_Tensor* x, mag_Tensor* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SHL, true, (mag_Tensor*[]){x, y}, 2, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_Tensor* mag_shr(mag_Tensor* x, mag_Tensor* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SHR, false, (mag_Tensor*[]){x, y}, 2, NULL, 0, MAG_STAGE_EVAL);
+}
+
+mag_Tensor* mag_shr_(mag_Tensor* x, mag_Tensor* y) {
+    return mag_tensor_operator(x->ctx, MAG_OP_SHR, true, (mag_Tensor*[]){x, y}, 2, NULL, 0, MAG_STAGE_EVAL);
+}
 
 void mag_tensor_fill_from_floats(mag_Tensor* t, const mag_E8M23* data, size_t len) {
     mag_assert(data && len, "invalid data pointer or length");
@@ -2047,6 +2062,50 @@ const mag_OPMetadata* mag_op_meta_of(mag_Operator opc) {
             .backward = NULL,
             .r_alloc = &mag_result_constructor_routine_isomorph,
             .validator = &mag_validate_op_unary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
+        },
+        [MAG_OP_SHL] = {
+            .mnemonic = "shl",
+            .desc = "𝑥 ≪ 𝑦",
+            .input_count = 2,
+            .input_dtypes = {
+                [0] = {
+                    {.type=MAG_DTYPE_I32, .is_used=true},
+                },
+                [1] = {
+                    {.type=MAG_DTYPE_I32, .is_used=true},
+                }
+            },
+            .op_param_layout = {},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
+            .backward = NULL,
+            .r_alloc = &mag_result_constructor_routine_isomorph,
+            .validator = &mag_validate_op_binary,
+            .cpu = {
+                .thread_growth = 0.1,
+                .thread_treshold = 250000
+            }
+        },
+        [MAG_OP_SHR] = {
+            .mnemonic = "shr",
+            .desc = "𝑥 ≫ 𝑦",
+            .input_count = 2,
+            .input_dtypes = {
+                [0] = {
+                    {.type=MAG_DTYPE_I32, .is_used=true},
+                },
+                [1] = {
+                    {.type=MAG_DTYPE_I32, .is_used=true},
+                }
+            },
+            .op_param_layout = {},
+            .flags = MAG_OP_FLAG_SUPPORTS_INPLACE | MAG_OP_FLAG_SUPPORT_CPU_MULTITHREADING,
+            .backward = NULL,
+            .r_alloc = &mag_result_constructor_routine_isomorph,
+            .validator = &mag_validate_op_binary,
             .cpu = {
                 .thread_growth = 0.1,
                 .thread_treshold = 250000

@@ -60,27 +60,27 @@ static constexpr std::int64_t broadcast_lim {lim-1};
         ); \
     }
 
-#define impl_binary_operator_int_test_group(name, op, data_type) \
+#define impl_binary_operator_int_test_group(name, op, data_type, min, max) \
     TEST(cpu_tensor_binary_ops, name##_same_shape_##data_type) { \
-        test::test_binary_int_operator<false, false>(lim, dtype::data_type, \
+        test::test_binary_int_operator<false, false>(lim, dtype::data_type, (min), (max), \
             [](tensor a, tensor b) -> tensor { return a op b; }, \
-            [](std::int32_t a, std::int32_t b) -> float { return a op b; } \
+            [](std::int32_t a, std::int32_t b) -> std::int32_t { return a op b; } \
         ); \
     } \
     TEST(cpu_tensor_binary_ops, name##_broadcast_##data_type) { \
-        test::test_binary_int_operator<true, false>(broadcast_lim, dtype::data_type, \
+        test::test_binary_int_operator<true, false>(broadcast_lim, dtype::data_type, (min), (max), \
             [](tensor a, tensor b) -> tensor { return a op b; }, \
             [](std::int32_t a, std::int32_t b) -> std::int32_t { return a op b; } \
         ); \
     } \
     TEST(cpu_tensor_binary_ops, name##_inplace_same_shape_##data_type) { \
-        test::test_binary_int_operator<false, true>(lim, dtype::data_type, \
+        test::test_binary_int_operator<false, true>(lim, dtype::data_type, (min), (max), \
             [](tensor a, tensor b) -> tensor { return a op##= b; }, \
             [](std::int32_t a, std::int32_t b) -> std::int32_t { return a op b; } \
         ); \
     } \
     TEST(cpu_tensor_binary_ops, name##_inplace_broadcast_##data_type) { \
-        test::test_binary_int_operator<true, true>(broadcast_lim, dtype::data_type, \
+        test::test_binary_int_operator<true, true>(broadcast_lim, dtype::data_type, (min), (max), \
             [](tensor a, tensor b) -> tensor { return a op##= b; }, \
             [](std::int32_t a, std::int32_t b) -> std::int32_t { return a op b; } \
         ); \
@@ -102,13 +102,15 @@ impl_binary_operator_bool_test_group(and, &)
 impl_binary_operator_bool_test_group(or, |)
 impl_binary_operator_bool_test_group(xor, ^)
 
-impl_binary_operator_int_test_group(add, +, i32)
-impl_binary_operator_int_test_group(sub, -, i32)
-impl_binary_operator_int_test_group(mul, *, i32)
-impl_binary_operator_int_test_group(div, /, i32)
-impl_binary_operator_int_test_group(and, &, i32)
-impl_binary_operator_int_test_group(or, |, i32)
-impl_binary_operator_int_test_group(xor, ^, i32)
+impl_binary_operator_int_test_group(add, +, i32, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max())
+impl_binary_operator_int_test_group(sub, -, i32, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max())
+impl_binary_operator_int_test_group(mul, *, i32, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max())
+impl_binary_operator_int_test_group(div, /, i32, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max())
+impl_binary_operator_int_test_group(and, &, i32, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max())
+impl_binary_operator_int_test_group(or, |, i32, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max())
+impl_binary_operator_int_test_group(xor, ^, i32, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max())
+impl_binary_operator_int_test_group(shl, <<, i32, 0, 32)
+impl_binary_operator_int_test_group(shr, >>, i32, 0, 32)
 
 #undef impl_binary_operator_float_test_group
 #undef impl_binary_operator_bool_test_group
