@@ -1,37 +1,41 @@
 name: Build
 
 on:
-  push:
-    branches: [ "master", "develop" ]
   pull_request:
     branches: [ "*" ]
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runs-on }}
 
     strategy:
       fail-fast: false
+
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm]
-        build_type: [Release]
-        compiler: [gcc, clang]
         include:
-          - os: windows-latest
+          - runs-on: [self-hosted, Linux, X64]
+            os: ubuntu-latest
+            c_compiler: gcc
+            cpp_compiler: g++
+            is_host_arch: true
+            generator: Ninja
             build_type: Release
-            compiler: cl
-          - os: windows-2019
+
+          - runs-on: ubuntu-latest
+            os: ubuntu-latest
+            c_compiler: gcc
+            cpp_compiler: g++
+            is_host_arch: true
+            generator: Unix Makefiles
             build_type: Release
-            compiler: cl
-          - os: macos-latest
+
+          - runs-on: ubuntu-22.04-arm
+            os: ubuntu-22.04-arm
+            c_compiler: gcc
+            cpp_compiler: g++
+            is_host_arch: true
+            generator: Unix Makefiles
             build_type: Release
-            compiler: clang
-          - os: macos-14
-            build_type: Release
-            compiler: clang
-          - os: macos-13
-            build_type: Release
-            compiler: clang
 
     steps:
       - uses: actions/checkout@v4
