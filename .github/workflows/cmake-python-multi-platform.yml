@@ -1,41 +1,37 @@
-name: Build
+name: CMake Python Multi-Platform Build and Test
 
 on:
+  push:
+    branches: [ "master", "develop" ]
   pull_request:
     branches: [ "*" ]
 
 jobs:
   build:
-    runs-on: ${{ matrix.runs-on }}
+    runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
-
       matrix:
+        os: [ubuntu-latest, ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm]
+        build_type: [Release]
+        compiler: [gcc, clang]
         include:
-          - runs-on: [self-hosted, Linux, X64]
-            os: ubuntu-latest
-            c_compiler: gcc
-            cpp_compiler: g++
-            is_host_arch: true
-            generator: Ninja
+          - os: windows-latest
             build_type: Release
-
-          - runs-on: ubuntu-latest
-            os: ubuntu-latest
-            c_compiler: gcc
-            cpp_compiler: g++
-            is_host_arch: true
-            generator: Unix Makefiles
+            compiler: cl
+          - os: windows-2019
             build_type: Release
-
-          - runs-on: ubuntu-22.04-arm
-            os: ubuntu-22.04-arm
-            c_compiler: gcc
-            cpp_compiler: g++
-            is_host_arch: true
-            generator: Unix Makefiles
+            compiler: cl
+          - os: macos-latest
             build_type: Release
+            compiler: clang
+          - os: macos-14
+            build_type: Release
+            compiler: clang
+          - os: macos-13
+            build_type: Release
+            compiler: clang
 
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +41,7 @@ jobs:
         run: echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
       - name: Install Packages
-        if: runner.os == 'linux'
+        if: runner.os != 'windows'
         shell: bash
         run: |
           sudo apt-get update
@@ -82,6 +78,9 @@ jobs:
 
       - name: Build C++ Runtime
         run: cmake --build "${{ steps.strings.outputs.build-output-dir }}" --config ${{ matrix.build_type }} -j4
+
+      - name: Prepare C++ Test Data
+        run: cp -r "${{ github.workspace }}/test_data" "${{ steps.strings.outputs.build-output-dir }}/test/unittests/test_data"
 
       - name: Run C++ Runtime Tests
         working-directory: "${{ steps.strings.outputs.build-output-dir }}"
