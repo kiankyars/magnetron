@@ -168,7 +168,7 @@ static void MAG_HOTPROC mag_vector_cast_mag_e5m10_cvt_e8m23(int64_t n, const mag
     }
 }
 
-static uint32_t MAG_AINLINE mag_mt19937_step(uint32_t* rem, uint32_t* next, uint32_t* state) {
+static uint32_t MAG_AINLINE mag_mt19937_step(uint32_t* _Nonnull rem, uint32_t* _Nonnull next, uint32_t* _Nonnull state) {
     if (--*rem <= 0) {
         *rem = 624;
         *next = 0;
@@ -192,7 +192,7 @@ static uint32_t MAG_AINLINE mag_mt19937_step(uint32_t* rem, uint32_t* next, uint
     return y;
 }
 
-static uint32_t MAG_AINLINE mag_pcg_step(uint64_t* state, uint64_t* inc) {
+static uint32_t MAG_AINLINE mag_pcg_step(uint64_t* _Nonnull state, uint64_t* _Nonnull inc) {
     uint64_t prev = *state;
     *state = prev*6364136223846793005ull + *inc;
     uint32_t mixed = ((prev>>18u) ^ prev) >> 27u;
@@ -202,7 +202,7 @@ static uint32_t MAG_AINLINE mag_pcg_step(uint64_t* state, uint64_t* inc) {
 
 #define mag_e8m23_canonical(y) (1.f/0x1.0p23f*((mag_E8M23)((y)>>9) + 0.5f)) /* Transform u32 -> xi ∈ [0, 1) */
 
-static void MAG_AINLINE mag_box_mueller(mag_E8M23* u1, mag_E8M23* u2, mag_E8M23 std, mag_E8M23 mean) {
+static void MAG_AINLINE mag_box_mueller(mag_E8M23* _Nonnull u1, mag_E8M23* _Nonnull u2, mag_E8M23 std, mag_E8M23 mean) {
     mag_E8M23 mag = std*sqrtf(-2.0f*logf(*u1));
     *u1 = mag*cosf(MAG_TAU**u2) + mean;
     *u2 = mag*sinf(MAG_TAU**u2) + mean;
