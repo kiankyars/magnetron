@@ -32,17 +32,28 @@ The tiny C99 core - wrapped in a modern Python API - gives you dynamic graphs, a
 A CUDA backend is also WIP.<br>
 
 ### Key features
-* N-dimensional, flattened tensors
-* Automatic differentiation on dynamic computation graphs
-* CPU multithreading + SIMD (SSE4, AVX2/AVX512, ARM NEON)
-* PyTorch-like Python API
-* Broadcasting-aware operators with in-place variants
-* High-level neural-net building blocks
-* float32 and float16 datatypes
-* Modern PRNGs (Mersenne Twister, PCG)
-* Clear validation and error messages
-* Custom compressed tensor file formats
-* No C and Python dependencies (except CFFI for the Python wrapper)
+* **PyTorch-like** Python API  
+  → Seamless switch for PyTorch users with familiar syntax and behavior  
+* **Automatic differentiation** on dynamic computation graphs  
+  → Supports flexible model construction and training workflows  
+* High-level **neural-net building blocks**  
+  → Includes `nn.Module`, `Linear`, `Sequential`, and more out of the box  
+* **Broadcasting-aware operators** with **in-place variants**  
+  → Efficient, NumPy-like tensor ops with performance in mind  
+* **CPU multithreading** + **SIMD** (SSE4, AVX2/AVX512, ARM NEON)  
+  → High performance even without a GPU  
+* Multiple **datatypes**: **float32**, **float16**, **int32**, and **boolean**  
+  → Flexibility for both training and quantized inference  
+* Custom **compressed tensor file formats**  
+  → Fast serialization & model loading
+* Modern **PRNGs** (**Mersenne Twister**, **PCG**)  
+  → Reliable and reproducible randomness
+* Clear **validation** and **error messages**  
+  → Easier debugging and better developer experience  
+* **N-dimensional**, flattened tensors  
+  → Simple internal representation with general support for shapes  
+* No external **C or Python dependencies** (except **CFFI** for the Python wrapper)  
+  → Lightweight and portable – great for embedded or restricted environments
 
 ## XOR Training Example
 A simple XOR neuronal network (MLP) trained with Magnetron. Copy and paste the code below into a file called `xor.py` and run it with Python.
@@ -106,16 +117,46 @@ Some examples use matplotlib and numpy for plotting and data generation, but the
 
 ### Prerequisites
 * Linux, MacOS or Windows
-* A C99 compiler (gcc, clang, msvc)
+* A modern, C-99 capable compiler (gcc, clang, msvc)
 * Python 3.6 or higher
+* CMake (Linux: `sudo apt install cmake`, OSX: `brew install cmake`)
 
 ### Installation
-*A pip installable package will be provided, as soon as all core features are implemented.*
-1. Clone the repo
-2. `cd magnetron/python` (VENV recommended).
-3. `pip install -r requirements.txt` Install dependencies for examples.
-4. `cd magnetron_framework && bash install_wheel_local.sh && cd ../` Install the Magnetron wheel locally, a pip installable package will be provided in the future.
-5. `python examples/simple/xor.py` Run the XOR example.
+
+*A pip-installable package will be provided once all core features are implemented. Until then, follow these steps to build Magnetron from source:*
+
+---
+
+1. **Clone the Magnetron repository:**
+
+    ```bash
+    git clone https://github.com/MarioSieg/magnetron
+    ```
+
+2. **Navigate into the Python root directory:**
+
+    ```bash
+    cd magnetron/python
+    ```
+
+3. **Create and activate a virtual environment:**
+
+    ```bash
+    python3 -m venv .venv && source .venv/bin/activate
+    ```
+
+4. **Install Magnetron**  
+   *(Make sure CMake and a C compiler are installed – see [Prerequisites](#prerequisites)):*
+
+    ```bash
+    pip install .
+    ```
+
+5. **Run the XOR training example:**
+
+    ```bash
+    python3 examples/xor.py
+    ```
 
 ## Usage
 See the [Examples](python/examples) directory which contains various models and training examples.<br>

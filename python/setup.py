@@ -105,7 +105,10 @@ setup(
     author_email='mario.sieg.64@gmail.com',
     description='A lightweight machine learning library with GPU support.',
     long_description='A lightweight machine learning library with GPU support.',
-    packages=['magnetron'],
+    packages=[
+        'magnetron',
+        'magnetron.nn',
+    ],
     package_dir={'': 'src'},
     package_data={'magnetron': ['*.dylib', '*.so', '*.dll']},
     include_package_data=True,
