@@ -1,5 +1,6 @@
 import magnetron as mag
 
-a = mag.Tensor.full((4, 4), fill_value=1, dtype=mag.int32)
-b = mag.Tensor.full((4, 4), fill_value=8, dtype=mag.int32)
-print(0xffff&((a << b)-1)>>1)
+a = mag.Tensor.uniform((4, 4), from_=0, to=255, dtype=mag.int32)
+
+print(a)
+print(a.tolist())

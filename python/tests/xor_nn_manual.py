@@ -108,13 +108,9 @@ def xor_nn_mag() -> None:
     return [predict(Tensor.from_data([xr]))[0] for xr in INPUT]
 
 
-"""
 def test_xor_nn() -> None:
     np_out = xor_nn_np()
     mag_out = xor_nn_mag()
     assert [round(x) for x in np_out] == [0, 1, 1, 0]
     assert [round(x) for x in mag_out] == [0, 1, 1, 0]
-    print(np_out)
-    print(mag_out)
-    # assert np.allclose(np_out, mag_out, atol=0.1)
-"""
+    assert np.allclose(np_out, mag_out, atol=0.1)

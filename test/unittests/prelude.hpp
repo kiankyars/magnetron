@@ -116,7 +116,7 @@ namespace magnetron::test {
         ctx.stop_grad_recorder();
         for_all_shape_perms(lim, BROADCAST ? 2 : 1, [&](std::span<const std::int64_t> shape) {
             tensor t_a {ctx, ty, shape};
-            t_a.fill_rand_uniform(min, max);
+            t_a.fill_rand_uniform_float(min, max);
             tensor t_b {t_a.clone()};
             std::vector<e8m23_t> d_a {t_a.to_float_vector()};
             std::vector<e8m23_t> d_b {t_b.to_float_vector()};
@@ -145,7 +145,7 @@ namespace magnetron::test {
         for_all_shape_perms(lim, BROADCAST ? 2 : 1, [&](std::span<const std::int64_t> shape) {
             tensor t_a {ctx, ty, shape};
             std::uniform_int_distribution<std::int32_t> fill_val {min, max};
-            t_a.fill(static_cast<e11m52_t>(fill_val(gen)));
+            t_a.fill_int(fill_val(gen));
             tensor t_b {t_a.clone()};
             std::vector<std::int32_t> d_a {t_a.to_int_vector()};
             std::vector<std::int32_t> d_b {t_b.to_int_vector()};
@@ -173,9 +173,9 @@ namespace magnetron::test {
         ctx.stop_grad_recorder();
         for_all_shape_perms(lim, BROADCAST ? 2 : 1, [&](std::span<const std::int64_t> shape) {
             tensor t_a {ctx, dtype::boolean, shape};
-            t_a.fill(1.0f);
+            t_a.fill_int(true);
             tensor t_b {t_a.clone()};
-            t_b.fill(0.0f);
+            t_b.fill_int(false);
             std::vector<bool> d_a {t_a.to_bool_vector()};
             std::vector<bool> d_b {t_b.to_bool_vector()};
             tensor t_r {std::invoke(a, t_a, t_b)};
@@ -225,7 +225,7 @@ namespace magnetron::test {
         auto ctx = context{compute_device::cpu};
         for_all_shape_perms(lim, BROADCAST ? 2 : 1, [&](std::span<const std::int64_t> shape) {
             tensor base{ctx, ty, shape};
-            base.fill_rand_uniform(min, max);
+            base.fill_rand_uniform_float(min, max);
             tensor t_a = SUBVIEW ?  make_random_view(base) : base;
             if constexpr (SUBVIEW)
                 ASSERT_TRUE(t_a.is_view());
@@ -384,7 +384,7 @@ namespace magnetron::test {
                 this->weight = weight;
                 if (has_bias) {
                     tensor bias {ctx, type, out_features};
-                    bias.fill(0);
+                    bias.fill_float(0.f);
                     bias.set_name("bias");
                     register_param(bias);
                     this->bias = bias;

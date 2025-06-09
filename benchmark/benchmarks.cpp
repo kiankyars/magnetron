@@ -19,9 +19,9 @@ static auto bench_op(dtype type) -> void {
     auto run_cycle {[&](std::int64_t numel) {
         context ctx {compute_device::cpu};
         tensor x {ctx, type, numel, numel};
-        x.fill(1.0f);
+        x.fill_float(1.0f);
         tensor y {ctx, type, numel, numel};
-        y.fill(3.0f);
+        y.fill_float(3.0f);
 
         bench.run(std::to_string(numel) + " elements", [&] {
             tensor r {x & y};

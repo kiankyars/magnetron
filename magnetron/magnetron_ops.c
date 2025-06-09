@@ -1068,17 +1068,28 @@ void mag_tensor_fill_from_raw_bytes(mag_Tensor* t, const void* data, size_t len)
     (*sto->transfer)(sto, MAG_TRANSFER_DIR_H2D, MAG_TRANSFER_OP_COPY, 0, (void*)data, len);
 }
 
-void mag_tensor_fill(mag_Tensor* t, mag_E11M52 x) {
+void mag_tensor_fill_float(mag_Tensor* t, mag_E8M23 x) {
+    mag_assert2(mag_tensor_is_floating_point_typed(t));
     t->init_op = MAG_IOP_BROADCAST;
     mag_OPParamLayout layout;
     mag_op_param_layout_init(&layout);
-    mag_op_param_layout_insert(&layout, mag_tensor_is_integral_typed(t) ? mag_op_param_wrap_i64((int64_t)x) : mag_op_param_wrap_e8m23((mag_E8M23)x));
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_e8m23(x));
     mag_op_param_layout_transfer(&layout, &t->init_op_params);
     mag_op_exec(t, t->ctx->device, MAG_STAGE_INIT);
 }
 
-void mag_tensor_fill_random_uniform(mag_Tensor* t, mag_E8M23 min, mag_E8M23 max) {
-    mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
+void mag_tensor_fill_int(mag_Tensor* t, int32_t x) {
+    mag_assert2(mag_tensor_is_integral_typed(t));
+    t->init_op = MAG_IOP_BROADCAST;
+    mag_OPParamLayout layout;
+    mag_op_param_layout_init(&layout);
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_i64(x));
+    mag_op_param_layout_transfer(&layout, &t->init_op_params);
+    mag_op_exec(t, t->ctx->device, MAG_STAGE_INIT);
+}
+
+void mag_tensor_fill_random_uniform_float(mag_Tensor* t, mag_E8M23 min, mag_E8M23 max) {
+    mag_assert2(mag_tensor_is_floating_point_typed(t));
     t->init_op = MAG_IOP_RAND_UNIFORM;
     mag_OPParamLayout layout;
     mag_op_param_layout_init(&layout);
@@ -1088,8 +1099,19 @@ void mag_tensor_fill_random_uniform(mag_Tensor* t, mag_E8M23 min, mag_E8M23 max)
     mag_op_exec(t, t->ctx->device, MAG_STAGE_INIT);
 }
 
+void mag_tensor_fill_random_uniform_int(mag_Tensor* t, int32_t min, int32_t max) {
+    mag_assert2(mag_tensor_is_integral_typed(t));
+    t->init_op = MAG_IOP_RAND_UNIFORM;
+    mag_OPParamLayout layout;
+    mag_op_param_layout_init(&layout);
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_i64(min));
+    mag_op_param_layout_insert(&layout, mag_op_param_wrap_i64(max));
+    mag_op_param_layout_transfer(&layout, &t->init_op_params);
+    mag_op_exec(t, t->ctx->device, MAG_STAGE_INIT);
+}
+
 void mag_tensor_fill_random_normal(mag_Tensor* t, mag_E8M23 mean, mag_E8M23 stddev) {
-    mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
+    mag_assert2(mag_tensor_is_floating_point_typed(t));
     t->init_op = MAG_IOP_RAND_NORMAL;
     mag_OPParamLayout layout;
     mag_op_param_layout_init(&layout);
@@ -1099,8 +1121,8 @@ void mag_tensor_fill_random_normal(mag_Tensor* t, mag_E8M23 mean, mag_E8M23 stdd
     mag_op_exec(t, t->ctx->device, MAG_STAGE_INIT);
 }
 
-void mag_tensor_fill_random_bernoulli(mag_Tensor* t, float p) {
-    mag_assert2(t->ctx->device_type == MAG_COMPUTE_DEVICE_TYPE_CPU);
+void mag_tensor_fill_random_bernoulli(mag_Tensor* t, mag_E8M23 p) {
+    mag_assert2(t->dtype == MAG_DTYPE_BOOL);
     t->init_op = MAG_IOP_RAND_BERNOULLI;
     mag_OPParamLayout layout;
     mag_op_param_layout_init(&layout);

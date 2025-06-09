@@ -66,7 +66,7 @@ TEST(cpu_tensor_init_ops, fill_e8m23) {
         std::uniform_real_distribution<e8m23_t> dist {dtype_traits<e8m23_t>::min, dtype_traits<e8m23_t>::max};
         e8m23_t fill_val {dist(gen)};
         tensor t {ctx, dtype::e8m23, shape};
-        t.fill(fill_val);
+        t.fill_float(fill_val);
         std::vector<e8m23_t> data {t.to_float_vector()};
         ASSERT_EQ(data.size(), t.numel());
         for (std::size_t i {}; i < data.size(); ++i) {
@@ -81,7 +81,7 @@ TEST(cpu_tensor_init_ops, fill_e5m10) {
         std::uniform_real_distribution<e8m23_t> dist {-1.0f, 1.0f};
         e8m23_t fill_val {dist(gen)};
         tensor t {ctx, dtype::e5m10, shape};
-        t.fill(fill_val);
+        t.fill_float(fill_val);
         std::vector<e8m23_t> data {t.to_float_vector()};
         ASSERT_EQ(data.size(), t.numel());
         for (std::size_t i {}; i < data.size(); ++i) {
@@ -93,10 +93,10 @@ TEST(cpu_tensor_init_ops, fill_e5m10) {
 TEST(cpu_tensor_init_ops, fill_bool) {
     context ctx {compute_device::cpu};
     for_all_shape_perms(lim, 1, [&](std::span<const std::int64_t> shape) {
-        std::uniform_real_distribution<e8m23_t> dist {0.0f, 1.0f};
-        e8m23_t fill_val {dist(gen) > 0.5f ? 1.0f : 0.0f};
+        std::bernoulli_distribution dist {};
+        bool fill_val {dist(gen)};
         tensor t {ctx, dtype::boolean, shape};
-        t.fill(fill_val);
+        t.fill_int(fill_val);
         std::vector<bool> data {t.to_bool_vector()};
         ASSERT_EQ(data.size(), t.numel());
         for (std::size_t i {}; i < data.size(); ++i) {
@@ -112,7 +112,7 @@ TEST(cpu_tensor_init_ops, fill_random_uniform_e8m23) {
         e8m23_t min {dist(gen)};
         e8m23_t max {std::uniform_real_distribution{min, dtype_traits<e8m23_t>::max}(gen)};
         tensor t {ctx, dtype::e8m23, shape};
-        t.fill_rand_uniform(min, max);
+        t.fill_rand_uniform_float(min, max);
         std::vector<e8m23_t> data {t.to_float_vector()};
         ASSERT_EQ(data.size(), t.numel());
         for (auto x : data) {

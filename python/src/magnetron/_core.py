@@ -42,6 +42,7 @@ class DataType:
     enum_value: int
     size: int
     name: str
+    native_type: str | None
 
     def __str__(self) -> str:
         return self.name
@@ -50,10 +51,10 @@ class DataType:
         return self.name
 
 
-float32: DataType = DataType(_C.MAG_DTYPE_E8M23, 4, 'float32')
-float16: DataType = DataType(_C.MAG_DTYPE_E5M10, 2, 'float16')
-boolean: DataType = DataType(_C.MAG_DTYPE_BOOL, 1, 'bool')
-int32: DataType = DataType(_C.MAG_DTYPE_I32, 4, 'int32')
+float32: DataType = DataType(_C.MAG_DTYPE_E8M23, 4, 'float32', 'float')
+float16: DataType = DataType(_C.MAG_DTYPE_E5M10, 2, 'float16', None)
+boolean: DataType = DataType(_C.MAG_DTYPE_BOOL, 1, 'bool', 'bool')
+int32: DataType = DataType(_C.MAG_DTYPE_I32, 4, 'int32', 'int32_t')
 
 _DTYPE_ENUM_MAP: dict[int, DataType] = {
     float32.enum_value: float32,
@@ -419,7 +420,8 @@ class Tensor:
         cls,
         shape: tuple[int, ...],
         *,
-        interval: (float, float) = (-1.0, 1.0),
+        from_: float | int | None = None,
+        to: float | int | None = None,
         dtype: DataType = Context.primary().default_dtype,
         requires_grad: bool = False,
         name: str | None = None,
@@ -432,7 +434,7 @@ class Tensor:
             requires_grad=requires_grad,
             name=name,
         )
-        tensor.fill_random_uniform_(interval[0], interval[1])
+        tensor.fill_random_uniform_(from_, to)
         return tensor
 
     @classmethod
@@ -510,13 +512,18 @@ class Tensor:
     def storage_base_ptr(self) -> int:
         return int(_ffi.cast('uintptr_t', _C.mag_tensor_get_storage_base_ptr(self._ptr)))
 
-    def item(self) -> float:
+    def item(self) -> float | int | bool:
         return self.tolist()[0]
 
-    def tolist(self) -> list[float]:
-        ptr: _ffi.CData = _C.mag_tensor_get_data_as_floats(self._ptr)  # Convert tensor dtype to float array
-        unpacked: list[float] = _ffi.unpack(ptr, self.numel)
-        _C.mag_tensor_get_data_as_floats_free(ptr)  # Free allocated native float array
+    def tolist(self) -> list[float] | list[int] | list[bool]:
+        unpack_fn = _C.mag_tensor_get_data_as_floats if self.is_floating_point else _C.mag_tensor_get_raw_data_as_bytes
+        free_fn = _C.mag_tensor_get_data_as_floats_free if self.is_floating_point else _C.mag_tensor_get_raw_data_as_bytes_free
+        castor = None if self.is_floating_point else self.dtype.native_type
+        ptr: _ffi.CData = unpack_fn(self._ptr)
+        if castor is not None:
+            ptr = _ffi.cast(f'const {castor}*', ptr)
+        unpacked = _ffi.unpack(ptr, self.numel)
+        free_fn(ptr)
         return unpacked
 
     @property
@@ -656,14 +663,26 @@ class Tensor:
 
     def fill_(self, value: float | int | bool) -> None:
         self._validate_inplace_op()
-        _C.mag_tensor_fill(self._ptr, float(value))
+        if self.is_floating_point:
+            _C.mag_tensor_fill_float(self._ptr, float(value))
+        else:
+            _C.mag_tensor_fill_int(self._ptr, int(value))
 
-    def fill_random_uniform_(self, min_val: float | int, max_val: float | int) -> None:
-        _validate_dtype_compat(_FLOATING_POINT_DTYPES, self)
+    def fill_random_uniform_(self, from_: float | int | None = None, to: float | int | None = None) -> None:
+        _validate_dtype_compat(_NUMERIC_DTYPES, self)
         self._validate_inplace_op()
-        if max_val < min_val:
-            min_val, max_val = max_val, min_val
-        _C.mag_tensor_fill_random_uniform(self._ptr, float(min_val), float(max_val))
+        from_def, to_def = (
+            (-0x80000000, 0x7FFFFFFF)
+            if self.is_integral
+            else (0.0, 1.0)
+        )
+        from_ = from_def if from_ is None else from_
+        to = to_def if to is None else to
+        assert to > from_, f'Invalid uniform range {to} must be > {from_}'
+        if self.is_floating_point:
+            _C.mag_tensor_fill_random_uniform_float(self._ptr, float(from_), float(to))
+        else:
+            _C.mag_tensor_fill_random_uniform_int(self._ptr, int(from_), int(to))
 
     def fill_random_normal_(self, mean: float, std: float) -> None:
         _validate_dtype_compat(_FLOATING_POINT_DTYPES, self)
@@ -671,7 +690,7 @@ class Tensor:
         _C.mag_tensor_fill_random_normal(self._ptr, mean, std)
 
     def fill_random_bernoulli_(self, p: float) -> None:
-        _validate_dtype_compat(_INTEGRAL_DTYPES, self)
+        _validate_dtype_compat({boolean}, self)
         self._validate_inplace_op()
         _C.mag_tensor_fill_random_bernoulli(self._ptr, p)
 
@@ -994,6 +1013,27 @@ class Tensor:
         return other / self
 
     def __itruediv__(self, other: object | int | float) -> 'Tensor':
+        self._validate_inplace_op()
+        if not isinstance(other, Tensor):
+            val: float | int = float(other) if self.is_floating_point else int(other)
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
+        _validate_dtype_compat(_NUMERIC_DTYPES, self, other)
+        return Tensor(_C.mag_div_(self._ptr, other._ptr))
+
+    def __floordiv__(self, other: object | int | float) -> 'Tensor':
+        if not isinstance(other, Tensor):
+            val: float | int = float(other) if self.is_floating_point else int(other)
+            other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
+        _validate_dtype_compat(_NUMERIC_DTYPES, self, other)
+        return Tensor(_C.mag_div(self._ptr, other._ptr))
+
+    def __rfloordiv__(self, other: int | float) -> 'Tensor':
+        val: float | int = float(other) if self.is_floating_point else int(other)
+        other = Tensor.full(self.shape, dtype=self.dtype, fill_value=val)
+        _validate_dtype_compat(_NUMERIC_DTYPES, self, other)
+        return other / self
+
+    def __ifloordiv__(self, other: object | int | float) -> 'Tensor':
         self._validate_inplace_op()
         if not isinstance(other, Tensor):
             val: float | int = float(other) if self.is_floating_point else int(other)

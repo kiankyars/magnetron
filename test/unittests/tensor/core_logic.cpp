@@ -8,7 +8,7 @@ using namespace magnetron::test;
 TEST(core_tensor_logic, dynamic_graph_complex) {
     context ctx {compute_device::cpu};
     tensor a {ctx, dtype::e8m23, 10};
-    a.fill(2.5f);
+    a.fill_float(2.5f);
 
     tensor b {a.clone()};
     tensor c {a*b};
@@ -70,7 +70,7 @@ TEST(core_tensor_logic, dynamic_graph_complex) {
 TEST(core_tensor_logic, dynamic_graph_init_op) {
     context ctx {compute_device::cpu};
     tensor a {ctx, dtype::e8m23, 10};
-    a.fill_rand_uniform(0.0f, 1.0f);
+    a.fill_rand_uniform_float(0.0f, 1.0f);
 
     mag_Tensor* ta {&*a};
     ASSERT_EQ(ta->op, MAG_OP_NOP);

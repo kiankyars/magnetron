@@ -2,7 +2,6 @@
 
 from magnetron import *
 
-
 def test_tensor_clone() -> None:
     a = Tensor.from_data([[1, 2], [3, 4]])
     b = a.clone()
@@ -11,7 +10,6 @@ def test_tensor_clone() -> None:
     assert a.rank == b.rank
     assert a.tolist() == b.tolist()
     assert a.is_contiguous == b.is_contiguous
-
 
 def test_tensor_transpose() -> None:
     a = Tensor.full((2, 3), fill_value=1)
@@ -27,28 +25,6 @@ def test_tensor_transpose() -> None:
     assert a.is_contiguous
     assert not b.is_contiguous
 
-
-"""
-def test_tensor_transpose_6d():
-    a = Tensor.full((1, 2, 3, 4, 5, 6), fill_value=1)
-    b = a.transpose()
-    assert a.shape == (1, 2, 3, 4, 5, 6)
-    assert b.shape == (2, 1, 3, 4, 5, 6)
-    assert a.numel == 720
-    assert b.numel == 720
-    assert a.rank == 6
-    assert b.rank == 6
-    assert a.tolist() == [1] * 720
-    assert b.tolist() == [1] * 720
-    assert a.is_contiguous
-    assert not a.is_transposed
-    assert not a.is_permuted
-    assert not b.is_contiguous
-    assert b.is_transposed
-    assert b.is_permuted
-"""
-
-
 def test_tensor_permute() -> None:
     a = Tensor.full((2, 3), fill_value=1)
     b = a.permute((1, 0))
@@ -62,7 +38,6 @@ def test_tensor_permute() -> None:
     assert b.tolist() == [1, 1, 1, 1, 1, 1]
     assert a.is_contiguous
     assert not b.is_contiguous
-
 
 def test_tensor_permute_6d() -> None:
     a = Tensor.full((1, 2, 3, 4, 5, 6), fill_value=1)

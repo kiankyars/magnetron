@@ -18,21 +18,21 @@ def test_tensor_fill_x() -> None:
 
 
 def test_tensor_fill_uniform() -> None:
-    tensor = Tensor.uniform((1, 2, 3, 4, 5, 6), interval=(-1, 1))
+    tensor = Tensor.uniform((1, 2, 3, 4, 5, 6), from_=-1, to=1)
     data = tensor.tolist()
     assert len(data) == 1 * 2 * 3 * 4 * 5 * 6
     assert all([-1 <= x <= 1 for x in data])
 
 
 def test_tensor_fill_uniform2() -> None:
-    tensor = Tensor.uniform((1, 2, 3, 4, 5, 6), interval=(0, 100))
+    tensor = Tensor.uniform((1, 2, 3, 4, 5, 6), from_=0, to=100)
     data = tensor.tolist()
     assert len(data) == 1 * 2 * 3 * 4 * 5 * 6
     assert all([0 <= x <= 100 for x in data])
 
 
 def test_tensor_fill_uniform3() -> None:
-    tensor = Tensor.uniform((1, 2, 3, 4, 5, 6), interval=(-1000, -20))
+    tensor = Tensor.uniform((1, 2, 3, 4, 5, 6), from_=-1000, to=-20)
     data = tensor.tolist()
     assert len(data) == 1 * 2 * 3 * 4 * 5 * 6
     assert all([-1000 <= x <= -20 for x in data])

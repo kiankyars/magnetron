@@ -1095,19 +1095,19 @@ mag_Tensor* mag_tensor_empty_scalar(mag_Context* ctx, mag_DType type) {
 
 mag_Tensor* mag_tensor_scalar(mag_Context* ctx, mag_DType type, mag_E8M23 value) {
     mag_Tensor* tensor = mag_tensor_empty_scalar(ctx, type);
-    mag_tensor_fill(tensor, value);
+    mag_tensor_fill_float(tensor, value);
     return tensor;
 }
 
 mag_Tensor* mag_tensor_full(mag_Context* ctx, mag_DType type, int64_t rank, const int64_t* shape, mag_E8M23 value) {
     mag_Tensor* tensor = mag_tensor_empty(ctx, type, rank, shape);
-    mag_tensor_fill(tensor, value);
+    mag_tensor_fill_float(tensor, value);
     return tensor;
 }
 
 mag_Tensor* mag_tensor_full_like(mag_Tensor* isomorph, mag_E8M23 value) {
     mag_Tensor* tensor = mag_tensor_empty_like(isomorph);
-    mag_tensor_fill(tensor, value);
+    mag_tensor_fill_float(tensor, value);
     return tensor;
 }
 
@@ -1407,7 +1407,7 @@ void mag_tensor_backward(mag_Tensor* root) {
 
 void mag_tensor_zero_grad(mag_Tensor* t) {
     if (t->grad && t->flags & MAG_TFLAG_REQUIRES_GRAD)
-        mag_tensor_fill(t->grad, 0.0f);
+        mag_tensor_fill_float(t->grad, 0.0f);
 }
 
 /*

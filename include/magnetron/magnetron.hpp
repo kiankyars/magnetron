@@ -420,12 +420,20 @@ namespace magnetron {
             mag_tensor_fill_from_raw_bytes(m_tensor, data.data(), data.size_bytes());
         }
 
-        auto fill(float val) -> void {
-            mag_tensor_fill(m_tensor, val);
+        auto fill_float(float val) -> void {
+            mag_tensor_fill_float(m_tensor, val);
         }
 
-        auto fill_rand_uniform(float min, float max) -> void {
-            mag_tensor_fill_random_uniform(m_tensor, min, max);
+        auto fill_int(std::int32_t val) -> void {
+            mag_tensor_fill_int(m_tensor, val);
+        }
+
+        auto fill_rand_uniform_float(float min, float max) -> void {
+            mag_tensor_fill_random_uniform_float(m_tensor, min, max);
+        }
+
+        auto fill_rand_uniform_int(std::int32_t min, std::int32_t max) -> void {
+            mag_tensor_fill_random_uniform_int(m_tensor, min, max);
         }
 
         auto fill_rand_normal(float mean, float stddev) -> void {
