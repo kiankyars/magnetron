@@ -169,6 +169,48 @@ def test_unary_op_round(dtype: mag.DataType) -> None:
     with mag.no_grad():
         unary_op(dtype, lambda x: x.round_(), lambda x: torch.round(x), from_=0, to=100)
 
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
+def test_unary_op_softmax(dtype: mag.DataType) -> None:
+    unary_op(dtype, lambda x: x.softmax(), lambda x: torch.softmax(x, dim=-1))
+    with mag.no_grad():
+        unary_op(dtype, lambda x: x.softmax_(), lambda x: torch.softmax(x, dim=-1))
+
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
+def test_unary_op_sigmoid(dtype: mag.DataType) -> None:
+    unary_op(dtype, lambda x: x.sigmoid(), lambda x: torch.sigmoid(x))
+    with mag.no_grad():
+        unary_op(dtype, lambda x: x.sigmoid_(), lambda x: torch.sigmoid(x))
+
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
+def test_unary_op_hard_sigmoid(dtype: mag.DataType) -> None:
+    unary_op(dtype, lambda x: x.hardsigmoid(), lambda x: torch.nn.functional.hardsigmoid(x))
+    with mag.no_grad():
+        unary_op(dtype, lambda x: x.hardsigmoid_(), lambda x: torch.nn.functional.hardsigmoid(x))
+
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
+def test_unary_op_silu(dtype: mag.DataType) -> None:
+    unary_op(dtype, lambda x: x.silu(), lambda x: torch.nn.functional.silu(x))
+    with mag.no_grad():
+        unary_op(dtype, lambda x: x.silu_(), lambda x: torch.nn.functional.silu(x))
+
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
+def test_unary_op_tanh(dtype: mag.DataType) -> None:
+    unary_op(dtype, lambda x: x.tanh(), lambda x: torch.tanh(x))
+    with mag.no_grad():
+        unary_op(dtype, lambda x: x.tanh_(), lambda x: torch.tanh(x))
+
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
+def test_unary_op_relu(dtype: mag.DataType) -> None:
+    unary_op(dtype, lambda x: x.relu(), lambda x: torch.relu(x))
+    with mag.no_grad():
+        unary_op(dtype, lambda x: x.relu_(), lambda x: torch.relu(x))
+
+@pytest.mark.parametrize('dtype', [mag.float16, mag.float32])
+def test_unary_op_gelu(dtype: mag.DataType) -> None:
+    unary_op(dtype, lambda x: x.gelu(), lambda x: torch.nn.functional.gelu(x))
+    with mag.no_grad():
+        unary_op(dtype, lambda x: x.gelu_(), lambda x: torch.nn.functional.gelu(x))
+
 @pytest.mark.parametrize('dtype', [mag.boolean, mag.int32])
 def test_unary_op_not(dtype: mag.DataType) -> None:
     unary_op(dtype, lambda x: ~x, lambda x: ~x)
@@ -180,7 +222,6 @@ def test_binary_op_add(dtype: mag.DataType) -> None:
 @pytest.mark.parametrize('dtype', [mag.float16, mag.float32, mag.int32])
 def test_binary_op_sub(dtype: mag.DataType) -> None:
     binary_op_square(dtype, lambda x, y: x + y)
-
 
 @pytest.mark.parametrize('dtype', [mag.float16, mag.float32, mag.int32])
 def test_binary_op_mul(dtype: mag.DataType) -> None:

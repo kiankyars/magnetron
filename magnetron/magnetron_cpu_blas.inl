@@ -61,7 +61,8 @@
 #define mag_i32p(t) ((const int32_t*)mag_tensor_get_data_ptr(t))
 #define mag_i32p_mut(t) ((int32_t*)mag_tensor_get_data_ptr(t))
 
-#define MAG_TAU (2.0f*3.14159265358979323846264338327950288f) /* τ=2π */
+#define MAG_TAU 6.283185307179586476925286766559005768394338798f /* τ=2π */
+#define MAG_INVSQRT2 0.707106781186547524400844362104849039284835937f /* 1/√2 */
 
 #if defined(_MSC_VER)
 typedef uint16_t __fp16; /* MSVC does not support __fp16. */
@@ -1262,14 +1263,14 @@ static void MAG_HOTPROC mag_vrelu_dv_e5m10(int64_t numel, mag_E5M10* _Nonnull o,
 static void MAG_HOTPROC mag_vgelu_e8m23(int64_t numel, mag_E8M23* _Nonnull o, const mag_E8M23* _Nonnull x) {
     for (int64_t i=0; i < numel; ++i) {
         mag_E8M23 xi = x[i];
-        o[i] = xi*.5f*(1.f+tanhf(xi));
+        o[i] = .5f*xi*(1.f+erff(xi*MAG_INVSQRT2));
     }
 }
 
 static void MAG_HOTPROC mag_vgelu_e5m10(int64_t numel, mag_E5M10* _Nonnull o, const mag_E5M10* _Nonnull x) {
     for (int64_t i=0; i < numel; ++i) {
         mag_E8M23 xi = mag_e5m10_cvt_e8m23(x[i]);
-        o[i] = mag_e8m23_cvt_e5m10(xi*.5f*(1.f+tanhf(xi)));
+        o[i] = mag_e8m23_cvt_e5m10(.5f*xi*(1.f+erff(xi*MAG_INVSQRT2)));
     }
 }
 
@@ -3387,8 +3388,9 @@ static void MAG_HOTPROC mag_blas_softmax_e5m10(const mag_CPUKernelPayload* _Nonn
             mag_bnd_chk(row_in+i, bx, mag_tensor_get_data_size(x));
             mag_bnd_chk(row_out+i, br, mag_tensor_get_data_size(r));
             mag_E8M23 fp32_row = mag_e5m10_cvt_e8m23(row_in[i]);
-            row_out[i] = mag_e8m23_cvt_e5m10(expf(fp32_row - max_val)); /* -max for numerical stability */
-            sum += fp32_row;
+            mag_E8M23 exp = expf(fp32_row - max_val);
+            row_out[i] = mag_e8m23_cvt_e5m10(exp); /* -max for numerical stability */
+            sum += exp;
         }
         for (int64_t i=0; i < last_dim; ++i) {
             row_out[i] = mag_e8m23_cvt_e5m10(mag_e5m10_cvt_e8m23(row_out[i]) / sum);

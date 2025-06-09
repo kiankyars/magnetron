@@ -860,11 +860,11 @@ class Tensor:
         self._validate_inplace_op()
         return Tensor(_C.mag_sigmoid_(self._ptr))
 
-    def hard_sigmoid(self) -> 'Tensor':
+    def hardsigmoid(self) -> 'Tensor':
         _validate_dtype_compat(_FLOATING_POINT_DTYPES, self)
         return Tensor(_C.mag_hard_sigmoid(self._ptr))
 
-    def hard_sigmoid_(self) -> 'Tensor':
+    def hardsigmoid_(self) -> 'Tensor':
         _validate_dtype_compat(_FLOATING_POINT_DTYPES, self)
         self._validate_inplace_op()
         return Tensor(_C.mag_hard_sigmoid_(self._ptr))
