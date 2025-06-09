@@ -2,7 +2,7 @@
 
 file(GLOB_RECURSE TEST_SOURCES *.hpp *.cpp)
 add_executable(magnetron_test ${TEST_SOURCES})
-target_link_libraries(magnetron_test magnetron)
+target_link_libraries(magnetron_test magnetron-static)
 target_include_directories(magnetron_test PRIVATE ../../magnetron)
 target_include_directories(magnetron_test PRIVATE ../extern/half/include)
 target_include_directories(magnetron_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

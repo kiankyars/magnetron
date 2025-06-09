@@ -1,4 +1,5 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
+
 import random
 
 import magnetron as mag
@@ -90,14 +91,14 @@ def test_autograd_inherit_nograd() -> None:
         t1 = x + y
         t2 = x - y
         t3 = t1 * t2
-        y = t3.relu()
-        assert not x.requires_grad
-        assert not y.requires_grad
+        yy = t3.relu()
+        assert x.requires_grad  # Overriding the no_grad context
+        assert y.requires_grad  # Overriding the no_grad context
         assert not t1.requires_grad
         assert not t2.requires_grad
         assert not t3.requires_grad
-        assert not y.requires_grad
-        magy = y
+        assert not yy.requires_grad
+        magy = yy
 
     with torch.no_grad():
         x = torch.Tensor([xi1])

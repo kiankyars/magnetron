@@ -17,7 +17,7 @@ def comment_replacer(match: re.Match[str]) -> str:
         return s
 
 
-macro_substitutions: dict[str, str] = {
+MACRO_SUBSTITUTIONS: dict[str, str] = {
     'MAG_EXPORT': ' ',
     '_Nonnull': ' ',
     '_Nullable': ' ',
@@ -42,7 +42,7 @@ with open(C_HDR_FILE, 'rt') as f:
         re.DOTALL | re.MULTILINE,
     )
     full_src = re.sub(pattern, comment_replacer, full_src)  # remove comments
-    for macro, replacement in macro_substitutions.items():
+    for macro, replacement in MACRO_SUBSTITUTIONS.items():
         full_src = full_src.replace(macro, replacement)
     c_input = [line.strip() for line in full_src.splitlines()]  # remove empty lines
     c_input = [line for line in c_input if keep_line(line)]  # remove empty lines

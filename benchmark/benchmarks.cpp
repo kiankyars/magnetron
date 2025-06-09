@@ -12,23 +12,23 @@ using namespace magnetron;
 
 static auto bench_op(dtype type) -> void {
     ankerl::nanobench::Bench bench {};
-    bench.title("Tensor Addition " + std::string{dtype_name(type)})
-        .unit("add " + std::string{dtype_name(type)})
+    bench.title("matmul " + std::string{dtype_name(type)})
+        .unit("matmul " + std::string{dtype_name(type)})
         .warmup(100)
         .performanceCounters(true);
     auto run_cycle {[&](std::int64_t numel) {
         context ctx {compute_device::cpu};
         tensor x {ctx, type, numel, numel};
-        x.fill(1.0f);
+        x.fill_float(1.0f);
         tensor y {ctx, type, numel, numel};
-        y.fill(3.0f);
+        y.fill_float(3.0f);
 
         bench.run(std::to_string(numel) + " elements", [&] {
-            tensor r {x + y};
+            tensor r {x & y};
             ankerl::nanobench::doNotOptimizeAway(r);
         });
     }};
-    run_cycle(10000);
+    //run_cycle(10000);
     run_cycle(1000);
     run_cycle(750);
     run_cycle(500);
@@ -40,6 +40,5 @@ static auto bench_op(dtype type) -> void {
 
 auto main() -> int {
     bench_op(dtype::e8m23);
-    bench_op(dtype::e5m10);
     return 0;
 }

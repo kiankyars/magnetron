@@ -1,0 +1,110 @@
+name: CMake Python Multi-Platform Build and Test
+
+on:
+  push:
+    branches: [ "master", "develop" ]
+  pull_request:
+    branches: [ "*" ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm]
+        build_type: [Release]
+        compiler: [gcc, clang]
+        include:
+          - os: windows-latest
+            build_type: Release
+            compiler: cl
+          - os: windows-2019
+            build_type: Release
+            compiler: cl
+          - os: macos-latest
+            build_type: Release
+            compiler: clang
+          - os: macos-14
+            build_type: Release
+            compiler: clang
+          - os: macos-13
+            build_type: Release
+            compiler: clang
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set reusable strings
+        id: strings
+        shell: bash
+        run: echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+
+      - name: Install Linux Packages
+        if: runner.os == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            gcc \
+            g++ \
+            clang \
+            python3 \
+            python3-pip \
+            python3-setuptools \
+            python3-wheel
+
+      - name: Configure CMake
+        shell: bash
+        run: |
+          # Map the matrix "compiler" to C and C++ compiler settings.
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+            CC=gcc
+            CXX=g++
+          elif [ "${{ matrix.compiler }}" = "clang" ]; then
+            # Note: On Windows, we explicitly set compiler to "cl"
+            CC=clang
+            CXX=clang++
+          else
+            CC=cl
+            CXX=cl
+          fi
+          cmake -B "${{ steps.strings.outputs.build-output-dir }}" \
+                -DCMAKE_C_COMPILER=$CC \
+                -DCMAKE_CXX_COMPILER=$CXX \
+                -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+                -S "${{ github.workspace }}"
+
+      - name: Build C++ Runtime
+        run: cmake --build "${{ steps.strings.outputs.build-output-dir }}" --config ${{ matrix.build_type }} -j4
+
+      - name: Prepare C++ Test Data
+        run: cp -r "${{ github.workspace }}/test/test_data" "${{ steps.strings.outputs.build-output-dir }}/test/unittests/test_data"
+
+      - name: Run C++ Runtime Tests
+        working-directory: "${{ steps.strings.outputs.build-output-dir }}"
+        run: ctest --build-config ${{ matrix.build_type }} --verbose
+
+      - name: Setup Python Virtual Environment
+        if: runner.os != 'windows'
+        shell: bash
+        run: |
+          python3 -m venv .venv
+          . .venv/bin/activate
+          pip install --upgrade pip
+
+      - name: Build Python wheel
+        if: runner.os != 'windows'
+        shell: bash
+        run: |
+          . .venv/bin/activate
+          cd "${{ github.workspace }}/python"
+          pip install .[dev]
+
+      - name: Run Python Tests
+        if: runner.os != 'windows'
+        shell: bash
+        run: |
+          . .venv/bin/activate
+          python -m pytest "${{ github.workspace }}/python/tests/"*

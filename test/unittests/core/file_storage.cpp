@@ -15,19 +15,19 @@ TEST(file_storage, put_get_tensor) {
     context ctx {compute_device::cpu};
     storage_stream stream {ctx};
 
-    tensor a {ctx, dtype::f32, 2, 2};
-    tensor b {ctx, dtype::f32, 4, 4};
+    tensor a {ctx, dtype::e8m23, 2, 2};
+    tensor b {ctx, dtype::e8m23, 4, 4};
 
     ASSERT_EQ(stream.get("tensor_a"), std::nullopt);
     stream.put("tensor_a", a);
     ASSERT_EQ(&*stream.get("tensor_a").value(), &*a);
-    ASSERT_EQ(stream.get("tensor_a").value().dtype(), dtype::f32);
+    ASSERT_EQ(stream.get("tensor_a").value().dtype(), dtype::e8m23);
     ASSERT_EQ(stream.get("tensor_a").value().shape()[0], 2);
     ASSERT_EQ(stream.get("tensor_a").value().shape()[1], 2);
     ASSERT_EQ(stream.get("tensor_b"), std::nullopt);
     stream.put("tensor_b", b);
     ASSERT_EQ(&*stream.get("tensor_b").value(), &*b);
-    ASSERT_EQ(stream.get("tensor_b").value().dtype(), dtype::f32);
+    ASSERT_EQ(stream.get("tensor_b").value().dtype(), dtype::e8m23);
     ASSERT_EQ(stream.get("tensor_b").value().shape()[0], 4);
     ASSERT_EQ(stream.get("tensor_b").value().shape()[1], 4);
     ASSERT_EQ(stream.all_tensor_keys().size(), 2);
@@ -38,8 +38,8 @@ TEST(file_storage, put_get_tensor) {
 TEST(file_storage, serialize) {
     context ctx {compute_device::cpu};
     storage_stream stream {ctx};
-    tensor a {ctx, dtype::f32, 2, 2};
-    tensor b {ctx, dtype::f32, 4, 4};
+    tensor a {ctx, dtype::e8m23, 2, 2};
+    tensor b {ctx, dtype::e8m23, 4, 4};
     stream.put("tensor_a", a);
     stream.put("tensor_b", b);
     ASSERT_EQ(stream.all_tensor_keys().size(), 2);
@@ -63,10 +63,10 @@ TEST(file_storage, deserialize) {
    {
         context ctx {compute_device::cpu};
         storage_stream stream {ctx};
-        tensor a {ctx, dtype::f32, 2, 2};
+        tensor a {ctx, dtype::e8m23, 2, 2};
         ASSERT_EQ(fill_a.size(), a.numel());
         a.fill_from(fill_a);
-        tensor b {ctx, dtype::f32, 4, 4};
+        tensor b {ctx, dtype::e8m23, 4, 4};
         ASSERT_EQ(fill_b.size(), b.numel());
         b.fill_from(fill_b);
         stream.put("tensor_a", a);
@@ -82,18 +82,18 @@ TEST(file_storage, deserialize) {
         ASSERT_TRUE(stream.get("tensor_b").has_value());
         tensor a {stream.get("tensor_a").value()};
         tensor b {stream.get("tensor_b").value()};
-        ASSERT_EQ(a.dtype(), dtype::f32);
+        ASSERT_EQ(a.dtype(), dtype::e8m23);
         ASSERT_EQ(a.shape()[0], 2);
         ASSERT_EQ(a.shape()[1], 2);
-        ASSERT_EQ(b.dtype(), dtype::f32);
+        ASSERT_EQ(b.dtype(), dtype::e8m23);
         ASSERT_EQ(b.shape()[0], 4);
         ASSERT_EQ(b.shape()[1], 4);
         ASSERT_EQ(a.data_size(), 2*2*sizeof(float));
         ASSERT_EQ(b.data_size(), 4*4*sizeof(float));
         ASSERT_EQ(a.numel(), 2*2);
         ASSERT_EQ(b.numel(), 4*4);
-        std::vector<mag_e8m23_t> dat_a {a.to_vector()};
-        std::vector<mag_e8m23_t> dat_b {b.to_vector()};
+        std::vector<mag_E8M23> dat_a {a.to_float_vector()};
+        std::vector<mag_E8M23> dat_b {b.to_float_vector()};
         for (std::size_t i {}; i < a.numel(); ++i) {
             ASSERT_FLOAT_EQ(dat_a[i], fill_a[i]);
         }
@@ -121,7 +121,7 @@ TEST(file_storage, stress_roundtrip) {
         std::uniform_real_distribution<float> dist{-1.0f, 1000.0f};
 
         for (std::size_t i = 0; i < N; ++i) {
-            tensor t{ctx, dtype::f32, H, W};
+            tensor t{ctx, dtype::e8m23, H, W};
             // fill and capture
             std::vector<test::e8m23_t> data(H * W);
             for (auto &x : data) x = dist(gen);
@@ -158,7 +158,7 @@ TEST(file_storage, stress_roundtrip) {
                 auto opt = reader.get(std::to_string(i));
                 ASSERT_TRUE(opt.has_value()) << "Missing tensor " << i;
                 tensor t = *opt;
-                auto loaded = t.to_vector();
+                auto loaded = t.to_float_vector();
                 auto &orig = reference[i];
                 ASSERT_EQ(loaded.size(), orig.size())
                     << "Size mismatch at tensor " << i;

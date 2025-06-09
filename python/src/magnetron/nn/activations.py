@@ -25,7 +25,7 @@ class HardSigmoid(Module):
         super().__init__()
 
     def forward(self, x: Tensor) -> Tensor:
-        return x.hard_sigmoid()
+        return x.hardsigmoid()
 
 
 class SiLU(Module):

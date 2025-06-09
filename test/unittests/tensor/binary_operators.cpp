@@ -8,60 +8,113 @@ using namespace test;
 static constexpr std::int64_t lim {4};
 static constexpr std::int64_t broadcast_lim {lim-1};
 
-#if 0
-TEST(cpu_tensor_binary_ops, print_test_info) {
-    std::cout << "=== Binary Operators ===" << std::endl;
-    std::set<std::vector<std::int64_t>> perms {};
-    test::for_all_shape_perms(lim, 1, [&](std::span<const std::int64_t> shape) {
-        perms.emplace(std::vector<std::int64_t>{shape.begin(), shape.end()});
-    });
-    test::for_all_shape_perms(lim, 2, [&](std::span<const std::int64_t> shape) {
-        perms.emplace(std::vector<std::int64_t>{shape.begin(), shape.end()});
-    });
-    std::cout << "=== Tested Shape Permutations (" << perms.size() << ") ===" << std::endl;
-    for (const auto& shape : perms) {
-        std::cout << test::shape_to_string(shape) << std::endl;
-    }
-}
-#endif
-
-#define impl_binary_operator_test_group(name, op, data_type) \
+#define impl_binary_operator_float_test_group(name, op, data_type) \
     TEST(cpu_tensor_binary_ops, name##_same_shape_##data_type) { \
-        test::test_binary_operator<false, false>(lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
+        test::test_binary_float_operator<false, false>(lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op b; }, \
             [](float a, float b) -> float { return a op b; } \
         ); \
     } \
     TEST(cpu_tensor_binary_ops, name##_broadcast_##data_type) { \
-        test::test_binary_operator<true, false>(broadcast_lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
+        test::test_binary_float_operator<true, false>(broadcast_lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op b; }, \
             [](float a, float b) -> float { return a op b; } \
         ); \
     } \
     TEST(cpu_tensor_binary_ops, name##_inplace_same_shape_##data_type) { \
-        test::test_binary_operator<false, true>(lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
+        test::test_binary_float_operator<false, true>(lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op##= b; }, \
             [](float a, float b) -> float { return a op b; } \
         ); \
     } \
     TEST(cpu_tensor_binary_ops, name##_inplace_broadcast_##data_type) { \
-        test::test_binary_operator<true, true>(broadcast_lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
+        test::test_binary_float_operator<true, true>(broadcast_lim, test::dtype_traits<test::data_type##_t>::test_eps, dtype::data_type, \
             [](tensor a, tensor b) -> tensor { return a op##= b; }, \
             [](float a, float b) -> float { return a op b; } \
         ); \
     }
 
-impl_binary_operator_test_group(add, +, e8m23)
-impl_binary_operator_test_group(add, +, e5m10)
+#define impl_binary_operator_bool_test_group(name, op) \
+    TEST(cpu_tensor_binary_ops, name##_same_shape_bool) { \
+        test::test_binary_boolean_operator<false, false>(lim, \
+            [](tensor a, tensor b) -> tensor { return a op b; }, \
+            [](bool a, bool b) -> bool { return a op b; } \
+        ); \
+    } \
+    TEST(cpu_tensor_binary_ops, name##_broadcast_bool) { \
+        test::test_binary_boolean_operator<true, false>(broadcast_lim, \
+            [](tensor a, tensor b) -> tensor { return a op b; }, \
+            [](bool a, bool b) -> bool { return a op b; } \
+        ); \
+    } \
+    TEST(cpu_tensor_binary_ops, name##_inplace_same_shape_bool) { \
+        test::test_binary_boolean_operator<false, true>(lim, \
+            [](tensor a, tensor b) -> tensor { return a op##= b; }, \
+            [](bool a, bool b) -> bool { return a op b; } \
+        ); \
+    } \
+    TEST(cpu_tensor_binary_ops, name##_inplace_broadcast_bool) { \
+        test::test_binary_boolean_operator<true, true>(broadcast_lim, \
+            [](tensor a, tensor b) -> tensor { return a op##= b; }, \
+            [](bool a, bool b) -> bool { return a op b; } \
+        ); \
+    }
 
-impl_binary_operator_test_group(sub, -, e8m23)
-impl_binary_operator_test_group(sub, -, e5m10)
+#define impl_binary_operator_int_test_group(name, op, data_type, min, max) \
+    TEST(cpu_tensor_binary_ops, name##_same_shape_##data_type) { \
+        test::test_binary_int_operator<false, false>(lim, dtype::data_type, (min), (max), \
+            [](tensor a, tensor b) -> tensor { return a op b; }, \
+            [](std::int32_t a, std::int32_t b) -> std::int32_t { return a op b; } \
+        ); \
+    } \
+    TEST(cpu_tensor_binary_ops, name##_broadcast_##data_type) { \
+        test::test_binary_int_operator<true, false>(broadcast_lim, dtype::data_type, (min), (max), \
+            [](tensor a, tensor b) -> tensor { return a op b; }, \
+            [](std::int32_t a, std::int32_t b) -> std::int32_t { return a op b; } \
+        ); \
+    } \
+    TEST(cpu_tensor_binary_ops, name##_inplace_same_shape_##data_type) { \
+        test::test_binary_int_operator<false, true>(lim, dtype::data_type, (min), (max), \
+            [](tensor a, tensor b) -> tensor { return a op##= b; }, \
+            [](std::int32_t a, std::int32_t b) -> std::int32_t { return a op b; } \
+        ); \
+    } \
+    TEST(cpu_tensor_binary_ops, name##_inplace_broadcast_##data_type) { \
+        test::test_binary_int_operator<true, true>(broadcast_lim, dtype::data_type, (min), (max), \
+            [](tensor a, tensor b) -> tensor { return a op##= b; }, \
+            [](std::int32_t a, std::int32_t b) -> std::int32_t { return a op b; } \
+        ); \
+    }
 
-impl_binary_operator_test_group(mul, *, e8m23)
-impl_binary_operator_test_group(mul, *, e5m10)
+impl_binary_operator_float_test_group(add, +, e8m23)
+impl_binary_operator_float_test_group(add, +, e5m10)
 
-impl_binary_operator_test_group(div, /, e8m23)
-impl_binary_operator_test_group(div, /, e5m10)
+impl_binary_operator_float_test_group(sub, -, e8m23)
+impl_binary_operator_float_test_group(sub, -, e5m10)
+
+impl_binary_operator_float_test_group(mul, *, e8m23)
+impl_binary_operator_float_test_group(mul, *, e5m10)
+
+impl_binary_operator_float_test_group(div, /, e8m23)
+impl_binary_operator_float_test_group(div, /, e5m10)
+
+impl_binary_operator_bool_test_group(and, &)
+impl_binary_operator_bool_test_group(or, |)
+impl_binary_operator_bool_test_group(xor, ^)
+
+impl_binary_operator_int_test_group(add, +, i32, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max())
+impl_binary_operator_int_test_group(sub, -, i32, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max())
+impl_binary_operator_int_test_group(mul, *, i32, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max())
+impl_binary_operator_int_test_group(div, /, i32, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max())
+impl_binary_operator_int_test_group(and, &, i32, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max())
+impl_binary_operator_int_test_group(or, |, i32, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max())
+impl_binary_operator_int_test_group(xor, ^, i32, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max())
+impl_binary_operator_int_test_group(shl, <<, i32, 0, 32)
+impl_binary_operator_int_test_group(shr, >>, i32, 0, 32)
+
+#undef impl_binary_operator_float_test_group
+#undef impl_binary_operator_bool_test_group
+#undef impl_binary_operator_int_test_group
 
 static auto naive_matmul(
     const e8m23_t* A,
@@ -122,14 +175,14 @@ TEST(cpu_tensor_binary_ops, matmul_square_e8m23) {
     tensor b {ctx, dtype::e8m23, B.size(), B[0].size()};
     a.fill_from(flatten(A));
     b.fill_from(flatten(B));
-    tensor c {a&b};
+    tensor c {a%b};
     ASSERT_EQ(c.shape()[0], 2);
     ASSERT_EQ(c.shape()[1], 2);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 4);
     ASSERT_EQ(c.numel(), a.numel());
     ASSERT_EQ(c.numel(), b.numel());
-    std::vector<e8m23_t> cr {c.to_vector()};
+    std::vector<e8m23_t> cr {c.to_float_vector()};
     for (std::int64_t i {}; i < c.numel(); ++i) {
         ASSERT_FLOAT_EQ(cr[i], reinterpret_cast<const e8m23_t*>(&C)[i]);
     }
@@ -153,14 +206,14 @@ TEST(cpu_tensor_binary_ops, matmul_square_e5m10) {
     tensor b {ctx, dtype::e5m10, B.size(), B[0].size()};
     a.fill_from(flatten(A));
     b.fill_from(flatten(B));
-    tensor c {a&b};
+    tensor c {a%b};
     ASSERT_EQ(c.shape()[0], 2);
     ASSERT_EQ(c.shape()[1], 2);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 4);
     ASSERT_EQ(c.numel(), a.numel());
     ASSERT_EQ(c.numel(), b.numel());
-    std::vector<e8m23_t> cr {c.to_vector()};
+    std::vector<e8m23_t> cr {c.to_float_vector()};
     for (std::int64_t i {}; i < c.numel(); ++i) {
         ASSERT_NEAR(cr[i], reinterpret_cast<const e8m23_t*>(&C)[i], 1e-2);
     }
@@ -186,12 +239,12 @@ TEST(cpu_tensor_binary_ops, matmul_non_square_e8m23) {
     tensor b {ctx, dtype::e8m23, B.size(), B[0].size()};
     a.fill_from(flatten(A));
     b.fill_from(flatten(B));
-    tensor c {a&b};
+    tensor c {a%b};
     ASSERT_EQ(c.shape()[0], 3);
     ASSERT_EQ(c.shape()[1], 4);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 12);
-    std::vector<e8m23_t> cr {c.to_vector()};
+    std::vector<e8m23_t> cr {c.to_float_vector()};
     for (std::int64_t i {}; i < c.numel(); ++i) {
         ASSERT_FLOAT_EQ(cr[i], reinterpret_cast<const e8m23_t*>(&C)[i]);
     }
@@ -217,12 +270,12 @@ TEST(cpu_tensor_binary_ops, matmul_non_square_e5m10) {
     tensor b {ctx, dtype::e5m10, B.size(), B[0].size()};
     a.fill_from(flatten(A));
     b.fill_from(flatten(B));
-    tensor c {a&b};
+    tensor c {a%b};
     ASSERT_EQ(c.shape()[0], 3);
     ASSERT_EQ(c.shape()[1], 4);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 12);
-    std::vector<e8m23_t> cr {c.to_vector()};
+    std::vector<e8m23_t> cr {c.to_float_vector()};
     for (std::int64_t i {}; i < c.numel(); ++i) {
         ASSERT_NEAR(cr[i], reinterpret_cast<const e8m23_t*>(&C)[i], 1e-2);
     }
@@ -242,14 +295,14 @@ TEST(cpu_tensor_binary_ops, matmul_square_zero_e8m23) {
     tensor b {ctx, dtype::e8m23, B.size(), B[0].size()};
     a.fill_from(flatten(A));
     b.fill_from(flatten(B));
-    tensor c {a&b};
+    tensor c {a%b};
     ASSERT_EQ(c.shape()[0], 2);
     ASSERT_EQ(c.shape()[1], 2);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 4);
     ASSERT_EQ(c.numel(), a.numel());
     ASSERT_EQ(c.numel(), b.numel());
-    std::vector<e8m23_t> cr {c.to_vector()};
+    std::vector<e8m23_t> cr {c.to_float_vector()};
     for (std::int64_t i {}; i < c.numel(); ++i) {
         ASSERT_FLOAT_EQ(cr[i], 0.0f);
     }
@@ -269,14 +322,14 @@ TEST(cpu_tensor_binary_ops, matmul_square_zero_e5m10) {
     tensor b {ctx, dtype::e5m10, B.size(), B[0].size()};
     a.fill_from(flatten(A));
     b.fill_from(flatten(B));
-    tensor c {a&b};
+    tensor c {a%b};
     ASSERT_EQ(c.shape()[0], 2);
     ASSERT_EQ(c.shape()[1], 2);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 4);
     ASSERT_EQ(c.numel(), a.numel());
     ASSERT_EQ(c.numel(), b.numel());
-    std::vector<e8m23_t> cr {c.to_vector()};
+    std::vector<e8m23_t> cr {c.to_float_vector()};
     for (std::int64_t i {}; i < c.numel(); ++i) {
         ASSERT_FLOAT_EQ(cr[i], 0.0f);
     }
@@ -297,14 +350,14 @@ TEST(cpu_tensor_binary_ops, matmul_square_identity_e8m23) {
     tensor b {ctx, dtype::e8m23, B.size(), B[0].size()};
     a.fill_from(flatten(A));
     b.fill_from(flatten(B));
-    tensor c {a&b};
+    tensor c {a%b};
     ASSERT_EQ(c.shape()[0], 2);
     ASSERT_EQ(c.shape()[1], 2);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 4);
     ASSERT_EQ(c.numel(), a.numel());
     ASSERT_EQ(c.numel(), b.numel());
-    std::vector<e8m23_t> cr {c.to_vector()};
+    std::vector<e8m23_t> cr {c.to_float_vector()};
     for (std::int64_t i {}; i < c.numel(); ++i) {
         ASSERT_FLOAT_EQ(cr[i], reinterpret_cast<const e8m23_t*>(&C)[i]);
     }
@@ -325,14 +378,14 @@ TEST(cpu_tensor_binary_ops, matmul_square_identity_e5m10) {
     tensor b {ctx, dtype::e5m10, B.size(), B[0].size()};
     a.fill_from(flatten(A));
     b.fill_from(flatten(B));
-    tensor c {a&b};
+    tensor c {a%b};
     ASSERT_EQ(c.shape()[0], 2);
     ASSERT_EQ(c.shape()[1], 2);
     ASSERT_EQ(c.rank(), 2);
     ASSERT_EQ(c.numel(), 4);
     ASSERT_EQ(c.numel(), a.numel());
     ASSERT_EQ(c.numel(), b.numel());
-    std::vector<e8m23_t> cr {c.to_vector()};
+    std::vector<e8m23_t> cr {c.to_float_vector()};
     for (std::int64_t i {}; i < c.numel(); ++i) {
         ASSERT_NEAR(cr[i], reinterpret_cast<const e8m23_t*>(&C)[i], 1e-2);
     }
@@ -355,7 +408,7 @@ TEST(cpu_tensor_binary_ops, matmul_matrix_vector_e8m23) {
     tensor b {ctx, dtype::e8m23, B.size()};
     a.fill_from(flatten(A));
     b.fill_from(B);
-    tensor c {a&b};
+    tensor c {a%b};
     ASSERT_EQ(c.shape()[0], 3);
     ASSERT_EQ(c.rank(), 1);
     ASSERT_EQ(c.numel(), 3);
@@ -383,7 +436,7 @@ TEST(cpu_tensor_binary_ops, matmul_matrix_vector_e5m10) {
     tensor b {ctx, dtype::e5m10, B.size()};
     a.fill_from(flatten(A));
     b.fill_from(B);
-    tensor c {a&b};
+    tensor c {a%b};
     ASSERT_EQ(c.shape()[0], 3);
     ASSERT_EQ(c.rank(), 1);
     ASSERT_EQ(c.numel(), 3);
@@ -393,3 +446,4 @@ TEST(cpu_tensor_binary_ops, matmul_matrix_vector_e5m10) {
         ASSERT_FLOAT_EQ(c(i), C[i]);
     }
 }
+

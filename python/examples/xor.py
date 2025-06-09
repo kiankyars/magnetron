@@ -5,7 +5,6 @@
 
 import magnetron as mag
 from magnetron import optim, nn
-from matplotlib import pyplot as plt
 
 EPOCHS: int = 2000
 
@@ -41,10 +40,16 @@ with mag.no_grad():
 
 # Plot the loss
 
-plt.figure()
-plt.plot(loss_values)
-plt.xlabel('Epoch')
-plt.ylabel('MSE Loss')
-plt.title('Training Loss over Time')
-plt.grid(True)
-plt.show()
+try:
+    from matplotlib import pyplot as plt
+
+    plt.figure()
+    plt.plot(loss_values)
+    plt.xlabel('Epoch')
+    plt.ylabel('MSE Loss')
+    plt.title('Training Loss over Time')
+    plt.grid(True)
+    plt.show()
+
+except ImportError:
+    print("matplotlib not installed; skipping loss plot.")
