@@ -1,5 +1,5 @@
 """
-GPT-2 inference using Magnetron.
+GPT-2 inference using Magnetron. (WORK IN PROGRESS NOT YET DONE)
 This file will read (or download) the pretrained weights, which are stored in Magnetron's custom file format.
 Then interactive inference is performed in the command line window.
 
