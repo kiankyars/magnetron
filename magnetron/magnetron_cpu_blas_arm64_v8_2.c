@@ -8,7 +8,7 @@
 #if !defined(__ARM_FEATURE_FP16_SCALAR_ARITHMETIC) \
     || !defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
     || !defined(__ARM_FEATURE_DOTPROD)
-#warning ("Current compiler lacks modern optimization flags - upgrade GCC/Clang to enable better optimizations!")
+#pragma message ("Current compiler lacks modern optimization flags - upgrade GCC/Clang to enable better optimizations!")
 #endif
 #else
 #pragma message("MSVC does not allow to fine tune CPU architecture level, usine clang-cl or mingw-w64 for best performance!")

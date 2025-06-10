@@ -11,7 +11,7 @@
     || !defined(__SSSE3__) \
     || !defined(__SSE4_1__) \
     || !defined(__SSE4_2__)
-#warning ("Current compiler lacks modern optimization flags - upgrade GCC/Clang to enable better optimizations!")
+#pragma message ("Current compiler lacks modern optimization flags - upgrade GCC/Clang to enable better optimizations!")
 #endif
 #else
 #pragma message("MSVC does not allow to fine tune CPU architecture level, usine clang-cl or mingw-w64 for best performance!")
