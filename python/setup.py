@@ -63,6 +63,8 @@ class CMakeBuildExecutor(build_ext):
 
         cmake_args = [
             '-DMAGNETRON_ENABLE_CUDA=OFF',
+            '-DMAGNETRON_BUILD_TESTS=OFF',
+            '-DMAGNETRON_BUILD_BENCHMARKS=OFF',
             f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={lib_output_dir}',
             f'-DCMAKE_BUILD_TYPE={"Release" if BUILD_RELEASE else "Debug"}',
         ]
