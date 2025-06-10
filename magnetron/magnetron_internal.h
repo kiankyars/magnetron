@@ -199,15 +199,6 @@ static MAG_AINLINE bool mag_atomic_compare_exchange_strong(volatile mag_Atomic64
 
 #endif
 
-
-#ifdef _MSC_VER
-#define mag_pragma_warn(msg) __pragma(message(msg))
-#elif defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
-#define mag_pragma_warn(msg) #warning msg
-#else
-#define mag_pragma_warn(msg)
-#endif
-
 mag_static_assert(sizeof(0u) == 4);     /* u literal suffix must infer to uint32. */
 mag_static_assert(sizeof(0ull) == 8);   /* ull literal suffix must infer to uint64. */
 
