@@ -203,7 +203,7 @@ static MAG_AINLINE bool mag_atomic_compare_exchange_strong(volatile mag_Atomic64
 #ifdef _MSC_VER
 #define mag_pragma_warn(msg) __pragma(message(msg))
 #elif defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
-#define mag_pragma_warn(msg) _Pragma("GCC warning \"" msg "\"")
+#define mag_pragma_warn(msg) #warning msg
 #else
 #define mag_pragma_warn(msg)
 #endif
