@@ -49,8 +49,6 @@
 #include "magnetron_internal.h"
 
 #include <math.h>
-#include <signal.h>
-#include <stdio.h>
 
 #define mag_e8m23p(t) ((const mag_E8M23*)mag_tensor_get_data_ptr(t))
 #define mag_e8m23p_mut(t) ((mag_E8M23*)mag_tensor_get_data_ptr(t))
