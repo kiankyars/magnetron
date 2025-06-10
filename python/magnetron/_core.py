@@ -4,6 +4,7 @@ import contextlib
 import faulthandler
 import threading
 import typing
+import weakref
 from collections import namedtuple
 from dataclasses import dataclass
 from enum import Enum, unique
@@ -106,6 +107,7 @@ class Context:
             desc[0] = _C.mag_compute_device_desc_cuda(device.device_id)
         self._ptr = _C.mag_ctx_create2(desc)
         self.default_dtype = Config.default_dtype
+        self._finalizer = weakref.finalize(self, _C.mag_ctx_destroy, self._ptr)
 
     @property
     def native_ptr(self) -> _ffi.CData:
@@ -176,10 +178,6 @@ class Context:
     def is_grad_recording(self) -> bool:
         return _C.mag_ctx_grad_recorder_is_running(self._ptr)
 
-    def __del__(self) -> None:
-        _C.mag_ctx_destroy(self._ptr)
-        self._ptr = _ffi.NULL
-
 
 class no_grad(contextlib.ContextDecorator):
     """Disables gradient recording within a function or block."""
@@ -243,7 +241,7 @@ def _get_reduction_axes(dim: int | tuple[int] | None) -> tuple[_ffi.CData, int]:
 class Tensor:
     """A 1-6 dimensional tensor with support for automatic differentiation."""
 
-    __slots__ = ('__weakref__', '_ctx', '_ptr')
+    __slots__ = ('__weakref__', '_ctx', '_ptr', '_finalizer')
 
     def __init__(
         self,
@@ -267,11 +265,7 @@ class Tensor:
             self.requires_grad = requires_grad
             if name is not None:
                 self.name = name
-
-    def __del__(self) -> None:
-        if self._ptr is not None and self._ptr != _ffi.NULL:
-            _C.mag_tensor_decref(self._ptr)
-        self._ptr = _ffi.NULL
+        self._finalizer = weakref.finalize(self, _C.mag_tensor_decref,self._ptr)
 
     @property
     def native_ptr(self) -> _ffi.CData:

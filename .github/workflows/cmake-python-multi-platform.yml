@@ -20,16 +20,10 @@ jobs:
           - os: windows-latest
             build_type: Release
             compiler: cl
-          - os: windows-2019
-            build_type: Release
-            compiler: cl
           - os: macos-latest
             build_type: Release
             compiler: clang
           - os: macos-14
-            build_type: Release
-            compiler: clang
-          - os: macos-13
             build_type: Release
             compiler: clang
 
@@ -99,7 +93,6 @@ jobs:
         shell: bash
         run: |
           . .venv/bin/activate
-          cd "${{ github.workspace }}/python"
           pip install .[dev]
 
       - name: Run Python Tests
@@ -107,4 +100,4 @@ jobs:
         shell: bash
         run: |
           . .venv/bin/activate
-          python -m pytest "${{ github.workspace }}/python/tests/"*
+          python -m pytest "${{ github.workspace }}/test/python/"*

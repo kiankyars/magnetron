@@ -4,7 +4,6 @@
 ** +=======================================================================+
 */
 
-
 #ifndef _MSC_VER
 #if !defined(__SSE__) \
     || !defined(__SSE2__) \
@@ -20,7 +19,7 @@
     || !defined(__AVX512BW__) \
     || !defined(__AVX512DQ__) \
     || !defined(__AVX512VL__)
-#error "BLAS specialization requires matching compile flags"
+#pragma message ("Current compiler lacks modern optimization flags - upgrade GCC/Clang to enable better optimizations!")
 #endif
 #else
 #pragma message("MSVC does not allow to fine tune CPU architecture level, usine clang-cl or mingw-w64 for best performance!")

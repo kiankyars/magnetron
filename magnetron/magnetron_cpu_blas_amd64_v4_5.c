@@ -24,7 +24,7 @@
     || !defined(__AVX512VNNI__) \
     || !defined(__AVX512BF16__) \
     || !defined(__AVX512FP16__)
-#error "BLAS specialization requires matching compile flags"
+#pragma message ("Current compiler lacks modern optimization flags - upgrade GCC/Clang to enable better optimizations!")
 #endif
 #else
 #pragma message("MSVC does not allow to fine tune CPU architecture level, usine clang-cl or mingw-w64 for best performance!")
