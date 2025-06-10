@@ -199,15 +199,10 @@ static MAG_AINLINE bool mag_atomic_compare_exchange_strong(volatile mag_Atomic64
 
 #endif
 
-##define MAG_STR_2(x) #x
-#define MAG_STR(x) MAG_STR_2(x)
-#define MAG_DO_PRAGMA(x) _Pragma(MAG_STR(x))
-#if defined(__clang__)
-#define mag_pragma_warn(msg) MAG_DO_PRAGMA(clang warning msg)
-#elif defined(__GNUC__) || defined(__INTEL_COMPILER)
-#define mag_pragma_warn(msg) MAG_DO_PRAGMA(GCC warning msg)
-#elif defined(_MSC_VER)
-#define mag_pragma_warn(msg) __pragma(message(__FILE__ "(" MAG_STR(__LINE__) "): " msg))
+#ifdef _MSC_VER
+#define mag_pragma_warn(msg) __pragma(message(msg))
+#elif defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
+#define mag_pragma_warn(msg) _Pragma("GCC warning \"" msg "\"")
 #else
 #define mag_pragma_warn(msg)
 #endif
