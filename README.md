@@ -133,12 +133,6 @@ Some examples use matplotlib and numpy for plotting and data generation, but the
     git clone https://github.com/MarioSieg/magnetron
     ```
 
-2. **Navigate into the Python root directory:**
-
-    ```bash
-    cd magnetron/python
-    ```
-
 3. **Create and activate a virtual environment:**
 
     ```bash

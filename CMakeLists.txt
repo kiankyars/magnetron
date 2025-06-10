@@ -59,3 +59,5 @@ endif()
 message(STATUS "C Compiler: ${CMAKE_C_COMPILER}")
 message(STATUS "C++ Compiler: ${CMAKE_CXX_COMPILER}")
 message(STATUS "Configuring magnetron project for ${CMAKE_SYSTEM_PROCESSOR}... done")
+
+install(TARGETS magnetron LIBRARY DESTINATION . RUNTIME DESTINATION .)

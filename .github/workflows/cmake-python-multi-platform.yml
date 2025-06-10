@@ -93,7 +93,6 @@ jobs:
         shell: bash
         run: |
           . .venv/bin/activate
-          cd "${{ github.workspace }}/python"
           pip install .[dev]
 
       - name: Run Python Tests
