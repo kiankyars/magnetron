@@ -127,10 +127,10 @@ Some examples use matplotlib and numpy for plotting and data generation, but the
 
 ---
 
-1. **Clone the Magnetron repository:**
+1. **Clone and enter the Magnetron repository:**
 
     ```bash
-    git clone https://github.com/MarioSieg/magnetron
+    git clone https://github.com/MarioSieg/magnetron && cd magnetron
     ```
 
 3. **Create and activate a virtual environment:**

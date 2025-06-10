@@ -31,7 +31,8 @@ Issues = "https://github.com/MarioSieg/magnetron/issues"
 dev = [
   "torch",
   "numpy",
-  "matplotlib"
+  "matplotlib",
+  "pytest"
 ]
 
 [tool.scikit-build.cmake.define]
@@ -40,4 +41,4 @@ MAGNETRON_BUILD_TESTS = false
 MAGNETRON_BUILD_BENCHMARKS = false
 
 [tool.scikit-build.wheel]
-packages = ["python/src/magnetron"]
+packages = ["python/magnetron"]
