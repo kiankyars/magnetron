@@ -16,3 +16,10 @@ add_test(NAME magnetron_test COMMAND magnetron_test)
 if (${MAGNETRON_ENABLE_CUDA})
     target_compile_definitions(magnetron_test PRIVATE MAG_ENABLE_CUDA)
 endif()
+
+if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")     # Enable optimizations only for release builds
+    if (NOT WIN32)
+        target_compile_options(magnetron_test PRIVATE -flto)
+        target_link_options(magnetron_test PRIVATE -flto)
+    endif()
+endif()
