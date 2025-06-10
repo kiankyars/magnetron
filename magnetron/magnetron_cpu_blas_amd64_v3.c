@@ -17,7 +17,7 @@
     || !defined(__BMI2__) \
     || !defined(__F16C__) \
     || !defined(__FMA__)
-#error "BLAS specialization requires matching compile flags"
+mag_pragma_warn("Current compiler lacks modern optimization flags - upgrade GCC/Clang to enable better optimizations!")
 #endif
 #else
 #pragma message("MSVC does not allow to fine tune CPU architecture level, usine clang-cl or mingw-w64 for best performance!")

@@ -199,6 +199,17 @@ static MAG_AINLINE bool mag_atomic_compare_exchange_strong(volatile mag_Atomic64
 
 #endif
 
+#define mag_str2(x) #x
+#define mag_str(x) mag_str2(x)
+#if defined(__clang__) || defined(__GNUC__) || defined(__INTEL_COMPILER) || \
+defined(__IBMC__) || defined(__IBMCPP__)
+#define mag_pragma_warn(msg) _Pragma(mag_str(GCC warning msg))
+#elif defined(_MSC_VER)
+#define mag_pragma_warn(msg) __pragma(message(__FILE__ "(" mag_str(__LINE__) "): " msg))
+#else
+#define mag_pragma_warn(msg)
+#endif
+
 mag_static_assert(sizeof(0u) == 4);     /* u literal suffix must infer to uint32. */
 mag_static_assert(sizeof(0ull) == 8);   /* ull literal suffix must infer to uint64. */
 

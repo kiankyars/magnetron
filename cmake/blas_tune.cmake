@@ -19,7 +19,7 @@ function(add_source_flags_if_supported SRC) # Adds source optimization flags, on
             message(WARNING
               "!! [${src}] compiler does NOT understand \"${flag}\" – "
               "source will be built without it. "
-              "Upgrade GCC/Clang to enable better optimizations and more advanced code generation!")
+              "Upgrade GCC/Clang to enable better optimizations!")
         endif()
     endforeach()
     if (accepted)
