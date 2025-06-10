@@ -1,12 +1,41 @@
 # (c) 2025 Mario "Neo" Sieg. <mario.sieg.64@gmail.com>
 
+include(CheckCCompilerFlag)
+
+function(add_source_flags_if_supported SRC) # Adds source optimization flags, only if the current compiler supports it
+    if (ARGC LESS 2)
+        message(FATAL_ERROR "add_source_flags_if_supported(<src> flag [flag …])")
+    endif()
+    set(src "${ARGV0}")
+    list(REMOVE_AT ARGV 0)
+    set(flags "${ARGV}")
+    set(accepted)
+    foreach(flag IN LISTS flags)
+        string(MAKE_C_IDENTIFIER "HAVE_${flag}" flag_var)
+        check_c_compiler_flag("${flag}" ${flag_var})
+        if (${flag_var})
+            list(APPEND accepted "${flag}")
+        else()
+            message(WARNING
+              "!! [${src}] compiler does NOT understand \"${flag}\" – "
+              "source will be built without it. "
+              "Upgrade GCC/Clang to enable better optimizations and more advanced code generation!")
+        endif()
+    endforeach()
+    if (accepted)
+        string(REPLACE ";" " " accepted_str "${accepted}")
+        set_property(SOURCE "${src}" APPEND PROPERTY COMPILE_FLAGS "${accepted_str}")
+    endif()
+endfunction()
+
 function(set_blas_spec_arch filename posix_arch msvc_arch)
     message(STATUS "BLAS CPU permutation ${filename} ${posix_arch} / ${msvc_arch}")
     if (WIN32)
-        set_property(SOURCE "${CMAKE_SOURCE_DIR}/magnetron/${filename}" APPEND PROPERTY COMPILE_FLAGS "${msvc_arch}")
+        separate_arguments(flag_list WINDOWS_COMMAND "${msvc_arch}")
     else()
-        set_property(SOURCE "${CMAKE_SOURCE_DIR}/magnetron/${filename}" APPEND PROPERTY COMPILE_FLAGS "${posix_arch}")
+        separate_arguments(flag_list UNIX_COMMAND "${posix_arch}")
     endif()
+    add_source_flags_if_supported("${CMAKE_SOURCE_DIR}/magnetron/${filename}" ${flag_list})
 endfunction()
 
 set(MAG_BLAS_SPEC_AMD64_SOURCES
