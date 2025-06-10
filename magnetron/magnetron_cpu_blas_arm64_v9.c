@@ -4,6 +4,8 @@
 ** +=======================================================================+
 */
 
+#include "magnetron_internal.h"
+
 #ifndef _MSC_VER
 #if !defined(__ARM_FEATURE_SVE) || !defined(__ARM_FEATURE_SVE2)
 mag_pragma_warn("Current compiler lacks modern optimization flags - upgrade GCC/Clang to enable better optimizations!")

@@ -4,6 +4,8 @@
 ** +=======================================================================+
 */
 
+#include "magnetron_internal.h"
+
 #ifndef _MSC_VER
 #if !defined(__ARM_FEATURE_FP16_SCALAR_ARITHMETIC) \
     || !defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)

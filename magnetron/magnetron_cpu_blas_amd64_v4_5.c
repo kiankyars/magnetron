@@ -4,6 +4,8 @@
 ** +=======================================================================+
 */
 
+#include "magnetron_internal.h"
+
 #ifndef _MSC_VER
 #if !defined(__SSE__) \
     || !defined(__SSE2__) \
