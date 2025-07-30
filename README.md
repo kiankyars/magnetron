@@ -14,10 +14,10 @@
   <p align="center">
     Super minimalistic machine-learning framework.
     <br />
-    <a href="https://github.com/MarioSieg/magnetron/tree/master/python/examples/simple"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/MarioSieg/magnetron/tree/master/docs/"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/MarioSieg/magnetron/blob/master/python/examples/xor.py">View Example</a>
+    <a href="https://github.com/MarioSieg/magnetron/blob/master/examples/xor.py">View Example</a>
     |
     <a href="https://github.com/MarioSieg/magnetron/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     |

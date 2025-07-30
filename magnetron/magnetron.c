@@ -1005,7 +1005,7 @@ mag_Tensor* mag_tensor_init_internal(mag_Context* ctx, mag_DType type, int64_t r
             view_offs += view->view_offs;
             view = view->view_uplink;
         }
-        mag_assert( /* Make sure the slice stays inside the parent’s storage buffer */
+        mag_assert( /* Make sure the slice stays inside the parent's storage buffer */
             !numbytes || numbytes + view_offs <= mag_tensor_get_data_size(view),
             "Slice exceeds backing storage (%" PRIi64 " > %" PRIi64 ")",
             numbytes + view_offs, mag_tensor_get_data_size(view)
@@ -3058,10 +3058,10 @@ void mag_storage_stream_close(mag_StorageStream* st) {
 }
 
 bool mag_storage_stream_serialize(mag_StorageStream* st, const char* path) {
-    FILE* f = mag_fopen(path, "wb"); /* TODO: is not closed by santinize */
+    FILE* f = mag_fopen(path, "wb");
     mag_Tensor** ord = NULL;
-    mag_sto_sanitize(f, "failed to open file for writing", return false);
-    mag_sto_sanitize(mag_hashmap_count(st->tensors) <= UINT32_MAX, "invalud num tensors", goto cleanup); /* We should never have more than 4B tensors (haha) */
+    mag_sto_sanitize(f, "failed to open file for writing", goto cleanup);
+    mag_sto_sanitize(mag_hashmap_count(st->tensors) <= UINT32_MAX, "invalid num tensors", goto cleanup); /* We should never have more than 4B tensors (haha) */
     mag_sto_sanitize(mag_sto_write_file_hdr(f, (uint32_t)mag_hashmap_count(st->tensors), 0), "failed to write file header", goto cleanup);
     mag_sto_sanitize(mag_sto_write_u32_le(f, MAG_STO_TENSOR_KV_SECTION), "failed to write kv section marker", goto cleanup);
     /* TODO: kv */
@@ -3092,7 +3092,7 @@ bool mag_storage_stream_serialize(mag_StorageStream* st, const char* path) {
     return true;
     cleanup:
         if (ord) (*mag_alloc)(ord, 0);
-        fclose(f);
+        if (f) fclose(f);
         return false;
 }
 
